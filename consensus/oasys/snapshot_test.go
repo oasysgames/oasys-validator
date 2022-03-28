@@ -395,7 +395,7 @@ func TestOasys(t *testing.T) {
 			Period: 1,
 			Epoch:  tt.epoch,
 		}
-		engine := New(config.Oasys, db)
+		engine := New(&config, config.Oasys, db, nil)
 		engine.fakeDiff = true
 
 		blocks, _ := core.GenerateChain(&config, genesis.ToBlock(db), engine, db, len(tt.votes), func(j int, gen *core.BlockGen) {

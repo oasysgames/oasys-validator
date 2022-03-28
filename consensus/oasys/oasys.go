@@ -19,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -124,6 +125,7 @@ var (
 
 // SignerFn hashes and signs the data to be signed by a backing account.
 type SignerFn func(signer accounts.Account, mimeType string, message []byte) ([]byte, error)
+type TxSignerFn func(accounts.Account, *types.Transaction, *big.Int) (*types.Transaction, error)
 
 // ecrecover extracts the Ethereum account address from a signed header.
 func ecrecover(header *types.Header, sigcache *lru.ARCCache) (common.Address, error) {
@@ -152,8 +154,9 @@ func ecrecover(header *types.Header, sigcache *lru.ARCCache) (common.Address, er
 
 // Oasys is the proof-of-stake consensus engine
 type Oasys struct {
-	config *params.OasysConfig // Consensus engine configuration parameters
-	db     ethdb.Database      // Database to store and retrieve snapshot checkpoints
+	chainConfig *params.ChainConfig // Chain config
+	config      *params.OasysConfig // Consensus engine configuration parameters
+	db          ethdb.Database      // Database to store and retrieve snapshot checkpoints
 
 	recents    *lru.ARCCache // Snapshots for recent block to speed up reorgs
 	signatures *lru.ARCCache // Signatures of recent blocks to speed up mining
@@ -164,13 +167,17 @@ type Oasys struct {
 	signFn SignerFn       // Signer function to authorize hashes with
 	lock   sync.RWMutex   // Protects the signer fields
 
+	ethAPI   *ethapi.PublicBlockChainAPI
+	txSigner types.Signer
+	txSignFn TxSignerFn
+
 	// The fields below are for testing only
 	fakeDiff bool // Skip difficulty verifications
 }
 
 // New creates a Oasys proof-of-stake consensus engine with the initial
 // signers set to the ones provided by the user.
-func New(config *params.OasysConfig, db ethdb.Database) *Oasys {
+func New(chainConfig *params.ChainConfig, config *params.OasysConfig, db ethdb.Database, ethAPI *ethapi.PublicBlockChainAPI) *Oasys {
 	// Set any missing consensus parameters to their defaults
 	conf := *config
 	if conf.Epoch == 0 {
@@ -186,6 +193,8 @@ func New(config *params.OasysConfig, db ethdb.Database) *Oasys {
 		recents:    recents,
 		signatures: signatures,
 		proposals:  make(map[common.Address]bool),
+		ethAPI:     ethAPI,
+		txSigner:   types.MakeSigner(chainConfig, common.Big0),
 	}
 }
 
@@ -561,12 +570,13 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 
 // Authorize injects a private key into the consensus engine to mint new blocks
 // with.
-func (c *Oasys) Authorize(signer common.Address, signFn SignerFn) {
+func (c *Oasys) Authorize(signer common.Address, signFn SignerFn, txSignFn TxSignerFn) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.signer = signer
 	c.signFn = signFn
+	c.txSignFn = txSignFn
 }
 
 // Seal implements consensus.Engine, attempting to create a sealed block using

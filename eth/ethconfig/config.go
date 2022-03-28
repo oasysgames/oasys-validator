@@ -30,10 +30,12 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/beacon"
 	"github.com/ethereum/go-ethereum/consensus/clique"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
+	"github.com/ethereum/go-ethereum/consensus/oasys"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/gasprice"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/node"
@@ -211,11 +213,14 @@ type Config struct {
 }
 
 // CreateConsensusEngine creates a consensus engine for the given chain configuration.
-func CreateConsensusEngine(stack *node.Node, chainConfig *params.ChainConfig, config *ethash.Config, notify []string, noverify bool, db ethdb.Database) consensus.Engine {
-	// If proof-of-authority is requested, set it up
+func CreateConsensusEngine(stack *node.Node, chainConfig *params.ChainConfig, config *ethash.Config, notify []string, noverify bool, db ethdb.Database, ethAPI *ethapi.PublicBlockChainAPI) consensus.Engine {
 	var engine consensus.Engine
 	if chainConfig.Clique != nil {
+		// If proof-of-authority is requested, set it up
 		engine = clique.New(chainConfig.Clique, db)
+	} else if chainConfig.Oasys != nil {
+		// If proof-of-stake is requested, set it up
+		engine = oasys.New(chainConfig, chainConfig.Oasys, db, ethAPI)
 	} else {
 		switch config.PowMode {
 		case ethash.ModeFake:
