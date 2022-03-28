@@ -29,7 +29,7 @@ func newTesterAccountPool() *testerAccountPool {
 	}
 }
 
-// checkpoint creates a Clique checkpoint signer section from the provided list
+// checkpoint creates a Oasys checkpoint signer section from the provided list
 // of authorized signers and embeds it into the provided header.
 func (ap *testerAccountPool) checkpoint(header *types.Header, signers []string) {
 	auths := make([]common.Address, len(signers))
@@ -57,7 +57,7 @@ func (ap *testerAccountPool) address(account string) common.Address {
 	return crypto.PubkeyToAddress(ap.accounts[account].PublicKey)
 }
 
-// sign calculates a Clique digital signature for the given block and embeds it
+// sign calculates a Oasys digital signature for the given block and embeds it
 // back into the header.
 func (ap *testerAccountPool) sign(header *types.Header, signer string) {
 	// Ensure we have a persistent key for the signer
@@ -70,7 +70,7 @@ func (ap *testerAccountPool) sign(header *types.Header, signer string) {
 }
 
 // testerVote represents a single block signed by a parcitular account, where
-// the account may or may not have cast a Clique vote.
+// the account may or may not have cast a Oasys vote.
 type testerVote struct {
 	signer     string
 	voted      string
@@ -79,9 +79,9 @@ type testerVote struct {
 	newbatch   bool
 }
 
-// Tests that Clique signer voting is evaluated correctly for various simple and
+// Tests that Oasys signer voting is evaluated correctly for various simple and
 // complex scenarios, as well as that a few special corner cases fail correctly.
-func TestClique(t *testing.T) {
+func TestOasys(t *testing.T) {
 	// Define the various voting scenarios to test
 	tests := []struct {
 		epoch   uint64
@@ -433,7 +433,7 @@ func TestClique(t *testing.T) {
 			}
 			batches[len(batches)-1] = append(batches[len(batches)-1], block)
 		}
-		// Pass all the headers through clique and ensure tallying succeeds
+		// Pass all the headers through oasys and ensure tallying succeeds
 		chain, err := core.NewBlockChain(db, nil, &config, engine, vm.Config{}, nil, nil)
 		if err != nil {
 			t.Errorf("test %d: failed to create test chain: %v", i, err)
