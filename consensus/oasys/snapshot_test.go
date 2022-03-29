@@ -36,7 +36,7 @@ func (ap *testerAccountPool) checkpoint(header *types.Header, signers []string) 
 	for i, signer := range signers {
 		auths[i] = ap.address(signer)
 	}
-	sort.Sort(signersAscending(auths))
+	sort.Sort(validatorsAscending(auths))
 	for i, auth := range auths {
 		copy(header.Extra[extraVanity+i*common.AddressLength:], auth.Bytes())
 	}
@@ -326,7 +326,7 @@ func TestOasys(t *testing.T) {
 			votes: []testerVote{
 				{signer: "B"},
 			},
-			failure: errUnauthorizedSigner,
+			failure: errUnauthorizedValidator,
 		}, {
 			// An authorized signer that signed recenty should not be able to sign again
 			signers: []string{"A", "B"},
@@ -476,7 +476,7 @@ func TestOasys(t *testing.T) {
 				}
 			}
 		}
-		result := snap.signers()
+		result := snap.validators()
 		if len(result) != len(signers) {
 			t.Errorf("test %d: signers mismatch: have %x, want %x", i, result, signers)
 			continue

@@ -61,7 +61,7 @@ func (api *API) GetSigners(number *rpc.BlockNumber) ([]common.Address, error) {
 	if err != nil {
 		return nil, err
 	}
-	return snap.signers(), nil
+	return snap.validators(), nil
 }
 
 // GetSignersAtHash retrieves the list of authorized signers at the specified block.
@@ -74,7 +74,7 @@ func (api *API) GetSignersAtHash(hash common.Hash) ([]common.Address, error) {
 	if err != nil {
 		return nil, err
 	}
-	return snap.signers(), nil
+	return snap.validators(), nil
 }
 
 // Proposals returns the current proposals the node tries to uphold and vote on.
@@ -129,7 +129,7 @@ func (api *API) Status() (*status, error) {
 		return nil, err
 	}
 	var (
-		signers = snap.signers()
+		signers = snap.validators()
 		end     = header.Number.Uint64()
 		start   = end - numBlocks
 	)

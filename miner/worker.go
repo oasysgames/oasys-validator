@@ -461,7 +461,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 		case <-timer.C:
 			// If sealing is running resubmit a new work cycle periodically to pull in
 			// higher priced transactions. Disable this overhead for pending blocks.
-			if w.isRunning() && (w.chainConfig.Clique == nil || w.chainConfig.Clique.Period > 0) {
+			if w.isRunning() && ((w.chainConfig.Clique == nil || w.chainConfig.Clique.Period > 0) || w.chainConfig.Oasys == nil || w.chainConfig.Oasys.Period > 0) {
 				// Short circuit if no new transaction arrives.
 				if atomic.LoadInt32(&w.newTxs) == 0 {
 					timer.Reset(recommit)
@@ -529,7 +529,7 @@ func (w *worker) mainLoop() {
 			w.commitWork(req.interrupt, req.noempty, req.timestamp)
 
 		case req := <-w.getWorkCh:
-			block, err := w.generateWork(req.params)
+			block, _, err := w.generateWork(req.params)
 			if err != nil {
 				req.err = err
 				req.result <- nil
@@ -603,7 +603,7 @@ func (w *worker) mainLoop() {
 				// Special case, if the consensus engine is 0 period clique(dev mode),
 				// submit sealing work here since all empty submission will be rejected
 				// by clique. Of course the advance sealing(empty submission) is disabled.
-				if w.chainConfig.Clique != nil && w.chainConfig.Clique.Period == 0 {
+				if (w.chainConfig.Clique != nil && w.chainConfig.Clique.Period == 0) || (w.chainConfig.Oasys != nil && w.chainConfig.Oasys.Period == 0) {
 					w.commitWork(nil, true, time.Now().Unix())
 				}
 			}
@@ -1076,10 +1076,10 @@ func (w *worker) fillTransactions(interrupt *int32, env *environment) {
 }
 
 // generateWork generates a sealing block based on the given parameters.
-func (w *worker) generateWork(params *generateParams) (*types.Block, error) {
+func (w *worker) generateWork(params *generateParams) (*types.Block, []*types.Receipt, error) {
 	work, err := w.prepareWork(params)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer work.discard()
 
@@ -1137,7 +1137,7 @@ func (w *worker) commit(env *environment, interval func(), update bool, start ti
 		// Create a local environment copy, avoid the data race with snapshot state.
 		// https://github.com/ethereum/go-ethereum/issues/24299
 		env := env.copy()
-		block, err := w.engine.FinalizeAndAssemble(w.chain, env.header, env.state, env.txs, env.unclelist(), env.receipts)
+		block, _, err := w.engine.FinalizeAndAssemble(w.chain, env.header, env.state, env.txs, env.unclelist(), env.receipts)
 		if err != nil {
 			return err
 		}
@@ -1215,6 +1215,9 @@ func (w *worker) postSideBlock(event core.ChainSideEvent) {
 
 // totalFees computes total consumed miner fees in ETH. Block transactions and receipts have to have the same order.
 func totalFees(block *types.Block, receipts []*types.Receipt) *big.Float {
+	if len(receipts) == 0 {
+		return new(big.Float).SetInt64(0)
+	}
 	feesWei := new(big.Int)
 	for i, tx := range block.Transactions() {
 		minerFee, _ := tx.EffectiveGasTip(block.BaseFee())

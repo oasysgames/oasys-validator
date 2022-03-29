@@ -58,7 +58,6 @@ func NewStateProcessor(config *params.ChainConfig, bc *BlockChain, engine consen
 // transactions failed to execute due to insufficient gas it will return an error.
 func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg vm.Config) (types.Receipts, []*types.Log, uint64, error) {
 	var (
-		receipts    types.Receipts
 		usedGas     = new(uint64)
 		header      = block.Header()
 		blockHash   = block.Hash()
@@ -72,8 +71,23 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	}
 	blockContext := NewEVMBlockContext(header, p.bc, nil)
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, p.config, cfg)
+
+	pos, isPoS := p.engine.(consensus.PoS)
+	generalTxs := make([]*types.Transaction, 0)
+	systemTxs := make([]*types.Transaction, 0)
+	receipts := make([]*types.Receipt, 0)
+
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
+		if isPoS {
+			if isSystemTx, err := pos.IsSystemTransaction(tx, block.Header()); err != nil {
+				return nil, nil, 0, err
+			} else if isSystemTx {
+				systemTxs = append(systemTxs, tx)
+				continue
+			}
+		}
+
 		msg, err := tx.AsMessage(types.MakeSigner(p.config, header.Number), header.BaseFee)
 		if err != nil {
 			return nil, nil, 0, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
@@ -83,11 +97,18 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		if err != nil {
 			return nil, nil, 0, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 		}
+		generalTxs = append(generalTxs, tx)
 		receipts = append(receipts, receipt)
-		allLogs = append(allLogs, receipt.Logs...)
 	}
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
-	p.engine.Finalize(p.bc, header, statedb, block.Transactions(), block.Uncles())
+	err := p.engine.Finalize(p.bc, header, statedb, &generalTxs, block.Uncles(), &receipts, &systemTxs, usedGas)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+
+	for _, receipt := range receipts {
+		allLogs = append(allLogs, receipt.Logs...)
+	}
 
 	return receipts, allLogs, *usedGas, nil
 }

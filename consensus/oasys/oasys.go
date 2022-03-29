@@ -111,12 +111,12 @@ var (
 	// the previous block's timestamp + the minimum block period.
 	errInvalidTimestamp = errors.New("invalid timestamp")
 
-	// errInvalidVotingChain is returned if an authorization list is attempted to
+	// errInvalidChain is returned if an authorization list is attempted to
 	// be modified via out-of-range or non-contiguous headers.
-	errInvalidVotingChain = errors.New("invalid voting chain")
+	errInvalidChain = errors.New("out-of-range or non-contiguous headers")
 
-	// errUnauthorizedSigner is returned if a header is signed by a non-authorized entity.
-	errUnauthorizedSigner = errors.New("unauthorized signer")
+	// errUnauthorizedValidator is returned if a header is signed by a non-authorized entity.
+	errUnauthorizedValidator = errors.New("unauthorized validator")
 
 	// errRecentlySigned is returned if a header is signed by an authorized entity
 	// that already signed a header recently, thus is temporarily not allowed to.
@@ -188,20 +188,21 @@ func New(chainConfig *params.ChainConfig, config *params.OasysConfig, db ethdb.D
 	signatures, _ := lru.NewARC(inmemorySignatures)
 
 	return &Oasys{
-		config:     &conf,
-		db:         db,
-		recents:    recents,
-		signatures: signatures,
-		proposals:  make(map[common.Address]bool),
-		ethAPI:     ethAPI,
-		txSigner:   types.MakeSigner(chainConfig, common.Big0),
+		chainConfig: chainConfig,
+		config:      &conf,
+		db:          db,
+		recents:     recents,
+		signatures:  signatures,
+		proposals:   make(map[common.Address]bool),
+		ethAPI:      ethAPI,
+		txSigner:    types.MakeSigner(chainConfig, common.Big0),
 	}
 }
 
 // Author implements consensus.Engine, returning the Ethereum address recovered
 // from the signature in the header's extra-data section.
 func (c *Oasys) Author(header *types.Header) (common.Address, error) {
-	return ecrecover(header, c.signatures)
+	return header.Coinbase, nil
 }
 
 // VerifyHeader checks whether a header conforms to the consensus rules.
@@ -343,12 +344,12 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 	}
 	// If the block is a checkpoint block, verify the signer list
 	if number%c.config.Epoch == 0 {
-		signers := make([]byte, len(snap.Signers)*common.AddressLength)
-		for i, signer := range snap.signers() {
-			copy(signers[i*common.AddressLength:], signer[:])
+		validators := make([]byte, len(snap.Validators)*common.AddressLength)
+		for i, signer := range snap.validators() {
+			copy(validators[i*common.AddressLength:], signer[:])
 		}
 		extraSuffix := len(header.Extra) - extraSeal
-		if !bytes.Equal(header.Extra[extraVanity:extraSuffix], signers) {
+		if !bytes.Equal(header.Extra[extraVanity:extraSuffix], validators) {
 			return errMismatchingCheckpointSigners
 		}
 	}
@@ -421,7 +422,7 @@ func (c *Oasys) snapshot(chain consensus.ChainHeaderReader, number uint64, hash 
 	for i := 0; i < len(headers)/2; i++ {
 		headers[i], headers[len(headers)-1-i] = headers[len(headers)-1-i], headers[i]
 	}
-	snap, err := snap.apply(headers)
+	snap, err := snap.apply(headers, chain, parents, c.chainConfig.ChainID)
 	if err != nil {
 		return nil, err
 	}
@@ -457,24 +458,24 @@ func (c *Oasys) verifySeal(snap *Snapshot, header *types.Header, parents []*type
 		return errUnknownBlock
 	}
 	// Resolve the authorization key and check against signers
-	signer, err := ecrecover(header, c.signatures)
+	validator, err := ecrecover(header, c.signatures)
 	if err != nil {
 		return err
 	}
-	if _, ok := snap.Signers[signer]; !ok {
-		return errUnauthorizedSigner
+	if _, ok := snap.Validators[validator]; !ok {
+		return errUnauthorizedValidator
 	}
 	for seen, recent := range snap.Recents {
-		if recent == signer {
+		if recent == validator {
 			// Signer is among recents, only fail if the current block doesn't shift it out
-			if limit := uint64(len(snap.Signers)/2 + 1); seen > number-limit {
+			if limit := uint64(len(snap.Validators)/2 + 1); seen > number-limit {
 				return errRecentlySigned
 			}
 		}
 	}
-	// Ensure that the difficulty corresponds to the turn-ness of the signer
+	// Ensure that the difficulty corresponds to the turn-ness of the validator
 	if !c.fakeDiff {
-		inturn := snap.inturn(header.Number.Uint64(), signer)
+		inturn := snap.inturn(header.Number.Uint64(), validator)
 		if inturn && header.Difficulty.Cmp(diffInTurn) != 0 {
 			return errWrongDifficulty
 		}
@@ -488,8 +489,7 @@ func (c *Oasys) verifySeal(snap *Snapshot, header *types.Header, parents []*type
 // Prepare implements consensus.Engine, preparing all the consensus fields of the
 // header for running the transactions on top.
 func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header) error {
-	// If the block isn't a checkpoint, cast a random vote (good enough for now)
-	header.Coinbase = common.Address{}
+	header.Coinbase = c.signer
 	header.Nonce = types.BlockNonce{}
 
 	number := header.Number.Uint64()
@@ -497,27 +497,6 @@ func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 	snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
 	if err != nil {
 		return err
-	}
-	if number%c.config.Epoch != 0 {
-		c.lock.RLock()
-
-		// Gather all the proposals that make sense voting on
-		addresses := make([]common.Address, 0, len(c.proposals))
-		for address, authorize := range c.proposals {
-			if snap.validVote(address, authorize) {
-				addresses = append(addresses, address)
-			}
-		}
-		// If there's pending proposals, cast a vote on them
-		if len(addresses) > 0 {
-			header.Coinbase = addresses[rand.Intn(len(addresses))]
-			if c.proposals[header.Coinbase] {
-				copy(header.Nonce[:], nonceAuthVote)
-			} else {
-				copy(header.Nonce[:], nonceDropVote)
-			}
-		}
-		c.lock.RUnlock()
 	}
 	// Set the correct difficulty
 	header.Difficulty = calcDifficulty(snap, c.signer)
@@ -529,8 +508,8 @@ func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 	header.Extra = header.Extra[:extraVanity]
 
 	if number%c.config.Epoch == 0 {
-		for _, signer := range snap.signers() {
-			header.Extra = append(header.Extra, signer[:]...)
+		for _, validator := range snap.validators() {
+			header.Extra = append(header.Extra, validator[:]...)
 		}
 	}
 	header.Extra = append(header.Extra, make([]byte, extraSeal)...)
@@ -552,20 +531,57 @@ func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 
 // Finalize implements consensus.Engine, ensuring no uncles are set, nor block
 // rewards given.
-func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header) {
-	// No block rewards in PoS, so the state remains as is and uncles are dropped
+func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs *[]*types.Transaction,
+	uncles []*types.Header, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64) error {
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 	header.UncleHash = types.CalcUncleHash(nil)
+
+	if header.Number.Cmp(common.Big1) == 0 {
+		cx := chainContext{Chain: chain, oasys: c}
+		err := c.initializeSystemContracts(state, header, cx, txs, receipts, systemTxs, usedGas, false)
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(*systemTxs) > 0 {
+		return errors.New("must not contain system transactions")
+	}
+
+	return nil
 }
 
 // FinalizeAndAssemble implements consensus.Engine, ensuring no uncles are set,
 // nor block rewards given, and returns the final block.
-func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
-	// Finalize block
-	c.Finalize(chain, header, state, txs, uncles)
+func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, []*types.Receipt, error) {
+	if txs == nil {
+		txs = make([]*types.Transaction, 0)
+	}
+	if receipts == nil {
+		receipts = make([]*types.Receipt, 0)
+	}
 
-	// Assemble and return the final block for sealing
-	return types.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil)), nil
+	if header.Number.Cmp(common.Big1) == 0 {
+		cx := chainContext{Chain: chain, oasys: c}
+		err := c.initializeSystemContracts(state, header, cx, &txs, &receipts, nil, &header.GasUsed, true)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
+	header.UncleHash = types.CalcUncleHash(nil)
+
+	// Assemble the final block for sealing
+	block := types.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil))
+
+	if header.GasLimit < header.GasUsed {
+		return nil, nil, errors.New("gas consumption of system txs exceed the gas limit")
+	}
+
+	header.UncleHash = types.CalcUncleHash(nil)
+
+	return block, receipts, nil
 }
 
 // Authorize injects a private key into the consensus engine to mint new blocks
@@ -595,7 +611,7 @@ func (c *Oasys) Seal(chain consensus.ChainHeaderReader, block *types.Block, resu
 	}
 	// Don't hold the signer fields for the entire sealing procedure
 	c.lock.RLock()
-	signer, signFn := c.signer, c.signFn
+	validator, signFn := c.signer, c.signFn
 	c.lock.RUnlock()
 
 	// Bail out if we're unauthorized to sign a block
@@ -603,14 +619,14 @@ func (c *Oasys) Seal(chain consensus.ChainHeaderReader, block *types.Block, resu
 	if err != nil {
 		return err
 	}
-	if _, authorized := snap.Signers[signer]; !authorized {
-		return errUnauthorizedSigner
+	if _, authorized := snap.Validators[validator]; !authorized {
+		return errUnauthorizedValidator
 	}
 	// If we're amongst the recent signers, wait for the next block
 	for seen, recent := range snap.Recents {
-		if recent == signer {
+		if recent == validator {
 			// Signer is among recents, only wait if the current block doesn't shift it out
-			if limit := uint64(len(snap.Signers)/2 + 1); number < limit || seen > number-limit {
+			if limit := uint64(len(snap.Validators)/2 + 1); number < limit || seen > number-limit {
 				return errors.New("signed recently, must wait for others")
 			}
 		}
@@ -619,13 +635,13 @@ func (c *Oasys) Seal(chain consensus.ChainHeaderReader, block *types.Block, resu
 	delay := time.Unix(int64(header.Time), 0).Sub(time.Now()) // nolint: gosimple
 	if header.Difficulty.Cmp(diffNoTurn) == 0 {
 		// It's not our turn explicitly to sign, delay it a bit
-		wiggle := time.Duration(len(snap.Signers)/2+1) * wiggleTime
+		wiggle := time.Duration(len(snap.Validators)/2+1) * wiggleTime
 		delay += time.Duration(rand.Int63n(int64(wiggle)))
 
 		log.Trace("Out-of-turn signing requested", "wiggle", common.PrettyDuration(wiggle))
 	}
 	// Sign all the things!
-	sighash, err := signFn(accounts.Account{Address: signer}, accounts.MimetypeOasys, OasysRLP(header))
+	sighash, err := signFn(accounts.Account{Address: validator}, accounts.MimetypeOasys, OasysRLP(header))
 	if err != nil {
 		return err
 	}

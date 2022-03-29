@@ -1524,7 +1524,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals, setHead bool)
 		// snapshot layer is missing, forcibly rerun the execution to build it.
 		if bc.skipBlock(err, it) {
 			logger := log.Debug
-			if bc.chainConfig.Clique == nil {
+			if bc.chainConfig.Clique == nil || bc.chainConfig.Oasys == nil {
 				logger = log.Warn
 			}
 			logger("Inserted known block", "number", block.Number(), "hash", block.Hash(),
