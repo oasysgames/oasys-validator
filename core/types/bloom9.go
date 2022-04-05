@@ -37,6 +37,10 @@ const (
 	BloomBitLength = 8 * BloomByteLength
 )
 
+var (
+	EmptyBloom = Bloom{}
+)
+
 // Bloom represents a 2048 bit bloom filter.
 type Bloom [BloomByteLength]byte
 

@@ -132,6 +132,5 @@ type PoW interface {
 type PoS interface {
 	Engine
 
-	IsSystemContract(to *common.Address) bool
 	IsSystemTransaction(tx *types.Transaction, header *types.Header) (bool, error)
 }

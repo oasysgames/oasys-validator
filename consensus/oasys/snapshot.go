@@ -3,13 +3,17 @@ package oasys
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"math/big"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
+	"github.com/ethereum/go-ethereum/core/contracts"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/internal/ethapi"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	lru "github.com/hashicorp/golang-lru"
 )
@@ -18,11 +22,13 @@ import (
 type Snapshot struct {
 	config   *params.OasysConfig // Consensus engine parameters to fine tune behavior
 	sigcache *lru.ARCCache       // Cache of recent block signatures to speed up ecrecover
+	ethAPI   *ethapi.PublicBlockChainAPI
 
 	Number     uint64                      `json:"number"`     // Block number where the snapshot was created
 	Hash       common.Hash                 `json:"hash"`       // Block hash where the snapshot was created
-	Validators map[common.Address]struct{} `json:"validators"` // Set of authorized validators at this moment
-	Recents    map[uint64]common.Address   `json:"recents"`    // Set of recent validators for spam protections
+	Validators map[common.Address]*big.Int `json:"validators"` // Set of authorized validators and stakes at this moment
+
+	Environment *contracts.EnvironmentValue `json:"environment"`
 }
 
 // validatorsAscending implements the sort interface to allow sorting a list of addresses
@@ -35,23 +41,26 @@ func (s validatorsAscending) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 // newSnapshot creates a new snapshot with the specified startup parameters. This
 // method does not initialize the set of recent validators, so only ever use if for
 // the genesis block.
-func newSnapshot(config *params.OasysConfig, sigcache *lru.ARCCache, number uint64, hash common.Hash, validators []common.Address) *Snapshot {
+func newSnapshot(config *params.OasysConfig, sigcache *lru.ARCCache, ethAPI *ethapi.PublicBlockChainAPI,
+	number uint64, hash common.Hash, validators []common.Address, environment *contracts.EnvironmentValue) *Snapshot {
 	snap := &Snapshot{
-		config:     config,
-		sigcache:   sigcache,
-		Number:     number,
-		Hash:       hash,
-		Validators: make(map[common.Address]struct{}),
-		Recents:    make(map[uint64]common.Address),
+		config:      config,
+		sigcache:    sigcache,
+		ethAPI:      ethAPI,
+		Number:      number,
+		Hash:        hash,
+		Validators:  make(map[common.Address]*big.Int),
+		Environment: environment.Copy(),
 	}
-	for _, validator := range validators {
-		snap.Validators[validator] = struct{}{}
+	for _, address := range validators {
+		snap.Validators[address] = new(big.Int).Set(common.Big0)
 	}
 	return snap
 }
 
 // loadSnapshot loads an existing snapshot from the database.
-func loadSnapshot(config *params.OasysConfig, sigcache *lru.ARCCache, db ethdb.Database, hash common.Hash) (*Snapshot, error) {
+func loadSnapshot(config *params.OasysConfig, sigcache *lru.ARCCache, ethAPI *ethapi.PublicBlockChainAPI,
+	db ethdb.Database, hash common.Hash) (*Snapshot, error) {
 	blob, err := db.Get(append([]byte("oasys-"), hash[:]...))
 	if err != nil {
 		return nil, err
@@ -62,6 +71,7 @@ func loadSnapshot(config *params.OasysConfig, sigcache *lru.ARCCache, db ethdb.D
 	}
 	snap.config = config
 	snap.sigcache = sigcache
+	snap.ethAPI = ethAPI
 
 	return snap, nil
 }
@@ -78,26 +88,23 @@ func (s *Snapshot) store(db ethdb.Database) error {
 // copy creates a deep copy of the snapshot, though not the individual votes.
 func (s *Snapshot) copy() *Snapshot {
 	cpy := &Snapshot{
-		config:     s.config,
-		sigcache:   s.sigcache,
-		Number:     s.Number,
-		Hash:       s.Hash,
-		Validators: make(map[common.Address]struct{}),
-		Recents:    make(map[uint64]common.Address),
+		config:      s.config,
+		sigcache:    s.sigcache,
+		ethAPI:      s.ethAPI,
+		Number:      s.Number,
+		Hash:        s.Hash,
+		Validators:  make(map[common.Address]*big.Int),
+		Environment: s.Environment.Copy(),
 	}
-	for validator := range s.Validators {
-		cpy.Validators[validator] = struct{}{}
+	for address, stake := range s.Validators {
+		cpy.Validators[address] = new(big.Int).Set(stake)
 	}
-	for block, validator := range s.Recents {
-		cpy.Recents[block] = validator
-	}
-
 	return cpy
 }
 
 // apply creates a new authorization snapshot by applying the given headers to
 // the original one.
-func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderReader, parents []*types.Header, chainId *big.Int) (*Snapshot, error) {
+func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderReader) (*Snapshot, error) {
 	// Allow passing in no headers for cleaner code
 	if len(headers) == 0 {
 		return s, nil
@@ -116,24 +123,39 @@ func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderRea
 
 	for _, header := range headers {
 		number := header.Number.Uint64()
-		// Delete the oldest validator from the recent list to allow it signing again
-		if limit := uint64(len(snap.Validators)/2 + 1); number >= limit {
-			delete(snap.Recents, number-limit)
-		}
-		// Resolve the authorization key and check against validators
+
 		validator, err := ecrecover(header, s.sigcache)
 		if err != nil {
 			return nil, err
 		}
-		if _, ok := snap.Validators[validator]; !ok {
+
+		var exists bool
+		if number > 0 && number%snap.Environment.EpochPeriod.Uint64() == 0 {
+			nextValidator, err := getNextValidators(s.ethAPI, header.ParentHash)
+			if err != nil {
+				log.Error("Failed to get validators", "in", "Snapshot.apply", "hash", header.Hash(), "number", number, "err", err)
+				return nil, err
+			}
+			nextEnv, err := getNextEnvironmentValue(s.ethAPI, header.ParentHash)
+			if err != nil {
+				log.Error("Failed to get environment value", "in", "Snapshot.apply", "hash", header.Hash(), "number", number, "err", err)
+				return nil, err
+			}
+
+			snap.Environment = nextEnv.Copy()
+			snap.Validators = map[common.Address]*big.Int{}
+			for i, address := range nextValidator.Operators {
+				snap.Validators[address] = nextValidator.Stakes[i]
+			}
+
+			exists = nextValidator.Exists(validator)
+		} else {
+			exists = snap.exists(validator)
+		}
+
+		if !exists {
 			return nil, errUnauthorizedValidator
 		}
-		for _, recent := range snap.Recents {
-			if recent == validator {
-				return nil, errRecentlySigned
-			}
-		}
-		snap.Recents[number] = validator
 	}
 	snap.Number += uint64(len(headers))
 	snap.Hash = headers[len(headers)-1].Hash()
@@ -143,19 +165,54 @@ func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderRea
 
 // validators retrieves the list of authorized validators in ascending order.
 func (s *Snapshot) validators() []common.Address {
-	sigs := make([]common.Address, 0, len(s.Validators))
-	for sig := range s.Validators {
-		sigs = append(sigs, sig)
+	validators := make([]common.Address, 0, len(s.Validators))
+	for v := range s.Validators {
+		validators = append(validators, v)
 	}
-	sort.Sort(validatorsAscending(sigs))
-	return sigs
+	sort.Sort(validatorsAscending(validators))
+	return validators
 }
 
-// inturn returns if a validator at a given block height is in-turn or not.
-func (s *Snapshot) inturn(number uint64, validator common.Address) bool {
-	validators, offset := s.validators(), 0
-	for offset < len(validators) && validators[offset] != validator {
-		offset++
+func (s *Snapshot) exists(validator common.Address) bool {
+	_, ok := s.Validators[validator]
+	return ok
+}
+
+func (s *Snapshot) getValidatorSchedule(env *contracts.EnvironmentValue, number uint64) map[uint64]common.Address {
+	validators, stakes := s.validatorsToTuple()
+	return getValidatorSchedule(validators, stakes, env.EpochPeriod.Uint64(), number)
+}
+
+func (s *Snapshot) backOffTime(env *contracts.EnvironmentValue, number uint64, validator common.Address) uint64 {
+	if !s.exists(validator) {
+		return 0
 	}
-	return (number % uint64(len(validators))) == uint64(offset)
+	validators, stakes := s.validatorsToTuple()
+	return backOffTime(validators, stakes, env.EpochPeriod.Uint64(), number, validator)
+}
+
+func (s *Snapshot) validatorsToTuple() ([]common.Address, []*big.Int) {
+	operators := make([]common.Address, len(s.Validators))
+	stakes := make([]*big.Int, len(s.Validators))
+	i := 0
+	for address, stake := range s.Validators {
+		operators[i] = address
+		stakes[i] = new(big.Int).Set(stake)
+		i++
+	}
+	return operators, stakes
+}
+
+func parseValidatorBytes(validatorBytes []byte) ([]common.Address, error) {
+	if len(validatorBytes)%common.AddressLength != 0 {
+		return nil, errors.New("invalid validator bytes")
+	}
+	n := len(validatorBytes) / common.AddressLength
+	result := make([]common.Address, n)
+	for i := 0; i < n; i++ {
+		address := make([]byte, common.AddressLength)
+		copy(address, validatorBytes[i*common.AddressLength:(i+1)*common.AddressLength])
+		result[i] = common.BytesToAddress(address)
+	}
+	return result, nil
 }

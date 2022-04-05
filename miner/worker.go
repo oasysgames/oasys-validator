@@ -19,7 +19,6 @@ package miner
 import (
 	"errors"
 	"fmt"
-	"math/big"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -827,10 +826,10 @@ func (w *worker) updateSnapshot(env *environment) {
 	w.snapshotState = env.state.Copy()
 }
 
-func (w *worker) commitTransaction(env *environment, tx *types.Transaction) ([]*types.Log, error) {
+func (w *worker) commitTransaction(env *environment, tx *types.Transaction, receiptProcessors ...core.ReceiptProcessor) ([]*types.Log, error) {
 	snap := env.state.Snapshot()
 
-	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &env.coinbase, env.gasPool, env.state, env.header, tx, &env.header.GasUsed, *w.chain.GetVMConfig())
+	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &env.coinbase, env.gasPool, env.state, env.header, tx, &env.header.GasUsed, *w.chain.GetVMConfig(), receiptProcessors...)
 	if err != nil {
 		env.state.RevertToSnapshot(snap)
 		return nil, err
@@ -847,6 +846,12 @@ func (w *worker) commitTransactions(env *environment, txs *types.TransactionsByP
 		env.gasPool = new(core.GasPool).AddGas(gasLimit)
 	}
 	var coalescedLogs []*types.Log
+
+	processorCapacity := 100
+	if txs.CurrentSize() < processorCapacity {
+		processorCapacity = txs.CurrentSize()
+	}
+	bloomProcessors := core.NewAsyncReceiptBloomGenerator(processorCapacity)
 
 	for {
 		// In the following three cases, we will interrupt the execution of the transaction.
@@ -895,7 +900,7 @@ func (w *worker) commitTransactions(env *environment, txs *types.TransactionsByP
 		// Start executing the transaction
 		env.state.Prepare(tx.Hash(), env.tcount)
 
-		logs, err := w.commitTransaction(env, tx)
+		logs, err := w.commitTransaction(env, tx, bloomProcessors)
 		switch {
 		case errors.Is(err, core.ErrGasLimitReached):
 			// Pop the current out-of-gas transaction without shifting in the next from the account
@@ -930,6 +935,7 @@ func (w *worker) commitTransactions(env *environment, txs *types.TransactionsByP
 			txs.Shift()
 		}
 	}
+	bloomProcessors.Close()
 
 	if !w.isRunning() && len(coalescedLogs) > 0 {
 		// We don't push the pendingLogsEvent while we are sealing. The reason is that
@@ -1137,7 +1143,7 @@ func (w *worker) commit(env *environment, interval func(), update bool, start ti
 		// Create a local environment copy, avoid the data race with snapshot state.
 		// https://github.com/ethereum/go-ethereum/issues/24299
 		env := env.copy()
-		block, _, err := w.engine.FinalizeAndAssemble(w.chain, env.header, env.state, env.txs, env.unclelist(), env.receipts)
+		block, _, err := w.engine.FinalizeAndAssemble(w.chain, types.CopyHeader(env.header), env.state, env.txs, env.unclelist(), env.receipts)
 		if err != nil {
 			return err
 		}
@@ -1148,7 +1154,7 @@ func (w *worker) commit(env *environment, interval func(), update bool, start ti
 				w.unconfirmed.Shift(block.NumberU64() - 1)
 				log.Info("Commit new sealing work", "number", block.Number(), "sealhash", w.engine.SealHash(block.Header()),
 					"uncles", len(env.uncles), "txs", env.tcount,
-					"gas", block.GasUsed(), "fees", totalFees(block, env.receipts),
+					"gas", block.GasUsed(),
 					"elapsed", common.PrettyDuration(time.Since(start)))
 
 			case <-w.exitCh:
@@ -1211,17 +1217,4 @@ func (w *worker) postSideBlock(event core.ChainSideEvent) {
 	case w.chainSideCh <- event:
 	case <-w.exitCh:
 	}
-}
-
-// totalFees computes total consumed miner fees in ETH. Block transactions and receipts have to have the same order.
-func totalFees(block *types.Block, receipts []*types.Receipt) *big.Float {
-	if len(receipts) == 0 {
-		return new(big.Float).SetInt64(0)
-	}
-	feesWei := new(big.Int)
-	for i, tx := range block.Transactions() {
-		minerFee, _ := tx.EffectiveGasTip(block.BaseFee())
-		feesWei.Add(feesWei, new(big.Int).Mul(new(big.Int).SetUint64(receipts[i].GasUsed), minerFee))
-	}
-	return new(big.Float).Quo(new(big.Float).SetInt(feesWei), new(big.Float).SetInt(big.NewInt(params.Ether)))
 }
