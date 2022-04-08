@@ -16,78 +16,105 @@ const (
 )
 
 var (
-	l1BuildEnvironment = contract{
-		address: common.HexToAddress("0x4500000000000000000000000000000000000001"),
-		code:    l1BuildEnvironmentCode,
+	l1BuildParamAddress   = common.HexToAddress("0x0001000000000000000000000000000000001000")
+	l1BuildDepositAddress = common.HexToAddress("0x0001000000000000000000000000000000002000")
+	l1BuildAgentAddress   = common.HexToAddress("0x0001000000000000000000000000000000003000")
+	l1BuildStep1Address   = common.HexToAddress("0x0001000000000000000000000000000000004000")
+	l1BuildStep2Address   = common.HexToAddress("0x0001000000000000000000000000000000005000")
+	l1BuildStep3Address   = common.HexToAddress("0x0001000000000000000000000000000000006000")
+	l1BuildStep4Address   = common.HexToAddress("0x0001000000000000000000000000000000007000")
+
+	l1BuildParam = &contract{
+		address: l1BuildParamAddress,
+		code:    l1BuildParamCode,
 		fixedStorage: map[string]interface{}{
-			// address private _owner
-			"0x00": common.HexToAddress("0x187caf6b1732ebf4f2f7a1190dde1b0e986490cf"),
-			// uint256 public environment.maxTransactionGasLimit
-			"0x01": big.NewInt(15000000),
-			// uint256 public environment.l2GasDiscountDivisor
-			"0x02": big.NewInt(32),
-			// uint256 public environment.enqueueGasCost
-			"0x03": big.NewInt(60000),
-			// uint256 public environment.fraudProofWindow
+			// uint256 public maxTransactionGasLimit
+			"0x00": big.NewInt(15_000_000),
+			// uint256 public l2GasDiscountDivisor
+			"0x01": big.NewInt(32),
+			// uint256 public enqueueGasCost
+			"0x02": big.NewInt(60_000),
+			// uint256 public fraudProofWindow
+			"0x03": common.Big0,
+			// uint256 public sequencerPublishWindow
 			"0x04": common.Big0,
-			// uint256 public environment.sequencerPublishWindow
-			"0x05": common.Big0,
 		},
 		dynamicStorage: map[string]string{
 			// bytes public l1StandardBridgeCode
-			"0x06": l1StandardBridgeCode,
+			"0x05": l1StandardBridgeCode,
 			// bytes public l1ERC721BridgeCode
-			"0x07": l1ERC721BridgeCode,
+			"0x06": l1ERC721BridgeCode,
 		},
 	}
-	l1BuildProgress = contract{
-		address: common.HexToAddress("0x4500000000000000000000000000000000000002"),
-		code:    l1BuildProgressCode,
+	l1BuildDeposit = &contract{
+		address: l1BuildDepositAddress,
+		code:    l1BuildDepositCode,
+		fixedStorage: map[string]interface{}{
+			// uint256 public requiredAmount
+			"0x00": common.Big0,
+			// uint256 public lockedBlock
+			"0x01": common.Big0,
+			// address public agentAddress
+			"0x02": l1BuildAgentAddress,
+		},
 	}
-	l1BuildStep1 = contract{
-		address: common.HexToAddress("0x4500000000000000000000000000000000000003"),
+	l1BuildAgent = &contract{
+		address: l1BuildAgentAddress,
+		code:    l1BuildAgentCode,
+		fixedStorage: map[string]interface{}{
+			// address public depositAddress
+			"0x00": l1BuildDepositAddress,
+			// address public step1Address
+			"0x01": l1BuildStep1Address,
+			// address public step2Address
+			"0x02": l1BuildStep2Address,
+			// address public step3Address
+			"0x03": l1BuildStep3Address,
+			// address public step4Address
+			"0x04": l1BuildStep4Address,
+		},
+	}
+	l1BuildStep1 = &contract{
+		address: l1BuildStep1Address,
 		code:    l1BuildStep1Code,
 		fixedStorage: map[string]interface{}{
-			// L1BuildProgress public progress
-			"0x00": l1BuildProgress.address,
-			// address public buildStep4
-			"0x01": l1BuildStep4.address,
+			// address public agentAddress
+			"0x00": l1BuildAgentAddress,
 		},
 	}
-	l1BuildStep2 = contract{
-		address: common.HexToAddress("0x4500000000000000000000000000000000000004"),
+	l1BuildStep2 = &contract{
+		address: l1BuildStep2Address,
 		code:    l1BuildStep2Code,
 		fixedStorage: map[string]interface{}{
-			// L1BuildEnvironment public environment
-			"0x00": l1BuildEnvironment.address,
-			// L1BuildProgress public progress
-			"0x01": l1BuildProgress.address,
+			// address public agentAddress
+			"0x00": l1BuildAgentAddress,
+			// address public paramAddress
+			"0x01": l1BuildParamAddress,
 		},
 	}
-	l1BuildStep3 = contract{
-		address: common.HexToAddress("0x4500000000000000000000000000000000000005"),
+	l1BuildStep3 = &contract{
+		address: l1BuildStep3Address,
 		code:    l1BuildStep3Code,
 		fixedStorage: map[string]interface{}{
-			// L1BuildProgress public progress
-			"0x00": l1BuildProgress.address,
-			// address public buildStep4
-			"0x01": l1BuildStep4.address,
+			// address public agentAddress
+			"0x00": l1BuildAgentAddress,
 		},
 	}
-	l1BuildStep4 = contract{
-		address: common.HexToAddress("0x4500000000000000000000000000000000000006"),
+	l1BuildStep4 = &contract{
+		address: l1BuildStep4Address,
 		code:    l1BuildStep4Code,
 		fixedStorage: map[string]interface{}{
-			// L1BuildEnvironment public environment
-			"0x00": l1BuildEnvironment.address,
-			// L1BuildProgress public progress
-			"0x01": l1BuildProgress.address,
+			// address public agentAddress
+			"0x00": l1BuildAgentAddress,
+			// address public paramAddress
+			"0x01": l1BuildParamAddress,
 		},
 	}
 
-	contracts = []contract{
-		l1BuildEnvironment,
-		l1BuildProgress,
+	contracts = []*contract{
+		l1BuildParam,
+		l1BuildDeposit,
+		l1BuildAgent,
 		l1BuildStep1,
 		l1BuildStep2,
 		l1BuildStep3,
