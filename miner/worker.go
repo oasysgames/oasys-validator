@@ -827,6 +827,10 @@ func (w *worker) updateSnapshot(env *environment) {
 }
 
 func (w *worker) commitTransaction(env *environment, tx *types.Transaction, receiptProcessors ...core.ReceiptProcessor) ([]*types.Log, error) {
+	if err := core.VerifyTx(env.header, tx); err != nil {
+		return nil, err
+	}
+
 	snap := env.state.Snapshot()
 
 	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &env.coinbase, env.gasPool, env.state, env.header, tx, &env.header.GasUsed, *w.chain.GetVMConfig(), receiptProcessors...)
@@ -926,6 +930,11 @@ func (w *worker) commitTransactions(env *environment, txs *types.TransactionsByP
 		case errors.Is(err, core.ErrTxTypeNotSupported):
 			// Pop the unsupported transaction without shifting in the next from the account
 			log.Trace("Skipping unsupported transaction type", "sender", from, "type", tx.Type())
+			txs.Pop()
+
+		case errors.Is(err, core.ErrUnauthorizedDeployment):
+			// Pop the deployment transaction
+			log.Trace("Skipping deployment transaction", "sender", from)
 			txs.Pop()
 
 		default:

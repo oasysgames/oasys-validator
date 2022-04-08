@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/versebuilder"
@@ -570,6 +571,10 @@ func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 // rewards given.
 func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs *[]*types.Transaction,
 	uncles []*types.Header, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64) error {
+	if err := verifyTx(header, *txs); err != nil {
+		return err
+	}
+
 	number := header.Number.Uint64()
 
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
@@ -671,14 +676,18 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 // FinalizeAndAssemble implements consensus.Engine, ensuring no uncles are set,
 // nor block rewards given, and returns the final block.
 func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, []*types.Receipt, error) {
-	number := header.Number.Uint64()
-
 	if txs == nil {
 		txs = make([]*types.Transaction, 0)
 	}
 	if receipts == nil {
 		receipts = make([]*types.Receipt, 0)
 	}
+
+	if err := verifyTx(header, txs); err != nil {
+		return nil, nil, err
+	}
+
+	number := header.Number.Uint64()
 
 	cx := chainContext{Chain: chain, oasys: c}
 	if number == 1 {
@@ -990,6 +999,15 @@ func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Hea
 	}
 
 	return snap.Environment, nil
+}
+
+func verifyTx(header *types.Header, txs []*types.Transaction) error {
+	for _, tx := range txs {
+		if err := core.VerifyTx(header, tx); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type validatorAndValue struct {

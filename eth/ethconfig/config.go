@@ -220,7 +220,7 @@ func CreateConsensusEngine(stack *node.Node, chainConfig *params.ChainConfig, co
 		engine = clique.New(chainConfig.Clique, db)
 	} else if chainConfig.Oasys != nil {
 		// If proof-of-stake is requested, set it up
-		engine = oasys.New(chainConfig, chainConfig.Oasys, db, ethAPI)
+		return oasys.New(chainConfig, chainConfig.Oasys, db, ethAPI)
 	} else {
 		switch config.PowMode {
 		case ethash.ModeFake:

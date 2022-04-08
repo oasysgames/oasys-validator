@@ -81,10 +81,12 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	generalTxs := make([]*types.Transaction, 0)
 	systemTxs := make([]*types.Transaction, 0)
 	receipts := make([]*types.Receipt, 0)
-	bloomProcessors := NewAsyncReceiptBloomGenerator(len(block.Transactions()))
+
+	txs := block.Transactions()
+	bloomProcessors := NewAsyncReceiptBloomGenerator(len(txs))
 
 	// Iterate over and process the individual transactions
-	for i, tx := range block.Transactions() {
+	for i, tx := range txs {
 		if isPoS {
 			isSystemTx, err := pos.IsSystemTransaction(tx, block.Header())
 			if err != nil {
