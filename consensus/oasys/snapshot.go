@@ -9,7 +9,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/core/contracts"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
@@ -28,7 +27,7 @@ type Snapshot struct {
 	Hash       common.Hash                 `json:"hash"`       // Block hash where the snapshot was created
 	Validators map[common.Address]*big.Int `json:"validators"` // Set of authorized validators and stakes at this moment
 
-	Environment *contracts.EnvironmentValue `json:"environment"`
+	Environment *environmentValue `json:"environment"`
 }
 
 // validatorsAscending implements the sort interface to allow sorting a list of addresses
@@ -42,7 +41,7 @@ func (s validatorsAscending) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 // method does not initialize the set of recent validators, so only ever use if for
 // the genesis block.
 func newSnapshot(config *params.OasysConfig, sigcache *lru.ARCCache, ethAPI *ethapi.PublicBlockChainAPI,
-	number uint64, hash common.Hash, validators []common.Address, environment *contracts.EnvironmentValue) *Snapshot {
+	number uint64, hash common.Hash, validators []common.Address, environment *environmentValue) *Snapshot {
 	snap := &Snapshot{
 		config:      config,
 		sigcache:    sigcache,
@@ -133,12 +132,12 @@ func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderRea
 		if number > 0 && number%snap.Environment.EpochPeriod.Uint64() == 0 {
 			nextValidator, err := getNextValidators(s.ethAPI, header.ParentHash)
 			if err != nil {
-				log.Error("Failed to get validators", "in", "Snapshot.apply", "hash", header.Hash(), "number", number, "err", err)
+				log.Error("Failed to get validators", "in", "Snapshot.apply", "hash", header.ParentHash, "number", number, "err", err)
 				return nil, err
 			}
 			nextEnv, err := getNextEnvironmentValue(s.ethAPI, header.ParentHash)
 			if err != nil {
-				log.Error("Failed to get environment value", "in", "Snapshot.apply", "hash", header.Hash(), "number", number, "err", err)
+				log.Error("Failed to get environment value", "in", "Snapshot.apply", "hash", header.ParentHash, "number", number, "err", err)
 				return nil, err
 			}
 
@@ -178,12 +177,12 @@ func (s *Snapshot) exists(validator common.Address) bool {
 	return ok
 }
 
-func (s *Snapshot) getValidatorSchedule(env *contracts.EnvironmentValue, number uint64) map[uint64]common.Address {
+func (s *Snapshot) getValidatorSchedule(env *environmentValue, number uint64) map[uint64]common.Address {
 	validators, stakes := s.validatorsToTuple()
 	return getValidatorSchedule(validators, stakes, env.EpochPeriod.Uint64(), number)
 }
 
-func (s *Snapshot) backOffTime(env *contracts.EnvironmentValue, number uint64, validator common.Address) uint64 {
+func (s *Snapshot) backOffTime(env *environmentValue, number uint64, validator common.Address) uint64 {
 	if !s.exists(validator) {
 		return 0
 	}

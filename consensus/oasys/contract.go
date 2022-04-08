@@ -8,14 +8,15 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/contracts"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -26,11 +27,36 @@ import (
 )
 
 var (
-	systemContracts = map[common.Address]bool{
-		contracts.Environment.Address:  true,
-		contracts.StakeManager.Address: true,
+	// Oasys system contracts
+	environment = &systemContract{
+		address: common.HexToAddress("0x0000000000000000000000000000000000001000"),
+		abis:    environmentAbi,
 	}
+	stakeManager = &systemContract{
+		address: common.HexToAddress("0x0000000000000000000000000000000000001001"),
+		abis:    stakeManagerAbi,
+	}
+	systemContracts = map[common.Address]bool{environment.address: true, stakeManager.address: true}
 )
+
+func init() {
+	// Parse the system contract ABI
+	contracts := []*systemContract{environment, stakeManager}
+	for _, contract := range contracts {
+		ABI, err := abi.JSON(strings.NewReader(contract.abis))
+		if err != nil {
+			panic(err)
+		}
+		contract.abi = &ABI
+	}
+}
+
+// systemContract
+type systemContract struct {
+	address common.Address
+	abi     *abi.ABI
+	abis    string
+}
 
 // chainContext
 type chainContext struct {
@@ -46,15 +72,92 @@ func (c chainContext) GetHeader(hash common.Hash, number uint64) *types.Header {
 	return c.Chain.GetHeader(hash, number)
 }
 
-func getInitialEnvironment(config *params.OasysConfig) *contracts.EnvironmentValue {
-	validatorThreshold, _ := new(big.Int).SetString("10000000000000000000000000", 10)
-	return &contracts.EnvironmentValue{
+// environmentValue
+type environmentValue struct {
+	// Block and epoch to which this setting applies
+	StartBlock *big.Int
+	StartEpoch *big.Int
+	// Block generation interval(by seconds)
+	BlockPeriod *big.Int
+	// Number of blocks in epoch
+	EpochPeriod *big.Int
+	// Annual rate of staking reward
+	RewardRate *big.Int
+	// Amount of tokens required to become a validator
+	ValidatorThreshold *big.Int
+	// Number of not sealed to jailing the validator
+	JailThreshold *big.Int
+	// Number of epochs to jailing the validator
+	JailPeriod *big.Int
+}
+
+func (p *environmentValue) IsEpoch(number uint64) bool {
+	return number%p.EpochPeriod.Uint64() == 0
+}
+
+func (p *environmentValue) Epoch(number uint64) uint64 {
+	return p.StartEpoch.Uint64() + (number-p.StartBlock.Uint64())/p.EpochPeriod.Uint64()
+}
+
+func (p *environmentValue) Copy() *environmentValue {
+	return &environmentValue{
+		StartBlock:         new(big.Int).Set(p.StartBlock),
+		StartEpoch:         new(big.Int).Set(p.StartEpoch),
+		BlockPeriod:        new(big.Int).Set(p.BlockPeriod),
+		EpochPeriod:        new(big.Int).Set(p.EpochPeriod),
+		RewardRate:         new(big.Int).Set(p.RewardRate),
+		ValidatorThreshold: new(big.Int).Set(p.ValidatorThreshold),
+		JailThreshold:      new(big.Int).Set(p.JailThreshold),
+		JailPeriod:         new(big.Int).Set(p.JailPeriod),
+	}
+}
+
+// getAllAmountsResult
+type getAllAmountsResult struct {
+	Stakes      *big.Int
+	Unstakes    *big.Int
+	Rewards     *big.Int
+	Commissions *big.Int
+}
+
+// getNextValidatorsResult
+type getNextValidatorsResult struct {
+	Owners    []common.Address
+	Operators []common.Address
+	Stakes    []*big.Int
+}
+
+func (p *getNextValidatorsResult) Copy() *getNextValidatorsResult {
+	cpy := getNextValidatorsResult{
+		Owners:    make([]common.Address, len(p.Owners)),
+		Operators: make([]common.Address, len(p.Operators)),
+		Stakes:    make([]*big.Int, len(p.Stakes)),
+	}
+	copy(cpy.Owners, p.Owners)
+	copy(cpy.Operators, p.Operators)
+	for i, v := range p.Stakes {
+		cpy.Stakes[i] = new(big.Int).Set(v)
+	}
+	return &cpy
+}
+
+func (p *getNextValidatorsResult) Exists(validator common.Address) bool {
+	for _, operator := range p.Operators {
+		if validator == operator {
+			return true
+		}
+	}
+	return false
+}
+
+func getInitialEnvironment(config *params.OasysConfig) *environmentValue {
+	return &environmentValue{
 		StartBlock:         common.Big0,
 		StartEpoch:         common.Big0,
-		BlockPeriod:        new(big.Int).SetUint64(config.Period),
-		EpochPeriod:        new(big.Int).SetUint64(config.Epoch),
+		BlockPeriod:        big.NewInt(int64(config.Period)),
+		EpochPeriod:        big.NewInt(int64(config.Epoch)),
 		RewardRate:         big.NewInt(10),
-		ValidatorThreshold: validatorThreshold,
+		ValidatorThreshold: new(big.Int).Mul(big.NewInt(10000000), big.NewInt(1e18)),
 		JailThreshold:      big.NewInt(500),
 		JailPeriod:         big.NewInt(2),
 	}
@@ -88,6 +191,7 @@ func (c *Oasys) IsSystemTransaction(tx *types.Transaction, header *types.Header)
 	return false, nil
 }
 
+// update functions
 func (c *Oasys) initializeSystemContracts(
 	state *state.StateDB,
 	header *types.Header,
@@ -98,23 +202,23 @@ func (c *Oasys) initializeSystemContracts(
 	usedGas *uint64,
 	mining bool,
 ) error {
-	// initialize Environment contract
-	data, err := contracts.Environment.ABI.Pack("initialize", contracts.StakeManager.Address, getInitialEnvironment(c.config))
+	// Initialize Environment contract
+	data, err := environment.abi.Pack("initialize", getInitialEnvironment(c.config))
 	if err != nil {
 		return err
 	}
-	msg := c.getSystemMessage(header.Coinbase, contracts.Environment.Address, data, common.Big0)
+	msg := getMessage(header.Coinbase, environment.address, data, common.Big0)
 	err = c.applyTransaction(msg, state, header, cx, txs, receipts, systemTxs, usedGas, mining)
 	if err != nil {
 		return err
 	}
 
-	// initialize StakeManager contract
-	data, err = contracts.StakeManager.ABI.Pack("initialize", contracts.Environment.Address)
+	// Initialize StakeManager contract
+	data, err = stakeManager.abi.Pack("initialize", environment.address)
 	if err != nil {
 		return err
 	}
-	msg = c.getSystemMessage(header.Coinbase, contracts.StakeManager.Address, data, common.Big0)
+	msg = getMessage(header.Coinbase, stakeManager.address, data, common.Big0)
 	err = c.applyTransaction(msg, state, header, cx, txs, receipts, systemTxs, usedGas, mining)
 	if err != nil {
 		return err
@@ -135,11 +239,11 @@ func (c *Oasys) updateValidatorBlocks(
 	mining bool,
 ) error {
 	validators, blocks := getValidatorBlocks(schedule)
-	data, err := contracts.StakeManager.ABI.Pack("updateValidatorBlocks", validators, blocks)
+	data, err := stakeManager.abi.Pack("updateValidatorBlocks", validators, blocks)
 	if err != nil {
 		return err
 	}
-	msg := c.getSystemMessage(header.Coinbase, contracts.StakeManager.Address, data, common.Big0)
+	msg := getMessage(header.Coinbase, stakeManager.address, data, common.Big0)
 	err = c.applyTransaction(msg, state, header, cx, txs, receipts, systemTxs, usedGas, mining)
 	if err != nil {
 		return err
@@ -158,11 +262,11 @@ func (c *Oasys) updateValidators(
 	usedGas *uint64,
 	mining bool,
 ) error {
-	data, err := contracts.StakeManager.ABI.Pack("updateValidators")
+	data, err := stakeManager.abi.Pack("updateValidators")
 	if err != nil {
 		return err
 	}
-	msg := c.getSystemMessage(header.Coinbase, contracts.StakeManager.Address, data, common.Big0)
+	msg := getMessage(header.Coinbase, stakeManager.address, data, common.Big0)
 	return c.applyTransaction(msg, state, header, cx, txs, receipts, systemTxs, usedGas, mining)
 }
 
@@ -177,21 +281,22 @@ func (c *Oasys) slash(
 	usedGas *uint64,
 	mining bool,
 ) error {
-	data, err := contracts.StakeManager.ABI.Pack("slash", validator)
+	data, err := stakeManager.abi.Pack("slash", validator)
 	if err != nil {
 		return err
 	}
-	msg := c.getSystemMessage(header.Coinbase, contracts.StakeManager.Address, data, common.Big0)
+	msg := getMessage(header.Coinbase, stakeManager.address, data, common.Big0)
 	return c.applyTransaction(msg, state, header, cx, txs, receipts, systemTxs, usedGas, mining)
 }
 
-func getNextValidators(ethAPI *ethapi.PublicBlockChainAPI, hash common.Hash) (*contracts.GetNextValidatorsResult, error) {
+// view functions
+func getNextValidators(ethAPI *ethapi.PublicBlockChainAPI, hash common.Hash) (*getNextValidatorsResult, error) {
 	method := "getCurrentValidators"
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	data, err := contracts.StakeManager.ABI.Pack(method)
+	data, err := stakeManager.abi.Pack(method)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +305,7 @@ func getNextValidators(ethAPI *ethapi.PublicBlockChainAPI, hash common.Hash) (*c
 	rbytes, err := ethAPI.Call(
 		ctx,
 		ethapi.TransactionArgs{
-			To:   &contracts.StakeManager.Address,
+			To:   &stakeManager.address,
 			Data: &hexData,
 		},
 		rpc.BlockNumberOrHashWithHash(hash, false),
@@ -209,54 +314,21 @@ func getNextValidators(ethAPI *ethapi.PublicBlockChainAPI, hash common.Hash) (*c
 		return nil, err
 	}
 
-	var result contracts.GetNextValidatorsResult
-	if err := contracts.StakeManager.ABI.UnpackIntoInterface(&result, method, rbytes); err != nil {
+	var result getNextValidatorsResult
+	if err := stakeManager.abi.UnpackIntoInterface(&result, method, rbytes); err != nil {
 		return nil, err
 	}
 
 	return &result, nil
 }
 
-func getAllAmounts(ethAPI *ethapi.PublicBlockChainAPI, hash common.Hash) (*contracts.GetAllAmountsResult, error) {
-	method := "getAllAmounts"
+func getRewards(ethAPI *ethapi.PublicBlockChainAPI, hash common.Hash) (*big.Int, error) {
+	method := "getTotalRewards"
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	data, err := contracts.StakeManager.ABI.Pack(method)
-	if err != nil {
-		return nil, err
-	}
-
-	hexData := (hexutil.Bytes)(data)
-	result, err := ethAPI.Call(
-		ctx,
-		ethapi.TransactionArgs{
-			To:   &contracts.StakeManager.Address,
-			Data: &hexData,
-		},
-		rpc.BlockNumberOrHashWithHash(hash, false),
-		nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var amounts contracts.GetAllAmountsResult
-
-	if err := contracts.StakeManager.ABI.UnpackIntoInterface(&amounts, method, result); err != nil {
-		return nil, err
-	}
-
-	return &amounts, nil
-}
-
-func getNextEnvironmentValue(ethAPI *ethapi.PublicBlockChainAPI, hash common.Hash) (*contracts.EnvironmentValue, error) {
-	method := "nextValue"
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	data, err := contracts.Environment.ABI.Pack(method)
+	data, err := stakeManager.abi.Pack(method, common.Big1)
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +337,7 @@ func getNextEnvironmentValue(ethAPI *ethapi.PublicBlockChainAPI, hash common.Has
 	rbytes, err := ethAPI.Call(
 		ctx,
 		ethapi.TransactionArgs{
-			To:   &contracts.Environment.Address,
+			To:   &stakeManager.address,
 			Data: &hexData,
 		},
 		rpc.BlockNumberOrHashWithHash(hash, false),
@@ -274,25 +346,44 @@ func getNextEnvironmentValue(ethAPI *ethapi.PublicBlockChainAPI, hash common.Has
 		return nil, err
 	}
 
-	var result struct{ Result contracts.EnvironmentValue }
-	if err := contracts.Environment.ABI.UnpackIntoInterface(&result, method, rbytes); err != nil {
+	var result *big.Int
+	if err := stakeManager.abi.UnpackIntoInterface(&result, method, rbytes); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func getNextEnvironmentValue(ethAPI *ethapi.PublicBlockChainAPI, hash common.Hash) (*environmentValue, error) {
+	method := "nextValue"
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	data, err := environment.abi.Pack(method)
+	if err != nil {
+		return nil, err
+	}
+
+	hexData := (hexutil.Bytes)(data)
+	rbytes, err := ethAPI.Call(
+		ctx,
+		ethapi.TransactionArgs{
+			To:   &environment.address,
+			Data: &hexData,
+		},
+		rpc.BlockNumberOrHashWithHash(hash, false),
+		nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result struct{ Result environmentValue }
+	if err := environment.abi.UnpackIntoInterface(&result, method, rbytes); err != nil {
 		return nil, err
 	}
 
 	return &result.Result, nil
-}
-
-func (c *Oasys) getSystemMessage(from, toAddress common.Address, data []byte, value *big.Int) callmsg {
-	return callmsg{
-		ethereum.CallMsg{
-			From:     from,
-			Gas:      math.MaxUint64 / 2,
-			GasPrice: common.Big0,
-			Value:    value,
-			To:       &toAddress,
-			Data:     data,
-		},
-	}
 }
 
 func (c *Oasys) applyTransaction(
@@ -358,6 +449,19 @@ func (c *Oasys) applyTransaction(
 	*receipts = append(*receipts, receipt)
 	state.SetNonce(msg.From(), nonce+1)
 	return nil
+}
+
+func getMessage(from, toAddress common.Address, data []byte, value *big.Int) callmsg {
+	return callmsg{
+		ethereum.CallMsg{
+			From:     from,
+			Gas:      math.MaxUint64 / 2,
+			GasPrice: common.Big0,
+			Value:    value,
+			To:       &toAddress,
+			Data:     data,
+		},
+	}
 }
 
 func applyMessage(

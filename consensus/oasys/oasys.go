@@ -15,9 +15,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
-	"github.com/ethereum/go-ethereum/core/contracts"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/versebuilder"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
@@ -301,7 +301,7 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 	if number > 0 && env.IsEpoch(number) {
 		result, err := getNextValidators(c.ethAPI, header.ParentHash)
 		if err != nil {
-			log.Error("Failed to get validators", "in", "verifyCascadingFields", "hash", header.Hash(), "number", number, "err", err)
+			log.Error("Failed to get validators", "in", "verifyCascadingFields", "hash", header.ParentHash, "number", number, "err", err)
 			return err
 		}
 		backoff = c.backOffTime(result, env, number, header.Coinbase)
@@ -465,7 +465,7 @@ func (c *Oasys) verifySeal(chain consensus.ChainHeaderReader, header *types.Head
 	if number > 0 && env.IsEpoch(number) {
 		result, err := getNextValidators(c.ethAPI, header.ParentHash)
 		if err != nil {
-			log.Error("Failed to get validators", "in", "verifySeal", "hash", header.Hash(), "number", number, "err", err)
+			log.Error("Failed to get validators", "in", "verifySeal", "hash", header.ParentHash, "number", number, "err", err)
 			return err
 		}
 		exists = result.Exists(validator)
@@ -523,7 +523,7 @@ func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 	if number > 0 && env.IsEpoch(number) {
 		result, err := getNextValidators(c.ethAPI, header.ParentHash)
 		if err != nil {
-			log.Error("Failed to get validators", "in", "Prepare", "hash", header.Hash(), "number", number, "err", err)
+			log.Error("Failed to get validators", "in", "Prepare", "hash", header.ParentHash, "number", number, "err", err)
 			return err
 		}
 
@@ -582,6 +582,12 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 			log.Error("Failed to initialize system contracts", "in", "Finalize", "hash", header.Hash(), "err", err)
 			return err
 		}
+
+		err = versebuilder.Deploy(state)
+		if err != nil {
+			log.Error("Failed to deploy verse builder", "in", "Finalize", "hash", header.Hash(), "err", err)
+			return err
+		}
 	}
 
 	env, err := c.environment(chain, header, nil)
@@ -591,12 +597,12 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 
 	var (
 		schedule       map[uint64]common.Address
-		nextValidators *contracts.GetNextValidatorsResult
+		nextValidators *getNextValidatorsResult
 	)
 	if env.IsEpoch(number) {
 		nextValidators, err = getNextValidators(c.ethAPI, header.ParentHash)
 		if err != nil {
-			log.Error("Failed to get validators", "in", "Finalize", "hash", header.Hash(), "number", number, "err", err)
+			log.Error("Failed to get validators", "in", "Finalize", "hash", header.ParentHash, "number", number, "err", err)
 			return err
 		}
 		schedule = c.getValidatorSchedule(nextValidators, env, number)
@@ -620,9 +626,11 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 			log.Error("Failed to update validator blocks", "in", "Finalize", "hash", header.Hash(), "number", number, "err", err)
 			return err
 		}
-		if err := c.addBalanceToStakeManager(state, header.ParentHash); err != nil {
-			log.Error("Failed to add balance to staking contract", "in", "Finalize", "hash", header.Hash(), "number", number, "err", err)
-			return err
+		if env.Epoch(number) > 2 {
+			if err := c.addBalanceToStakeManager(state, header.ParentHash); err != nil {
+				log.Error("Failed to add balance to staking contract", "in", "Finalize", "hash", header.ParentHash, "number", number, "err", err)
+				return err
+			}
 		}
 	}
 
@@ -679,6 +687,12 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 			log.Error("Failed to initialize system contracts", "in", "FinalizeAndAssemble", "hash", header.Hash(), "err", err)
 			return nil, nil, err
 		}
+
+		err = versebuilder.Deploy(state)
+		if err != nil {
+			log.Error("Failed to deploy verse builder", "in", "FinalizeAndAssemble", "hash", header.Hash(), "err", err)
+			return nil, nil, err
+		}
 	}
 
 	env, err := c.environment(chain, header, nil)
@@ -690,7 +704,7 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 	if env.IsEpoch(number) {
 		nextValidators, err := getNextValidators(c.ethAPI, header.ParentHash)
 		if err != nil {
-			log.Error("Failed to get validators", "in", "FinalizeAndAssemble", "hash", header.Hash(), "number", number, "err", err)
+			log.Error("Failed to get validators", "in", "FinalizeAndAssemble", "hash", header.ParentHash, "number", number, "err", err)
 			return nil, nil, err
 		}
 		schedule = c.getValidatorSchedule(nextValidators, env, number)
@@ -714,9 +728,11 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 			log.Error("Failed to update validator blocks", "in", "FinalizeAndAssemble", "hash", header.Hash(), "number", number, "err", err)
 			return nil, nil, err
 		}
-		if err := c.addBalanceToStakeManager(state, header.ParentHash); err != nil {
-			log.Error("Failed to add balance to staking contract", "in", "FinalizeAndAssemble", "hash", header.Hash(), "number", number, "err", err)
-			return nil, nil, err
+		if env.Epoch(number) > 2 {
+			if err := c.addBalanceToStakeManager(state, header.ParentHash); err != nil {
+				log.Error("Failed to add balance to staking contract", "in", "FinalizeAndAssemble", "hash", header.Hash(), "number", number, "err", err)
+				return nil, nil, err
+			}
 		}
 	}
 
@@ -778,7 +794,7 @@ func (c *Oasys) Seal(chain consensus.ChainHeaderReader, block *types.Block, resu
 	if number > 0 && env.IsEpoch(number) {
 		result, err := getNextValidators(c.ethAPI, header.ParentHash)
 		if err != nil {
-			log.Error("Failed to get validators", "in", "Seal", "hash", header.Hash(), "number", number, "err", err)
+			log.Error("Failed to get validators", "in", "Seal", "hash", header.ParentHash, "number", number, "err", err)
 			return err
 		}
 		exists = result.Exists(validator)
@@ -921,46 +937,39 @@ func encodeSigHeader(w io.Writer, header *types.Header) {
 	}
 }
 
-// TODO
 func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash) error {
 	var (
-		amounts *contracts.GetAllAmountsResult
+		rewards *big.Int
 		err     error
 	)
 
-	if amounts, err = getAllAmounts(c.ethAPI, hash); err != nil {
-		log.Error("Failed to get amounts", "in", "Seal", "hash", hash, "err", err)
+	if rewards, err = getRewards(c.ethAPI, hash); err != nil {
+		log.Error("Failed to get rewards", "hash", hash, "err", err)
 		return err
 	}
-
-	current := state.GetBalance(contracts.StakeManager.Address)
-	required := new(big.Int).Add(amounts.Stakes, amounts.Unstakes)
-	required = required.Add(required, amounts.Rewards)
-	required = required.Add(required, amounts.Commissions)
-
-	if current.Cmp(required) == -1 {
-		missing := new(big.Int).Sub(required, current)
-		state.AddBalance(contracts.StakeManager.Address, missing)
-		log.Info("Balance added to stake manager", "hash", hash, "amount", missing.String())
+	if rewards.Cmp(common.Big0) == 0 {
+		return nil
 	}
 
+	state.AddBalance(stakeManager.address, rewards)
+	log.Info("Balance added to stake manager", "hash", hash, "amount", rewards.String())
 	return nil
 }
 
-func (c *Oasys) getValidatorSchedule(result *contracts.GetNextValidatorsResult,
-	env *contracts.EnvironmentValue, number uint64) map[uint64]common.Address {
+func (c *Oasys) getValidatorSchedule(result *getNextValidatorsResult,
+	env *environmentValue, number uint64) map[uint64]common.Address {
 	return getValidatorSchedule(result.Operators, result.Stakes, env.EpochPeriod.Uint64(), number)
 }
 
-func (c *Oasys) backOffTime(result *contracts.GetNextValidatorsResult,
-	env *contracts.EnvironmentValue, number uint64, validator common.Address) uint64 {
+func (c *Oasys) backOffTime(result *getNextValidatorsResult,
+	env *environmentValue, number uint64, validator common.Address) uint64 {
 	if !result.Exists(validator) {
 		return 0
 	}
 	return backOffTime(result.Operators, result.Stakes, env.EpochPeriod.Uint64(), number, validator)
 }
 
-func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header) (*contracts.EnvironmentValue, error) {
+func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header) (*environmentValue, error) {
 	number := header.Number.Uint64()
 	if number < c.config.Epoch {
 		return getInitialEnvironment(c.config), nil
@@ -974,7 +983,7 @@ func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Hea
 	if number%snap.Environment.EpochPeriod.Uint64() == 0 {
 		nextEnv, err := getNextEnvironmentValue(c.ethAPI, header.ParentHash)
 		if err != nil {
-			log.Error("Failed to get environment value", "in", "environment", "hash", header.Hash(), "number", number, "err", err)
+			log.Error("Failed to get environment value", "in", "environment", "hash", header.ParentHash, "number", number, "err", err)
 			return nil, err
 		}
 		return nextEnv, nil
