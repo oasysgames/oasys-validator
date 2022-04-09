@@ -15,10 +15,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
+	"github.com/ethereum/go-ethereum/contracts/erc20"
+	"github.com/ethereum/go-ethereum/contracts/versebuilder"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/core/versebuilder"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
@@ -575,24 +576,32 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 		return err
 	}
 
-	number := header.Number.Uint64()
-
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 	header.UncleHash = types.CalcUncleHash(nil)
+
+	hash := header.Hash()
+	number := header.Number.Uint64()
+
+	err := versebuilder.Deploy(state, number)
+	if err != nil {
+		log.Error("Failed to deploy verse builder", "in", "Finalize", "hash", hash, "number", number, "err", err)
+		return err
+	}
+
+	err = erc20.Deploy(state, number)
+	if err != nil {
+		log.Error("Failed to deploy erc20 tokens", "in", "Finalize", "hash", hash, "number", number, "err", err)
+		return err
+	}
 
 	cx := chainContext{Chain: chain, oasys: c}
 	if number == 1 {
 		err := c.initializeSystemContracts(state, header, cx, txs, receipts, systemTxs, usedGas, false)
 		if err != nil {
-			log.Error("Failed to initialize system contracts", "in", "Finalize", "hash", header.Hash(), "err", err)
+			log.Error("Failed to initialize system contracts", "in", "Finalize", "hash", hash, "number", number, "err", err)
 			return err
 		}
 
-		err = versebuilder.Deploy(state)
-		if err != nil {
-			log.Error("Failed to deploy verse builder", "in", "Finalize", "hash", header.Hash(), "err", err)
-			return err
-		}
 	}
 
 	env, err := c.environment(chain, header, nil)
@@ -621,14 +630,14 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 
 	if env.IsEpoch(number + 1) {
 		if err := c.updateValidators(state, header, cx, txs, receipts, systemTxs, usedGas, false); err != nil {
-			log.Error("Failed to update validators", "in", "Finalize", "hash", header.Hash(), "number", number, "err", err)
+			log.Error("Failed to update validators", "in", "Finalize", "hash", hash, "number", number, "err", err)
 			return err
 		}
 	}
 
 	if env.IsEpoch(number) {
 		if err := c.updateValidatorBlocks(schedule, state, header, cx, txs, receipts, systemTxs, usedGas, false); err != nil {
-			log.Error("Failed to update validator blocks", "in", "Finalize", "hash", header.Hash(), "number", number, "err", err)
+			log.Error("Failed to update validator blocks", "in", "Finalize", "hash", hash, "number", number, "err", err)
 			return err
 		}
 		if env.Epoch(number) > 2 {
@@ -661,7 +670,7 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 		expectedValidator := schedule[number]
 		if validator != expectedValidator {
 			if err := c.slash(expectedValidator, state, header, cx, txs, receipts, systemTxs, usedGas, false); err != nil {
-				log.Error("Failed to slash validator", "in", "Finalize", "hash", header.Hash(), "number", number, "address", expectedValidator, "err", err)
+				log.Error("Failed to slash validator", "in", "Finalize", "hash", hash, "number", number, "address", expectedValidator, "err", err)
 			}
 		}
 	}
@@ -687,19 +696,26 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 		return nil, nil, err
 	}
 
+	hash := header.Hash()
 	number := header.Number.Uint64()
+
+	err := versebuilder.Deploy(state, number)
+	if err != nil {
+		log.Error("Failed to deploy verse builder", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "err", err)
+		return nil, nil, err
+	}
+
+	err = erc20.Deploy(state, number)
+	if err != nil {
+		log.Error("Failed to deploy erc20 tokens", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "err", err)
+		return nil, nil, err
+	}
 
 	cx := chainContext{Chain: chain, oasys: c}
 	if number == 1 {
 		err := c.initializeSystemContracts(state, header, cx, &txs, &receipts, nil, &header.GasUsed, true)
 		if err != nil {
-			log.Error("Failed to initialize system contracts", "in", "FinalizeAndAssemble", "hash", header.Hash(), "err", err)
-			return nil, nil, err
-		}
-
-		err = versebuilder.Deploy(state)
-		if err != nil {
-			log.Error("Failed to deploy verse builder", "in", "FinalizeAndAssemble", "hash", header.Hash(), "err", err)
+			log.Error("Failed to initialize system contracts", "in", "FinalizeAndAssemble", "hash", hash, "err", err)
 			return nil, nil, err
 		}
 	}
@@ -727,19 +743,19 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 
 	if env.IsEpoch(number + 1) {
 		if err := c.updateValidators(state, header, cx, &txs, &receipts, nil, &header.GasUsed, true); err != nil {
-			log.Error("Failed to update validators", "in", "FinalizeAndAssemble", "hash", header.Hash(), "number", number, "err", err)
+			log.Error("Failed to update validators", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "err", err)
 			return nil, nil, err
 		}
 	}
 
 	if env.IsEpoch(number) {
 		if err := c.updateValidatorBlocks(schedule, state, header, cx, &txs, &receipts, nil, &header.GasUsed, true); err != nil {
-			log.Error("Failed to update validator blocks", "in", "FinalizeAndAssemble", "hash", header.Hash(), "number", number, "err", err)
+			log.Error("Failed to update validator blocks", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "err", err)
 			return nil, nil, err
 		}
 		if env.Epoch(number) > 2 {
 			if err := c.addBalanceToStakeManager(state, header.ParentHash); err != nil {
-				log.Error("Failed to add balance to staking contract", "in", "FinalizeAndAssemble", "hash", header.Hash(), "number", number, "err", err)
+				log.Error("Failed to add balance to staking contract", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "err", err)
 				return nil, nil, err
 			}
 		}
@@ -749,7 +765,7 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 		expectedValidator := schedule[number]
 		if header.Coinbase != expectedValidator {
 			if err := c.slash(expectedValidator, state, header, cx, &txs, &receipts, nil, &header.GasUsed, true); err != nil {
-				log.Error("Failed to slash validator", "in", "FinalizeAndAssemble", "hash", header.Hash(), "number", number, "address", expectedValidator, "err", err)
+				log.Error("Failed to slash validator", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "address", expectedValidator, "err", err)
 			}
 		}
 	}
