@@ -186,6 +186,10 @@ var (
 		accounts.MimetypeClique,
 		0x02,
 	}
+	ApplicationOasys = SigFormat{
+		accounts.MimetypeOasys,
+		0x03,
+	}
 	TextPlain = SigFormat{
 		accounts.MimetypeTextPlain,
 		0x45,
