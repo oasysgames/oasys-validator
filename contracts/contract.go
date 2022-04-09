@@ -25,6 +25,7 @@ var (
 var (
 	// AddressPrefix is a reserved address prefix list for built-in contracts.
 	AddressPrefix = map[string]common.Address{
+		"genesis":      common.HexToAddress("0x0000000000000000000000000000000000000000"),
 		"versebuilder": common.HexToAddress("0x0001000000000000000000000000000000000000"),
 		"erc20":        common.HexToAddress("0x0002000000000000000000000000000000000000"),
 	}

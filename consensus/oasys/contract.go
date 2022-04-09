@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus"
+	"github.com/ethereum/go-ethereum/contracts"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -27,13 +28,15 @@ import (
 )
 
 var (
+	addressPrefix = contracts.AddressPrefix["genesis"].Hash().Big()
+
 	// Oasys system contracts
 	environment = &systemContract{
-		address: common.HexToAddress("0x0000000000000000000000000000000000001000"),
+		address: common.BigToAddress(new(big.Int).Add(addressPrefix, big.NewInt(4096*1))),
 		abis:    environmentAbi,
 	}
 	stakeManager = &systemContract{
-		address: common.HexToAddress("0x0000000000000000000000000000000000001001"),
+		address: common.BigToAddress(new(big.Int).Add(addressPrefix, big.NewInt(4096*2))),
 		abis:    stakeManagerAbi,
 	}
 	systemContracts = map[common.Address]bool{environment.address: true, stakeManager.address: true}
@@ -110,14 +113,6 @@ func (p *environmentValue) Copy() *environmentValue {
 		JailThreshold:      new(big.Int).Set(p.JailThreshold),
 		JailPeriod:         new(big.Int).Set(p.JailPeriod),
 	}
-}
-
-// getAllAmountsResult
-type getAllAmountsResult struct {
-	Stakes      *big.Int
-	Unstakes    *big.Int
-	Rewards     *big.Int
-	Commissions *big.Int
 }
 
 // getNextValidatorsResult
