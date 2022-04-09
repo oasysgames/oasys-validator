@@ -827,7 +827,8 @@ func (w *worker) updateSnapshot(env *environment) {
 }
 
 func (w *worker) commitTransaction(env *environment, tx *types.Transaction, receiptProcessors ...core.ReceiptProcessor) ([]*types.Log, error) {
-	if err := core.VerifyTx(env.header, tx); err != nil {
+	// Oasys transaction verification
+	if err := core.VerifyTx(tx); err != nil {
 		return nil, err
 	}
 

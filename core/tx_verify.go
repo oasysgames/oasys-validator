@@ -12,7 +12,7 @@ var (
 )
 
 // VerifyTx checks if it is ok to process the transaction.
-func VerifyTx(header *types.Header, tx *types.Transaction) error {
+func VerifyTx(tx *types.Transaction) error {
 	if tx.To() == nil {
 		return ErrUnauthorizedDeployment
 	}

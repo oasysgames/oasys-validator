@@ -1017,9 +1017,10 @@ func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Hea
 	return snap.Environment, nil
 }
 
+// Oasys transaction verification
 func verifyTx(header *types.Header, txs []*types.Transaction) error {
 	for _, tx := range txs {
-		if err := core.VerifyTx(header, tx); err != nil {
+		if err := core.VerifyTx(tx); err != nil {
 			return err
 		}
 	}
