@@ -51,7 +51,7 @@ OPTIONS:
 	AppHelpTemplate = `NAME:
    {{.App.Name}} - {{.App.Usage}}
 
-   Copyright 2013-2021 The go-ethereum Authors
+   Copyright 2022 Oasys | Blockchain for The Games All Rights Reserved.
 
 USAGE:
    {{.App.HelpName}} [options]{{if .App.Commands}} [command] [command options]{{end}} {{if .App.ArgsUsage}}{{.App.ArgsUsage}}{{else}}[arguments...]{{end}}
@@ -77,7 +77,7 @@ COPYRIGHT:
 	ClefAppHelpTemplate = `NAME:
    {{.App.Name}} - {{.App.Usage}}
 
-   Copyright 2013-2021 The go-ethereum Authors
+   Copyright 2022 Oasys | Blockchain for The Games All Rights Reserved.
 
 USAGE:
    {{.App.HelpName}} [options]{{if .App.Commands}} command [command options]{{end}} {{if .App.ArgsUsage}}{{.App.ArgsUsage}}{{else}}[arguments...]{{end}}
