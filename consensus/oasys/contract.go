@@ -16,7 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/contracts"
+	contracts "github.com/ethereum/go-ethereum/contracts/oasys"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -28,15 +28,14 @@ import (
 )
 
 var (
-	addressPrefix = contracts.AddressPrefix["genesis"].Hash().Big()
 
 	// Oasys system contracts
 	environment = &systemContract{
-		address: common.BigToAddress(new(big.Int).Add(addressPrefix, big.NewInt(4096*1))),
+		address: contracts.Genesis.GetAddress(4096 * 1),
 		abis:    environmentAbi,
 	}
 	stakeManager = &systemContract{
-		address: common.BigToAddress(new(big.Int).Add(addressPrefix, big.NewInt(4096*2))),
+		address: contracts.Genesis.GetAddress(4096 * 2),
 		abis:    stakeManagerAbi,
 	}
 	systemContracts = map[common.Address]bool{environment.address: true, stakeManager.address: true}
@@ -152,7 +151,7 @@ func getInitialEnvironment(config *params.OasysConfig) *environmentValue {
 		BlockPeriod:        big.NewInt(int64(config.Period)),
 		EpochPeriod:        big.NewInt(int64(config.Epoch)),
 		RewardRate:         big.NewInt(10),
-		ValidatorThreshold: new(big.Int).Mul(big.NewInt(10000000), big.NewInt(1e18)),
+		ValidatorThreshold: new(big.Int).Mul(big.NewInt(params.Ether), big.NewInt(10_000_000)),
 		JailThreshold:      big.NewInt(500),
 		JailPeriod:         big.NewInt(2),
 	}

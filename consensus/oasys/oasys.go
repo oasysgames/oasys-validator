@@ -15,8 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
-	"github.com/ethereum/go-ethereum/contracts/erc20"
-	"github.com/ethereum/go-ethereum/contracts/versebuilder"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -582,18 +580,6 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 	hash := header.Hash()
 	number := header.Number.Uint64()
 
-	err := versebuilder.Deploy(state, number)
-	if err != nil {
-		log.Error("Failed to deploy verse builder", "in", "Finalize", "hash", hash, "number", number, "err", err)
-		return err
-	}
-
-	err = erc20.Deploy(state, number)
-	if err != nil {
-		log.Error("Failed to deploy erc20 tokens", "in", "Finalize", "hash", hash, "number", number, "err", err)
-		return err
-	}
-
 	cx := chainContext{Chain: chain, oasys: c}
 	if number == 1 {
 		err := c.initializeSystemContracts(state, header, cx, txs, receipts, systemTxs, usedGas, false)
@@ -698,18 +684,6 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 
 	hash := header.Hash()
 	number := header.Number.Uint64()
-
-	err := versebuilder.Deploy(state, number)
-	if err != nil {
-		log.Error("Failed to deploy verse builder", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "err", err)
-		return nil, nil, err
-	}
-
-	err = erc20.Deploy(state, number)
-	if err != nil {
-		log.Error("Failed to deploy erc20 tokens", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "err", err)
-		return nil, nil, err
-	}
 
 	cx := chainContext{Chain: chain, oasys: c}
 	if number == 1 {

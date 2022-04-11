@@ -67,7 +67,7 @@ const environmentAbi = `
             "type": "uint256"
           }
         ],
-        "internalType": "struct IEnvironment.Environment[]",
+        "internalType": "struct Environment.EnvironmentValue[]",
         "name": "_values",
         "type": "tuple[]"
       }
@@ -120,7 +120,7 @@ const environmentAbi = `
             "type": "uint256"
           }
         ],
-        "internalType": "struct IEnvironment.Environment",
+        "internalType": "struct Environment.EnvironmentValue",
         "name": "initialValue",
         "type": "tuple"
       }
@@ -216,7 +216,7 @@ const environmentAbi = `
             "type": "uint256"
           }
         ],
-        "internalType": "struct IEnvironment.Environment",
+        "internalType": "struct Environment.EnvironmentValue",
         "name": "",
         "type": "tuple"
       }
@@ -269,7 +269,7 @@ const environmentAbi = `
             "type": "uint256"
           }
         ],
-        "internalType": "struct IEnvironment.Environment",
+        "internalType": "struct Environment.EnvironmentValue",
         "name": "newValue",
         "type": "tuple"
       }
@@ -345,7 +345,7 @@ const environmentAbi = `
             "type": "uint256"
           }
         ],
-        "internalType": "struct IEnvironment.Environment",
+        "internalType": "struct Environment.EnvironmentValue",
         "name": "",
         "type": "tuple"
       }
@@ -632,7 +632,7 @@ const stakeManagerAbi = `
     "name": "environment",
     "outputs": [
       {
-        "internalType": "contract IEnvironment",
+        "internalType": "contract Environment",
         "name": "",
         "type": "address"
       }
@@ -945,7 +945,7 @@ const stakeManagerAbi = `
   {
     "inputs": [
       {
-        "internalType": "contract IEnvironment",
+        "internalType": "contract Environment",
         "name": "_environment",
         "type": "address"
       }
