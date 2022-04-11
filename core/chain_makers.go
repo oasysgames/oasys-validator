@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
+	contracts "github.com/ethereum/go-ethereum/contracts/oasys"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -251,6 +252,8 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		if config.DAOForkSupport && config.DAOForkBlock != nil && config.DAOForkBlock.Cmp(b.header.Number) == 0 {
 			misc.ApplyDAOHardFork(statedb)
 		}
+		// Deploy oasys built-in contracts
+		contracts.Deploy(config, statedb, b.header.Number.Uint64())
 		// Execute any user modifications to the block
 		if gen != nil {
 			gen(i, b)
