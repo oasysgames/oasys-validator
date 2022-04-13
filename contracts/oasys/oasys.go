@@ -15,11 +15,9 @@ import (
 )
 
 const (
-	Genesis Namespace = iota
-	WrappedOAS
-	VerseBuilder
-	Token
-	Rollup
+	// Address of initial wallet in genesis.
+	mainnetGenesisWallet = "0xfc302c2252a69003b3f03750564393924d2c96ae"
+	testnetGenesisWallet = "0x2929efbad86a7989879fc7650d1e30c02a488660"
 
 	hexPrefix         = "0x"
 	storageSlotLength = 64
@@ -27,15 +25,6 @@ const (
 
 var (
 	GenesisHash common.Hash
-
-	// reserved address prefix list of built-in contracts.
-	addressPrefixes = map[Namespace]string{
-		Genesis:      "0x0000000000000000000000000000000000000000",
-		WrappedOAS:   "0x0001000000000000000000000000000000000000",
-		Rollup:       "0x0002000000000000000000000000000000000000",
-		Token:        "0x0003000000000000000000000000000000000000",
-		VerseBuilder: "0x0004000000000000000000000000000000000000",
-	}
 
 	builtinContracts = map[uint64][]deployable{
 		1: {
@@ -59,15 +48,6 @@ func Deploy(config *params.ChainConfig, state *state.StateDB, block uint64) {
 	}
 }
 
-// Namespace is a category of oasys built-in contracts.
-type Namespace int
-
-// GetAddress returns the address with add offset to the first address of namespace.
-func (p Namespace) GetAddress(offset int64) common.Address {
-	base := common.HexToAddress(addressPrefixes[p]).Hash().Big()
-	return common.BigToAddress(new(big.Int).Add(base, big.NewInt(offset)))
-}
-
 // deployable
 type deployable interface {
 	deploy(state *state.StateDB)
@@ -85,14 +65,15 @@ func (p contractSet) deploy(state *state.StateDB) {
 // contract
 type contract struct {
 	name           string
-	address        common.Address
+	address        string
 	code           string
 	fixedStorage   map[string]interface{}
 	dynamicStorage map[string]string
 }
 
 func (c *contract) deploy(state *state.StateDB) {
-	if len(state.GetCode(c.address)) != 0 {
+	address := common.HexToAddress(c.address)
+	if len(state.GetCode(address)) != 0 {
 		panic(fmt.Errorf("%s contract already exists", c.name))
 	}
 
@@ -105,11 +86,11 @@ func (c *contract) deploy(state *state.StateDB) {
 		panic(fmt.Errorf("failed to create %s contract storage map: %s", c.name, err.Error()))
 	}
 
-	state.SetCode(c.address, bytecode)
+	state.SetCode(address, bytecode)
 	for key, val := range storage {
-		state.SetState(c.address, key, val)
+		state.SetState(address, key, val)
 	}
-	log.Info("Deploy contract", "name", c.name, "address", c.address.String())
+	log.Info("Deploy contract", "name", c.name, "address", c.address)
 }
 
 // ByteCodes returns the contract byte codes.

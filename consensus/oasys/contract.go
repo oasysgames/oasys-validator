@@ -16,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus"
-	contracts "github.com/ethereum/go-ethereum/contracts/oasys"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -27,18 +26,26 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
-var (
+const (
+	// Oasys genesis contracts
+	environmentContractAddress  = "0x0000000000000000000000000000000000001000"
+	stakeManagerContractAddress = "0x0000000000000000000000000000000000001001"
+	allowListContractAddress    = "0x0000000000000000000000000000000000001002"
+)
 
-	// Oasys system contracts
+var (
 	environment = &systemContract{
-		address: contracts.Genesis.GetAddress(4096 * 1),
+		address: common.HexToAddress(environmentContractAddress),
 		abis:    environmentAbi,
 	}
 	stakeManager = &systemContract{
-		address: contracts.Genesis.GetAddress(4096 * 2),
+		address: common.HexToAddress(stakeManagerContractAddress),
 		abis:    stakeManagerAbi,
 	}
-	systemContracts = map[common.Address]bool{environment.address: true, stakeManager.address: true}
+	genesisContracts = map[common.Address]bool{
+		environment.address:  true,
+		stakeManager.address: true,
+	}
 )
 
 func init() {
@@ -179,7 +186,7 @@ func (c *Oasys) IsSystemTransaction(tx *types.Transaction, header *types.Header)
 	if err != nil {
 		return false, errors.New("unauthorized transaction")
 	}
-	if sender == header.Coinbase && systemContracts[*tx.To()] && tx.GasPrice().Cmp(common.Big0) == 0 {
+	if sender == header.Coinbase && genesisContracts[*tx.To()] && tx.GasPrice().Cmp(common.Big0) == 0 {
 		return true, nil
 	}
 	return false, nil
@@ -208,7 +215,7 @@ func (c *Oasys) initializeSystemContracts(
 	}
 
 	// Initialize StakeManager contract
-	data, err = stakeManager.abi.Pack("initialize", environment.address)
+	data, err = stakeManager.abi.Pack("initialize", environment.address, common.HexToAddress(allowListContractAddress))
 	if err != nil {
 		return err
 	}
