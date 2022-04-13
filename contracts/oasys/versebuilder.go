@@ -9,13 +9,16 @@ import (
 )
 
 var (
-	l1BuildParamAddress   = VerseBuilder.GetAddress(4096 * 1)
-	l1BuildDepositAddress = VerseBuilder.GetAddress(4096 * 2)
-	l1BuildAgentAddress   = VerseBuilder.GetAddress(4096 * 3)
-	l1BuildStep1Address   = VerseBuilder.GetAddress(4096 * 4)
-	l1BuildStep2Address   = VerseBuilder.GetAddress(4096 * 5)
-	l1BuildStep3Address   = VerseBuilder.GetAddress(4096 * 6)
-	l1BuildStep4Address   = VerseBuilder.GetAddress(4096 * 7)
+	verseBuilderContractSet = &versebuilder{}
+
+	l1BuildParamAddress     = "0x5200000000000000000000000000000000000005"
+	l1BuildDepositAddress   = "0x5200000000000000000000000000000000000006"
+	l1BuildAgentAddress     = "0x5200000000000000000000000000000000000007"
+	l1BuildStep1Address     = "0x5200000000000000000000000000000000000008"
+	l1BuildStep2Address     = "0x5200000000000000000000000000000000000009"
+	l1BuildStep3Address     = "0x520000000000000000000000000000000000000a"
+	l1BuildStep4Address     = "0x520000000000000000000000000000000000000b"
+	l1BuildAllowListAddress = "0x520000000000000000000000000000000000000c"
 
 	l1BuildParam = &contract{
 		name:    "L1BuildParam",
@@ -45,8 +48,10 @@ var (
 		address: l1BuildDepositAddress,
 		code:    l1BuildDepositCode,
 		fixedStorage: map[string]interface{}{
+			// address public allowlistAddress
+			"0x02": l1BuildAllowListAddress,
 			// address public agentAddress
-			"0x02": l1BuildAgentAddress,
+			"0x03": l1BuildAgentAddress,
 		},
 	}
 	l1BuildAgent = &contract{
@@ -110,7 +115,12 @@ var (
 			"0x01": l1BuildParamAddress,
 		},
 	}
-	verseBuilderContractSet = &versebuilder{}
+	l1BuildAllowList = &contract{
+		name:         "L1BuildAllowList",
+		address:      l1BuildAllowListAddress,
+		code:         allowListCode,
+		fixedStorage: map[string]interface{}{},
+	}
 )
 
 type versebuilder struct{}
@@ -122,9 +132,11 @@ func (p *versebuilder) deploy(state *state.StateDB) {
 		l1BuildDeposit.fixedStorage["0x00"] = new(big.Int).Mul(big.NewInt(params.Ether), big.NewInt(1_000_000))
 		// uint256 public lockedBlock
 		l1BuildDeposit.fixedStorage["0x01"] = big.NewInt(1_036_800)
+		// address private _owner
+		l1BuildAllowList.fixedStorage["0x00"] = common.HexToAddress(mainnetGenesisWallet)
 	default:
-		l1BuildDeposit.fixedStorage["0x00"] = common.Big0
-		l1BuildDeposit.fixedStorage["0x01"] = common.Big0
+		l1BuildDeposit.fixedStorage["0x00"] = big.NewInt(params.GWei)
+		l1BuildDeposit.fixedStorage["0x01"] = common.Big1
 	}
 
 	contracts := []*contract{
@@ -135,6 +147,7 @@ func (p *versebuilder) deploy(state *state.StateDB) {
 		l1BuildStep2,
 		l1BuildStep3,
 		l1BuildStep4,
+		l1BuildAllowList,
 	}
 	for _, c := range contracts {
 		c.deploy(state)

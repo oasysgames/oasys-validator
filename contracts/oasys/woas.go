@@ -7,7 +7,7 @@ import (
 var (
 	wrappedOAS = &contract{
 		name:    "WOAS",
-		address: WrappedOAS.GetAddress(0),
+		address: "0x5200000000000000000000000000000000000001",
 		code:    wrappedOASCode,
 		fixedStorage: map[string]interface{}{
 			// string public name

@@ -3,7 +3,7 @@ package oasys
 var (
 	verifierInfo = &contract{
 		name:    "VerifierInfo",
-		address: Rollup.GetAddress(4096 * 1),
+		address: "0x5200000000000000000000000000000000000002",
 		code:    verifierInfoCode,
 	}
 	rollupContractSet = contractSet{
