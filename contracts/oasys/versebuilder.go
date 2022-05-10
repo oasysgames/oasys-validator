@@ -9,16 +9,14 @@ import (
 )
 
 var (
-	verseBuilderContractSet = &versebuilder{}
-
-	l1BuildParamAddress     = "0x5200000000000000000000000000000000000005"
-	l1BuildDepositAddress   = "0x5200000000000000000000000000000000000006"
-	l1BuildAgentAddress     = "0x5200000000000000000000000000000000000007"
-	l1BuildStep1Address     = "0x5200000000000000000000000000000000000008"
-	l1BuildStep2Address     = "0x5200000000000000000000000000000000000009"
-	l1BuildStep3Address     = "0x520000000000000000000000000000000000000a"
-	l1BuildStep4Address     = "0x520000000000000000000000000000000000000b"
-	l1BuildAllowListAddress = "0x520000000000000000000000000000000000000c"
+	l1BuildParamAddress     = "0x5200000000000000000000000000000000000006"
+	l1BuildDepositAddress   = "0x5200000000000000000000000000000000000007"
+	l1BuildAgentAddress     = "0x5200000000000000000000000000000000000008"
+	l1BuildStep1Address     = "0x5200000000000000000000000000000000000009"
+	l1BuildStep2Address     = "0x520000000000000000000000000000000000000a"
+	l1BuildStep3Address     = "0x520000000000000000000000000000000000000b"
+	l1BuildStep4Address     = "0x520000000000000000000000000000000000000c"
+	l1BuildAllowListAddress = "0x520000000000000000000000000000000000000d"
 
 	l1BuildParam = &contract{
 		name:    "L1BuildParam",
@@ -121,9 +119,20 @@ var (
 		code:         allowListCode,
 		fixedStorage: map[string]interface{}{},
 	}
+
+	verseBuilderContractSet = &versebuilder{
+		l1BuildParam,
+		l1BuildDeposit,
+		l1BuildAgent,
+		l1BuildStep1,
+		l1BuildStep2,
+		l1BuildStep3,
+		l1BuildStep4,
+		l1BuildAllowList,
+	}
 )
 
-type versebuilder struct{}
+type versebuilder contractSet
 
 func (p *versebuilder) deploy(state *state.StateDB) {
 	switch GenesisHash {
@@ -139,17 +148,7 @@ func (p *versebuilder) deploy(state *state.StateDB) {
 		l1BuildDeposit.fixedStorage["0x01"] = common.Big1
 	}
 
-	contracts := []*contract{
-		l1BuildParam,
-		l1BuildDeposit,
-		l1BuildAgent,
-		l1BuildStep1,
-		l1BuildStep2,
-		l1BuildStep3,
-		l1BuildStep4,
-		l1BuildAllowList,
-	}
-	for _, c := range contracts {
+	for _, c := range *p {
 		c.deploy(state)
 	}
 }

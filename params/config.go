@@ -32,8 +32,8 @@ var (
 	SepoliaGenesisHash      = common.HexToHash("0x25a5cc106eea7138acab33231d7160d69cb777ee0c2c553fcddf5138993e6dd9")
 	RinkebyGenesisHash      = common.HexToHash("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
 	GoerliGenesisHash       = common.HexToHash("0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a")
-	OasysMainnetGenesisHash = common.HexToHash("0x2e1b928859fd5639dc653031339493b9033d5459b27dab2b49b7362b9620e5db")
-	OasysTestnetGenesisHash = common.HexToHash("0x80f74540f90b08ca8532afb2752c6a49604cf086dad26a537dd9b966db2728e0")
+	OasysMainnetGenesisHash = common.HexToHash("0x2759c556e190644c286d0ebbf425f3c087775003485ba8b179aa709b6eb5a84b")
+	OasysTestnetGenesisHash = common.HexToHash("0x36dd0fc193654dd597d7625714750c5194373eed447526062cc746fd5264fb4c")
 )
 
 // TrustedCheckpoints associates each known checkpoint with the genesis hash of
