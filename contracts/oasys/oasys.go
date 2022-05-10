@@ -28,10 +28,11 @@ var (
 
 	builtinContracts = map[uint64][]deployable{
 		1: {
-			wrappedOAS,
-			rollupContractSet,
 			tokenContractSet,
+			rollupContractSet,
+			tokenFactoryContractSet,
 			verseBuilderContractSet,
+			nftBridgeContractSet,
 		},
 	}
 )
