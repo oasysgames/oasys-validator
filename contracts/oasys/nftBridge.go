@@ -2,7 +2,6 @@ package oasys
 
 import (
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -40,7 +39,7 @@ var (
 
 type nftbridge contractSet
 
-func (p *nftbridge) deploy(state *state.StateDB) {
+func (p *nftbridge) deploy(state StateDB) {
 	var owner common.Address
 
 	switch GenesisHash {
@@ -50,13 +49,12 @@ func (p *nftbridge) deploy(state *state.StateDB) {
 		owner = common.HexToAddress(testnetGenesisWallet)
 	}
 
-	if owner != (common.Address{}) {
-		// address private _owner
-		nftBridgeMainchain.fixedStorage["0x00"] = owner
-		nftBridgeSidechain.fixedStorage["0x00"] = owner
-	}
-
 	for _, c := range *p {
-		c.deploy(state)
+		cpy := c.copy()
+		if (c == nftBridgeMainchain || c == nftBridgeSidechain) && owner != (common.Address{}) {
+			// address private _owner
+			cpy.fixedStorage["0x00"] = owner
+		}
+		cpy.deploy(state)
 	}
 }

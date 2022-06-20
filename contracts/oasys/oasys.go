@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
@@ -37,8 +36,15 @@ var (
 	}
 )
 
+// StateDB is an interface of state.StateDB.
+type StateDB interface {
+	GetCode(addr common.Address) []byte
+	SetCode(addr common.Address, code []byte)
+	SetState(addr common.Address, key common.Hash, value common.Hash)
+}
+
 // Deploy oasys built-in contracts.
-func Deploy(config *params.ChainConfig, state *state.StateDB, block uint64) {
+func Deploy(config *params.ChainConfig, state StateDB, block uint64) {
 	if config == nil || config.Oasys == nil || state == nil {
 		return
 	}
@@ -51,13 +57,13 @@ func Deploy(config *params.ChainConfig, state *state.StateDB, block uint64) {
 
 // deployable
 type deployable interface {
-	deploy(state *state.StateDB)
+	deploy(state StateDB)
 }
 
 // contractSet
 type contractSet []*contract
 
-func (p contractSet) deploy(state *state.StateDB) {
+func (p contractSet) deploy(state StateDB) {
 	for _, c := range p {
 		c.deploy(state)
 	}
@@ -72,7 +78,7 @@ type contract struct {
 	dynamicStorage map[string]string
 }
 
-func (c *contract) deploy(state *state.StateDB) {
+func (c *contract) deploy(state StateDB) {
 	address := common.HexToAddress(c.address)
 	if len(state.GetCode(address)) != 0 {
 		panic(fmt.Errorf("%s contract already exists", c.name))
@@ -147,6 +153,24 @@ func (c *contract) storage() (map[common.Hash]common.Hash, error) {
 	}
 
 	return storage, nil
+}
+
+// Returns the copied instance.
+func (c *contract) copy() *contract {
+	cpy := &contract{
+		name:           c.name,
+		address:        c.address,
+		code:           c.code,
+		fixedStorage:   make(map[string]interface{}),
+		dynamicStorage: make(map[string]string),
+	}
+	for key, value := range c.fixedStorage {
+		cpy.fixedStorage[key] = value
+	}
+	for key, value := range c.dynamicStorage {
+		cpy.dynamicStorage[key] = value
+	}
+	return cpy
 }
 
 func toChunks(s string, l int) []string {

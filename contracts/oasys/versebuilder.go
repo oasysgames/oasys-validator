@@ -4,7 +4,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -134,21 +133,24 @@ var (
 
 type versebuilder contractSet
 
-func (p *versebuilder) deploy(state *state.StateDB) {
-	switch GenesisHash {
-	case params.OasysMainnetGenesisHash:
-		// uint256 public requiredAmount
-		l1BuildDeposit.fixedStorage["0x00"] = new(big.Int).Mul(big.NewInt(params.Ether), big.NewInt(1_000_000))
-		// uint256 public lockedBlock
-		l1BuildDeposit.fixedStorage["0x01"] = big.NewInt(1_036_800)
-		// address private _owner
-		l1BuildAllowList.fixedStorage["0x00"] = common.HexToAddress(mainnetGenesisWallet)
-	default:
-		l1BuildDeposit.fixedStorage["0x00"] = big.NewInt(params.GWei)
-		l1BuildDeposit.fixedStorage["0x01"] = common.Big1
-	}
-
+func (p *versebuilder) deploy(state StateDB) {
+	isMainnet := GenesisHash == params.OasysMainnetGenesisHash
 	for _, c := range *p {
-		c.deploy(state)
+		cpy := c.copy()
+		if c == l1BuildDeposit {
+			if isMainnet {
+				// uint256 public requiredAmount
+				cpy.fixedStorage["0x00"] = new(big.Int).Mul(big.NewInt(params.Ether), big.NewInt(1_000_000))
+				// uint256 public lockedBlock
+				cpy.fixedStorage["0x01"] = big.NewInt(1_036_800)
+			} else {
+				cpy.fixedStorage["0x00"] = big.NewInt(params.GWei)
+				cpy.fixedStorage["0x01"] = common.Big1
+			}
+		} else if c == l1BuildAllowList && isMainnet {
+			// address private _owner
+			cpy.fixedStorage["0x00"] = common.HexToAddress(mainnetGenesisWallet)
+		}
+		cpy.deploy(state)
 	}
 }
