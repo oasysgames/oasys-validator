@@ -3,12 +3,13 @@ package oasys
 import (
 	"bytes"
 	"context"
+	"embed"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"math/big"
-	"strings"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts"
@@ -16,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus"
-	contracts "github.com/ethereum/go-ethereum/contracts/oasys"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -27,16 +27,30 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
-var (
+const (
+	// Oasys genesis contracts
+	environmentAddress  = "0x0000000000000000000000000000000000001000"
+	stakeManagerAddress = "0x0000000000000000000000000000000000001001"
+	allowListAddress    = "0x0000000000000000000000000000000000001002"
+)
 
-	// Oasys system contracts
+var (
+	//go:embed oasys-genesis-contract/artifacts/contracts/Environment.sol/Environment.json
+	//go:embed oasys-genesis-contract/artifacts/contracts/StakeManager.sol/StakeManager.json
+	artifacts embed.FS
+
+	// Oasys genesis contracts
 	environment = &systemContract{
-		address: contracts.Genesis.GetAddress(4096 * 1),
-		abis:    environmentAbi,
+		address: common.HexToAddress(environmentAddress),
+		artifact: &artifact{
+			path: "oasys-genesis-contract/artifacts/contracts/Environment.sol/Environment.json",
+		},
 	}
 	stakeManager = &systemContract{
-		address: contracts.Genesis.GetAddress(4096 * 2),
-		abis:    stakeManagerAbi,
+		address: common.HexToAddress(stakeManagerAddress),
+		artifact: &artifact{
+			path: "oasys-genesis-contract/artifacts/contracts/StakeManager.sol/StakeManager.json",
+		},
 	}
 	systemContracts = map[common.Address]bool{environment.address: true, stakeManager.address: true}
 )
@@ -45,7 +59,15 @@ func init() {
 	// Parse the system contract ABI
 	contracts := []*systemContract{environment, stakeManager}
 	for _, contract := range contracts {
-		ABI, err := abi.JSON(strings.NewReader(contract.abis))
+		rawData, err := artifacts.ReadFile(contract.artifact.path)
+		if err != nil {
+			panic(err)
+		}
+		if err = json.Unmarshal(rawData, contract.artifact); err != nil {
+			panic(err)
+		}
+
+		ABI, err := abi.JSON(bytes.NewReader(contract.artifact.Abi))
 		if err != nil {
 			panic(err)
 		}
@@ -53,11 +75,24 @@ func init() {
 	}
 }
 
+// artifact
+type artifact struct {
+	path             string
+	Abi              json.RawMessage `json:"abi"`
+	DeployedBytecode string          `json:"deployedBytecode"`
+}
+
 // systemContract
 type systemContract struct {
-	address common.Address
-	abi     *abi.ABI
-	abis    string
+	address  common.Address
+	abi      *abi.ABI
+	artifact *artifact
+}
+
+func (s *systemContract) verifyCode(state *state.StateDB) bool {
+	deployed := state.GetCode(s.address)
+	expect := common.FromHex(s.artifact.DeployedBytecode)
+	return bytes.Equal(deployed, expect)
 }
 
 // chainContext
@@ -197,6 +232,9 @@ func (c *Oasys) initializeSystemContracts(
 	mining bool,
 ) error {
 	// Initialize Environment contract
+	if !environment.verifyCode(state) {
+		return errors.New("invalid contract code: Environment")
+	}
 	data, err := environment.abi.Pack("initialize", getInitialEnvironment(c.config))
 	if err != nil {
 		return err
@@ -208,7 +246,10 @@ func (c *Oasys) initializeSystemContracts(
 	}
 
 	// Initialize StakeManager contract
-	data, err = stakeManager.abi.Pack("initialize", environment.address)
+	if !stakeManager.verifyCode(state) {
+		return errors.New("invalid contract code: StakeManager")
+	}
+	data, err = stakeManager.abi.Pack("initialize", environment.address, common.HexToAddress(allowListAddress))
 	if err != nil {
 		return err
 	}
