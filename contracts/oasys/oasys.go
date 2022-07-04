@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
@@ -47,8 +46,15 @@ var (
 	}
 )
 
+// StateDB is an interface of state.StateDB.
+type StateDB interface {
+	GetCode(addr common.Address) []byte
+	SetCode(addr common.Address, code []byte)
+	SetState(addr common.Address, key common.Hash, value common.Hash)
+}
+
 // Deploy oasys built-in contracts.
-func Deploy(config *params.ChainConfig, state *state.StateDB, block uint64) {
+func Deploy(config *params.ChainConfig, state StateDB, block uint64) {
 	if config == nil || config.Oasys == nil || state == nil {
 		return
 	}
@@ -70,13 +76,13 @@ func (p Namespace) GetAddress(offset int64) common.Address {
 
 // deployable
 type deployable interface {
-	deploy(state *state.StateDB)
+	deploy(state StateDB)
 }
 
 // contractSet
 type contractSet []*contract
 
-func (p contractSet) deploy(state *state.StateDB) {
+func (p contractSet) deploy(state StateDB) {
 	for _, c := range p {
 		c.deploy(state)
 	}
@@ -91,7 +97,7 @@ type contract struct {
 	dynamicStorage map[string]string
 }
 
-func (c *contract) deploy(state *state.StateDB) {
+func (c *contract) deploy(state StateDB) {
 	if len(state.GetCode(c.address)) != 0 {
 		panic(fmt.Errorf("%s contract already exists", c.name))
 	}

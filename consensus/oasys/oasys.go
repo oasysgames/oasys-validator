@@ -1129,16 +1129,16 @@ func backOffTime(validators []common.Address, stakes []*big.Int, epochPeriod, nu
 	}
 
 	turn := 0
-	prev := common.Address{}
+	prevs := make(map[common.Address]bool)
 	for {
 		picked := chooser.choice()
 		if picked == validator {
 			break
 		}
-		if picked == prev {
+		if prevs[picked] {
 			continue
 		}
-		prev = picked
+		prevs[picked] = true
 		turn++
 	}
 

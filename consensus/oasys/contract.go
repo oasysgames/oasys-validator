@@ -324,8 +324,12 @@ func (c *Oasys) slash(
 	return c.applyTransaction(msg, state, header, cx, txs, receipts, systemTxs, usedGas, mining)
 }
 
+type blockchainAPI interface {
+	Call(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *ethapi.StateOverride) (hexutil.Bytes, error)
+}
+
 // view functions
-func getNextValidators(ethAPI *ethapi.PublicBlockChainAPI, hash common.Hash) (*getNextValidatorsResult, error) {
+func getNextValidators(ethAPI blockchainAPI, hash common.Hash) (*getNextValidatorsResult, error) {
 	method := "getCurrentValidators"
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -357,7 +361,7 @@ func getNextValidators(ethAPI *ethapi.PublicBlockChainAPI, hash common.Hash) (*g
 	return &result, nil
 }
 
-func getRewards(ethAPI *ethapi.PublicBlockChainAPI, hash common.Hash) (*big.Int, error) {
+func getRewards(ethAPI blockchainAPI, hash common.Hash) (*big.Int, error) {
 	method := "getTotalRewards"
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -389,7 +393,7 @@ func getRewards(ethAPI *ethapi.PublicBlockChainAPI, hash common.Hash) (*big.Int,
 	return result, nil
 }
 
-func getNextEnvironmentValue(ethAPI *ethapi.PublicBlockChainAPI, hash common.Hash) (*environmentValue, error) {
+func getNextEnvironmentValue(ethAPI blockchainAPI, hash common.Hash) (*environmentValue, error) {
 	method := "nextValue"
 
 	ctx, cancel := context.WithCancel(context.Background())

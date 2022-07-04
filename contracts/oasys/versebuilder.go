@@ -4,7 +4,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -115,7 +114,7 @@ var (
 
 type versebuilder struct{}
 
-func (p *versebuilder) deploy(state *state.StateDB) {
+func (p *versebuilder) deploy(state StateDB) {
 	switch GenesisHash {
 	case params.OasysMainnetGenesisHash:
 		// uint256 public requiredAmount
