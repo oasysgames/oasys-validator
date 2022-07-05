@@ -9,7 +9,6 @@ import (
 
 var (
 	epochPeriod = uint64(40)
-	ether       = big.NewInt(1_000_000_000_000_000_000)
 
 	validators = []common.Address{
 		common.HexToAddress("0xd0887E868eCd4b16B75c60595DD0a7bA21Dbc0E9"),
@@ -123,10 +122,20 @@ func TestBackOffTime(t *testing.T) {
 		{119, []uint64{2, 3, 4, 0}},
 	}
 
+	wallets, accounts, err := makeWallets(1)
+	if err != nil {
+		t.Fatalf("failed to create test wallets: %v", err)
+	}
+
+	env, err := makeEnv(*wallets[0], *accounts[0])
+	if err != nil {
+		t.Fatalf("failed to create test env: %v", err)
+	}
+
 	for _, tc := range testCases {
 		for i, want := range tc.want {
 			validator := validators[i]
-			backoff := backOffTime(validators, stakes, epochPeriod, tc.block, validator)
+			backoff := backOffTime(env.chain, validators, stakes, epochPeriod, tc.block, validator)
 			if backoff != want {
 				t.Errorf("backoff mismatch, block %v, validator %v, got %v, want %v", tc.block, names[validator], backoff, want)
 			}
@@ -223,8 +232,18 @@ func TestGetValidatorSchedule(t *testing.T) {
 		{119, "validator-3"},
 	}
 
+	wallets, accounts, err := makeWallets(1)
+	if err != nil {
+		t.Fatalf("failed to create test wallets: %v", err)
+	}
+
+	env, err := makeEnv(*wallets[0], *accounts[0])
+	if err != nil {
+		t.Fatalf("failed to create test env: %v", err)
+	}
+
 	for _, tc := range testCases {
-		schedule := getValidatorSchedule(validators, stakes, epochPeriod, tc.block)
+		schedule := getValidatorSchedule(env.chain, validators, stakes, epochPeriod, tc.block)
 		got := names[schedule[tc.block]]
 		if got != tc.want {
 			t.Errorf("validator mismatch, block %v, got %v, want %v", tc.block, got, tc.want)
