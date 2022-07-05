@@ -262,7 +262,8 @@ func (c *Oasys) initializeSystemContracts(
 	return nil
 }
 
-func (c *Oasys) updateValidatorBlocks(
+func (c *Oasys) slash(
+	validator common.Address,
 	schedule map[uint64]common.Address,
 	state *state.StateDB,
 	header *types.Header,
@@ -273,50 +274,13 @@ func (c *Oasys) updateValidatorBlocks(
 	usedGas *uint64,
 	mining bool,
 ) error {
-	validators, blocks := getValidatorBlocks(schedule)
-	data, err := stakeManager.abi.Pack("updateValidatorBlocks", validators, blocks)
-	if err != nil {
-		return err
+	blocks := int64(0)
+	for _, address := range schedule {
+		if address == validator {
+			blocks++
+		}
 	}
-	msg := getMessage(header.Coinbase, stakeManager.address, data, common.Big0)
-	err = c.applyTransaction(msg, state, header, cx, txs, receipts, systemTxs, usedGas, mining)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (c *Oasys) updateValidators(
-	state *state.StateDB,
-	header *types.Header,
-	cx core.ChainContext,
-	txs *[]*types.Transaction,
-	receipts *[]*types.Receipt,
-	systemTxs *[]*types.Transaction,
-	usedGas *uint64,
-	mining bool,
-) error {
-	data, err := stakeManager.abi.Pack("updateValidators")
-	if err != nil {
-		return err
-	}
-	msg := getMessage(header.Coinbase, stakeManager.address, data, common.Big0)
-	return c.applyTransaction(msg, state, header, cx, txs, receipts, systemTxs, usedGas, mining)
-}
-
-func (c *Oasys) slash(
-	validator common.Address,
-	state *state.StateDB,
-	header *types.Header,
-	cx core.ChainContext,
-	txs *[]*types.Transaction,
-	receipts *[]*types.Receipt,
-	systemTxs *[]*types.Transaction,
-	usedGas *uint64,
-	mining bool,
-) error {
-	data, err := stakeManager.abi.Pack("slash", validator)
+	data, err := stakeManager.abi.Pack("slash", validator, big.NewInt(blocks))
 	if err != nil {
 		return err
 	}
@@ -330,7 +294,7 @@ type blockchainAPI interface {
 
 // view functions
 func getNextValidators(ethAPI blockchainAPI, hash common.Hash) (*getNextValidatorsResult, error) {
-	method := "getCurrentValidators"
+	method := "getNextValidators"
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

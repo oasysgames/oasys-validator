@@ -614,23 +614,10 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 		schedule = snap.getValidatorSchedule(env, number)
 	}
 
-	if env.IsEpoch(number + 1) {
-		if err := c.updateValidators(state, header, cx, txs, receipts, systemTxs, usedGas, false); err != nil {
-			log.Error("Failed to update validators", "in", "Finalize", "hash", hash, "number", number, "err", err)
+	if env.IsEpoch(number) && env.Epoch(number) > 2 {
+		if err := c.addBalanceToStakeManager(state, header.ParentHash); err != nil {
+			log.Error("Failed to add balance to staking contract", "in", "Finalize", "hash", header.ParentHash, "number", number, "err", err)
 			return err
-		}
-	}
-
-	if env.IsEpoch(number) {
-		if err := c.updateValidatorBlocks(schedule, state, header, cx, txs, receipts, systemTxs, usedGas, false); err != nil {
-			log.Error("Failed to update validator blocks", "in", "Finalize", "hash", hash, "number", number, "err", err)
-			return err
-		}
-		if env.Epoch(number) > 2 {
-			if err := c.addBalanceToStakeManager(state, header.ParentHash); err != nil {
-				log.Error("Failed to add balance to staking contract", "in", "Finalize", "hash", header.ParentHash, "number", number, "err", err)
-				return err
-			}
 		}
 	}
 
@@ -655,7 +642,7 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 		}
 		expectedValidator := schedule[number]
 		if validator != expectedValidator {
-			if err := c.slash(expectedValidator, state, header, cx, txs, receipts, systemTxs, usedGas, false); err != nil {
+			if err := c.slash(expectedValidator, schedule, state, header, cx, txs, receipts, systemTxs, usedGas, false); err != nil {
 				log.Error("Failed to slash validator", "in", "Finalize", "hash", hash, "number", number, "address", expectedValidator, "err", err)
 			}
 		}
@@ -715,30 +702,17 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 		schedule = snap.getValidatorSchedule(env, number)
 	}
 
-	if env.IsEpoch(number + 1) {
-		if err := c.updateValidators(state, header, cx, &txs, &receipts, nil, &header.GasUsed, true); err != nil {
-			log.Error("Failed to update validators", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "err", err)
+	if env.IsEpoch(number) && env.Epoch(number) > 2 {
+		if err := c.addBalanceToStakeManager(state, header.ParentHash); err != nil {
+			log.Error("Failed to add balance to staking contract", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "err", err)
 			return nil, nil, err
-		}
-	}
-
-	if env.IsEpoch(number) {
-		if err := c.updateValidatorBlocks(schedule, state, header, cx, &txs, &receipts, nil, &header.GasUsed, true); err != nil {
-			log.Error("Failed to update validator blocks", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "err", err)
-			return nil, nil, err
-		}
-		if env.Epoch(number) > 2 {
-			if err := c.addBalanceToStakeManager(state, header.ParentHash); err != nil {
-				log.Error("Failed to add balance to staking contract", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "err", err)
-				return nil, nil, err
-			}
 		}
 	}
 
 	if number >= c.config.Epoch && header.Difficulty.Cmp(diffInTurn) != 0 {
 		expectedValidator := schedule[number]
 		if header.Coinbase != expectedValidator {
-			if err := c.slash(expectedValidator, state, header, cx, &txs, &receipts, nil, &header.GasUsed, true); err != nil {
+			if err := c.slash(expectedValidator, schedule, state, header, cx, &txs, &receipts, nil, &header.GasUsed, true); err != nil {
 				log.Error("Failed to slash validator", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "address", expectedValidator, "err", err)
 			}
 		}
@@ -1103,21 +1077,6 @@ func getValidatorSchedule(validators []common.Address, stakes []*big.Int, epochP
 		ret[start+i] = chooser.choice()
 	}
 	return ret
-}
-
-func getValidatorBlocks(schedule map[uint64]common.Address) ([]common.Address, []*big.Int) {
-	counts := make(map[common.Address]uint64)
-	for _, address := range schedule {
-		counts[address]++
-	}
-
-	validators := []common.Address{}
-	blocks := []*big.Int{}
-	for address, count := range counts {
-		validators = append(validators, address)
-		blocks = append(blocks, new(big.Int).SetUint64(count))
-	}
-	return sortValidatorsAndValues(validators, blocks)
 }
 
 func backOffTime(validators []common.Address, stakes []*big.Int, epochPeriod, number uint64, validator common.Address) uint64 {
