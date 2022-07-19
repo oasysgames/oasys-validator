@@ -136,6 +136,11 @@ func (p *environmentValue) Epoch(number uint64) uint64 {
 	return p.StartEpoch.Uint64() + (number-p.StartBlock.Uint64())/p.EpochPeriod.Uint64()
 }
 
+func (p *environmentValue) GetFirstBlock(number uint64) uint64 {
+	elapsedEpoch := p.Epoch(number) - p.StartEpoch.Uint64()
+	return p.StartBlock.Uint64() + elapsedEpoch*p.EpochPeriod.Uint64()
+}
+
 func (p *environmentValue) Copy() *environmentValue {
 	return &environmentValue{
 		StartBlock:         new(big.Int).Set(p.StartBlock),
@@ -182,7 +187,7 @@ func (p *getNextValidatorsResult) Exists(validator common.Address) bool {
 func getInitialEnvironment(config *params.OasysConfig) *environmentValue {
 	return &environmentValue{
 		StartBlock:         common.Big0,
-		StartEpoch:         common.Big0,
+		StartEpoch:         common.Big1,
 		BlockPeriod:        big.NewInt(int64(config.Period)),
 		EpochPeriod:        big.NewInt(int64(config.Epoch)),
 		RewardRate:         big.NewInt(10),

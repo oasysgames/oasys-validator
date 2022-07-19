@@ -932,7 +932,7 @@ func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash)
 }
 
 func (c *Oasys) getValidatorSchedule(chain consensus.ChainHeaderReader, result *getNextValidatorsResult, env *environmentValue, number uint64) map[uint64]common.Address {
-	return getValidatorSchedule(chain, result.Operators, result.Stakes, env.EpochPeriod.Uint64(), number)
+	return getValidatorSchedule(chain, result.Operators, result.Stakes, env, number)
 }
 
 func (c *Oasys) backOffTime(chain consensus.ChainHeaderReader, result *getNextValidatorsResult,
@@ -940,7 +940,7 @@ func (c *Oasys) backOffTime(chain consensus.ChainHeaderReader, result *getNextVa
 	if !result.Exists(validator) {
 		return 0
 	}
-	return backOffTime(chain, result.Operators, result.Stakes, env.EpochPeriod.Uint64(), number, validator)
+	return backOffTime(chain, result.Operators, result.Stakes, env, number, validator)
 }
 
 func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header) (*environmentValue, error) {
@@ -1052,9 +1052,10 @@ func newWeightedRandomChooser(
 	chain consensus.ChainHeaderReader,
 	validators []common.Address,
 	stakes []*big.Int,
-	epochPeriod, number uint64,
+	env *environmentValue,
+	number uint64,
 ) *weightedRandomChooser {
-	start := getEpochStartBlock(epochPeriod, number)
+	start := env.GetFirstBlock(number)
 	seed := int64(start)
 	if start > 0 {
 		if header := chain.GetHeaderByNumber(start - 1); header != nil {
@@ -1077,9 +1078,10 @@ func newWeightedRandomChooser(
 	return chooser
 }
 
-func getValidatorSchedule(chain consensus.ChainHeaderReader, validators []common.Address, stakes []*big.Int, epochPeriod, number uint64) map[uint64]common.Address {
-	start := getEpochStartBlock(epochPeriod, number)
-	chooser := newWeightedRandomChooser(chain, validators, stakes, epochPeriod, number)
+func getValidatorSchedule(chain consensus.ChainHeaderReader, validators []common.Address, stakes []*big.Int, env *environmentValue, number uint64) map[uint64]common.Address {
+	start := env.GetFirstBlock(number)
+	chooser := newWeightedRandomChooser(chain, validators, stakes, env, number)
+	epochPeriod := env.EpochPeriod.Uint64()
 	ret := make(map[uint64]common.Address)
 	for i := uint64(0); i < epochPeriod; i++ {
 		ret[start+i] = chooser.choice()
@@ -1087,9 +1089,9 @@ func getValidatorSchedule(chain consensus.ChainHeaderReader, validators []common
 	return ret
 }
 
-func backOffTime(chain consensus.ChainHeaderReader, validators []common.Address, stakes []*big.Int, epochPeriod, number uint64, validator common.Address) uint64 {
-	start := getEpochStartBlock(epochPeriod, number)
-	chooser := newWeightedRandomChooser(chain, validators, stakes, epochPeriod, number)
+func backOffTime(chain consensus.ChainHeaderReader, validators []common.Address, stakes []*big.Int, env *environmentValue, number uint64, validator common.Address) uint64 {
+	start := env.GetFirstBlock(number)
+	chooser := newWeightedRandomChooser(chain, validators, stakes, env, number)
 	for i := number - start; i > 0; i-- {
 		chooser.skip()
 	}
@@ -1112,8 +1114,4 @@ func backOffTime(chain consensus.ChainHeaderReader, validators []common.Address,
 		return 0
 	}
 	return uint64(turn) + backoffWiggleTime
-}
-
-func getEpochStartBlock(epochPeriod, number uint64) uint64 {
-	return uint64(number/epochPeriod) * epochPeriod
 }

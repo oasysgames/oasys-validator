@@ -179,7 +179,7 @@ func (s *Snapshot) exists(validator common.Address) bool {
 
 func (s *Snapshot) getValidatorSchedule(chain consensus.ChainHeaderReader, env *environmentValue, number uint64) map[uint64]common.Address {
 	validators, stakes := s.validatorsToTuple()
-	return getValidatorSchedule(chain, validators, stakes, env.EpochPeriod.Uint64(), number)
+	return getValidatorSchedule(chain, validators, stakes, env, number)
 }
 
 func (s *Snapshot) backOffTime(chain consensus.ChainHeaderReader, env *environmentValue, number uint64, validator common.Address) uint64 {
@@ -187,7 +187,7 @@ func (s *Snapshot) backOffTime(chain consensus.ChainHeaderReader, env *environme
 		return 0
 	}
 	validators, stakes := s.validatorsToTuple()
-	return backOffTime(chain, validators, stakes, env.EpochPeriod.Uint64(), number, validator)
+	return backOffTime(chain, validators, stakes, env, number, validator)
 }
 
 func (s *Snapshot) validatorsToTuple() ([]common.Address, []*big.Int) {
