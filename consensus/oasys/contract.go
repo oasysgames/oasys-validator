@@ -129,7 +129,7 @@ type environmentValue struct {
 }
 
 func (p *environmentValue) IsEpoch(number uint64) bool {
-	return number%p.EpochPeriod.Uint64() == 0
+	return (number-p.StartBlock.Uint64())%p.EpochPeriod.Uint64() == 0
 }
 
 func (p *environmentValue) Epoch(number uint64) uint64 {
