@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	epochPeriod = uint64(40)
+	epochPeriod = big.NewInt(40)
 
 	validators = []common.Address{
 		common.HexToAddress("0xd0887E868eCd4b16B75c60595DD0a7bA21Dbc0E9"),
@@ -132,10 +132,16 @@ func TestBackOffTime(t *testing.T) {
 		t.Fatalf("failed to create test env: %v", err)
 	}
 
+	envValue := &environmentValue{
+		StartBlock:  common.Big0,
+		StartEpoch:  common.Big1,
+		EpochPeriod: epochPeriod,
+	}
+
 	for _, tc := range testCases {
 		for i, want := range tc.want {
 			validator := validators[i]
-			backoff := backOffTime(env.chain, validators, stakes, epochPeriod, tc.block, validator)
+			backoff := backOffTime(env.chain, validators, stakes, envValue, tc.block, validator)
 			if backoff != want {
 				t.Errorf("backoff mismatch, block %v, validator %v, got %v, want %v", tc.block, names[validator], backoff, want)
 			}
@@ -242,8 +248,14 @@ func TestGetValidatorSchedule(t *testing.T) {
 		t.Fatalf("failed to create test env: %v", err)
 	}
 
+	envValue := &environmentValue{
+		StartBlock:  common.Big0,
+		StartEpoch:  common.Big1,
+		EpochPeriod: epochPeriod,
+	}
+
 	for _, tc := range testCases {
-		schedule := getValidatorSchedule(env.chain, validators, stakes, epochPeriod, tc.block)
+		schedule := getValidatorSchedule(env.chain, validators, stakes, envValue, tc.block)
 		got := names[schedule[tc.block]]
 		if got != tc.want {
 			t.Errorf("validator mismatch, block %v, got %v, want %v", tc.block, got, tc.want)
