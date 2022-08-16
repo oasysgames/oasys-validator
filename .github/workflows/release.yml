@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v2
+        with:
+          submodules: true
 
       - name: Build Binary - ${{ matrix.os }} ${{ matrix.arch }}
         if: matrix.arch == 'amd64'

@@ -3,12 +3,13 @@ package oasys
 import (
 	"bytes"
 	"context"
+	"embed"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"math/big"
-	"strings"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts"
@@ -28,19 +29,28 @@ import (
 
 const (
 	// Oasys genesis contracts
-	environmentContractAddress  = "0x0000000000000000000000000000000000001000"
-	stakeManagerContractAddress = "0x0000000000000000000000000000000000001001"
-	allowListContractAddress    = "0x0000000000000000000000000000000000001002"
+	environmentAddress  = "0x0000000000000000000000000000000000001000"
+	stakeManagerAddress = "0x0000000000000000000000000000000000001001"
+	allowListAddress    = "0x0000000000000000000000000000000000001002"
 )
 
 var (
+	//go:embed oasys-genesis-contract/artifacts/contracts/Environment.sol/Environment.json
+	//go:embed oasys-genesis-contract/artifacts/contracts/StakeManager.sol/StakeManager.json
+	artifacts embed.FS
+
+	// Oasys genesis contracts
 	environment = &systemContract{
-		address: common.HexToAddress(environmentContractAddress),
-		abis:    environmentAbi,
+		address: common.HexToAddress(environmentAddress),
+		artifact: &artifact{
+			path: "oasys-genesis-contract/artifacts/contracts/Environment.sol/Environment.json",
+		},
 	}
 	stakeManager = &systemContract{
-		address: common.HexToAddress(stakeManagerContractAddress),
-		abis:    stakeManagerAbi,
+		address: common.HexToAddress(stakeManagerAddress),
+		artifact: &artifact{
+			path: "oasys-genesis-contract/artifacts/contracts/StakeManager.sol/StakeManager.json",
+		},
 	}
 	genesisContracts = map[common.Address]bool{
 		environment.address:  true,
@@ -52,7 +62,15 @@ func init() {
 	// Parse the system contract ABI
 	contracts := []*systemContract{environment, stakeManager}
 	for _, contract := range contracts {
-		ABI, err := abi.JSON(strings.NewReader(contract.abis))
+		rawData, err := artifacts.ReadFile(contract.artifact.path)
+		if err != nil {
+			panic(err)
+		}
+		if err = json.Unmarshal(rawData, contract.artifact); err != nil {
+			panic(err)
+		}
+
+		ABI, err := abi.JSON(bytes.NewReader(contract.artifact.Abi))
 		if err != nil {
 			panic(err)
 		}
@@ -60,11 +78,24 @@ func init() {
 	}
 }
 
+// artifact
+type artifact struct {
+	path             string
+	Abi              json.RawMessage `json:"abi"`
+	DeployedBytecode string          `json:"deployedBytecode"`
+}
+
 // systemContract
 type systemContract struct {
-	address common.Address
-	abi     *abi.ABI
-	abis    string
+	address  common.Address
+	abi      *abi.ABI
+	artifact *artifact
+}
+
+func (s *systemContract) verifyCode(state *state.StateDB) bool {
+	deployed := state.GetCode(s.address)
+	expect := common.FromHex(s.artifact.DeployedBytecode)
+	return bytes.Equal(deployed, expect)
 }
 
 // chainContext
@@ -101,11 +132,16 @@ type environmentValue struct {
 }
 
 func (p *environmentValue) IsEpoch(number uint64) bool {
-	return number%p.EpochPeriod.Uint64() == 0
+	return (number-p.StartBlock.Uint64())%p.EpochPeriod.Uint64() == 0
 }
 
 func (p *environmentValue) Epoch(number uint64) uint64 {
 	return p.StartEpoch.Uint64() + (number-p.StartBlock.Uint64())/p.EpochPeriod.Uint64()
+}
+
+func (p *environmentValue) GetFirstBlock(number uint64) uint64 {
+	elapsedEpoch := p.Epoch(number) - p.StartEpoch.Uint64()
+	return p.StartBlock.Uint64() + elapsedEpoch*p.EpochPeriod.Uint64()
 }
 
 func (p *environmentValue) Copy() *environmentValue {
@@ -154,7 +190,7 @@ func (p *getNextValidatorsResult) Exists(validator common.Address) bool {
 func getInitialEnvironment(config *params.OasysConfig) *environmentValue {
 	return &environmentValue{
 		StartBlock:         common.Big0,
-		StartEpoch:         common.Big0,
+		StartEpoch:         common.Big1,
 		BlockPeriod:        big.NewInt(int64(config.Period)),
 		EpochPeriod:        big.NewInt(int64(config.Epoch)),
 		RewardRate:         big.NewInt(10),
@@ -204,6 +240,9 @@ func (c *Oasys) initializeSystemContracts(
 	mining bool,
 ) error {
 	// Initialize Environment contract
+	if !environment.verifyCode(state) {
+		return errors.New("invalid contract code: Environment")
+	}
 	data, err := environment.abi.Pack("initialize", getInitialEnvironment(c.config))
 	if err != nil {
 		return err
@@ -215,7 +254,10 @@ func (c *Oasys) initializeSystemContracts(
 	}
 
 	// Initialize StakeManager contract
-	data, err = stakeManager.abi.Pack("initialize", environment.address, common.HexToAddress(allowListContractAddress))
+	if !stakeManager.verifyCode(state) {
+		return errors.New("invalid contract code: StakeManager")
+	}
+	data, err = stakeManager.abi.Pack("initialize", environment.address, common.HexToAddress(allowListAddress))
 	if err != nil {
 		return err
 	}
@@ -228,7 +270,8 @@ func (c *Oasys) initializeSystemContracts(
 	return nil
 }
 
-func (c *Oasys) updateValidatorBlocks(
+func (c *Oasys) slash(
+	validator common.Address,
 	schedule map[uint64]common.Address,
 	state *state.StateDB,
 	header *types.Header,
@@ -239,31 +282,13 @@ func (c *Oasys) updateValidatorBlocks(
 	usedGas *uint64,
 	mining bool,
 ) error {
-	validators, blocks := getValidatorBlocks(schedule)
-	data, err := stakeManager.abi.Pack("updateValidatorBlocks", validators, blocks)
-	if err != nil {
-		return err
+	blocks := int64(0)
+	for _, address := range schedule {
+		if address == validator {
+			blocks++
+		}
 	}
-	msg := getMessage(header.Coinbase, stakeManager.address, data, common.Big0)
-	err = c.applyTransaction(msg, state, header, cx, txs, receipts, systemTxs, usedGas, mining)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (c *Oasys) updateValidators(
-	state *state.StateDB,
-	header *types.Header,
-	cx core.ChainContext,
-	txs *[]*types.Transaction,
-	receipts *[]*types.Receipt,
-	systemTxs *[]*types.Transaction,
-	usedGas *uint64,
-	mining bool,
-) error {
-	data, err := stakeManager.abi.Pack("updateValidators")
+	data, err := stakeManager.abi.Pack("slash", validator, big.NewInt(blocks))
 	if err != nil {
 		return err
 	}
@@ -271,28 +296,13 @@ func (c *Oasys) updateValidators(
 	return c.applyTransaction(msg, state, header, cx, txs, receipts, systemTxs, usedGas, mining)
 }
 
-func (c *Oasys) slash(
-	validator common.Address,
-	state *state.StateDB,
-	header *types.Header,
-	cx core.ChainContext,
-	txs *[]*types.Transaction,
-	receipts *[]*types.Receipt,
-	systemTxs *[]*types.Transaction,
-	usedGas *uint64,
-	mining bool,
-) error {
-	data, err := stakeManager.abi.Pack("slash", validator)
-	if err != nil {
-		return err
-	}
-	msg := getMessage(header.Coinbase, stakeManager.address, data, common.Big0)
-	return c.applyTransaction(msg, state, header, cx, txs, receipts, systemTxs, usedGas, mining)
+type blockchainAPI interface {
+	Call(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *ethapi.StateOverride) (hexutil.Bytes, error)
 }
 
 // view functions
-func getNextValidators(ethAPI *ethapi.PublicBlockChainAPI, hash common.Hash) (*getNextValidatorsResult, error) {
-	method := "getCurrentValidators"
+func getNextValidators(ethAPI blockchainAPI, hash common.Hash) (*getNextValidatorsResult, error) {
+	method := "getNextValidators"
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -323,7 +333,7 @@ func getNextValidators(ethAPI *ethapi.PublicBlockChainAPI, hash common.Hash) (*g
 	return &result, nil
 }
 
-func getRewards(ethAPI *ethapi.PublicBlockChainAPI, hash common.Hash) (*big.Int, error) {
+func getRewards(ethAPI blockchainAPI, hash common.Hash) (*big.Int, error) {
 	method := "getTotalRewards"
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -355,7 +365,7 @@ func getRewards(ethAPI *ethapi.PublicBlockChainAPI, hash common.Hash) (*big.Int,
 	return result, nil
 }
 
-func getNextEnvironmentValue(ethAPI *ethapi.PublicBlockChainAPI, hash common.Hash) (*environmentValue, error) {
+func getNextEnvironmentValue(ethAPI blockchainAPI, hash common.Hash) (*environmentValue, error) {
 	method := "nextValue"
 
 	ctx, cancel := context.WithCancel(context.Background())

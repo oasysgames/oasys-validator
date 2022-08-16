@@ -49,6 +49,8 @@ var (
 
 	diffInTurn = big.NewInt(2) // Block difficulty for in-turn signatures
 	diffNoTurn = big.NewInt(1) // Block difficulty for out-of-turn signatures
+
+	ether = big.NewInt(1_000_000_000_000_000_000)
 )
 
 // Various error messages to mark blocks invalid. These should be private to
@@ -304,14 +306,14 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 			log.Error("Failed to get validators", "in", "verifyCascadingFields", "hash", header.ParentHash, "number", number, "err", err)
 			return err
 		}
-		backoff = c.backOffTime(result, env, number, header.Coinbase)
+		backoff = c.backOffTime(chain, result, env, number, header.Coinbase)
 	} else {
 		// Retrieve the snapshot needed to verify this header and cache it
 		snap, err := c.snapshot(chain, number-1, header.ParentHash, parents)
 		if err != nil {
 			return err
 		}
-		backoff = snap.backOffTime(env, number, header.Coinbase)
+		backoff = snap.backOffTime(chain, env, number, header.Coinbase)
 	}
 	if header.Time < parent.Time+env.BlockPeriod.Uint64()+backoff {
 		return consensus.ErrFutureBlock
@@ -469,14 +471,14 @@ func (c *Oasys) verifySeal(chain consensus.ChainHeaderReader, header *types.Head
 			return err
 		}
 		exists = result.Exists(validator)
-		schedule = c.getValidatorSchedule(result, env, number)
+		schedule = c.getValidatorSchedule(chain, result, env, number)
 	} else {
 		snap, err := c.snapshot(chain, number-1, header.ParentHash, parents)
 		if err != nil {
 			return err
 		}
 		exists = snap.exists(validator)
-		schedule = snap.getValidatorSchedule(env, number)
+		schedule = snap.getValidatorSchedule(chain, env, number)
 	}
 	if !exists {
 		return errUnauthorizedValidator
@@ -533,15 +535,15 @@ func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 			header.Extra = append(header.Extra, validator[:]...)
 		}
 
-		backoff = c.backOffTime(result, env, number, c.signer)
-		schedule = c.getValidatorSchedule(result, env, number)
+		backoff = c.backOffTime(chain, result, env, number, c.signer)
+		schedule = c.getValidatorSchedule(chain, result, env, number)
 	} else {
 		snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
 		if err != nil {
 			return err
 		}
-		backoff = snap.backOffTime(env, number, c.signer)
-		schedule = snap.getValidatorSchedule(env, number)
+		backoff = snap.backOffTime(chain, env, number, c.signer)
+		schedule = snap.getValidatorSchedule(chain, env, number)
 	}
 
 	// Add extra seal
@@ -605,32 +607,19 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 			log.Error("Failed to get validators", "in", "Finalize", "hash", header.ParentHash, "number", number, "err", err)
 			return err
 		}
-		schedule = c.getValidatorSchedule(nextValidators, env, number)
+		schedule = c.getValidatorSchedule(chain, nextValidators, env, number)
 	} else {
 		snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
 		if err != nil {
 			return err
 		}
-		schedule = snap.getValidatorSchedule(env, number)
+		schedule = snap.getValidatorSchedule(chain, env, number)
 	}
 
-	if env.IsEpoch(number + 1) {
-		if err := c.updateValidators(state, header, cx, txs, receipts, systemTxs, usedGas, false); err != nil {
-			log.Error("Failed to update validators", "in", "Finalize", "hash", hash, "number", number, "err", err)
+	if env.IsEpoch(number) && env.Epoch(number) > 2 {
+		if err := c.addBalanceToStakeManager(state, header.ParentHash); err != nil {
+			log.Error("Failed to add balance to staking contract", "in", "Finalize", "hash", header.ParentHash, "number", number, "err", err)
 			return err
-		}
-	}
-
-	if env.IsEpoch(number) {
-		if err := c.updateValidatorBlocks(schedule, state, header, cx, txs, receipts, systemTxs, usedGas, false); err != nil {
-			log.Error("Failed to update validator blocks", "in", "Finalize", "hash", hash, "number", number, "err", err)
-			return err
-		}
-		if env.Epoch(number) > 2 {
-			if err := c.addBalanceToStakeManager(state, header.ParentHash); err != nil {
-				log.Error("Failed to add balance to staking contract", "in", "Finalize", "hash", header.ParentHash, "number", number, "err", err)
-				return err
-			}
 		}
 	}
 
@@ -655,7 +644,7 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 		}
 		expectedValidator := schedule[number]
 		if validator != expectedValidator {
-			if err := c.slash(expectedValidator, state, header, cx, txs, receipts, systemTxs, usedGas, false); err != nil {
+			if err := c.slash(expectedValidator, schedule, state, header, cx, txs, receipts, systemTxs, usedGas, false); err != nil {
 				log.Error("Failed to slash validator", "in", "Finalize", "hash", hash, "number", number, "address", expectedValidator, "err", err)
 			}
 		}
@@ -706,39 +695,26 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 			log.Error("Failed to get validators", "in", "FinalizeAndAssemble", "hash", header.ParentHash, "number", number, "err", err)
 			return nil, nil, err
 		}
-		schedule = c.getValidatorSchedule(nextValidators, env, number)
+		schedule = c.getValidatorSchedule(chain, nextValidators, env, number)
 	} else {
 		snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
 		if err != nil {
 			return nil, nil, err
 		}
-		schedule = snap.getValidatorSchedule(env, number)
+		schedule = snap.getValidatorSchedule(chain, env, number)
 	}
 
-	if env.IsEpoch(number + 1) {
-		if err := c.updateValidators(state, header, cx, &txs, &receipts, nil, &header.GasUsed, true); err != nil {
-			log.Error("Failed to update validators", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "err", err)
+	if env.IsEpoch(number) && env.Epoch(number) > 2 {
+		if err := c.addBalanceToStakeManager(state, header.ParentHash); err != nil {
+			log.Error("Failed to add balance to staking contract", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "err", err)
 			return nil, nil, err
-		}
-	}
-
-	if env.IsEpoch(number) {
-		if err := c.updateValidatorBlocks(schedule, state, header, cx, &txs, &receipts, nil, &header.GasUsed, true); err != nil {
-			log.Error("Failed to update validator blocks", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "err", err)
-			return nil, nil, err
-		}
-		if env.Epoch(number) > 2 {
-			if err := c.addBalanceToStakeManager(state, header.ParentHash); err != nil {
-				log.Error("Failed to add balance to staking contract", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "err", err)
-				return nil, nil, err
-			}
 		}
 	}
 
 	if number >= c.config.Epoch && header.Difficulty.Cmp(diffInTurn) != 0 {
 		expectedValidator := schedule[number]
 		if header.Coinbase != expectedValidator {
-			if err := c.slash(expectedValidator, state, header, cx, &txs, &receipts, nil, &header.GasUsed, true); err != nil {
+			if err := c.slash(expectedValidator, schedule, state, header, cx, &txs, &receipts, nil, &header.GasUsed, true); err != nil {
 				log.Error("Failed to slash validator", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "address", expectedValidator, "err", err)
 			}
 		}
@@ -853,13 +829,13 @@ func (c *Oasys) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, p
 			log.Error("Failed to get validators", "in", "Seal", "hash", parent.Hash(), "number", number, "err", err)
 			return nil
 		}
-		schedule = c.getValidatorSchedule(result, env, number)
+		schedule = c.getValidatorSchedule(chain, result, env, number)
 	} else {
 		snap, err := c.snapshot(chain, number, parent.Hash(), nil)
 		if err != nil {
 			return nil
 		}
-		schedule = snap.getValidatorSchedule(env, number)
+		schedule = snap.getValidatorSchedule(chain, env, number)
 	}
 
 	if schedule[number] == c.signer {
@@ -955,17 +931,16 @@ func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash)
 	return nil
 }
 
-func (c *Oasys) getValidatorSchedule(result *getNextValidatorsResult,
-	env *environmentValue, number uint64) map[uint64]common.Address {
-	return getValidatorSchedule(result.Operators, result.Stakes, env.EpochPeriod.Uint64(), number)
+func (c *Oasys) getValidatorSchedule(chain consensus.ChainHeaderReader, result *getNextValidatorsResult, env *environmentValue, number uint64) map[uint64]common.Address {
+	return getValidatorSchedule(chain, result.Operators, result.Stakes, env, number)
 }
 
-func (c *Oasys) backOffTime(result *getNextValidatorsResult,
+func (c *Oasys) backOffTime(chain consensus.ChainHeaderReader, result *getNextValidatorsResult,
 	env *environmentValue, number uint64, validator common.Address) uint64 {
 	if !result.Exists(validator) {
 		return 0
 	}
-	return backOffTime(result.Operators, result.Stakes, env.EpochPeriod.Uint64(), number, validator)
+	return backOffTime(chain, result.Operators, result.Stakes, env, number, validator)
 }
 
 func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header) (*environmentValue, error) {
@@ -1074,14 +1049,23 @@ func (c *weightedRandomChooser) skip() {
 }
 
 func newWeightedRandomChooser(
-	random *rand.Rand,
+	chain consensus.ChainHeaderReader,
 	validators []common.Address,
 	stakes []*big.Int,
+	env *environmentValue,
+	number uint64,
 ) *weightedRandomChooser {
-	ether := big.NewInt(1_000_000_000_000_000_000)
+	start := env.GetFirstBlock(number)
+	seed := int64(start)
+	if start > 0 {
+		if header := chain.GetHeaderByNumber(start - 1); header != nil {
+			seed = header.Hash().Big().Int64()
+		}
+	}
+
 	validators, stakes = sortValidatorsAndValues(validators, stakes)
 	chooser := &weightedRandomChooser{
-		random:     random,
+		random:     rand.New(rand.NewSource(seed)),
 		validators: make([]common.Address, len(validators)),
 		totals:     make([]int, len(stakes)),
 		max:        0,
@@ -1094,10 +1078,10 @@ func newWeightedRandomChooser(
 	return chooser
 }
 
-func getValidatorSchedule(validators []common.Address, stakes []*big.Int, epochPeriod, number uint64) map[uint64]common.Address {
-	start := uint64(number/epochPeriod) * epochPeriod
-	random := rand.New(rand.NewSource(int64(start)))
-	chooser := newWeightedRandomChooser(random, validators, stakes)
+func getValidatorSchedule(chain consensus.ChainHeaderReader, validators []common.Address, stakes []*big.Int, env *environmentValue, number uint64) map[uint64]common.Address {
+	start := env.GetFirstBlock(number)
+	chooser := newWeightedRandomChooser(chain, validators, stakes, env, number)
+	epochPeriod := env.EpochPeriod.Uint64()
 	ret := make(map[uint64]common.Address)
 	for i := uint64(0); i < epochPeriod; i++ {
 		ret[start+i] = chooser.choice()
@@ -1105,40 +1089,24 @@ func getValidatorSchedule(validators []common.Address, stakes []*big.Int, epochP
 	return ret
 }
 
-func getValidatorBlocks(schedule map[uint64]common.Address) ([]common.Address, []*big.Int) {
-	counts := make(map[common.Address]uint64)
-	for _, address := range schedule {
-		counts[address]++
-	}
-
-	validators := []common.Address{}
-	blocks := []*big.Int{}
-	for address, count := range counts {
-		validators = append(validators, address)
-		blocks = append(blocks, new(big.Int).SetUint64(count))
-	}
-	return sortValidatorsAndValues(validators, blocks)
-}
-
-func backOffTime(validators []common.Address, stakes []*big.Int, epochPeriod, number uint64, validator common.Address) uint64 {
-	start := uint64(number/epochPeriod) * epochPeriod
-	random := rand.New(rand.NewSource(int64(start)))
-	chooser := newWeightedRandomChooser(random, validators, stakes)
+func backOffTime(chain consensus.ChainHeaderReader, validators []common.Address, stakes []*big.Int, env *environmentValue, number uint64, validator common.Address) uint64 {
+	start := env.GetFirstBlock(number)
+	chooser := newWeightedRandomChooser(chain, validators, stakes, env, number)
 	for i := number - start; i > 0; i-- {
 		chooser.skip()
 	}
 
 	turn := 0
-	prev := common.Address{}
+	prevs := make(map[common.Address]bool)
 	for {
 		picked := chooser.choice()
 		if picked == validator {
 			break
 		}
-		if picked == prev {
+		if prevs[picked] {
 			continue
 		}
-		prev = picked
+		prevs[picked] = true
 		turn++
 	}
 
