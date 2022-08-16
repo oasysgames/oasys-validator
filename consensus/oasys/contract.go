@@ -52,7 +52,10 @@ var (
 			path: "oasys-genesis-contract/artifacts/contracts/StakeManager.sol/StakeManager.json",
 		},
 	}
-	systemContracts = map[common.Address]bool{environment.address: true, stakeManager.address: true}
+	genesisContracts = map[common.Address]bool{
+		environment.address:  true,
+		stakeManager.address: true,
+	}
 )
 
 func init() {
@@ -219,7 +222,7 @@ func (c *Oasys) IsSystemTransaction(tx *types.Transaction, header *types.Header)
 	if err != nil {
 		return false, errors.New("unauthorized transaction")
 	}
-	if sender == header.Coinbase && systemContracts[*tx.To()] && tx.GasPrice().Cmp(common.Big0) == 0 {
+	if sender == header.Coinbase && genesisContracts[*tx.To()] && tx.GasPrice().Cmp(common.Big0) == 0 {
 		return true, nil
 	}
 	return false, nil

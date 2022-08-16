@@ -41,13 +41,13 @@ jobs:
             arm64v8/golang:1.17.8-buster make geth
 
       - name: Compress Binary
-        run: zip -j geth-${{ matrix.os }}-${{ matrix.arch }}.zip ./build/bin/geth
+        run: zip -j geth-${{ github.ref_name }}-${{ matrix.os }}-${{ matrix.arch }}.zip ./build/bin/geth
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v2
         with:
           name: ${{ github.ref_name }}
-          path: geth-${{ matrix.os }}-${{ matrix.arch }}.zip
+          path: geth-${{ github.ref_name }}-${{ matrix.os }}-${{ matrix.arch }}.zip
 
   release:
     name: Release
@@ -66,9 +66,15 @@ jobs:
       - name: Archive genesis.json
         run: zip -r genesis.zip genesis
 
+      - name: Create setup.sh
+        run: |
+          sed -e 's#__REPOSITORY__#${{ github.repository }}#' .github/setup_template.sh | \
+          sed -e 's#__RELEASE__#${{ github.ref_name }}#' > setup.sh
+
       - name: Create sha256sums.txt
         run: |
           sha256sum genesis.zip > sha256sums.txt
+          sha256sum setup.sh >> sha256sums.txt
           (cd artifacts && sha256sum *) >> sha256sums.txt
 
       - name: Create Release
@@ -81,13 +87,13 @@ jobs:
           release_name: Release ${{ github.ref_name }}
           draft: true
 
-      - name: Upload Asset - Linux x86_64
+      - name: Upload Asset - Linux amd64
         uses: actions/upload-release-asset@v1.0.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: artifacts/geth-linux-amd64.zip
+          asset_path: artifacts/geth-${{ github.ref_name }}-linux-amd64.zip
           asset_name: geth-${{ github.ref_name }}-linux-amd64.zip
           asset_content_type: application/zip
 
@@ -97,7 +103,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: artifacts/geth-linux-arm64.zip
+          asset_path: artifacts/geth-${{ github.ref_name }}-linux-arm64.zip
           asset_name: geth-${{ github.ref_name }}-linux-arm64.zip
           asset_content_type: application/zip
 
@@ -110,6 +116,16 @@ jobs:
           asset_path: genesis.zip
           asset_name: genesis.zip
           asset_content_type: application/zip
+
+      - name: Upload Asset - setup.sh
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: setup.sh
+          asset_name: setup.sh
+          asset_content_type: text/plain
 
       - name: Upload Asset - sha256sums.txt
         uses: actions/upload-release-asset@v1.0.1
