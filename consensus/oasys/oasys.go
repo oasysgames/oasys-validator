@@ -301,7 +301,7 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 	}
 	var backoff uint64
 	if number > 0 && env.IsEpoch(number) {
-		result, err := getNextValidators(c.ethAPI, header.ParentHash)
+		result, err := getNextValidators(c.ethAPI, header.ParentHash, env.Epoch(number))
 		if err != nil {
 			log.Error("Failed to get validators", "in", "verifyCascadingFields", "hash", header.ParentHash, "number", number, "err", err)
 			return err
@@ -465,7 +465,7 @@ func (c *Oasys) verifySeal(chain consensus.ChainHeaderReader, header *types.Head
 		schedule map[uint64]common.Address
 	)
 	if number > 0 && env.IsEpoch(number) {
-		result, err := getNextValidators(c.ethAPI, header.ParentHash)
+		result, err := getNextValidators(c.ethAPI, header.ParentHash, env.Epoch(number))
 		if err != nil {
 			log.Error("Failed to get validators", "in", "verifySeal", "hash", header.ParentHash, "number", number, "err", err)
 			return err
@@ -523,7 +523,7 @@ func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 		schedule map[uint64]common.Address
 	)
 	if number > 0 && env.IsEpoch(number) {
-		result, err := getNextValidators(c.ethAPI, header.ParentHash)
+		result, err := getNextValidators(c.ethAPI, header.ParentHash, env.Epoch(number))
 		if err != nil {
 			log.Error("Failed to get validators", "in", "Prepare", "hash", header.ParentHash, "number", number, "err", err)
 			return err
@@ -602,7 +602,7 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 		nextValidators *getNextValidatorsResult
 	)
 	if env.IsEpoch(number) {
-		nextValidators, err = getNextValidators(c.ethAPI, header.ParentHash)
+		nextValidators, err = getNextValidators(c.ethAPI, header.ParentHash, env.Epoch(number))
 		if err != nil {
 			log.Error("Failed to get validators", "in", "Finalize", "hash", header.ParentHash, "number", number, "err", err)
 			return err
@@ -690,7 +690,7 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 
 	var schedule map[uint64]common.Address
 	if env.IsEpoch(number) {
-		nextValidators, err := getNextValidators(c.ethAPI, header.ParentHash)
+		nextValidators, err := getNextValidators(c.ethAPI, header.ParentHash, env.Epoch(number))
 		if err != nil {
 			log.Error("Failed to get validators", "in", "FinalizeAndAssemble", "hash", header.ParentHash, "number", number, "err", err)
 			return nil, nil, err
@@ -767,7 +767,7 @@ func (c *Oasys) Seal(chain consensus.ChainHeaderReader, block *types.Block, resu
 	// Bail out if we're unauthorized to sign a block
 	var exists bool
 	if number > 0 && env.IsEpoch(number) {
-		result, err := getNextValidators(c.ethAPI, header.ParentHash)
+		result, err := getNextValidators(c.ethAPI, header.ParentHash, env.Epoch(number))
 		if err != nil {
 			log.Error("Failed to get validators", "in", "Seal", "hash", header.ParentHash, "number", number, "err", err)
 			return err
@@ -824,7 +824,7 @@ func (c *Oasys) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, p
 
 	var schedule map[uint64]common.Address
 	if env.IsEpoch(number) {
-		result, err := getNextValidators(c.ethAPI, parent.Hash())
+		result, err := getNextValidators(c.ethAPI, parent.Hash(), env.Epoch(number))
 		if err != nil {
 			log.Error("Failed to get validators", "in", "Seal", "hash", parent.Hash(), "number", number, "err", err)
 			return nil

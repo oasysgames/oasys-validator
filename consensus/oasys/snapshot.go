@@ -130,7 +130,7 @@ func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderRea
 
 		var exists bool
 		if number > 0 && number%snap.Environment.EpochPeriod.Uint64() == 0 {
-			nextValidator, err := getNextValidators(s.ethAPI, header.ParentHash)
+			nextValidator, err := getNextValidators(s.ethAPI, header.ParentHash, snap.Environment.Epoch(number))
 			if err != nil {
 				log.Error("Failed to get validators", "in", "Snapshot.apply", "hash", header.ParentHash, "number", number, "err", err)
 				return nil, err
