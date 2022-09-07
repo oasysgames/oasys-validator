@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -157,36 +158,122 @@ func TestSlash(t *testing.T) {
 }
 
 func TestGetNextValidators(t *testing.T) {
-	wantOwner := common.HexToAddress("0x8e7545C66468422b2Aea17C714990c3C332d897e")
-	wantOperator := common.HexToAddress("0xd0887E868eCd4b16B75c60595DD0a7bA21Dbc0E9")
-	wantStake := new(big.Int).Mul(big.NewInt(10_000_000), big.NewInt(params.Ether))
+	addressArrTy, _ := abi.NewType("address[]", "", nil)
+	uint256ArrTy, _ := abi.NewType("uint256[]", "", nil)
+	boolArrTy, _ := abi.NewType("bool[]", "", nil)
+	uint256Ty, _ := abi.NewType("uint256", "", nil)
+	arguments := abi.Arguments{
+		{Type: addressArrTy},
+		{Type: addressArrTy},
+		{Type: uint256ArrTy},
+		{Type: boolArrTy},
+		{Type: uint256Ty},
+	}
 
-	ethapi := &testBlockchainAPI{common.FromHex("0x000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000000010000000000000000000000008e7545c66468422b2aea17c714990c3c332d897e0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000d0887e868ecd4b16b75c60595dd0a7ba21dbc0e90000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000084595161401484a000000")}
-	got, _ := getNextValidators(ethapi, common.Hash{})
-	if len(got.Owners) != 1 {
-		t.Errorf("len(Owners) != 1")
+	var (
+		wantOwners = []common.Address{
+			common.HexToAddress("0x01"),
+			common.HexToAddress("0x02"),
+			common.HexToAddress("0x03"),
+		}
+		wantOperators = []common.Address{
+			common.HexToAddress("0x04"),
+			common.HexToAddress("0x05"),
+			common.HexToAddress("0x06"),
+		}
+		wantStakes = []*big.Int{
+			big.NewInt(0),
+			big.NewInt(1),
+			big.NewInt(2),
+		}
+	)
+	var (
+		rbytes    = make([][]byte, 7)
+		howMany   = 100
+		newCursor = howMany
+	)
+	for i := 0; i < len(rbytes); i++ {
+		var (
+			owners     = make([]common.Address, howMany)
+			operators  = make([]common.Address, howMany)
+			stakes     = make([]*big.Int, howMany)
+			candidates = make([]bool, howMany)
+		)
+		for j := 0; j < howMany; j++ {
+			if i%len(wantOwners) == 0 && j == howMany/2 {
+				idx := i / len(wantOwners)
+				owners[j] = wantOwners[idx]
+				operators[j] = wantOperators[idx]
+				stakes[j] = wantStakes[idx]
+				candidates[j] = true
+			} else {
+				owners[j] = common.Address{}
+				operators[j] = common.Address{}
+				stakes[j] = big.NewInt(0)
+				candidates[j] = false
+			}
+		}
+
+		rbyte, _ := arguments.Pack(owners, operators, stakes, candidates, big.NewInt(int64(newCursor)))
+		rbytes[i] = rbyte
+
+		if i == len(rbytes)-1 {
+			rbyte, _ := arguments.Pack([]common.Address{}, []common.Address{}, []*big.Int{}, []bool{}, big.NewInt(int64(newCursor)))
+			rbytes = append(rbytes, rbyte)
+			break
+		}
+
+		newCursor += howMany
 	}
-	if len(got.Operators) != 1 {
-		t.Errorf("len(Operators) != 1")
+
+	ethapi := &testBlockchainAPI{rbytes: rbytes}
+	got, _ := getNextValidators(ethapi, common.Hash{}, 1)
+	if len(got.Owners) != len(wantOwners) {
+		t.Errorf("invalid owners length, got: %d, want: %d", len(got.Owners), len(wantOwners))
 	}
-	if len(got.Stakes) != 1 {
-		t.Errorf("len(Stakes) != 1")
+	if len(got.Operators) != len(wantOperators) {
+		t.Errorf("invalid operators length, got: %d, want: %d", len(got.Operators), len(wantOperators))
 	}
-	if got.Owners[0] != wantOwner {
-		t.Errorf("invalid owner, got %v, want: %v", got.Owners[0], wantOwner)
+	if len(got.Stakes) != len(wantStakes) {
+		t.Errorf("invalid stakes length, got: %d, want: %d", len(got.Stakes), len(wantStakes))
 	}
-	if got.Operators[0] != wantOperator {
-		t.Errorf("invalid operator, got %v, want: %v", got.Operators[0], wantOperator)
+	for i, want := range wantOwners {
+		got := got.Owners[i]
+		if got != want {
+			t.Errorf("invalid owner, got %v, want: %v", got, want)
+		}
 	}
-	if got.Stakes[0].Cmp(wantStake) != 0 {
-		t.Errorf("invalid stake, got %v, want: %v", got.Stakes[0], wantStake)
+	for i, want := range wantOperators {
+		got := got.Operators[i]
+		if got != want {
+			t.Errorf("invalid operator, got %v, want: %v", got, want)
+		}
+	}
+	for i, want := range wantStakes {
+		got := got.Stakes[i]
+		if got.Cmp(want) != 0 {
+			t.Errorf("invalid stake, got %v, want: %v", got, want)
+		}
 	}
 }
 
 func TestGetRewards(t *testing.T) {
 	want := big.NewInt(1902587519025875190)
 
-	ethapi := &testBlockchainAPI{common.FromHex("0x0000000000000000000000000000000000000000000000001a675944a9a108f6")}
+	addressArrTy, _ := abi.NewType("address[]", "", nil)
+	uint256Ty, _ := abi.NewType("uint256", "", nil)
+	rbytes := make([][]byte, 2)
+
+	// mocking to getValidatorOwners method
+	rbyte, _ := abi.Arguments{{Type: addressArrTy}, {Type: uint256Ty}}.
+		Pack([]common.Address{}, common.Big0)
+	rbytes[0] = rbyte
+
+	// mocking to getTotalRewards method
+	rbyte, _ = abi.Arguments{{Type: uint256Ty}}.Pack(want)
+	rbytes[1] = rbyte
+
+	ethapi := &testBlockchainAPI{rbytes: rbytes}
 	got, _ := getRewards(ethapi, common.Hash{})
 	if got.Cmp(want) != 0 {
 		t.Errorf("got %v, want: %v", got, want)
@@ -200,12 +287,38 @@ func TestGetNextEnvironmentValue(t *testing.T) {
 		BlockPeriod:        big.NewInt(3),
 		EpochPeriod:        big.NewInt(20),
 		RewardRate:         big.NewInt(10),
+		CommissionRate:     big.NewInt(15),
 		ValidatorThreshold: new(big.Int).Mul(big.NewInt(params.Ether), big.NewInt(10_000_000)),
 		JailThreshold:      big.NewInt(500),
 		JailPeriod:         big.NewInt(2),
 	}
 
-	ethapi := &testBlockchainAPI{common.FromHex("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000084595161401484a00000000000000000000000000000000000000000000000000000000000000000001f40000000000000000000000000000000000000000000000000000000000000002")}
+	uint256Ty, _ := abi.NewType("uint256", "", nil)
+	arguments := abi.Arguments{
+		{Type: uint256Ty},
+		{Type: uint256Ty},
+		{Type: uint256Ty},
+		{Type: uint256Ty},
+		{Type: uint256Ty},
+		{Type: uint256Ty},
+		{Type: uint256Ty},
+		{Type: uint256Ty},
+		{Type: uint256Ty},
+	}
+
+	rbyte, _ := arguments.Pack(
+		want.StartBlock,
+		want.StartEpoch,
+		want.BlockPeriod,
+		want.EpochPeriod,
+		want.RewardRate,
+		want.CommissionRate,
+		want.ValidatorThreshold,
+		want.JailThreshold,
+		want.JailPeriod,
+	)
+
+	ethapi := &testBlockchainAPI{rbytes: [][]byte{rbyte}}
 	got, _ := getNextEnvironmentValue(ethapi, common.Hash{})
 
 	if got.StartBlock.Cmp(want.StartBlock) != 0 {
@@ -228,6 +341,10 @@ func TestGetNextEnvironmentValue(t *testing.T) {
 		t.Errorf("RewardRate, got %v, want: %v", got.RewardRate, want.RewardRate)
 	}
 
+	if got.CommissionRate.Cmp(want.CommissionRate) != 0 {
+		t.Errorf("CommissionRate, got %v, want: %v", got.CommissionRate, want.CommissionRate)
+	}
+
 	if got.ValidatorThreshold.Cmp(want.ValidatorThreshold) != 0 {
 		t.Errorf("ValidatorThreshold, got %v, want: %v", got.ValidatorThreshold, want.ValidatorThreshold)
 	}
@@ -242,11 +359,13 @@ func TestGetNextEnvironmentValue(t *testing.T) {
 }
 
 type testBlockchainAPI struct {
-	rbytes []byte
+	rbytes [][]byte
+	count  int
 }
 
 func (p *testBlockchainAPI) Call(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *ethapi.StateOverride) (hexutil.Bytes, error) {
-	return p.rbytes, nil
+	defer func() { p.count++ }()
+	return p.rbytes[p.count], nil
 }
 
 type testEnv struct {
@@ -328,6 +447,7 @@ func makeEnv(wallet accounts.Wallet, account accounts.Account) (*testEnv, error)
 						        uint256 blockPeriod;
 						        uint256 epochPeriod;
 						        uint256 rewardRate;
+								uint256 commissionRate;
 						        uint256 validatorThreshold;
 						        uint256 jailThreshold;
 						        uint256 jailPeriod;
@@ -343,7 +463,7 @@ func makeEnv(wallet accounts.Wallet, account accounts.Account) (*testEnv, error)
 						    }
 						}
 					*/
-					Code:    common.FromHex("0x608060405234801561001057600080fd5b50600436106100365760003560e01c8063158ef93e1461003b578063f38e08e11461006a575b600080fd5b60005461004e906001600160a01b031681565b6040516001600160a01b03909116815260200160405180910390f35b61007d6100783660046100bc565b61007f565b005b600080546001600160a01b03191660011781556040517f5daa87a0e9463431830481fd4b6e3403442dfb9a12b9c07597e9f61d50b633c89190a150565b60006101008083850312156100cf578182fd5b6040519081019067ffffffffffffffff821181831017156100fe57634e487b7160e01b83526041600452602483fd5b81604052833581526020840135602082015260408401356040820152606084013560608201526080840135608082015260a084013560a082015260c084013560c082015260e084013560e082015280925050509291505056fea264697066735822122085ce3ed80b68bcb59b7305e51231593534de9b80fa9929e4b994451c5fe705a064736f6c63430008020033"),
+					Code:    common.FromHex("0x608060405234801561001057600080fd5b50600436106100365760003560e01c806308a543561461003b578063158ef93e14610050575b600080fd5b61004e6100493660046100f4565b61007f565b005b600054610063906001600160a01b031681565b6040516001600160a01b03909116815260200160405180910390f35b600080546001600160a01b03191660011781556040517f5daa87a0e9463431830481fd4b6e3403442dfb9a12b9c07597e9f61d50b633c89190a150565b604051610120810167ffffffffffffffff811182821017156100ee57634e487b7160e01b600052604160045260246000fd5b60405290565b6000610120828403121561010757600080fd5b61010f6100bc565b823581526020830135602082015260408301356040820152606083013560608201526080830135608082015260a083013560a082015260c083013560c082015260e083013560e0820152610100808401358183015250809150509291505056fea264697066735822122041f32989a5b45778808b251b74c621d5d19de8c37be0b731a89cb63b775dd07b64736f6c634300080c0033"),
 					Balance: common.Big0,
 				},
 				_stakeManagerAddress: {
