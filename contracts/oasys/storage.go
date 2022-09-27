@@ -15,6 +15,7 @@ import (
 
 const (
 	storageSlotSize = 64
+	hexPrefix       = "0x"
 )
 
 type storage map[string]interface{}
@@ -31,20 +32,36 @@ func (s storage) build() (map[common.Hash]common.Hash, error) {
 	return storage, nil
 }
 
-// Returns the copied instance.
-func (s storage) copy() storage {
-	cpy := storage{}
-	for key, val := range s {
-		switch t := val.(type) {
-		case *big.Int:
-			cpy[key] = common.BigToHash(t)
-		case mapping:
-			cpy[key] = t.copy()
-		default:
-			cpy[key] = t
-		}
+// Different storage values for each genesis.
+type genesismap map[common.Hash]interface{}
+
+// Add values to storage.
+func (g genesismap) add(storage map[common.Hash]common.Hash, rootSlot common.Hash) error {
+	if val, ok := g[GenesisHash]; ok {
+		return setStorage(storage, rootSlot, val)
 	}
-	return cpy
+	if val, ok := g[defaultGenesisHash]; ok {
+		return setStorage(storage, rootSlot, val)
+	}
+	return nil
+}
+
+// `array` type storage.
+type array []interface{}
+
+// Add array values to storage.
+func (a *array) add(storage map[common.Hash]common.Hash, rootSlot common.Hash) error {
+	storage[rootSlot] = common.BigToHash(big.NewInt(int64(len(*a))))
+
+	slot := new(big.Int).SetBytes(crypto.Keccak256(rootSlot.Bytes()))
+	for _, val := range *a {
+		if err := setStorage(storage, common.BigToHash(slot), val); err != nil {
+			return err
+		}
+		slot.Add(slot, common.Big1)
+	}
+
+	return nil
 }
 
 // `mapping` type storage.
@@ -70,18 +87,6 @@ func (m *mapping) add(storage map[common.Hash]common.Hash, rootSlot common.Hash)
 	return nil
 }
 
-// Returns the copied instance.
-func (m *mapping) copy() *mapping {
-	cpy := &mapping{
-		keyType: m.keyType,
-		values:  map[string]interface{}{},
-	}
-	for k, v := range m.values {
-		cpy.values[k] = v
-	}
-	return cpy
-}
-
 func setStorage(storage map[common.Hash]common.Hash, slot common.Hash, val interface{}) error {
 	switch t := val.(type) {
 	case common.Hash:
@@ -90,10 +95,12 @@ func setStorage(storage map[common.Hash]common.Hash, slot common.Hash, val inter
 		storage[slot] = t.Hash()
 	case *big.Int:
 		storage[slot] = common.BigToHash(t)
+	case array:
+		return t.add(storage, slot)
 	case mapping:
-		if err := t.add(storage, slot); err != nil {
-			return err
-		}
+		return t.add(storage, slot)
+	case genesismap:
+		return t.add(storage, slot)
 	case string:
 		isHex := strings.HasPrefix(t, hexPrefix)
 		if isHex {
