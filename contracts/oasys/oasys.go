@@ -12,8 +12,8 @@ const (
 	AllowListAddress    = "0x0000000000000000000000000000000000001002"
 
 	// Address of initial wallet in genesis.
-	mainnetGenesisWalletAddress = "0x54288e1CA4EDc0FB2cC6ea60AD189FAAF386dBc2"
-	testnetGenesisWalletAddress = "0xBA6c8AB502D878aa250654820c579e71d14aF791"
+	mainnetGenesisWalletAddress = "0xdF3548cD5e355202AE92e766c7361eA4F6687A61"
+	testnetGenesisWalletAddress = "0xbf9Ec8a822519C00128f0c7C13f13cafF0501Aea"
 )
 
 var (
