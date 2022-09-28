@@ -113,12 +113,12 @@ case "$NETWORK" in
     1)
         NETWORK=mainnet
         NETWORK_ID=248
-        ENODE="enode://093c363d9fa759b58cb0a59d8ca664b4b4981873dc0305b113edf6d0c865089ed9894300b385e58bb3da2f7b8b575170522c5f542a9d47cbff7d28d3c8c8dd65@35.73.174.118:30303"
+        BOOTNODES="enode://1e68361cb0e761e0789c014acdbd2491f30176acf25480408382916632e58af1711d857c75be5917319d06049937e49c09ca51a28590e6ee22aceca1161fd583@3.113.207.39:30301,enode://24a55fd923d780213d15f5551bcbb7171343ef095512927d91baca3e7917124c679f894282eefec37350088b31c45a49bb28df790eb88f487ad60a9b6ccc8f3b@35.238.159.190:30301"
         ;;
     2)
         NETWORK=testnet
         NETWORK_ID=9372
-        ENODE="enode://4a85df39ec500acd31d4b9feeea1d024afee5e8df4bc29325c2abf2e0a02a34f6ece24aca06cb5027675c167ecf95a9fc23fb7a0f671f84edb07dafe6e729856@35.77.156.6:30303"
+        BOOTNODES="enode://4a85df39ec500acd31d4b9feeea1d024afee5e8df4bc29325c2abf2e0a02a34f6ece24aca06cb5027675c167ecf95a9fc23fb7a0f671f84edb07dafe6e729856@3.113.59.173:30303"
         ;;
     *)
         msg_err "Select 1 or 2 for the network."
@@ -128,7 +128,6 @@ esac
 HOME_DIR=/home/$SERVICE_USER
 WALLET_FILE=$HOME_DIR/.ethereum/wallet.txt
 PASSWORD_FILE=$HOME_DIR/.ethereum/password.txt
-STATIC_NODE_FILE=$HOME_DIR/.ethereum/geth/static-nodes.json
 UNIT_FILE=/usr/lib/systemd/system/geth.service
 
 cd $(mktemp -d)
@@ -189,16 +188,6 @@ fi
 
 spacer
 
-msg_blue "5. Create a static node configuration"
-if [ -f $STATIC_NODE_FILE ]; then
-    echo skip
-else
-    echo -n "[\"${ENODE}\"]" > $STATIC_NODE_FILE
-    echo "Created: $STATIC_NODE_FILE"
-fi
-
-spacer
-
 msg_blue  "6. Create a systemd unit"
 if [ -f $UNIT_FILE ]; then
     echo skip
@@ -213,6 +202,7 @@ Type=simple
 
 Environment=DATA_DIR=$HOME_DIR/.ethereum
 Environment=NETWORK_ID=$NETWORK_ID
+Environment=BOOTNODES=$BOOTNODES
 Environment=ETHERBASE=$ETHERBASE
 Environment=PASSWORD=$PASSWORD_FILE
 Environment=GASLIMIT=30000000
@@ -220,7 +210,9 @@ Environment=GASLIMIT=30000000
 ExecStart=$INSTALL_PATH \\
   --datadir \${DATA_DIR} \\
   --networkid \${NETWORK_ID} \\
-  --miner.etherbase \${ETHERBASE} --miner.gaslimit \${GASLIMIT}$SYSTEMD_OPTS \\
+  --bootnodes \${BOOTNODES} \\
+  --miner.etherbase \${ETHERBASE} \\
+  --miner.gaslimit \${GASLIMIT}$SYSTEMD_OPTS \\
   --syncmode full --gcmode archive
 
 KillMode=process
