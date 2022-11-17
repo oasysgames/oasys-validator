@@ -34,14 +34,16 @@ func Deploy(chainConfig *params.ChainConfig, state StateDB, block uint64) {
 		return
 	}
 
-	deploy, ok := deployments[GenesisHash]
+	deploymentMap, ok := deploymentSets[GenesisHash]
 	if !ok {
-		deploy = deployments[defaultGenesisHash]
+		deploymentMap = deploymentSets[defaultGenesisHash]
 	}
 
-	if contracts, ok := deploy[block]; ok {
-		for _, c := range contracts {
-			c.deploy(state, block)
+	if deploymentSet, ok := deploymentMap[block]; ok {
+		for _, deployments := range deploymentSet {
+			for _, d := range deployments {
+				d.deploy(state, block)
+			}
 		}
 	}
 }
