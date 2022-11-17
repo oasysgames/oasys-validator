@@ -1,6 +1,12 @@
 package oasys
 
 var (
+	// Genesis
+	stakeManager = &contract{
+		name:    "StakeManager",
+		address: "0x0000000000000000000000000000000000001001",
+	}
+
 	// ERC20 Tokens
 	wrappedOAS = &contract{
 		name:    "WOAS",
@@ -9,6 +15,10 @@ var (
 	stakableOAS = &contract{
 		name:    "SOAS",
 		address: "0x5200000000000000000000000000000000000002",
+	}
+	lockedOAS = &contract{
+		name:    "LOAS",
+		address: "0x5200000000000000000000000000000000000023",
 	}
 
 	// FT/NFT Factory
@@ -73,6 +83,46 @@ var (
 	sccVerifier = &contract{
 		name:    "OasysStateCommitmentChainVerifier",
 		address: "0x5200000000000000000000000000000000000014",
+	}
+
+	// cBridge / Powered by Celer Network.
+	cBridgeBridge = &contract{
+		name:    "cBridge/Bridge",
+		address: "0x5200000000000000000000000000000000000015",
+	}
+	cBridgeOriginalTokenVaultV2 = &contract{
+		name:    "cBridge/OriginalTokenVaultV2",
+		address: "0x5200000000000000000000000000000000000016",
+	}
+	cBridgePeggedTokenBridgeV2 = &contract{
+		name:    "cBridge/PeggedTokenBridgeV2",
+		address: "0x5200000000000000000000000000000000000017",
+	}
+
+	// Tealswap / Powered by SOOHO.IO Inc.
+	tealswapFactory = &contract{
+		name:    "Tealswap/TealswapFactory",
+		address: "0x5200000000000000000000000000000000000018",
+	}
+	tealswapRouter = &contract{
+		name:    "Tealswap/TealswapRouter",
+		address: "0x5200000000000000000000000000000000000019",
+	}
+
+	// tofuNFT / Powered by JINJA Foundation Ltd.
+	tofunftMarketNG = &contract{
+		name:    "tofuNFT/MarketNG",
+		address: "0x5200000000000000000000000000000000000020",
+	}
+
+	// multicall
+	multicall = &contract{
+		name:    "Multicall",
+		address: "0x5200000000000000000000000000000000000021",
+	}
+	multicall2 = &contract{
+		name:    "Multicall2",
+		address: "0x5200000000000000000000000000000000000022",
 	}
 )
 
