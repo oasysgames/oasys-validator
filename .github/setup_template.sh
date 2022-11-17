@@ -118,7 +118,7 @@ case "$NETWORK" in
     2)
         NETWORK=testnet
         NETWORK_ID=9372
-        BOOTNODES="enode://4a85df39ec500acd31d4b9feeea1d024afee5e8df4bc29325c2abf2e0a02a34f6ece24aca06cb5027675c167ecf95a9fc23fb7a0f671f84edb07dafe6e729856@3.113.59.173:30303"
+        BOOTNODES="enode://4a85df39ec500acd31d4b9feeea1d024afee5e8df4bc29325c2abf2e0a02a34f6ece24aca06cb5027675c167ecf95a9fc23fb7a0f671f84edb07dafe6e729856@34.142.254.12:30301"
         ;;
     *)
         msg_err "Select 1 or 2 for the network."
