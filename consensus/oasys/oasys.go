@@ -616,11 +616,9 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 		schedule = snap.getValidatorSchedule(chain, env, number)
 	}
 
-	if env.IsEpoch(number) && env.Epoch(number) > 2 {
-		if err := c.addBalanceToStakeManager(state, header.ParentHash); err != nil {
-			log.Error("Failed to add balance to staking contract", "in", "Finalize", "hash", header.ParentHash, "number", number, "err", err)
-			return err
-		}
+	if err := c.addBalanceToStakeManager(state, header.ParentHash, number, env); err != nil {
+		log.Error("Failed to add balance to staking contract", "in", "Finalize", "hash", header.ParentHash, "number", number, "err", err)
+		return err
 	}
 
 	if number >= c.config.Epoch && header.Difficulty.Cmp(diffInTurn) != 0 {
@@ -704,11 +702,9 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 		schedule = snap.getValidatorSchedule(chain, env, number)
 	}
 
-	if env.IsEpoch(number) && env.Epoch(number) > 2 {
-		if err := c.addBalanceToStakeManager(state, header.ParentHash); err != nil {
-			log.Error("Failed to add balance to staking contract", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "err", err)
-			return nil, nil, err
-		}
+	if err := c.addBalanceToStakeManager(state, header.ParentHash, number, env); err != nil {
+		log.Error("Failed to add balance to staking contract", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "err", err)
+		return nil, nil, err
 	}
 
 	if number >= c.config.Epoch && header.Difficulty.Cmp(diffInTurn) != 0 {
@@ -912,7 +908,11 @@ func encodeSigHeader(w io.Writer, header *types.Header) {
 	}
 }
 
-func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash) error {
+func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash, number uint64, env *environmentValue) error {
+	if !env.IsEpoch(number) || env.Epoch(number) < 3 || env.Epoch(number) > 60 {
+		return nil
+	}
+
 	var (
 		rewards *big.Int
 		err     error
