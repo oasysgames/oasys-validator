@@ -716,6 +716,13 @@ func _deployments4(genesisHash common.Hash, contracts wantContracts) {
 	contracts["0x5200000000000000000000000000000000000019"].codeHash = "4f0022a690d7d0c129b3ebb98189c859"
 }
 
+func _deployments5(genesisHash common.Hash, contracts wantContracts) {
+	contracts["0x0000000000000000000000000000000000001001"] = &wantContract{
+		name:     "StakeManager",
+		codeHash: "6b27b9390ac94f453964e28131abd35a",
+	}
+}
+
 func TestDeploy(t *testing.T) {
 	type wantDeployments []struct {
 		block  uint64
@@ -736,6 +743,7 @@ func TestDeploy(t *testing.T) {
 				{1, []deployFn{_deployments0}},
 				{235000, []deployFn{_deployments1}},
 				{309600, []deployFn{_deployments2, _deployments3, _deployments4}},
+				{419000, []deployFn{_deployments5}},
 			},
 		},
 		{
@@ -748,6 +756,7 @@ func TestDeploy(t *testing.T) {
 				{200800, []deployFn{_deployments1}},
 				{269700, []deployFn{_deployments3}},
 				{293000, []deployFn{_deployments4}},
+				{385000, []deployFn{_deployments5}},
 			},
 		},
 		{
@@ -760,6 +769,7 @@ func TestDeploy(t *testing.T) {
 				{3, []deployFn{_deployments2}},
 				{4, []deployFn{_deployments3}},
 				{5, []deployFn{_deployments4}},
+				{6, []deployFn{_deployments5}},
 			},
 		},
 	}
