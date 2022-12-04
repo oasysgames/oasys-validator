@@ -41,6 +41,7 @@ jobs:
             arm64v8/golang:1.17.8-buster make geth
 
       - name: Check version label
+        if: matrix.arch == 'amd64'
         run: './build/bin/geth version | grep -q "Version: $(echo ${{ github.ref_name }} | cut -c 2-10)"'
 
       - name: Compress Binary
