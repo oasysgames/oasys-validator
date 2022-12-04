@@ -40,6 +40,9 @@ jobs:
             -e GOARCH=${{ matrix.arch }} \
             arm64v8/golang:1.17.8-buster make geth
 
+      - name: Check version label
+        run: './build/bin/geth version | grep -q "Version: $(echo ${{ github.ref_name }} | cut -c 2-10)"'
+
       - name: Compress Binary
         run: zip -j geth-${{ github.ref_name }}-${{ matrix.os }}-${{ matrix.arch }}.zip ./build/bin/geth
 
