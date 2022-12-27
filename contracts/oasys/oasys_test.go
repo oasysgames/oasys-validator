@@ -723,6 +723,17 @@ func _deployments5(genesisHash common.Hash, contracts wantContracts) {
 	}
 }
 
+func _deployments6(genesisHash common.Hash, contracts wantContracts) {
+	contracts["0x0000000000000000000000000000000000001001"] = &wantContract{
+		name:     "StakeManager",
+		codeHash: "735838a05b27e27f0b494cd92daf9488",
+	}
+	contracts["0x5200000000000000000000000000000000000014"] = &wantContract{
+		name:     "OasysStateCommitmentChainVerifier",
+		codeHash: "a5f4d408c91a65184c6d32af3573652f",
+	}
+}
+
 func TestDeploy(t *testing.T) {
 	type wantDeployments []struct {
 		block  uint64
@@ -744,6 +755,7 @@ func TestDeploy(t *testing.T) {
 				{235000, []deployFn{_deployments1}},
 				{309600, []deployFn{_deployments2, _deployments3, _deployments4}},
 				{419000, []deployFn{_deployments5}},
+				{557100, []deployFn{_deployments6}},
 			},
 		},
 		{
@@ -757,6 +769,7 @@ func TestDeploy(t *testing.T) {
 				{269700, []deployFn{_deployments3}},
 				{293000, []deployFn{_deployments4}},
 				{385000, []deployFn{_deployments5}},
+				{546400, []deployFn{_deployments6}},
 			},
 		},
 		{
@@ -770,6 +783,7 @@ func TestDeploy(t *testing.T) {
 				{4, []deployFn{_deployments3}},
 				{5, []deployFn{_deployments4}},
 				{6, []deployFn{_deployments5}},
+				{7, []deployFn{_deployments6}},
 			},
 		},
 	}
