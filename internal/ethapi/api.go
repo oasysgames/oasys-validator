@@ -1680,11 +1680,6 @@ func (s *PublicTransactionPoolAPI) sign(addr common.Address, tx *types.Transacti
 
 // SubmitTransaction is a helper function that submits tx to txPool and logs a message.
 func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (common.Hash, error) {
-	// Oasys transaction verification
-	if err := core.VerifyTx(tx); err != nil {
-		return common.Hash{}, err
-	}
-
 	// If the transaction fee cap is already specified, ensure the
 	// fee of the given transaction is _reasonable_.
 	if err := checkTxFee(tx.GasPrice(), tx.Gas(), b.RPCTxFeeCap()); err != nil {
@@ -1701,6 +1696,11 @@ func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 	signer := types.MakeSigner(b.ChainConfig(), b.CurrentBlock().Number())
 	from, err := types.Sender(signer, tx)
 	if err != nil {
+		return common.Hash{}, err
+	}
+
+	// Oasys transaction verification
+	if err := core.VerifyTx(tx, from); err != nil {
 		return common.Hash{}, err
 	}
 

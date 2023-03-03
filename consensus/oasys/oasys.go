@@ -572,7 +572,7 @@ func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 // rewards given.
 func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs *[]*types.Transaction,
 	uncles []*types.Header, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64) error {
-	if err := verifyTx(header, *txs); err != nil {
+	if err := c.verifyTx(header, *txs); err != nil {
 		return err
 	}
 
@@ -665,7 +665,7 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 		receipts = make([]*types.Receipt, 0)
 	}
 
-	if err := verifyTx(header, txs); err != nil {
+	if err := c.verifyTx(header, txs); err != nil {
 		return nil, nil, err
 	}
 
@@ -967,9 +967,11 @@ func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Hea
 }
 
 // Oasys transaction verification
-func verifyTx(header *types.Header, txs []*types.Transaction) error {
+func (c *Oasys) verifyTx(header *types.Header, txs []*types.Transaction) error {
 	for _, tx := range txs {
-		if err := core.VerifyTx(tx); err != nil {
+		if from, err := types.Sender(c.txSigner, tx); err != nil {
+			return err
+		} else if err = core.VerifyTx(tx, from); err != nil {
 			return err
 		}
 	}
