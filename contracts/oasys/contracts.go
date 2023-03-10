@@ -6,6 +6,10 @@ var (
 		name:    "StakeManager",
 		address: "0x0000000000000000000000000000000000001001",
 	}
+	oasMultiTransfer = &contract{
+		name:    "OASMultiTransfer",
+		address: "0x520000000000000000000000000000000000002c",
+	}
 
 	// ERC20 Tokens
 	wrappedOAS = &contract{

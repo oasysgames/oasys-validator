@@ -735,6 +735,7 @@ func _deployments6(genesisHash common.Hash, contracts wantContracts) {
 }
 
 func _deployments7(genesisHash common.Hash, contracts wantContracts) {
+	// bitbank(production)
 	contracts["0x5200000000000000000000000000000000000024"] = &wantContract{
 		name:     "BitBank/ExchangeDeposit",
 		codeHash: "7c01eeed578ce05e1fd0f5c111226485",
@@ -748,6 +749,7 @@ func _deployments7(genesisHash common.Hash, contracts wantContracts) {
 		codeHash: "366c1356dc3d1a1ceea5bfb1eaf1a444",
 	}
 
+	// bitbank(stg)
 	contracts["0x5200000000000000000000000000000000000026"] = &wantContract{
 		name:     "BitBank/ExchangeDeposit/Staging",
 		codeHash: "235bbfbfbdad5e3ab9517bbebf9ce871",
@@ -760,9 +762,16 @@ func _deployments7(genesisHash common.Hash, contracts wantContracts) {
 		name:     "BitBank/ProxyFactory/Staging",
 		codeHash: "926045b146916c697183f4d13d522487",
 	}
+
+	// genesis
+	contracts["0x520000000000000000000000000000000000002c"] = &wantContract{
+		name:     "OASMultiTransfer",
+		codeHash: "aa00ad6907ed85ea9f45e11cacb96556",
+	}
 }
 
 func _deployments8(genesisHash common.Hash, contracts wantContracts) {
+	// bitbank(yokohama)
 	contracts["0x5200000000000000000000000000000000000028"] = &wantContract{
 		name:     "BitBank/ExchangeDeposit/Yokohama",
 		codeHash: "bd3a10e9f19f01a7f276e0b7af362124",
@@ -776,6 +785,7 @@ func _deployments8(genesisHash common.Hash, contracts wantContracts) {
 		codeHash: "012249681b080004ce2ff0f32ae6f986",
 	}
 
+	// bitbank(dev)
 	contracts["0x520000000000000000000000000000000000002A"] = &wantContract{
 		name:     "BitBank/ExchangeDeposit/Dev",
 		codeHash: "21757e2e10aaba129a8319fce15abf3f",
