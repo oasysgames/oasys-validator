@@ -6,6 +6,10 @@ var (
 		name:    "StakeManager",
 		address: "0x0000000000000000000000000000000000001001",
 	}
+	oasMultiTransfer = &contract{
+		name:    "OASMultiTransfer",
+		address: "0x520000000000000000000000000000000000002c",
+	}
 
 	// ERC20 Tokens
 	wrappedOAS = &contract{
@@ -123,6 +127,40 @@ var (
 	multicall2 = &contract{
 		name:    "Multicall2",
 		address: "0x5200000000000000000000000000000000000022",
+	}
+
+	// bitbank
+	bitbankExchangeDeposit = &contract{
+		name:    "bitbank/ExchangeDeposit",
+		address: "0x5200000000000000000000000000000000000024",
+	}
+	bitbankProxyFactory = &contract{
+		name:    "bitbank/ProxyFactory",
+		address: "0x5200000000000000000000000000000000000025",
+	}
+	bitbankExchangeDepositStaging = &contract{
+		name:    "bitbank/ExchangeDeposit/Staging",
+		address: "0x5200000000000000000000000000000000000026",
+	}
+	bitbankProxyFactoryStaging = &contract{
+		name:    "bitbank/ProxyFactory/Staging",
+		address: "0x5200000000000000000000000000000000000027",
+	}
+	bitbankExchangeDepositYokohama = &contract{
+		name:    "bitbank/ExchangeDeposit/Yokohama",
+		address: "0x5200000000000000000000000000000000000028",
+	}
+	bitbankProxyFactoryYokohama = &contract{
+		name:    "bitbank/ProxyFactory/Yokohama",
+		address: "0x5200000000000000000000000000000000000029",
+	}
+	bitbankExchangeDepositDev = &contract{
+		name:    "bitbank/ExchangeDeposit/Dev",
+		address: "0x520000000000000000000000000000000000002A",
+	}
+	bitbankProxyFactoryDev = &contract{
+		name:    "bitbank/ProxyFactory/Dev",
+		address: "0x520000000000000000000000000000000000002b",
 	}
 )
 

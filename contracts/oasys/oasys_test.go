@@ -734,6 +734,72 @@ func _deployments6(genesisHash common.Hash, contracts wantContracts) {
 	}
 }
 
+func _deployments7(genesisHash common.Hash, contracts wantContracts) {
+	// bitbank(production)
+	contracts["0x5200000000000000000000000000000000000024"] = &wantContract{
+		name:     "BitBank/ExchangeDeposit",
+		codeHash: "7c01eeed578ce05e1fd0f5c111226485",
+		storage: map[string]string{
+			"0x00": "0x0000000000000000000000003727cfcbd85390bb11b3ff421878123adb866be8",
+			"0x01": "0x000000000000000000000000000000000000000000000000002386f26fc10000",
+		},
+	}
+	contracts["0x5200000000000000000000000000000000000025"] = &wantContract{
+		name:     "BitBank/ProxyFactory",
+		codeHash: "366c1356dc3d1a1ceea5bfb1eaf1a444",
+	}
+
+	// bitbank(stg)
+	contracts["0x5200000000000000000000000000000000000026"] = &wantContract{
+		name:     "BitBank/ExchangeDeposit/Staging",
+		codeHash: "235bbfbfbdad5e3ab9517bbebf9ce871",
+		storage: map[string]string{
+			"0x00": "0x000000000000000000000000a3a80b4daa8be824b73f689eb87fb0955446dece",
+			"0x01": "0x000000000000000000000000000000000000000000000000002386f26fc10000",
+		},
+	}
+	contracts["0x5200000000000000000000000000000000000027"] = &wantContract{
+		name:     "BitBank/ProxyFactory/Staging",
+		codeHash: "926045b146916c697183f4d13d522487",
+	}
+
+	// genesis
+	contracts["0x520000000000000000000000000000000000002c"] = &wantContract{
+		name:     "OASMultiTransfer",
+		codeHash: "aa00ad6907ed85ea9f45e11cacb96556",
+	}
+}
+
+func _deployments8(genesisHash common.Hash, contracts wantContracts) {
+	// bitbank(yokohama)
+	contracts["0x5200000000000000000000000000000000000028"] = &wantContract{
+		name:     "BitBank/ExchangeDeposit/Yokohama",
+		codeHash: "bd3a10e9f19f01a7f276e0b7af362124",
+		storage: map[string]string{
+			"0x00": "0x0000000000000000000000006f83f131b8c3f29f24fd146c6b75bce0844dc6d3",
+			"0x01": "0x000000000000000000000000000000000000000000000000002386f26fc10000",
+		},
+	}
+	contracts["0x5200000000000000000000000000000000000029"] = &wantContract{
+		name:     "BitBank/ProxyFactory/Yokohama",
+		codeHash: "012249681b080004ce2ff0f32ae6f986",
+	}
+
+	// bitbank(dev)
+	contracts["0x520000000000000000000000000000000000002A"] = &wantContract{
+		name:     "BitBank/ExchangeDeposit/Dev",
+		codeHash: "21757e2e10aaba129a8319fce15abf3f",
+		storage: map[string]string{
+			"0x00": "0x000000000000000000000000ba7b3124bd11c738e22c2ee61f46cb2108d2356b",
+			"0x01": "0x000000000000000000000000000000000000000000000000002386f26fc10000",
+		},
+	}
+	contracts["0x520000000000000000000000000000000000002b"] = &wantContract{
+		name:     "BitBank/ProxyFactory/Dev",
+		codeHash: "5caecd63989a8bfd27225fafe0dc6378",
+	}
+}
+
 func TestDeploy(t *testing.T) {
 	type wantDeployments []struct {
 		block  uint64
@@ -756,6 +822,7 @@ func TestDeploy(t *testing.T) {
 				{309600, []deployFn{_deployments2, _deployments3, _deployments4}},
 				{419000, []deployFn{_deployments5}},
 				{557100, []deployFn{_deployments6}},
+				{971800, []deployFn{_deployments7}},
 			},
 		},
 		{
@@ -770,6 +837,7 @@ func TestDeploy(t *testing.T) {
 				{293000, []deployFn{_deployments4}},
 				{385000, []deployFn{_deployments5}},
 				{546400, []deployFn{_deployments6}},
+				{955400, []deployFn{_deployments7, _deployments8}},
 			},
 		},
 		{
@@ -784,6 +852,7 @@ func TestDeploy(t *testing.T) {
 				{5, []deployFn{_deployments4}},
 				{6, []deployFn{_deployments5}},
 				{7, []deployFn{_deployments6}},
+				{8, []deployFn{_deployments7, _deployments8}},
 			},
 		},
 	}
