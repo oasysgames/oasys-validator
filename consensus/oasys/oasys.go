@@ -78,9 +78,16 @@ var (
 	// invalid list of validators (i.e. non divisible by 20 bytes).
 	errInvalidCheckpointValidators = errors.New("invalid validator list on checkpoint block")
 
+	// errInvalidEpochHash is returned if a epoch block contains an invalid Keccak256 hash.
+	errInvalidEpochHash = errors.New("invalid hash on epoch block")
+
 	// errMismatchingEpochValidators is returned if a checkpoint block contains a
 	// list of validators different than the one the local node calculated.
 	errMismatchingEpochValidators = errors.New("mismatching validator list on checkpoint block")
+
+	// errMismatchingEpochHash is returned if a epoch block contains a
+	// Keccak256 hash different than the one the local node calculated.
+	errMismatchingEpochHash = errors.New("mismatching hash of validator list on epoch block")
 
 	// errInvalidMixDigest is returned if a block's mix digest is non-zero.
 	errInvalidMixDigest = errors.New("non-zero mix digest")
@@ -240,13 +247,13 @@ func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 	if err != nil {
 		return err
 	}
-	isEpoch := env.IsEpoch(number)
 	validatorBytes := len(header.Extra) - extraVanity - extraSeal
-	if !isEpoch && validatorBytes != 0 {
+	if env.IsEpoch(number) {
+		if err := c.verifyExtraHeaderLengthInEpoch(header.Number, validatorBytes); err != nil {
+			return err
+		}
+	} else if validatorBytes != 0 {
 		return errExtraSigners
-	}
-	if isEpoch && validatorBytes%common.AddressLength != 0 {
-		return errInvalidCheckpointValidators
 	}
 	// Ensure that the mix digest is zero as we don't have fork protection currently
 	if header.MixDigest != (common.Hash{}) {
@@ -529,12 +536,7 @@ func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 			return err
 		}
 
-		newValidators := result.Copy().Operators
-		sort.Sort(validatorsAscending(newValidators))
-		for _, validator := range newValidators {
-			header.Extra = append(header.Extra, validator[:]...)
-		}
-
+		header.Extra = append(header.Extra, c.getExtraHeaderValueInEpoch(header.Number, result.Operators)...)
 		backoff = c.backOffTime(chain, result, env, number, c.signer)
 		schedule = c.getValidatorSchedule(chain, result, env, number)
 	} else {
@@ -598,10 +600,11 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 	}
 
 	var (
+		isEpoch        = env.IsEpoch(number)
 		schedule       map[uint64]common.Address
 		nextValidators *getNextValidatorsResult
 	)
-	if env.IsEpoch(number) {
+	if isEpoch {
 		nextValidators, err = getNextValidators(c.ethAPI, header.ParentHash, env.Epoch(number))
 		if err != nil {
 			log.Error("Failed to get validators", "in", "Finalize", "hash", header.ParentHash, "number", number, "err", err)
@@ -621,21 +624,15 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 		return err
 	}
 
-	if number >= c.config.Epoch && header.Difficulty.Cmp(diffInTurn) != 0 {
-		if env.IsEpoch(number) {
-			// If the block is a checkpoint block, verify the validator list
-			newValidators := nextValidators.Copy().Operators
-			sort.Sort(validatorsAscending(newValidators))
-			validatorsBytes := make([]byte, len(newValidators)*common.AddressLength)
-			for i, validator := range newValidators {
-				copy(validatorsBytes[i*common.AddressLength:], validator.Bytes())
-			}
-			extraSuffix := len(header.Extra) - extraSeal
-			if !bytes.Equal(header.Extra[extraVanity:extraSuffix], validatorsBytes) {
-				return errMismatchingEpochValidators
-			}
+	if isEpoch {
+		// If the block is a epoch block, verify the validator list or hash
+		actual := header.Extra[extraVanity : len(header.Extra)-extraSeal]
+		if err := c.verifyExtraHeaderValueInEpoch(header.Number, actual, nextValidators.Operators); err != nil {
+			return err
 		}
+	}
 
+	if number >= c.config.Epoch && header.Difficulty.Cmp(diffInTurn) != 0 {
 		validator, err := ecrecover(header, c.signatures)
 		if err != nil {
 			return err
@@ -859,6 +856,53 @@ func (c *Oasys) APIs(chain consensus.ChainHeaderReader) []rpc.API {
 		Service:   &API{chain: chain, oasys: c},
 		Public:    false,
 	}}
+}
+
+// Converting the validator list for the extra header field.
+func (c *Oasys) getExtraHeaderValueInEpoch(number *big.Int, validators []common.Address) []byte {
+	cpy := make([]common.Address, len(validators))
+	copy(cpy, validators)
+
+	forked := c.chainConfig.IsForkedOasysFork1(number)
+	if !forked {
+		sort.Sort(validatorsAscending(cpy))
+	}
+
+	extra := make([]byte, len(cpy)*common.AddressLength)
+	for i, v := range cpy {
+		copy(extra[i*common.AddressLength:], v.Bytes())
+	}
+
+	// Convert to hash because there may be many validators.
+	if forked {
+		extra = crypto.Keccak256(extra)
+	}
+	return extra
+}
+
+// Verify the length of the Extra header field.
+func (c *Oasys) verifyExtraHeaderLengthInEpoch(number *big.Int, length int) error {
+	if c.chainConfig.IsForkedOasysFork1(number) {
+		if length != crypto.DigestLength {
+			return errInvalidEpochHash
+		}
+	} else if length%common.AddressLength != 0 {
+		return errInvalidCheckpointValidators
+	}
+	return nil
+}
+
+// Verify the value of the Extra header field.
+func (c *Oasys) verifyExtraHeaderValueInEpoch(number *big.Int, actual []byte, validators []common.Address) error {
+	expect := c.getExtraHeaderValueInEpoch(number, validators)
+	if bytes.Equal(actual, expect) {
+		return nil
+	}
+
+	if c.chainConfig.IsForkedOasysFork1(number) {
+		return errMismatchingEpochHash
+	}
+	return errMismatchingEpochValidators
 }
 
 // SealHash returns the hash of a block prior to it being sealed.
