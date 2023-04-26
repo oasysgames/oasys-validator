@@ -7,5 +7,8 @@
 	url = https://github.com/ipsilon/evm-benchmarks
 	shallow = true
 [submodule "consensus/oasys/oasys-genesis-contract"]
-	path = consensus/oasys/oasys-genesis-contract
+	path = consensus/oasys/oasys-genesis-contract-cfb3cd0
+	url = https://github.com/oasysgames/oasys-genesis-contract.git
+[submodule "oasys-genesis-contract-6037082"]
+	path = consensus/oasys/oasys-genesis-contract-6037082
 	url = https://github.com/oasysgames/oasys-genesis-contract.git

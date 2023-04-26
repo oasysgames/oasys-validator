@@ -19,7 +19,7 @@ import (
 
 // Snapshot is the state of the authorization voting at a given point in time.
 type Snapshot struct {
-	config   *params.OasysConfig // Consensus engine parameters to fine tune behavior
+	config   *params.ChainConfig // Consensus engine parameters to fine tune behavior
 	sigcache *lru.ARCCache       // Cache of recent block signatures to speed up ecrecover
 	ethAPI   *ethapi.PublicBlockChainAPI
 
@@ -40,7 +40,7 @@ func (s validatorsAscending) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 // newSnapshot creates a new snapshot with the specified startup parameters. This
 // method does not initialize the set of recent validators, so only ever use if for
 // the genesis block.
-func newSnapshot(config *params.OasysConfig, sigcache *lru.ARCCache, ethAPI *ethapi.PublicBlockChainAPI,
+func newSnapshot(config *params.ChainConfig, sigcache *lru.ARCCache, ethAPI *ethapi.PublicBlockChainAPI,
 	number uint64, hash common.Hash, validators []common.Address, environment *environmentValue) *Snapshot {
 	snap := &Snapshot{
 		config:      config,
@@ -58,7 +58,7 @@ func newSnapshot(config *params.OasysConfig, sigcache *lru.ARCCache, ethAPI *eth
 }
 
 // loadSnapshot loads an existing snapshot from the database.
-func loadSnapshot(config *params.OasysConfig, sigcache *lru.ARCCache, ethAPI *ethapi.PublicBlockChainAPI,
+func loadSnapshot(config *params.ChainConfig, sigcache *lru.ARCCache, ethAPI *ethapi.PublicBlockChainAPI,
 	db ethdb.Database, hash common.Hash) (*Snapshot, error) {
 	blob, err := db.Get(append([]byte("oasys-"), hash[:]...))
 	if err != nil {
@@ -130,7 +130,7 @@ func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderRea
 
 		var exists bool
 		if number > 0 && number%snap.Environment.EpochPeriod.Uint64() == 0 {
-			nextValidator, err := getNextValidators(s.ethAPI, header.ParentHash, snap.Environment.Epoch(number))
+			nextValidator, err := getNextValidators(s.config, s.ethAPI, header.ParentHash, snap.Environment.Epoch(number), number)
 			if err != nil {
 				log.Error("Failed to get validators", "in", "Snapshot.apply", "hash", header.ParentHash, "number", number, "err", err)
 				return nil, err
