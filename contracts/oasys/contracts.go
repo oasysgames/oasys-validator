@@ -10,6 +10,14 @@ var (
 		name:    "OASMultiTransfer",
 		address: "0x520000000000000000000000000000000000002c",
 	}
+	candidateValidatorManagerHighStakes = &contract{
+		name:    "CandidateValidatorManager/highStakes",
+		address: "0x520000000000000000000000000000000000002D",
+	}
+	candidateValidatorManager = &contract{
+		name:    "CandidateValidatorManager",
+		address: "0x520000000000000000000000000000000000002e",
+	}
 
 	// ERC20 Tokens
 	wrappedOAS = &contract{

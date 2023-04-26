@@ -539,6 +539,7 @@ func (c *ChainConfig) IsArrowGlacier(num *big.Int) bool {
 	return isForked(c.ArrowGlacierBlock, num)
 }
 
+// TODO
 func (c *ChainConfig) IsForkedOasysFork1(num *big.Int) bool {
 	return isForked(c.OasysFork1Block, num)
 }
