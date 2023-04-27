@@ -54,9 +54,11 @@ var (
 			path: "oasys-genesis-contract-cfb3cd0/artifacts/contracts/StakeManager.sol/StakeManager.json",
 		},
 	}
-	genesisContracts = map[common.Address]bool{
-		environment.address:  true,
-		stakeManager.address: true,
+	systemMethods = map[*genesisContract]map[string]int{
+		// Methods with the `onlyCoinbase` modifier are system methods.
+		// See: https://github.com/oasysgames/oasys-genesis-contract/search?q=onlyCoinbase
+		environment:  {"initialize": 0, "updateValue": 0},
+		stakeManager: {"initialize": 0, "slash": 0},
 	}
 
 	candidateManager = &builtinContract{
@@ -77,6 +79,15 @@ func init() {
 	}
 	if err := candidateManager.parseABI(); err != nil {
 		panic(err)
+	}
+
+	// Check if the ABI includes system methods
+	for contract, methods := range systemMethods {
+		for method := range methods {
+			if _, ok := contract.abi.Methods[method]; !ok {
+				panic(fmt.Sprintf("Method `%s` does not exist", method))
+			}
+		}
 	}
 }
 
@@ -245,16 +256,33 @@ func (m callmsg) Value() *big.Int      { return m.CallMsg.Value }
 func (m callmsg) Data() []byte         { return m.CallMsg.Data }
 
 func (c *Oasys) IsSystemTransaction(tx *types.Transaction, header *types.Header) (bool, error) {
+	// deploy transaction
 	if tx.To() == nil {
 		return false, nil
 	}
-	sender, err := types.Sender(c.txSigner, tx)
-	if err != nil {
+
+	if sender, err := types.Sender(c.txSigner, tx); err != nil {
 		return false, errors.New("unauthorized transaction")
+	} else if sender != header.Coinbase {
+		// not created by validator
+		return false, nil
 	}
-	if sender == header.Coinbase && genesisContracts[*tx.To()] && tx.GasPrice().Cmp(common.Big0) == 0 {
-		return true, nil
+
+	for contract, methods := range systemMethods {
+		if contract.address != *tx.To() {
+			continue
+		}
+
+		if called, err := contract.abi.MethodById(tx.Data()); err != nil {
+			return false, nil
+		} else if _, ok := methods[called.RawName]; ok {
+			log.Info("System method transacted",
+				"validator", header.Coinbase.Hex(), "tx", tx.Hash().Hex(),
+				"contract", contract.address.Hex(), "method", called.RawName)
+			return true, nil
+		}
 	}
+
 	return false, nil
 }
 
