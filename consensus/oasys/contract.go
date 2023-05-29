@@ -367,7 +367,7 @@ func getNextValidators(
 	epoch uint64,
 	block uint64,
 ) (*nextValidators, error) {
-	if config.IsForkedOasysFork1(new(big.Int).SetUint64(block)) {
+	if config.IsForkedOasysPublication(new(big.Int).SetUint64(block)) {
 		return callGetHighStakes(ethAPI, hash, epoch)
 	}
 	return callGetValidators(ethAPI, hash, epoch)
