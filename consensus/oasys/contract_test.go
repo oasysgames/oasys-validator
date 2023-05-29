@@ -259,7 +259,7 @@ func TestGetNextValidators(t *testing.T) {
 		newCursor += howMany
 	}
 
-	config := &params.ChainConfig{OasysFork1Block: big.NewInt(10)}
+	config := &params.ChainConfig{ChainID: big.NewInt(999999), Oasys: &params.OasysConfig{}}
 	ethapi := &testBlockchainAPI{rbytes: rbytes}
 
 	for _, block := range []uint64{1, 10} {

@@ -863,7 +863,7 @@ func (c *Oasys) getExtraHeaderValueInEpoch(number *big.Int, validators []common.
 	cpy := make([]common.Address, len(validators))
 	copy(cpy, validators)
 
-	forked := c.chainConfig.IsForkedOasysFork1(number)
+	forked := c.chainConfig.IsForkedOasysPublication(number)
 	if !forked {
 		sort.Sort(validatorsAscending(cpy))
 	}
@@ -882,7 +882,7 @@ func (c *Oasys) getExtraHeaderValueInEpoch(number *big.Int, validators []common.
 
 // Verify the length of the Extra header field.
 func (c *Oasys) verifyExtraHeaderLengthInEpoch(number *big.Int, length int) error {
-	if c.chainConfig.IsForkedOasysFork1(number) {
+	if c.chainConfig.IsForkedOasysPublication(number) {
 		if length != crypto.DigestLength {
 			return errInvalidEpochHash
 		}
@@ -899,7 +899,7 @@ func (c *Oasys) verifyExtraHeaderValueInEpoch(number *big.Int, actual []byte, va
 		return nil
 	}
 
-	if c.chainConfig.IsForkedOasysFork1(number) {
+	if c.chainConfig.IsForkedOasysPublication(number) {
 		return errMismatchingEpochHash
 	}
 	return errMismatchingEpochValidators
