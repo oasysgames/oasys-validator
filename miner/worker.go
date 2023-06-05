@@ -936,11 +936,6 @@ func (w *worker) commitTransactions(env *environment, txs *types.TransactionsByP
 			log.Trace("Skipping unsupported transaction type", "sender", from, "type", tx.Type())
 			txs.Pop()
 
-		case errors.Is(err, core.ErrUnauthorizedDeployment):
-			// Pop the deployment transaction
-			log.Trace("Skipping deployment transaction", "sender", from)
-			txs.Pop()
-
 		default:
 			// Strange error, discard the transaction and get the next in line (note, the
 			// nonce-too-high clause will prevent us from executing in vain).
