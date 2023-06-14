@@ -538,10 +538,10 @@ func (c *ChainConfig) OasysPublicationBlock() *big.Int {
 		return nil
 	}
 	if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
-		return big.NewInt(1524200)
+		return big.NewInt(1529980)
 	}
 	if c.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0 {
-		return big.NewInt(1514100)
+		return big.NewInt(1519840)
 	}
 	return big.NewInt(2)
 }

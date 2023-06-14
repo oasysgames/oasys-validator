@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"path/filepath"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts"
@@ -45,13 +46,13 @@ var (
 	environment = &genesisContract{
 		address: common.HexToAddress(environmentAddress),
 		artifact: &artifact{
-			path: "oasys-genesis-contract-cfb3cd0/artifacts/contracts/Environment.sol/Environment.json",
+			path: filepath.FromSlash("oasys-genesis-contract-cfb3cd0/artifacts/contracts/Environment.sol/Environment.json"),
 		},
 	}
 	stakeManager = &genesisContract{
 		address: common.HexToAddress(stakeManagerAddress),
 		artifact: &artifact{
-			path: "oasys-genesis-contract-cfb3cd0/artifacts/contracts/StakeManager.sol/StakeManager.json",
+			path: filepath.FromSlash("oasys-genesis-contract-cfb3cd0/artifacts/contracts/StakeManager.sol/StakeManager.json"),
 		},
 	}
 	systemMethods = map[*genesisContract]map[string]int{
@@ -64,7 +65,7 @@ var (
 	candidateManager = &builtinContract{
 		address: common.HexToAddress(candidateManagerAddress),
 		artifact: &artifact{
-			path: "oasys-genesis-contract-6037082/artifacts/contracts/CandidateValidatorManager.sol/CandidateValidatorManager.json",
+			path: filepath.FromSlash("oasys-genesis-contract-6037082/artifacts/contracts/CandidateValidatorManager.sol/CandidateValidatorManager.json"),
 		},
 	}
 )
