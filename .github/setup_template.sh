@@ -87,7 +87,6 @@ if ! unzip -h >/dev/null 2>&1; then
 fi
 
 # Ask for parameters.
-ask "Select a network [1: mainnet, 2: testnet]" NETWORK 1
 ask "Enter the binary installation path" INSTALL_PATH "/usr/local/bin/geth"
 ask "Enter the os user name of systemd service" SERVICE_USER "geth"
 ask "Enter the passphrase for the private key" PASSPHRASE "" "-s"
@@ -109,22 +108,9 @@ if [ -z "$PASSPHRASE" ]; then
     exit 1
 fi
 
-case "$NETWORK" in
-    1)
-        NETWORK=mainnet
-        NETWORK_ID=248
-        BOOTNODES="enode://1e68361cb0e761e0789c014acdbd2491f30176acf25480408382916632e58af1711d857c75be5917319d06049937e49c09ca51a28590e6ee22aceca1161fd583@3.113.207.39:30301,enode://24a55fd923d780213d15f5551bcbb7171343ef095512927d91baca3e7917124c679f894282eefec37350088b31c45a49bb28df790eb88f487ad60a9b6ccc8f3b@35.238.159.190:30301"
-        ;;
-    2)
-        NETWORK=testnet
-        NETWORK_ID=9372
-        BOOTNODES="enode://4a85df39ec500acd31d4b9feeea1d024afee5e8df4bc29325c2abf2e0a02a34f6ece24aca06cb5027675c167ecf95a9fc23fb7a0f671f84edb07dafe6e729856@34.142.254.12:30301"
-        ;;
-    *)
-        msg_err "Select 1 or 2 for the network."
-        exit 1
-esac
-
+NETWORK=mainnet
+NETWORK_ID=248
+BOOTNODES="enode://1e68361cb0e761e0789c014acdbd2491f30176acf25480408382916632e58af1711d857c75be5917319d06049937e49c09ca51a28590e6ee22aceca1161fd583@3.113.207.39:30301,enode://24a55fd923d780213d15f5551bcbb7171343ef095512927d91baca3e7917124c679f894282eefec37350088b31c45a49bb28df790eb88f487ad60a9b6ccc8f3b@35.238.159.190:30301"
 HOME_DIR=/home/$SERVICE_USER
 WALLET_FILE=$HOME_DIR/.ethereum/wallet.txt
 PASSWORD_FILE=$HOME_DIR/.ethereum/password.txt
