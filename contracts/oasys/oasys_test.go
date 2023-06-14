@@ -1042,7 +1042,7 @@ func TestDeploy(t *testing.T) {
 				{419000, []deployFn{_deployments5}},
 				{557100, []deployFn{_deployments6}},
 				{971800, []deployFn{_deployments7}},
-				{1524200, []deployFn{_deployments9}},
+				{1529980, []deployFn{_deployments9}},
 			},
 		},
 		{
@@ -1058,7 +1058,7 @@ func TestDeploy(t *testing.T) {
 				{385000, []deployFn{_deployments5}},
 				{546400, []deployFn{_deployments6}},
 				{955400, []deployFn{_deployments7, _deployments8}},
-				{1514100, []deployFn{_deployments9}},
+				{1519840, []deployFn{_deployments9}},
 			},
 		},
 		{

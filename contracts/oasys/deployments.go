@@ -743,7 +743,7 @@ var (
 			419000:  deploymentSet{deployments5},
 			557100:  deploymentSet{deployments6},
 			971800:  deploymentSet{deployments7},
-			1524200: deploymentSet{deployments9},
+			1529980: deploymentSet{deployments9},
 		},
 		params.OasysTestnetGenesisHash: {
 			1:       deploymentSet{deployments0},
@@ -754,7 +754,7 @@ var (
 			385000:  deploymentSet{deployments5},
 			546400:  deploymentSet{deployments6},
 			955400:  deploymentSet{deployments7, deployments8},
-			1514100: deploymentSet{deployments9},
+			1519840: deploymentSet{deployments9},
 		},
 		defaultGenesisHash: {
 			2: deploymentSet{
