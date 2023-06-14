@@ -162,12 +162,25 @@ func TestGetNextValidators(t *testing.T) {
 	uint256ArrTy, _ := abi.NewType("uint256[]", "", nil)
 	boolArrTy, _ := abi.NewType("bool[]", "", nil)
 	uint256Ty, _ := abi.NewType("uint256", "", nil)
-	arguments := abi.Arguments{
-		{Type: addressArrTy},
-		{Type: addressArrTy},
-		{Type: uint256ArrTy},
-		{Type: boolArrTy},
-		{Type: uint256Ty},
+
+	// Return value of the `StakeManager.getValidators` method.
+	returnTy1 := abi.Arguments{
+		{Type: addressArrTy}, // owners
+		{Type: addressArrTy}, // operators
+		{Type: uint256ArrTy}, // stakes
+		{Type: boolArrTy},    // candidates
+		{Type: uint256Ty},    // newCursor
+	}
+
+	// Return value of the `CandidateValidatorManager.getHighStakes` method.
+	returnTy2 := abi.Arguments{
+		{Type: addressArrTy}, // owners
+		{Type: addressArrTy}, // operators
+		{Type: boolArrTy},    // actives
+		{Type: boolArrTy},    // jailed
+		{Type: uint256ArrTy}, // stakes
+		{Type: boolArrTy},    // candidates
+		{Type: uint256Ty},    // newCursor
 	}
 
 	var (
@@ -188,14 +201,21 @@ func TestGetNextValidators(t *testing.T) {
 		}
 	)
 	var (
-		rbytes    = make([][]byte, 7)
+		// rbytes    = make([][]byte, 7)
+		page      = 7
 		howMany   = 100
 		newCursor = howMany
+		rbytes    = map[common.Address][][]byte{
+			stakeManager.address:     make([][]byte, page),
+			candidateManager.address: make([][]byte, page),
+		}
 	)
-	for i := 0; i < len(rbytes); i++ {
+	for i := 0; i < page; i++ {
 		var (
 			owners     = make([]common.Address, howMany)
 			operators  = make([]common.Address, howMany)
+			actives    = make([]bool, howMany)
+			jailed     = make([]bool, howMany)
 			stakes     = make([]*big.Int, howMany)
 			candidates = make([]bool, howMany)
 		)
@@ -204,55 +224,73 @@ func TestGetNextValidators(t *testing.T) {
 				idx := i / len(wantOwners)
 				owners[j] = wantOwners[idx]
 				operators[j] = wantOperators[idx]
+				actives[j] = true
+				jailed[j] = false
 				stakes[j] = wantStakes[idx]
 				candidates[j] = true
 			} else {
 				owners[j] = common.Address{}
 				operators[j] = common.Address{}
+				actives[j] = true
+				jailed[j] = false
 				stakes[j] = big.NewInt(0)
 				candidates[j] = false
 			}
 		}
 
-		rbyte, _ := arguments.Pack(owners, operators, stakes, candidates, big.NewInt(int64(newCursor)))
-		rbytes[i] = rbyte
+		bnewCursor := big.NewInt(int64(newCursor))
 
-		if i == len(rbytes)-1 {
-			rbyte, _ := arguments.Pack([]common.Address{}, []common.Address{}, []*big.Int{}, []bool{}, big.NewInt(int64(newCursor)))
-			rbytes = append(rbytes, rbyte)
+		rbyte, _ := returnTy1.Pack(owners, operators, stakes, candidates, bnewCursor)
+		rbytes[stakeManager.address][i] = rbyte
+
+		rbyte, _ = returnTy2.Pack(owners, operators, actives, jailed, stakes, candidates, bnewCursor)
+		rbytes[candidateManager.address][i] = rbyte
+
+		if i == page-1 {
+			rbyte, _ := returnTy1.Pack([]common.Address{}, []common.Address{}, []*big.Int{}, []bool{}, bnewCursor)
+			rbytes[stakeManager.address] = append(rbytes[stakeManager.address], rbyte)
+
+			rbyte, _ = returnTy2.Pack([]common.Address{}, []common.Address{}, []bool{}, []bool{}, []*big.Int{}, []bool{}, bnewCursor)
+			rbytes[candidateManager.address] = append(rbytes[candidateManager.address], rbyte)
+
 			break
 		}
 
 		newCursor += howMany
 	}
 
+	config := &params.ChainConfig{ChainID: big.NewInt(999999), Oasys: &params.OasysConfig{}}
 	ethapi := &testBlockchainAPI{rbytes: rbytes}
-	got, _ := getNextValidators(ethapi, common.Hash{}, 1)
-	if len(got.Owners) != len(wantOwners) {
-		t.Errorf("invalid owners length, got: %d, want: %d", len(got.Owners), len(wantOwners))
-	}
-	if len(got.Operators) != len(wantOperators) {
-		t.Errorf("invalid operators length, got: %d, want: %d", len(got.Operators), len(wantOperators))
-	}
-	if len(got.Stakes) != len(wantStakes) {
-		t.Errorf("invalid stakes length, got: %d, want: %d", len(got.Stakes), len(wantStakes))
-	}
-	for i, want := range wantOwners {
-		got := got.Owners[i]
-		if got != want {
-			t.Errorf("invalid owner, got %v, want: %v", got, want)
+
+	for _, block := range []uint64{1, 10} {
+		got, _ := getNextValidators(config, ethapi, common.Hash{}, 1, block)
+
+		if len(got.Owners) != len(wantOwners) {
+			t.Errorf("invalid owners length, got: %d, want: %d", len(got.Owners), len(wantOwners))
 		}
-	}
-	for i, want := range wantOperators {
-		got := got.Operators[i]
-		if got != want {
-			t.Errorf("invalid operator, got %v, want: %v", got, want)
+		if len(got.Operators) != len(wantOperators) {
+			t.Errorf("invalid operators length, got: %d, want: %d", len(got.Operators), len(wantOperators))
 		}
-	}
-	for i, want := range wantStakes {
-		got := got.Stakes[i]
-		if got.Cmp(want) != 0 {
-			t.Errorf("invalid stake, got %v, want: %v", got, want)
+		if len(got.Stakes) != len(wantStakes) {
+			t.Errorf("invalid stakes length, got: %d, want: %d", len(got.Stakes), len(wantStakes))
+		}
+		for i, want := range wantOwners {
+			got := got.Owners[i]
+			if got != want {
+				t.Errorf("invalid owner, got %v, want: %v", got, want)
+			}
+		}
+		for i, want := range wantOperators {
+			got := got.Operators[i]
+			if got != want {
+				t.Errorf("invalid operator, got %v, want: %v", got, want)
+			}
+		}
+		for i, want := range wantStakes {
+			got := got.Stakes[i]
+			if got.Cmp(want) != 0 {
+				t.Errorf("invalid stake, got %v, want: %v", got, want)
+			}
 		}
 	}
 }
@@ -273,7 +311,7 @@ func TestGetRewards(t *testing.T) {
 	rbyte, _ = abi.Arguments{{Type: uint256Ty}}.Pack(want)
 	rbytes[1] = rbyte
 
-	ethapi := &testBlockchainAPI{rbytes: rbytes}
+	ethapi := &testBlockchainAPI{rbytes: map[common.Address][][]byte{stakeManager.address: rbytes}}
 	got, _ := getRewards(ethapi, common.Hash{})
 	if got.Cmp(want) != 0 {
 		t.Errorf("got %v, want: %v", got, want)
@@ -318,7 +356,7 @@ func TestGetNextEnvironmentValue(t *testing.T) {
 		want.JailPeriod,
 	)
 
-	ethapi := &testBlockchainAPI{rbytes: [][]byte{rbyte}}
+	ethapi := &testBlockchainAPI{rbytes: map[common.Address][][]byte{environment.address: {rbyte}}}
 	got, _ := getNextEnvironmentValue(ethapi, common.Hash{})
 
 	if got.StartBlock.Cmp(want.StartBlock) != 0 {
@@ -359,13 +397,18 @@ func TestGetNextEnvironmentValue(t *testing.T) {
 }
 
 type testBlockchainAPI struct {
-	rbytes [][]byte
-	count  int
+	rbytes map[common.Address][][]byte
+	count  map[common.Address]int
 }
 
 func (p *testBlockchainAPI) Call(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *ethapi.StateOverride) (hexutil.Bytes, error) {
-	defer func() { p.count++ }()
-	return p.rbytes[p.count], nil
+	if p.count == nil {
+		p.count = map[common.Address]int{}
+	}
+
+	to := *args.To
+	defer func() { p.count[to]++ }()
+	return p.rbytes[to][p.count[to]], nil
 }
 
 type testEnv struct {
