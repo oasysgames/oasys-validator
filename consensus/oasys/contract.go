@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"path/filepath"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts"
@@ -29,52 +30,65 @@ import (
 
 const (
 	// Oasys genesis contracts
-	environmentAddress  = "0x0000000000000000000000000000000000001000"
-	stakeManagerAddress = "0x0000000000000000000000000000000000001001"
-	allowListAddress    = "0x0000000000000000000000000000000000001002"
+	environmentAddress      = "0x0000000000000000000000000000000000001000"
+	stakeManagerAddress     = "0x0000000000000000000000000000000000001001"
+	allowListAddress        = "0x0000000000000000000000000000000000001002"
+	candidateManagerAddress = "0x520000000000000000000000000000000000002e"
 )
 
 var (
-	//go:embed oasys-genesis-contract/artifacts/contracts/Environment.sol/Environment.json
-	//go:embed oasys-genesis-contract/artifacts/contracts/StakeManager.sol/StakeManager.json
+	//go:embed oasys-genesis-contract-cfb3cd0/artifacts/contracts/Environment.sol/Environment.json
+	//go:embed oasys-genesis-contract-cfb3cd0/artifacts/contracts/StakeManager.sol/StakeManager.json
+	//go:embed oasys-genesis-contract-6037082/artifacts/contracts/CandidateValidatorManager.sol/CandidateValidatorManager.json
 	artifacts embed.FS
 
 	// Oasys genesis contracts
-	environment = &systemContract{
+	environment = &genesisContract{
 		address: common.HexToAddress(environmentAddress),
 		artifact: &artifact{
-			path: "oasys-genesis-contract/artifacts/contracts/Environment.sol/Environment.json",
+			path: filepath.FromSlash("oasys-genesis-contract-cfb3cd0/artifacts/contracts/Environment.sol/Environment.json"),
 		},
 	}
-	stakeManager = &systemContract{
+	stakeManager = &genesisContract{
 		address: common.HexToAddress(stakeManagerAddress),
 		artifact: &artifact{
-			path: "oasys-genesis-contract/artifacts/contracts/StakeManager.sol/StakeManager.json",
+			path: filepath.FromSlash("oasys-genesis-contract-cfb3cd0/artifacts/contracts/StakeManager.sol/StakeManager.json"),
 		},
 	}
-	genesisContracts = map[common.Address]bool{
-		environment.address:  true,
-		stakeManager.address: true,
+	systemMethods = map[*genesisContract]map[string]int{
+		// Methods with the `onlyCoinbase` modifier are system methods.
+		// See: https://github.com/oasysgames/oasys-genesis-contract/search?q=onlyCoinbase
+		environment:  {"initialize": 0, "updateValue": 0},
+		stakeManager: {"initialize": 0, "slash": 0},
+	}
+
+	candidateManager = &builtinContract{
+		address: common.HexToAddress(candidateManagerAddress),
+		artifact: &artifact{
+			path: filepath.FromSlash("oasys-genesis-contract-6037082/artifacts/contracts/CandidateValidatorManager.sol/CandidateValidatorManager.json"),
+		},
 	}
 )
 
 func init() {
 	// Parse the system contract ABI
-	contracts := []*systemContract{environment, stakeManager}
-	for _, contract := range contracts {
-		rawData, err := artifacts.ReadFile(contract.artifact.path)
-		if err != nil {
-			panic(err)
-		}
-		if err = json.Unmarshal(rawData, contract.artifact); err != nil {
-			panic(err)
-		}
+	if err := environment.parseABI(); err != nil {
+		panic(err)
+	}
+	if err := stakeManager.parseABI(); err != nil {
+		panic(err)
+	}
+	if err := candidateManager.parseABI(); err != nil {
+		panic(err)
+	}
 
-		ABI, err := abi.JSON(bytes.NewReader(contract.artifact.Abi))
-		if err != nil {
-			panic(err)
+	// Check if the ABI includes system methods
+	for contract, methods := range systemMethods {
+		for method := range methods {
+			if _, ok := contract.abi.Methods[method]; !ok {
+				panic(fmt.Sprintf("Method `%s` does not exist", method))
+			}
 		}
-		contract.abi = &ABI
 	}
 }
 
@@ -85,18 +99,42 @@ type artifact struct {
 	DeployedBytecode string          `json:"deployedBytecode"`
 }
 
-// systemContract
-type systemContract struct {
+// contract
+type contract struct {
 	address  common.Address
 	abi      *abi.ABI
 	artifact *artifact
 }
 
-func (s *systemContract) verifyCode(state *state.StateDB) bool {
-	deployed := state.GetCode(s.address)
-	expect := common.FromHex(s.artifact.DeployedBytecode)
+func (b *contract) parseABI() error {
+	rawData, err := artifacts.ReadFile(b.artifact.path)
+	if err != nil {
+		return err
+	}
+	if err = json.Unmarshal(rawData, b.artifact); err != nil {
+		return err
+	}
+
+	ABI, err := abi.JSON(bytes.NewReader(b.artifact.Abi))
+	if err != nil {
+		return err
+	}
+	b.abi = &ABI
+
+	return nil
+}
+
+// Contracts deployed in the genesis block
+type genesisContract = contract
+
+func (g *genesisContract) verifyCode(state *state.StateDB) bool {
+	deployed := state.GetCode(g.address)
+	expect := common.FromHex(g.artifact.DeployedBytecode)
 	return bytes.Equal(deployed, expect)
 }
+
+// Contracts deployed in a hard fork.
+type builtinContract = contract
 
 // chainContext
 type chainContext struct {
@@ -160,15 +198,15 @@ func (p *environmentValue) Copy() *environmentValue {
 	}
 }
 
-// getNextValidatorsResult
-type getNextValidatorsResult struct {
+// nextValidators
+type nextValidators struct {
 	Owners    []common.Address
 	Operators []common.Address
 	Stakes    []*big.Int
 }
 
-func (p *getNextValidatorsResult) Copy() *getNextValidatorsResult {
-	cpy := getNextValidatorsResult{
+func (p *nextValidators) Copy() *nextValidators {
+	cpy := nextValidators{
 		Owners:    make([]common.Address, len(p.Owners)),
 		Operators: make([]common.Address, len(p.Operators)),
 		Stakes:    make([]*big.Int, len(p.Stakes)),
@@ -181,7 +219,7 @@ func (p *getNextValidatorsResult) Copy() *getNextValidatorsResult {
 	return &cpy
 }
 
-func (p *getNextValidatorsResult) Exists(validator common.Address) bool {
+func (p *nextValidators) Exists(validator common.Address) bool {
 	for _, operator := range p.Operators {
 		if validator == operator {
 			return true
@@ -219,20 +257,37 @@ func (m callmsg) Value() *big.Int      { return m.CallMsg.Value }
 func (m callmsg) Data() []byte         { return m.CallMsg.Data }
 
 func (c *Oasys) IsSystemTransaction(tx *types.Transaction, header *types.Header) (bool, error) {
+	// deploy transaction
 	if tx.To() == nil {
 		return false, nil
 	}
-	sender, err := types.Sender(c.txSigner, tx)
-	if err != nil {
+
+	if sender, err := types.Sender(c.txSigner, tx); err != nil {
 		return false, errors.New("unauthorized transaction")
+	} else if sender != header.Coinbase {
+		// not created by validator
+		return false, nil
 	}
-	if sender == header.Coinbase && genesisContracts[*tx.To()] && tx.GasPrice().Cmp(common.Big0) == 0 {
-		return true, nil
+
+	for contract, methods := range systemMethods {
+		if contract.address != *tx.To() {
+			continue
+		}
+
+		if called, err := contract.abi.MethodById(tx.Data()); err != nil {
+			return false, nil
+		} else if _, ok := methods[called.RawName]; ok {
+			log.Info("System method transacted",
+				"validator", header.Coinbase.Hex(), "tx", tx.Hash().Hex(),
+				"contract", contract.address.Hex(), "method", called.RawName)
+			return true, nil
+		}
 	}
+
 	return false, nil
 }
 
-// update functions
+// Transact the `Environment.initialize` and `StakeManager.initialize` method.
 func (c *Oasys) initializeSystemContracts(
 	state *state.StateDB,
 	header *types.Header,
@@ -274,6 +329,7 @@ func (c *Oasys) initializeSystemContracts(
 	return nil
 }
 
+// Transact the `StakeManager.slash` method.
 func (c *Oasys) slash(
 	validator common.Address,
 	schedule map[uint64]common.Address,
@@ -305,16 +361,30 @@ type blockchainAPI interface {
 }
 
 // view functions
-func getNextValidators(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*getNextValidatorsResult, error) {
+func getNextValidators(
+	config *params.ChainConfig,
+	ethAPI blockchainAPI,
+	hash common.Hash,
+	epoch uint64,
+	block uint64,
+) (*nextValidators, error) {
+	if config.IsForkedOasysPublication(new(big.Int).SetUint64(block)) {
+		return callGetHighStakes(ethAPI, hash, epoch)
+	}
+	return callGetValidators(ethAPI, hash, epoch)
+}
+
+// Call the `StakeManager.getValidators` method.
+func callGetValidators(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*nextValidators, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	var (
 		method  = "getValidators"
-		result  getNextValidatorsResult
-		bepoch  = big.NewInt(int64(epoch))
+		result  nextValidators
+		bepoch  = new(big.Int).SetUint64(epoch)
 		cursor  = big.NewInt(0)
-		howMany = big.NewInt(200)
+		howMany = big.NewInt(100)
 	)
 	for {
 		data, err := stakeManager.abi.Pack(method, bepoch, cursor, howMany)
@@ -361,6 +431,67 @@ func getNextValidators(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*g
 	return &result, nil
 }
 
+// Call the `CandidateValidatorManager.getHighStakes` method.
+func callGetHighStakes(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*nextValidators, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var (
+		method  = "getHighStakes"
+		result  nextValidators
+		bpoch   = new(big.Int).SetUint64(epoch)
+		cursor  = big.NewInt(0)
+		howMany = big.NewInt(100)
+	)
+	for {
+		data, err := candidateManager.abi.Pack(method, bpoch, cursor, howMany)
+		if err != nil {
+			return nil, err
+		}
+
+		hexData := (hexutil.Bytes)(data)
+		rbytes, err := ethAPI.Call(
+			ctx,
+			ethapi.TransactionArgs{
+				To:   &candidateManager.address,
+				Data: &hexData,
+			},
+			rpc.BlockNumberOrHashWithHash(hash, false),
+			nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var recv struct {
+			Owners     []common.Address
+			Operators  []common.Address
+			Stakes     []*big.Int
+			Candidates []bool
+			NewCursor  *big.Int
+
+			// unused
+			Actives, Jailed []bool
+		}
+		if err := candidateManager.abi.UnpackIntoInterface(&recv, method, rbytes); err != nil {
+			return nil, err
+		} else if len(recv.Owners) == 0 {
+			break
+		}
+
+		cursor = recv.NewCursor
+		for i := range recv.Owners {
+			if recv.Candidates[i] {
+				result.Owners = append(result.Owners, recv.Owners[i])
+				result.Operators = append(result.Operators, recv.Operators[i])
+				result.Stakes = append(result.Stakes, recv.Stakes[i])
+			}
+		}
+	}
+
+	return &result, nil
+}
+
+// Call the `StakeManager.getValidatorOwners` method.
 func getValidatorOwners(ethAPI blockchainAPI, hash common.Hash) ([]common.Address, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -369,7 +500,7 @@ func getValidatorOwners(ethAPI blockchainAPI, hash common.Hash) ([]common.Addres
 		method  = "getValidatorOwners"
 		result  []common.Address
 		cursor  = big.NewInt(0)
-		howMany = big.NewInt(200)
+		howMany = big.NewInt(100)
 	)
 	for {
 		data, err := stakeManager.abi.Pack(method, cursor, howMany)
@@ -407,6 +538,7 @@ func getValidatorOwners(ethAPI blockchainAPI, hash common.Hash) ([]common.Addres
 	return result, nil
 }
 
+// Call the `StakeManager.getTotalRewards` method.
 func getRewards(ethAPI blockchainAPI, hash common.Hash) (*big.Int, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -465,6 +597,7 @@ func getRewards(ethAPI blockchainAPI, hash common.Hash) (*big.Int, error) {
 	return result, nil
 }
 
+// Call the `Environment.nextValue` method.
 func getNextEnvironmentValue(ethAPI blockchainAPI, hash common.Hash) (*environmentValue, error) {
 	method := "nextValue"
 
