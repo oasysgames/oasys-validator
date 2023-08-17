@@ -1019,6 +1019,34 @@ func _deployments9(genesisHash common.Hash, contracts wantContracts) {
 	}
 }
 
+func _deployments10(genesisHash common.Hash, contracts wantContracts) {
+	appends := wantContracts{
+		"0x520000000000000000000000000000000000002F": {
+			name:     "PermissionedContractFactory",
+			codeHash: "36ef0cfff03bcac398171fc8c608a6fb",
+		},
+	}
+
+	switch genesisHash {
+	case params.OasysMainnetGenesisHash:
+		// PermissionedContractFactory
+		appends["0x520000000000000000000000000000000000002F"].storage = map[string]string{
+			"0x0bce92cc78449169524412e83bbfd32ee216dec5bba171ae073372f5ed4cecef": "0x0000000000000000000000000000000000000000000000000000000000000001",
+			"0x7b2a9f35ae3460479c151abacf19c3f133eb204503bb0a42027ce683342103af": "0x0000000000000000000000000000000000000000000000000000000000000001",
+		}
+	case params.OasysTestnetGenesisHash:
+		// PermissionedContractFactory
+		appends["0x520000000000000000000000000000000000002F"].storage = map[string]string{
+			"0x8544f4d9501cd2ef57e66ff394f96f2a0b39125d6cdb5f1740571be3740295b6": "0x0000000000000000000000000000000000000000000000000000000000000001",
+			"0xdf9cbebfc4724c8cf2eaa7e61614a9d0061eda58cfd1e1e47131ced2975d6e46": "0x0000000000000000000000000000000000000000000000000000000000000001",
+		}
+	}
+
+	for k, v := range appends {
+		contracts[k] = v
+	}
+}
+
 func TestDeploy(t *testing.T) {
 	type wantDeployments []struct {
 		block  uint64
@@ -1043,6 +1071,7 @@ func TestDeploy(t *testing.T) {
 				{557100, []deployFn{_deployments6}},
 				{971800, []deployFn{_deployments7}},
 				{1529980, []deployFn{_deployments9}},
+				{1892000, []deployFn{_deployments10}},
 			},
 		},
 		{
@@ -1059,6 +1088,7 @@ func TestDeploy(t *testing.T) {
 				{546400, []deployFn{_deployments6}},
 				{955400, []deployFn{_deployments7, _deployments8}},
 				{1519840, []deployFn{_deployments9}},
+				{1880660, []deployFn{_deployments10}},
 			},
 		},
 		{
@@ -1077,6 +1107,7 @@ func TestDeploy(t *testing.T) {
 					_deployments7,
 					_deployments8,
 					_deployments9,
+					_deployments10,
 				}},
 			},
 		},

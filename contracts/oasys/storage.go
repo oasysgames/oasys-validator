@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
-	"reflect"
 	"strconv"
 	"strings"
 
@@ -66,20 +65,38 @@ func (a *array) add(storage map[common.Hash]common.Hash, rootSlot common.Hash) e
 
 // `mapping` type storage.
 type mapping struct {
-	keyType reflect.Type
-	values  map[string]interface{}
+	keyFn  func(key string) common.Hash
+	values map[string]interface{}
 }
+
+var (
+	addressKeyFn = func(key string) common.Hash { return common.HexToHash(key) }
+)
 
 // Add mapping values to storage.
 func (m *mapping) add(storage map[common.Hash]common.Hash, rootSlot common.Hash) error {
-	if m.keyType != reflect.TypeOf(common.Address{}) {
-		return fmt.Errorf("unsupported key type: %s", m.keyType)
-	}
-
 	for mkey, mval := range m.values {
-		k := bytes.Join([][]byte{common.HexToHash(mkey).Bytes(), rootSlot[:]}, nil)
+		k := bytes.Join([][]byte{m.keyFn(mkey).Bytes(), rootSlot[:]}, nil)
 		slot := common.BytesToHash(crypto.Keccak256(k))
 		if err := setStorage(storage, slot, mval); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// `struct` type value.
+type structValue []struct {
+	pos   int64
+	value interface{}
+}
+
+// Add members to storage.
+func (s structValue) add(storage map[common.Hash]common.Hash, rootSlot common.Hash) error {
+	for _, member := range s {
+		memberSlot := new(big.Int).Add(rootSlot.Big(), big.NewInt(member.pos))
+		if err := setStorage(storage, common.BigToHash(memberSlot), member.value); err != nil {
 			return err
 		}
 	}
@@ -100,6 +117,8 @@ func setStorage(storage map[common.Hash]common.Hash, slot common.Hash, val inter
 	case mapping:
 		return t.add(storage, slot)
 	case genesismap:
+		return t.add(storage, slot)
+	case structValue:
 		return t.add(storage, slot)
 	case string:
 		isHex := strings.HasPrefix(t, hexPrefix)
