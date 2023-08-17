@@ -19,6 +19,12 @@ var (
 		address: "0x520000000000000000000000000000000000002e",
 	}
 
+	// Governance
+	permissionedContractFactory = &contract{
+		name:    "PermissionedContractFactory",
+		address: "0x520000000000000000000000000000000000002F",
+	}
+
 	// ERC20 Tokens
 	wrappedOAS = &contract{
 		name:    "WOAS",
