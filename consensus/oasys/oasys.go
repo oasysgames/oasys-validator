@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
@@ -652,6 +653,86 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 	return nil
 }
 
+func (c *Oasys) FinalizeWithEVM(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs *[]*types.Transaction,
+	uncles []*types.Header, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64, evm *vm.EVM) error {
+	if err := verifyTx(header, *txs); err != nil {
+		return err
+	}
+
+	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
+	header.UncleHash = types.CalcUncleHash(nil)
+
+	hash := header.Hash()
+	number := header.Number.Uint64()
+
+	cx := chainContext{Chain: chain, oasys: c}
+	if number == 1 {
+		err := c.initializeSystemContracts(state, header, cx, txs, receipts, systemTxs, usedGas, false)
+		if err != nil {
+			log.Error("Failed to initialize system contracts", "in", "Finalize", "hash", hash, "number", number, "err", err)
+			return err
+		}
+
+	}
+
+	env, err := c.environmentWithEVM(chain, header, nil, evm)
+	if err != nil {
+		return err
+	}
+
+	var (
+		isEpoch        = env.IsEpoch(number)
+		schedule       map[uint64]common.Address
+		nextValidators *nextValidators
+	)
+	if isEpoch {
+		nextValidators, err = getNextValidatorsWithEVM(c.chainConfig, header.ParentHash, env.Epoch(number), number, evm)
+		if err != nil {
+			log.Error("Failed to get validators", "in", "Finalize", "hash", header.ParentHash, "number", number, "err", err)
+			return err
+		}
+		schedule = c.getValidatorScheduleByHash(chain, nextValidators, env, number, header.ParentHash)
+	} else {
+		snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
+		if err != nil {
+			return err
+		}
+		schedule = snap.getValidatorScheduleByHash(chain, env, number, header.ParentHash)
+	}
+
+	if err := c.addBalanceToStakeManagerWithEVM(state, header.ParentHash, number, env, evm); err != nil {
+		log.Error("Failed to add balance to staking contract", "in", "Finalize", "hash", header.ParentHash, "number", number, "err", err)
+		return err
+	}
+
+	if isEpoch {
+		// If the block is a epoch block, verify the validator list or hash
+		actual := header.Extra[extraVanity : len(header.Extra)-extraSeal]
+		if err := c.verifyExtraHeaderValueInEpoch(header.Number, actual, nextValidators.Operators); err != nil {
+			return err
+		}
+	}
+
+	if number >= c.config.Epoch && header.Difficulty.Cmp(diffInTurn) != 0 {
+		validator, err := ecrecover(header, c.signatures)
+		if err != nil {
+			return err
+		}
+		expectedValidator := schedule[number]
+		if validator != expectedValidator {
+			if err := c.slash(expectedValidator, schedule, state, header, cx, txs, receipts, systemTxs, usedGas, false); err != nil {
+				log.Error("Failed to slash validator", "in", "Finalize", "hash", hash, "number", number, "address", expectedValidator, "err", err)
+			}
+		}
+	}
+
+	if len(*systemTxs) > 0 {
+		return errors.New("must not contain system transactions")
+	}
+
+	return nil
+}
+
 // FinalizeAndAssemble implements consensus.Engine, ensuring no uncles are set,
 // nor block rewards given, and returns the final block.
 func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, []*types.Receipt, error) {
@@ -975,8 +1056,35 @@ func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash,
 	return nil
 }
 
+func (c *Oasys) addBalanceToStakeManagerWithEVM(state *state.StateDB, hash common.Hash, number uint64, env *environmentValue, evm *vm.EVM) error {
+	if !env.IsEpoch(number) || env.Epoch(number) < 3 || env.Epoch(number) > 60 {
+		return nil
+	}
+
+	var (
+		rewards *big.Int
+		err     error
+	)
+
+	if rewards, err = getRewardsWithEVM(hash, evm); err != nil {
+		log.Error("Failed to get rewards", "hash", hash, "err", err)
+		return err
+	}
+	if rewards.Cmp(common.Big0) == 0 {
+		return nil
+	}
+
+	state.AddBalance(stakeManager.address, rewards)
+	log.Info("Balance added to stake manager", "hash", hash, "amount", rewards.String())
+	return nil
+}
+
 func (c *Oasys) getValidatorSchedule(chain consensus.ChainHeaderReader, result *nextValidators, env *environmentValue, number uint64) map[uint64]common.Address {
 	return getValidatorSchedule(chain, result.Operators, result.Stakes, env, number)
+}
+
+func (c *Oasys) getValidatorScheduleByHash(chain consensus.ChainHeaderReader, result *nextValidators, env *environmentValue, number uint64, hash common.Hash) map[uint64]common.Address {
+	return getValidatorScheduleByHash(chain, result.Operators, result.Stakes, env, number, hash)
 }
 
 func (c *Oasys) backOffTime(chain consensus.ChainHeaderReader, result *nextValidators,
@@ -1000,6 +1108,30 @@ func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Hea
 
 	if number%snap.Environment.EpochPeriod.Uint64() == 0 {
 		nextEnv, err := getNextEnvironmentValue(c.ethAPI, header.ParentHash)
+		if err != nil {
+			log.Error("Failed to get environment value", "in", "environment", "hash", header.ParentHash, "number", number, "err", err)
+			return nil, err
+		}
+		return nextEnv, nil
+	}
+
+	return snap.Environment, nil
+}
+
+func (c *Oasys) environmentWithEVM(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header, evm *vm.EVM) (*environmentValue, error) {
+	number := header.Number.Uint64()
+	if number < c.config.Epoch {
+		return getInitialEnvironment(c.config), nil
+	}
+
+	snap, err := c.snapshot(chain, number-1, header.ParentHash, parents)
+	if err != nil {
+		return nil, err
+	}
+	log.Debug("inside of snap", "number", snap.Number, "hash", snap.Hash)
+
+	if number%snap.Environment.EpochPeriod.Uint64() == 0 {
+		nextEnv, err := getNextEnvironmentValueWithEVM(header.ParentHash, evm)
 		if err != nil {
 			log.Error("Failed to get environment value", "in", "environment", "hash", header.ParentHash, "number", number, "err", err)
 			return nil, err
@@ -1122,9 +1254,51 @@ func newWeightedRandomChooser(
 	return chooser
 }
 
+func newWeightedRandomChooserByHash(
+	chain consensus.ChainHeaderReader,
+	validators []common.Address,
+	stakes []*big.Int,
+	env *environmentValue,
+	number uint64,
+	hash common.Hash,
+) *weightedRandomChooser {
+	start := env.GetFirstBlock(number)
+	seed := int64(start)
+	if start > 0 {
+		if header := chain.GetHeaderByHash(hash); header != nil {
+			seed = header.Hash().Big().Int64()
+		}
+	}
+
+	validators, stakes = sortValidatorsAndValues(validators, stakes)
+	chooser := &weightedRandomChooser{
+		random:     rand.New(rand.NewSource(seed)),
+		validators: make([]common.Address, len(validators)),
+		totals:     make([]int, len(stakes)),
+		max:        0,
+	}
+	for i, validator := range validators {
+		chooser.validators[i] = validator
+		chooser.max += int(new(big.Int).Div(stakes[i], ether).Int64())
+		chooser.totals[i] = chooser.max
+	}
+	return chooser
+}
+
 func getValidatorSchedule(chain consensus.ChainHeaderReader, validators []common.Address, stakes []*big.Int, env *environmentValue, number uint64) map[uint64]common.Address {
 	start := env.GetFirstBlock(number)
 	chooser := newWeightedRandomChooser(chain, validators, stakes, env, number)
+	epochPeriod := env.EpochPeriod.Uint64()
+	ret := make(map[uint64]common.Address)
+	for i := uint64(0); i < epochPeriod; i++ {
+		ret[start+i] = chooser.choice()
+	}
+	return ret
+}
+
+func getValidatorScheduleByHash(chain consensus.ChainHeaderReader, validators []common.Address, stakes []*big.Int, env *environmentValue, number uint64, hash common.Hash) map[uint64]common.Address {
+	start := env.GetFirstBlock(number)
+	chooser := newWeightedRandomChooserByHash(chain, validators, stakes, env, number, hash)
 	epochPeriod := env.EpochPeriod.Uint64()
 	ret := make(map[uint64]common.Address)
 	for i := uint64(0); i < epochPeriod; i++ {

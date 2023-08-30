@@ -26,6 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/trie"
@@ -276,6 +277,11 @@ func (beacon *Beacon) Finalize(chain consensus.ChainHeaderReader, header *types.
 	// external consensus engine.
 	header.Root = state.IntermediateRoot(true)
 	return nil
+}
+
+func (beacon *Beacon) FinalizeWithEVM(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs *[]*types.Transaction,
+	uncles []*types.Header, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64, evm *vm.EVM) error {
+	return beacon.Finalize(chain, header, state, txs, uncles, receipts, systemTxs, usedGas)
 }
 
 // FinalizeAndAssemble implements consensus.Engine, setting the final state and

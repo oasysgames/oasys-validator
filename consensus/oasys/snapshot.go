@@ -182,6 +182,11 @@ func (s *Snapshot) getValidatorSchedule(chain consensus.ChainHeaderReader, env *
 	return getValidatorSchedule(chain, validators, stakes, env, number)
 }
 
+func (s *Snapshot) getValidatorScheduleByHash(chain consensus.ChainHeaderReader, env *environmentValue, number uint64, hash common.Hash) map[uint64]common.Address {
+	validators, stakes := s.validatorsToTuple()
+	return getValidatorScheduleByHash(chain, validators, stakes, env, number, hash)
+}
+
 func (s *Snapshot) backOffTime(chain consensus.ChainHeaderReader, env *environmentValue, number uint64, validator common.Address) uint64 {
 	if !s.exists(validator) {
 		return 0

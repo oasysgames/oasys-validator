@@ -31,6 +31,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
@@ -596,6 +597,11 @@ func (ethash *Ethash) Finalize(chain consensus.ChainHeaderReader, header *types.
 	accumulateRewards(chain.Config(), state, header, uncles)
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 	return nil
+}
+
+func (ethash *Ethash) FinalizeWithEVM(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs *[]*types.Transaction,
+	uncles []*types.Header, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64, evm *vm.EVM) error {
+	return ethash.Finalize(chain, header, state, txs, uncles, receipts, systemTxs, usedGas)
 }
 
 // FinalizeAndAssemble implements consensus.Engine, accumulating the block and
