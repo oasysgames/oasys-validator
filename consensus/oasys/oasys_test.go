@@ -141,7 +141,7 @@ func TestBackOffTime(t *testing.T) {
 	for _, tc := range testCases {
 		for i, want := range tc.want {
 			validator := validators[i]
-			backoff := backOffTime(env.chain, validators, stakes, envValue, tc.block, validator)
+			backoff := backOffTime(env.chain, validators, stakes, envValue, tc.block, validator, nil)
 			if backoff != want {
 				t.Errorf("backoff mismatch, block %v, validator %v, got %v, want %v", tc.block, names[validator], backoff, want)
 			}
