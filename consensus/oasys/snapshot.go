@@ -178,22 +178,17 @@ func (s *Snapshot) exists(validator common.Address) bool {
 	return ok
 }
 
-func (s *Snapshot) getValidatorSchedule(chain consensus.ChainHeaderReader, env *environmentValue, number uint64) map[uint64]common.Address {
+func (s *Snapshot) getValidatorSchedule(chain consensus.ChainHeaderReader, env *environmentValue, number uint64, hash *common.Hash) map[uint64]common.Address {
 	validators, stakes := s.validatorsToTuple()
-	return getValidatorSchedule(chain, validators, stakes, env, number)
+	return getValidatorSchedule(chain, validators, stakes, env, number, hash)
 }
 
-func (s *Snapshot) getValidatorScheduleByHash(chain consensus.ChainHeaderReader, env *environmentValue, number uint64, hash common.Hash) map[uint64]common.Address {
-	validators, stakes := s.validatorsToTuple()
-	return getValidatorScheduleByHash(chain, validators, stakes, env, number, hash)
-}
-
-func (s *Snapshot) backOffTime(chain consensus.ChainHeaderReader, env *environmentValue, number uint64, validator common.Address) uint64 {
+func (s *Snapshot) backOffTime(chain consensus.ChainHeaderReader, env *environmentValue, number uint64, validator common.Address, hash *common.Hash) uint64 {
 	if !s.exists(validator) {
 		return 0
 	}
 	validators, stakes := s.validatorsToTuple()
-	return backOffTime(chain, validators, stakes, env, number, validator)
+	return backOffTime(chain, validators, stakes, env, number, validator, hash)
 }
 
 func (s *Snapshot) validatorsToTuple() ([]common.Address, []*big.Int) {
