@@ -266,22 +266,17 @@ func (beacon *Beacon) Prepare(chain consensus.ChainHeaderReader, header *types.H
 
 // Finalize implements consensus.Engine, setting the final state on the header
 func (beacon *Beacon) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs *[]*types.Transaction,
-	uncles []*types.Header, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64) error {
+	uncles []*types.Header, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64, evm *vm.EVM) error {
 	// Finalize is different with Prepare, it can be used in both block generation
 	// and verification. So determine the consensus rules by header type.
 	if !beacon.IsPoSHeader(header) {
-		beacon.ethone.Finalize(chain, header, state, txs, uncles, receipts, systemTxs, usedGas)
+		beacon.ethone.Finalize(chain, header, state, txs, uncles, receipts, systemTxs, usedGas, nil)
 		return nil
 	}
 	// The block reward is no longer handled here. It's done by the
 	// external consensus engine.
 	header.Root = state.IntermediateRoot(true)
 	return nil
-}
-
-func (beacon *Beacon) FinalizeWithEVM(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs *[]*types.Transaction,
-	uncles []*types.Header, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64, evm *vm.EVM) error {
-	return beacon.Finalize(chain, header, state, txs, uncles, receipts, systemTxs, usedGas)
 }
 
 // FinalizeAndAssemble implements consensus.Engine, setting the final state and
@@ -293,7 +288,7 @@ func (beacon *Beacon) FinalizeAndAssemble(chain consensus.ChainHeaderReader, hea
 		return beacon.ethone.FinalizeAndAssemble(chain, header, state, txs, uncles, receipts)
 	}
 	// Finalize and assemble the block
-	beacon.Finalize(chain, header, state, &txs, uncles, nil, nil, nil)
+	beacon.Finalize(chain, header, state, &txs, uncles, nil, nil, nil, nil)
 	return types.NewBlock(header, txs, uncles, receipts, trie.NewStackTrie(nil)), receipts, nil
 }
 

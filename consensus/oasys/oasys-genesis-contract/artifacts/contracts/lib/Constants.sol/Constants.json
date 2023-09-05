@@ -1,0 +1,128 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "Constants",
+  "sourceName": "contracts/lib/Constants.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "MAX_COMMISSION_RATE",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MAX_REWARD_RATE",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MIN_BLOCK_PERIOD",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MIN_EPOCH_PERIOD",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MIN_JAIL_PERIOD",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MIN_JAIL_THRESHOLD",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MIN_VALIDATOR_THRESHOLD",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "REWARD_PRECISION",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "SECONDS_PER_YEAR",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x61010561003a600b82828239805160001a60731461002d57634e487b7160e01b600052600060045260246000fd5b30600052607381538281f3fe730000000000000000000000000000000000000000301460806040526004361060925760003560e01c80635e52aadc1160695780635e52aadc1460b0578063718dc3c3146097578063d8b654371460b0578063e6a69ab81460be578063f6cb1a491460c857600080fd5b8063207239c0146097578063331b8dd41460b05780633d6aa5e11460b75780634bb8e66e1460b0575b600080fd5b609e606481565b60405190815260200160405180910390f35b609e600181565b609e601981565b609e6301e1338081565b609e60038156fea264697066735822122009a5dd82b09f8e6d1938bac92ab88cc0dd3e9056c7159e7035a5c22999c5ec4164736f6c634300080c0033",
+  "deployedBytecode": "0x730000000000000000000000000000000000000000301460806040526004361060925760003560e01c80635e52aadc1160695780635e52aadc1460b0578063718dc3c3146097578063d8b654371460b0578063e6a69ab81460be578063f6cb1a491460c857600080fd5b8063207239c0146097578063331b8dd41460b05780633d6aa5e11460b75780634bb8e66e1460b0575b600080fd5b609e606481565b60405190815260200160405180910390f35b609e600181565b609e601981565b609e6301e1338081565b609e60038156fea264697066735822122009a5dd82b09f8e6d1938bac92ab88cc0dd3e9056c7159e7035a5c22999c5ec4164736f6c634300080c0033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

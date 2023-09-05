@@ -1,0 +1,356 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "IEnvironment",
+  "sourceName": "contracts/IEnvironment.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "epoch",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_epoch",
+          "type": "uint256"
+        }
+      ],
+      "name": "findValue",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "startBlock",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "startEpoch",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "blockPeriod",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "epochPeriod",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "rewardRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "commissionRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "validatorThreshold",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "jailThreshold",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "jailPeriod",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IEnvironment.EnvironmentValue",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "startBlock",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "startEpoch",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "blockPeriod",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "epochPeriod",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "rewardRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "commissionRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "validatorThreshold",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "jailThreshold",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "jailPeriod",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IEnvironment.EnvironmentValue",
+          "name": "initialValue",
+          "type": "tuple"
+        }
+      ],
+      "name": "initialize",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "isFirstBlock",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "isLastBlock",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "nextValue",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "startBlock",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "startEpoch",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "blockPeriod",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "epochPeriod",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "rewardRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "commissionRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "validatorThreshold",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "jailThreshold",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "jailPeriod",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IEnvironment.EnvironmentValue",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "startBlock",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "startEpoch",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "blockPeriod",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "epochPeriod",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "rewardRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "commissionRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "validatorThreshold",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "jailThreshold",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "jailPeriod",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IEnvironment.EnvironmentValue",
+          "name": "newValue",
+          "type": "tuple"
+        }
+      ],
+      "name": "updateValue",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "value",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "startBlock",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "startEpoch",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "blockPeriod",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "epochPeriod",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "rewardRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "commissionRate",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "validatorThreshold",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "jailThreshold",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "jailPeriod",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IEnvironment.EnvironmentValue",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

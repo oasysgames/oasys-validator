@@ -115,7 +115,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	}
 	bloomProcessors.Close()
 
-	err := p.engine.FinalizeWithEVM(p.bc, header, statedb, &generalTxs, block.Uncles(), &receipts, &systemTxs, usedGas, vmenv)
+	err := p.engine.Finalize(p.bc, header, statedb, &generalTxs, block.Uncles(), &receipts, &systemTxs, usedGas, vmenv)
 	if err != nil {
 		return nil, nil, 0, err
 	}

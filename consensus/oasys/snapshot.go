@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/log"
@@ -103,7 +104,7 @@ func (s *Snapshot) copy() *Snapshot {
 
 // apply creates a new authorization snapshot by applying the given headers to
 // the original one.
-func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderReader) (*Snapshot, error) {
+func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderReader, evm *vm.EVM) (*Snapshot, error) {
 	// Allow passing in no headers for cleaner code
 	if len(headers) == 0 {
 		return s, nil
@@ -130,7 +131,7 @@ func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderRea
 
 		var exists bool
 		if number > 0 && number%snap.Environment.EpochPeriod.Uint64() == 0 {
-			nextValidator, err := getNextValidators(s.config, s.ethAPI, header.ParentHash, snap.Environment.Epoch(number), number)
+			nextValidator, err := getNextValidators(s.config, s.ethAPI, header.ParentHash, snap.Environment.Epoch(number), number, evm)
 			if err != nil {
 				log.Error("Failed to get validators", "in", "Snapshot.apply", "hash", header.ParentHash, "number", number, "err", err)
 				return nil, err

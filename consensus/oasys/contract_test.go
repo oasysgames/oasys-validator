@@ -263,7 +263,7 @@ func TestGetNextValidators(t *testing.T) {
 	ethapi := &testBlockchainAPI{rbytes: rbytes}
 
 	for _, block := range []uint64{1, 10} {
-		got, _ := getNextValidators(config, ethapi, common.Hash{}, 1, block)
+		got, _ := getNextValidators(config, ethapi, common.Hash{}, 1, block, nil)
 
 		if len(got.Owners) != len(wantOwners) {
 			t.Errorf("invalid owners length, got: %d, want: %d", len(got.Owners), len(wantOwners))
@@ -312,7 +312,7 @@ func TestGetRewards(t *testing.T) {
 	rbytes[1] = rbyte
 
 	ethapi := &testBlockchainAPI{rbytes: map[common.Address][][]byte{stakeManager.address: rbytes}}
-	got, _ := getRewards(ethapi, common.Hash{})
+	got, _ := getRewards(ethapi, common.Hash{}, nil)
 	if got.Cmp(want) != 0 {
 		t.Errorf("got %v, want: %v", got, want)
 	}
