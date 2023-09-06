@@ -2472,17 +2472,12 @@ Chain config: %v
 
 Number: %v
 Hash: 0x%x
-Header:
-  ParentHash: 0x%x
-	Coinbase: 0x%x
-	Root: 0x%x
-	Difficulty: %s
-	Time: %d
+Header: %v
 %v
 
 Error: %v
 ##############################
-`, bc.chainConfig, block.Number(), block.Hash(), block.Header().ParentHash, block.Header().Coinbase, block.Header().Root, block.Header().Difficulty.String(), block.Header().Time, receiptString, err))
+`, bc.chainConfig, block.Number(), block.Hash(), block.Header(), receiptString, err))
 }
 
 // InsertHeaderChain attempts to insert the given header chain in to the local
