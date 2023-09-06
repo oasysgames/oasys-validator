@@ -122,16 +122,6 @@ func TestBackOffTime(t *testing.T) {
 		{119, []uint64{2, 3, 4, 0}},
 	}
 
-	wallets, accounts, err := makeWallets(1)
-	if err != nil {
-		t.Fatalf("failed to create test wallets: %v", err)
-	}
-
-	env, err := makeEnv(*wallets[0], *accounts[0])
-	if err != nil {
-		t.Fatalf("failed to create test env: %v", err)
-	}
-
 	envValue := &environmentValue{
 		StartBlock:  common.Big0,
 		StartEpoch:  common.Big1,
@@ -140,10 +130,10 @@ func TestBackOffTime(t *testing.T) {
 
 	for _, tc := range testCases {
 		for i, want := range tc.want {
-			validator := validators[i]
-			backoff := backOffTime(env.chain, validators, stakes, envValue, tc.block, validator)
+			chooser := newWeightedChooser(validators, stakes, int64(envValue.GetFirstBlock(tc.block)))
+			backoff := backOffTime(envValue, chooser, tc.block, validators[i])
 			if backoff != want {
-				t.Errorf("backoff mismatch, block %v, validator %v, got %v, want %v", tc.block, names[validator], backoff, want)
+				t.Errorf("backoff mismatch, block %v, validator %v, got %v, want %v", tc.block, names[validators[i]], backoff, want)
 			}
 		}
 	}
@@ -238,16 +228,6 @@ func TestGetValidatorSchedule(t *testing.T) {
 		{119, "validator-3"},
 	}
 
-	wallets, accounts, err := makeWallets(1)
-	if err != nil {
-		t.Fatalf("failed to create test wallets: %v", err)
-	}
-
-	env, err := makeEnv(*wallets[0], *accounts[0])
-	if err != nil {
-		t.Fatalf("failed to create test env: %v", err)
-	}
-
 	envValue := &environmentValue{
 		StartBlock:  common.Big0,
 		StartEpoch:  common.Big1,
@@ -255,7 +235,8 @@ func TestGetValidatorSchedule(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		schedule := getValidatorSchedule(env.chain, validators, stakes, envValue, tc.block)
+		chooser := newWeightedChooser(validators, stakes, int64(envValue.GetFirstBlock(tc.block)))
+		schedule := getValidatorSchedule(envValue, chooser, tc.block)
 		got := names[schedule[tc.block]]
 		if got != tc.want {
 			t.Errorf("validator mismatch, block %v, got %v, want %v", tc.block, got, tc.want)
