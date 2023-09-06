@@ -24,7 +24,7 @@ func getNextValidators(
 	if config.IsForkedOasysPublication(new(big.Int).SetUint64(block)) {
 		return callGetHighStakes(ethAPI, hash, epoch, evm)
 	}
-	return callGetValidators(ethAPI, hash, epoch)
+	return callGetValidators(ethAPI, hash, epoch, evm)
 }
 
 func callGetHighStakes(ethAPI blockchainAPI, hash common.Hash, epoch uint64, evm *vm.EVM) (*nextValidators, error) {
@@ -98,7 +98,7 @@ func getRewards(ethAPI blockchainAPI, hash common.Hash, evm *vm.EVM) (*big.Int, 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	validators, err := getValidatorOwners(ethAPI, hash)
+	validators, err := getValidatorOwners(ethAPI, hash, evm)
 	if err != nil {
 		return nil, err
 	}
@@ -158,4 +158,163 @@ func getRewards(ethAPI blockchainAPI, hash common.Hash, evm *vm.EVM) (*big.Int, 
 	}
 
 	return result, nil
+}
+
+// Call the `StakeManager.getValidators` method.
+func callGetValidators(ethAPI blockchainAPI, hash common.Hash, epoch uint64, evm *vm.EVM) (*nextValidators, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var (
+		method  = "getValidators"
+		result  nextValidators
+		bepoch  = new(big.Int).SetUint64(epoch)
+		cursor  = big.NewInt(0)
+		howMany = big.NewInt(100)
+	)
+	for {
+		data, err := stakeManager.abi.Pack(method, bepoch, cursor, howMany)
+		if err != nil {
+			return nil, err
+		}
+
+		var (
+			sender  = vm.AccountRef(common.Address{})
+			hexData = (hexutil.Bytes)(data)
+			rbytes  []byte
+		)
+		if evm != nil {
+			rbytes, _, err = evm.Call(sender, stakeManager.address, data, uint64(math.MaxUint64/2), nil)
+		} else {
+			rbytes, err = ethAPI.Call(
+				ctx,
+				ethapi.TransactionArgs{
+					To:   &stakeManager.address,
+					Data: &hexData,
+				},
+				rpc.BlockNumberOrHashWithHash(hash, false),
+				nil)
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		var recv struct {
+			Owners     []common.Address
+			Operators  []common.Address
+			Stakes     []*big.Int
+			Candidates []bool
+			NewCursor  *big.Int
+		}
+		if err := stakeManager.abi.UnpackIntoInterface(&recv, method, rbytes); err != nil {
+			return nil, err
+		} else if len(recv.Owners) == 0 {
+			break
+		}
+
+		cursor = recv.NewCursor
+		for i := range recv.Owners {
+			if recv.Candidates[i] {
+				result.Owners = append(result.Owners, recv.Owners[i])
+				result.Operators = append(result.Operators, recv.Operators[i])
+				result.Stakes = append(result.Stakes, recv.Stakes[i])
+			}
+		}
+	}
+
+	return &result, nil
+}
+
+// Call the `StakeManager.getValidatorOwners` method.
+func getValidatorOwners(ethAPI blockchainAPI, hash common.Hash, evm *vm.EVM) ([]common.Address, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var (
+		method  = "getValidatorOwners"
+		result  []common.Address
+		cursor  = big.NewInt(0)
+		howMany = big.NewInt(100)
+	)
+	for {
+		data, err := stakeManager.abi.Pack(method, cursor, howMany)
+		if err != nil {
+			return nil, err
+		}
+
+		var (
+			sender  = vm.AccountRef(common.Address{})
+			hexData = (hexutil.Bytes)(data)
+			rbytes  []byte
+		)
+		if evm != nil {
+			rbytes, _, err = evm.Call(sender, stakeManager.address, data, uint64(math.MaxUint64/2), nil)
+		} else {
+			rbytes, err = ethAPI.Call(
+				ctx,
+				ethapi.TransactionArgs{
+					To:   &stakeManager.address,
+					Data: &hexData,
+				},
+				rpc.BlockNumberOrHashWithHash(hash, false),
+				nil)
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		var recv struct {
+			Owners    []common.Address
+			NewCursor *big.Int
+		}
+		if err := stakeManager.abi.UnpackIntoInterface(&recv, method, rbytes); err != nil {
+			return nil, err
+		} else if len(recv.Owners) == 0 {
+			break
+		}
+
+		cursor = recv.NewCursor
+		result = append(result, recv.Owners...)
+	}
+
+	return result, nil
+}
+
+func getNextEnvironmentValue(ethAPI blockchainAPI, hash common.Hash, evm *vm.EVM) (*environmentValue, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	method := "nextValue"
+	data, err := environment.abi.Pack(method)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		sender  = vm.AccountRef(common.Address{})
+		hexData = (hexutil.Bytes)(data)
+		rbytes  []byte
+	)
+	if evm != nil {
+		rbytes, _, err = evm.Call(sender, environment.address, data, uint64(math.MaxUint64/2), nil)
+	} else {
+		rbytes, err = ethAPI.Call(
+			ctx,
+			ethapi.TransactionArgs{
+				To:   &environment.address,
+				Data: &hexData,
+			},
+			rpc.BlockNumberOrHashWithHash(hash, false),
+			nil)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var recv struct{ Result environmentValue }
+	if err := environment.abi.UnpackIntoInterface(&recv, method, rbytes); err != nil {
+		return nil, err
+	}
+
+	return &recv.Result, nil
 }

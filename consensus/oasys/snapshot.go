@@ -133,10 +133,11 @@ func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderRea
 		if number > 0 && number%snap.Environment.EpochPeriod.Uint64() == 0 {
 			nextValidator, err := getNextValidators(s.config, s.ethAPI, header.ParentHash, snap.Environment.Epoch(number), number, evm)
 			if err != nil {
+				stackExample()
 				log.Error("Failed to get validators", "in", "Snapshot.apply", "hash", header.ParentHash, "number", number, "err", err)
 				return nil, err
 			}
-			nextEnv, err := getNextEnvironmentValue(s.ethAPI, header.ParentHash)
+			nextEnv, err := getNextEnvironmentValue(s.ethAPI, header.ParentHash, evm)
 			if err != nil {
 				log.Error("Failed to get environment value", "in", "Snapshot.apply", "hash", header.ParentHash, "number", number, "err", err)
 				return nil, err

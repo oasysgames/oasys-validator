@@ -357,7 +357,7 @@ func TestGetNextEnvironmentValue(t *testing.T) {
 	)
 
 	ethapi := &testBlockchainAPI{rbytes: map[common.Address][][]byte{environment.address: {rbyte}}}
-	got, _ := getNextEnvironmentValue(ethapi, common.Hash{})
+	got, _ := getNextEnvironmentValue(ethapi, common.Hash{}, nil)
 
 	if got.StartBlock.Cmp(want.StartBlock) != 0 {
 		t.Errorf("StartBlock, got %v, want: %v", got.StartBlock, want.StartBlock)

@@ -255,7 +255,7 @@ func TestGetValidatorSchedule(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		schedule := getValidatorSchedule(env.chain, validators, stakes, envValue, tc.block)
+		schedule := getValidatorSchedule(env.chain, validators, stakes, envValue, tc.block, nil)
 		got := names[schedule[tc.block]]
 		if got != tc.want {
 			t.Errorf("validator mismatch, block %v, got %v, want %v", tc.block, got, tc.want)
