@@ -50,7 +50,7 @@ func callGetHighStakes(ethAPI blockchainAPI, hash common.Hash, epoch uint64, evm
 			rbytes  []byte
 		)
 		if evm != nil {
-			rbytes, _, err = evm.Call(sender, candidateManager.address, data, uint64(math.MaxUint64/2), nil)
+			rbytes, _, err = evm.Call(sender, candidateManager.address, data, uint64(math.MaxUint64/2), new(big.Int))
 		} else {
 			rbytes, err = ethAPI.Call(
 				ctx,
@@ -134,7 +134,7 @@ func getRewards(ethAPI blockchainAPI, hash common.Hash, evm *vm.EVM) (*big.Int, 
 			rbytes  []byte
 		)
 		if evm != nil {
-			rbytes, _, err = evm.Call(sender, stakeManager.address, data, uint64(math.MaxUint64/2), nil)
+			rbytes, _, err = evm.Call(sender, stakeManager.address, data, uint64(math.MaxUint64/2), new(big.Int))
 		} else {
 			rbytes, err = ethAPI.Call(
 				ctx,
@@ -184,7 +184,7 @@ func callGetValidators(ethAPI blockchainAPI, hash common.Hash, epoch uint64, evm
 			rbytes  []byte
 		)
 		if evm != nil {
-			rbytes, _, err = evm.Call(sender, stakeManager.address, data, uint64(math.MaxUint64/2), nil)
+			rbytes, _, err = evm.Call(sender, stakeManager.address, data, uint64(math.MaxUint64/2), new(big.Int))
 		} else {
 			rbytes, err = ethAPI.Call(
 				ctx,
@@ -248,7 +248,7 @@ func getValidatorOwners(ethAPI blockchainAPI, hash common.Hash, evm *vm.EVM) ([]
 			rbytes  []byte
 		)
 		if evm != nil {
-			rbytes, _, err = evm.Call(sender, stakeManager.address, data, uint64(math.MaxUint64/2), nil)
+			rbytes, _, err = evm.Call(sender, stakeManager.address, data, uint64(math.MaxUint64/2), new(big.Int))
 		} else {
 			rbytes, err = ethAPI.Call(
 				ctx,
@@ -296,7 +296,7 @@ func getNextEnvironmentValue(ethAPI blockchainAPI, hash common.Hash, evm *vm.EVM
 		rbytes  []byte
 	)
 	if evm != nil {
-		rbytes, _, err = evm.Call(sender, environment.address, data, uint64(math.MaxUint64/2), nil)
+		rbytes, _, err = evm.Call(sender, environment.address, data, uint64(math.MaxUint64/2), new(big.Int))
 	} else {
 		rbytes, err = ethAPI.Call(
 			ctx,
