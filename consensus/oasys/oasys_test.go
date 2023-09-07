@@ -141,7 +141,7 @@ func TestBackOffTime(t *testing.T) {
 	for _, tc := range testCases {
 		for i, want := range tc.want {
 			validator := validators[i]
-			backoff := backOffTime(env.chain, validators, stakes, envValue, tc.block, validator, nil)
+			backoff := backOffTime(env.chain, validators, stakes, envValue, tc.block, validator, nil, nil, nil)
 			if backoff != want {
 				t.Errorf("backoff mismatch, block %v, validator %v, got %v, want %v", tc.block, names[validator], backoff, want)
 			}
@@ -255,7 +255,7 @@ func TestGetValidatorSchedule(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		schedule := getValidatorSchedule(env.chain, validators, stakes, envValue, tc.block, nil)
+		schedule := getValidatorSchedule(env.chain, validators, stakes, envValue, tc.block, nil, nil, nil)
 		got := names[schedule[tc.block]]
 		if got != tc.want {
 			t.Errorf("validator mismatch, block %v, got %v, want %v", tc.block, got, tc.want)

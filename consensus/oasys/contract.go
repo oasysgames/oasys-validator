@@ -279,7 +279,7 @@ func (c *Oasys) IsSystemTransaction(tx *types.Transaction, header *types.Header)
 		} else if _, ok := methods[called.RawName]; ok {
 			log.Info("System method transacted",
 				"validator", header.Coinbase.Hex(), "tx", tx.Hash().Hex(),
-				"contract", contract.address.Hex(), "method", called.RawName)
+				"contract", contract.address.Hex(), "method", called.RawName, "blockNumber", header.Number.Uint64())
 			return true, nil
 		}
 	}
