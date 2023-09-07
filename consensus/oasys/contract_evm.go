@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 )
@@ -153,6 +154,7 @@ func getRewards(ethAPI blockchainAPI, hash common.Hash, evm *vm.EVM) (*big.Int, 
 		if err := stakeManager.abi.UnpackIntoInterface(&recv, method, rbytes); err != nil {
 			return nil, err
 		}
+		log.Debug("getTotalRewards", "rewards", recv.String(), "hash", hash)
 
 		result.Add(result, recv)
 	}

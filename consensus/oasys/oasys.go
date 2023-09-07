@@ -1101,10 +1101,11 @@ func newWeightedRandomChooser(
 	validators []common.Address,
 	stakes []*big.Int,
 	env *environmentValue,
+	number uint64,
 	header *types.Header,
 	config *params.OasysConfig,
 ) *weightedRandomChooser {
-	start := env.GetFirstBlock(header.Number.Uint64())
+	start := env.GetFirstBlock(number)
 	seed := int64(start)
 	if start > 0 {
 		if header != nil {
@@ -1114,7 +1115,7 @@ func newWeightedRandomChooser(
 				seed = seedHash.Big().Int64()
 			}
 		} else {
-			if header := chain.GetHeaderByNumber(start - 1); header != nil {
+			if header = chain.GetHeaderByNumber(start - 1); header != nil {
 				seed = header.Hash().Big().Int64()
 			}
 		}
@@ -1149,7 +1150,7 @@ func newWeightedRandomChooser(
 
 func getValidatorSchedule(chain consensus.ChainHeaderReader, validators []common.Address, stakes []*big.Int, env *environmentValue, number uint64, hash *common.Hash, header *types.Header, config *params.OasysConfig) map[uint64]common.Address {
 	start := env.GetFirstBlock(number)
-	chooser := newWeightedRandomChooser(chain, validators, stakes, env, header, config)
+	chooser := newWeightedRandomChooser(chain, validators, stakes, env, number, header, config)
 	epochPeriod := env.EpochPeriod.Uint64()
 	ret := make(map[uint64]common.Address)
 	for i := uint64(0); i < epochPeriod; i++ {
@@ -1160,7 +1161,7 @@ func getValidatorSchedule(chain consensus.ChainHeaderReader, validators []common
 
 func backOffTime(chain consensus.ChainHeaderReader, validators []common.Address, stakes []*big.Int, env *environmentValue, number uint64, validator common.Address, hash *common.Hash, header *types.Header, config *params.OasysConfig) uint64 {
 	start := env.GetFirstBlock(number)
-	chooser := newWeightedRandomChooser(chain, validators, stakes, env, header, config)
+	chooser := newWeightedRandomChooser(chain, validators, stakes, env, number, header, config)
 	for i := number - start; i > 0; i-- {
 		chooser.skip()
 	}
@@ -1187,7 +1188,7 @@ func backOffTime(chain consensus.ChainHeaderReader, validators []common.Address,
 
 // https://www.golangprograms.com/example-stack-and-caller-from-runtime-package.html
 func stackExample() {
-	stackSlice := make([]byte, 512)
+	stackSlice := make([]byte, 1024*2)
 	s := runtime.Stack(stackSlice, false)
 	fmt.Printf("\n%s", stackSlice[0:s])
 }
