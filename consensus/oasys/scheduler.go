@@ -3,6 +3,7 @@ package oasys
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"math/big"
 	"math/rand"
 	"sort"
@@ -12,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	lru "github.com/hashicorp/golang-lru"
 )
@@ -28,26 +28,114 @@ func init() {
 	lastBlockHashes, _ = lru.New(65535)
 }
 
-type validatorAndValue struct {
-	validator common.Address
-	value     *big.Int
+type scheduler struct {
+	env       *environmentValue
+	number    uint64
+	chooser   *weightedChooser
+	exists    map[common.Address]bool
+	schedules map[uint64]common.Address // block => validator
+	turns     map[common.Address]uint64 // validator => turn
 }
 
-type validatorsAndValuesAscending []*validatorAndValue
+func newScheduler(env *environmentValue, validators []common.Address, number uint64, chooser *weightedChooser) *scheduler {
+	s := &scheduler{
+		env:       env,
+		number:    number,
+		chooser:   chooser,
+		exists:    map[common.Address]bool{},
+		schedules: map[uint64]common.Address{},
+		turns:     map[common.Address]uint64{},
+	}
+
+	for _, validator := range s.chooser.validators {
+		s.exists[validator] = true
+	}
+
+	var (
+		start  = s.env.GetFirstBlock(s.number)
+		period = s.env.EpochPeriod.Uint64()
+	)
+	for i := uint64(0); i < period; i++ {
+		choiced := s.chooser.random()
+		s.schedules[start+i] = choiced
+		if start+i >= s.number {
+			if _, ok := s.turns[choiced]; !ok {
+				s.turns[choiced] = uint64(len(s.turns))
+			}
+		}
+	}
+	return s
+}
+
+func (s *scheduler) onSchedule(validator common.Address) bool {
+	return s.schedules[s.number] == validator
+}
+
+func (s *scheduler) difficulty(validator common.Address, ext bool) *big.Int {
+	if !ext {
+		if s.onSchedule(validator) {
+			return new(big.Int).Set(diffInTurn)
+		}
+		return new(big.Int).Set(diffNoTurn)
+	}
+
+	turn, err := s.turn(validator)
+	if errors.Is(err, errUnauthorizedValidator) {
+		return new(big.Int).Set(diffNoTurn)
+	}
+
+	unit := new(big.Int).Div(totalSupply, s.env.ValidatorThreshold).Uint64()
+	vals := uint64(len(s.chooser.validators))
+	return new(big.Int).SetUint64(unit * (vals - turn))
+}
+
+func (s *scheduler) turn(validator common.Address) (uint64, error) {
+	if !s.exists[validator] {
+		return 0, errUnauthorizedValidator
+	}
+
+	for {
+		if _, ok := s.turns[validator]; ok {
+			break
+		}
+
+		choiced := s.chooser.random()
+		if _, ok := s.turns[choiced]; !ok {
+			s.turns[choiced] = uint64(len(s.turns))
+		}
+	}
+
+	return s.turns[validator], nil
+}
+
+func (s *scheduler) backOffTime(validator common.Address) uint64 {
+	turn, err := s.turn(validator)
+	if errors.Is(err, errUnauthorizedValidator) || turn == 0 {
+		return 0
+	}
+	return turn + backoffWiggleTime
+}
+
+type validatorAndStake struct {
+	validator common.Address
+	stake     *big.Int
+}
+
+type validatorsAndValuesAscending []*validatorAndStake
 
 func (s validatorsAndValuesAscending) Len() int { return len(s) }
 func (s validatorsAndValuesAscending) Less(i, j int) bool {
-	if s[i].value.Cmp(s[j].value) == 0 {
+	if s[i].stake.Cmp(s[j].stake) == 0 {
 		return bytes.Compare(s[i].validator[:], s[j].validator[:]) < 0
 	}
-	return s[i].value.Cmp(s[j].value) < 0
+	return s[i].stake.Cmp(s[j].stake) < 0
 }
 func (s validatorsAndValuesAscending) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
-func sortValidatorsAndValues(validators []common.Address, values []*big.Int) ([]common.Address, []*big.Int) {
-	choices := make([]*validatorAndValue, len(validators))
+func sortValidatorsAndValues(validators []common.Address, stakes []*big.Int) ([]common.Address, []*big.Int) {
+	choices := make([]*validatorAndStake, len(validators))
 	for i, validator := range validators {
-		choices[i] = &validatorAndValue{validator, values[i]}
+		choices[i] = &validatorAndStake{validator, stakes[i]}
 	}
 	sort.Sort(validatorsAndValuesAscending(choices))
 
@@ -55,19 +143,19 @@ func sortValidatorsAndValues(validators []common.Address, values []*big.Int) ([]
 	rvalues := make([]*big.Int, len(choices))
 	for i, c := range choices {
 		rvalidators[i] = c.validator
-		rvalues[i] = new(big.Int).Set(c.value)
+		rvalues[i] = new(big.Int).Set(c.stake)
 	}
 	return rvalidators, rvalues
 }
 
 type weightedChooser struct {
-	random     *rand.Rand
+	rnd        *rand.Rand
 	validators []common.Address
 	totals     []int
 	max        int
 }
 
-func (c *weightedChooser) choice() common.Address {
+func (c *weightedChooser) random() common.Address {
 	if (c.max) == 0 {
 		i := rand.Intn(len(c.validators))
 		return c.validators[i]
@@ -93,17 +181,13 @@ func (c *weightedChooser) randInt() int {
 	if (c.max) == 0 {
 		return 0
 	}
-	return c.random.Intn(c.max) + 1
-}
-
-func (c *weightedChooser) skip() {
-	c.randInt()
+	return c.rnd.Intn(c.max) + 1
 }
 
 func newWeightedChooser(validators []common.Address, stakes []*big.Int, seed int64) *weightedChooser {
 	validators, stakes = sortValidatorsAndValues(validators, stakes)
 	chooser := &weightedChooser{
-		random:     rand.New(rand.NewSource(seed)),
+		rnd:        rand.New(rand.NewSource(seed)),
 		validators: make([]common.Address, len(validators)),
 		totals:     make([]int, len(stakes)),
 		max:        0,
@@ -114,62 +198,6 @@ func newWeightedChooser(validators []common.Address, stakes []*big.Int, seed int
 		chooser.totals[i] = chooser.max
 	}
 	return chooser
-}
-
-func newWeightedChooserFromHeaderSeed(
-	config *params.OasysConfig,
-	chain consensus.ChainHeaderReader,
-	validators []common.Address,
-	stakes []*big.Int,
-	env *environmentValue,
-	header *types.Header,
-) (*weightedChooser, error) {
-	start := env.GetFirstBlock(header.Number.Uint64())
-	seed := int64(start)
-	if start > 0 {
-		if seedHash, err := getPrevEpochLastBlockHash(config, chain, env, header); err != nil {
-			return nil, err
-		} else if seedHash != emptyHash {
-			seed = seedHash.Big().Int64()
-		}
-	}
-	return newWeightedChooser(validators, stakes, seed), nil
-}
-
-func getValidatorSchedule(env *environmentValue, chooser *weightedChooser, number uint64) map[uint64]common.Address {
-	epochPeriod := env.EpochPeriod.Uint64()
-	start := env.GetFirstBlock(number)
-
-	ret := make(map[uint64]common.Address)
-	for i := uint64(0); i < epochPeriod; i++ {
-		ret[start+i] = chooser.choice()
-	}
-	return ret
-}
-
-func backOffTime(env *environmentValue, chooser *weightedChooser, number uint64, validator common.Address) uint64 {
-	for i := number - env.GetFirstBlock(number); i > 0; i-- {
-		chooser.skip()
-	}
-
-	turn := 0
-	prevs := make(map[common.Address]bool)
-	for {
-		picked := chooser.choice()
-		if picked == validator {
-			break
-		}
-		if prevs[picked] {
-			continue
-		}
-		prevs[picked] = true
-		turn++
-	}
-
-	if turn == 0 {
-		return 0
-	}
-	return uint64(turn) + backoffWiggleTime
 }
 
 func getPrevEpochLastBlockHash(
@@ -218,10 +246,9 @@ func getPrevEpochLastBlockHash(
 		}
 
 		// Something is wrong.
-		log.Error("Unable to traverse the chain",
-			"parent", parent.Hex(), "number", number-1,
-			"header.Number", header.Number, "header.Hash", header.Hash().Hex(), "header.ParentHash", header.ParentHash.Hex())
-		return emptyHash, consensus.ErrUnknownAncestor
+		return emptyHash, fmt.Errorf(
+			"unable to traverse the chain: parent=%s, number=%d, header.Number=%d, header.Hash=%s, header.ParentHash=%s",
+			parent, number-1, header.Number, header.Hash(), header.ParentHash)
 	}
 
 	for _, key := range addCaches {

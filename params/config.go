@@ -443,7 +443,7 @@ func (c *ChainConfig) String() string {
 	default:
 		engine = "unknown"
 	}
-	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, Arrow Glacier: %v, MergeFork: %v, OasysPublication: %v, Engine: %v}",
+	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, Arrow Glacier: %v, MergeFork: %v, OasysPublication: %v, OasysExtendDifficulty: %v, Engine: %v}",
 		c.ChainID,
 		c.HomesteadBlock,
 		c.DAOForkBlock,
@@ -461,6 +461,7 @@ func (c *ChainConfig) String() string {
 		c.ArrowGlacierBlock,
 		c.MergeForkBlock,
 		c.OasysPublicationBlock(),
+		c.OasysExtendDifficultyBlock(),
 		engine,
 	)
 }
@@ -546,14 +547,28 @@ func (c *ChainConfig) OasysPublicationBlock() *big.Int {
 	return big.NewInt(2)
 }
 
-// IsOasysPublication returns true if num is equal to or greater than the Oasys hard fork block.
+// IsOasysPublication returns true if num is equal to or greater than the Oasys Publication fork block.
 func (c *ChainConfig) IsForkedOasysPublication(num *big.Int) bool {
 	return isForked(c.OasysPublicationBlock(), num)
 }
 
-// IsOasysPublication returns true if num is equal to than the Oasys Publication fork block.
-func (c *ChainConfig) IsOnOasysPublication(num *big.Int) bool {
-	return configNumEqual(c.OasysPublicationBlock(), num)
+// OasysExtendDifficultyBlock returns the hard fork of Oasys.
+func (c *ChainConfig) OasysExtendDifficultyBlock() *big.Int {
+	if c.Oasys == nil {
+		return nil
+	}
+	if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
+		return big.NewInt(999_999_999)
+	}
+	if c.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0 {
+		return big.NewInt(999_999_999)
+	}
+	return big.NewInt(2)
+}
+
+// IsForkedOasysExtendDifficulty returns true if num is equal to or greater than the Oasys fork block.
+func (c *ChainConfig) IsForkedOasysExtendDifficulty(num *big.Int) bool {
+	return isForked(c.OasysExtendDifficultyBlock(), num)
 }
 
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.

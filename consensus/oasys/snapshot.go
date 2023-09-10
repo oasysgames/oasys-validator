@@ -177,27 +177,6 @@ func (s *Snapshot) exists(validator common.Address) bool {
 	return ok
 }
 
-func (s *Snapshot) getValidatorSchedule(chain consensus.ChainHeaderReader, env *environmentValue, header *types.Header) (map[uint64]common.Address, error) {
-	validators, stakes := s.validatorsToTuple()
-	chooser, err := newWeightedChooserFromHeaderSeed(s.config.Oasys, chain, validators, stakes, env, header)
-	if err != nil {
-		return nil, err
-	}
-	return getValidatorSchedule(env, chooser, header.Number.Uint64()), nil
-}
-
-func (s *Snapshot) backOffTime(chain consensus.ChainHeaderReader, env *environmentValue, header *types.Header, validator common.Address) (uint64, error) {
-	if !s.exists(validator) {
-		return 0, nil
-	}
-	validators, stakes := s.validatorsToTuple()
-	chooser, err := newWeightedChooserFromHeaderSeed(s.config.Oasys, chain, validators, stakes, env, header)
-	if err != nil {
-		return 0, err
-	}
-	return backOffTime(env, chooser, header.Number.Uint64(), validator), nil
-}
-
 func (s *Snapshot) validatorsToTuple() ([]common.Address, []*big.Int) {
 	operators := make([]common.Address, len(s.Validators))
 	stakes := make([]*big.Int, len(s.Validators))
