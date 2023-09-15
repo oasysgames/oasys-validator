@@ -333,7 +333,7 @@ func (c *Oasys) initializeSystemContracts(
 // Transact the `StakeManager.slash` method.
 func (c *Oasys) slash(
 	validator common.Address,
-	schedule map[uint64]common.Address,
+	schedules []*common.Address,
 	state *state.StateDB,
 	header *types.Header,
 	cx core.ChainContext,
@@ -344,8 +344,8 @@ func (c *Oasys) slash(
 	mining bool,
 ) error {
 	blocks := int64(0)
-	for _, address := range schedule {
-		if address == validator {
+	for _, address := range schedules {
+		if *address == validator {
 			blocks++
 		}
 	}

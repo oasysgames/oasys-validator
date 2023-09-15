@@ -113,9 +113,20 @@ var (
 	errCoinBaseMisMatch = errors.New("coinbase do not match with signature")
 )
 
+var (
+	// The key is the hash value of the final block from the previous epoch.
+	schedulerCache *lru.Cache
+)
+
 // SignerFn hashes and signs the data to be signed by a backing account.
 type SignerFn func(signer accounts.Account, mimeType string, message []byte) ([]byte, error)
 type TxSignerFn func(accounts.Account, *types.Transaction, *big.Int) (*types.Transaction, error)
+
+func init() {
+	// The capacity should be greater than or equal to the
+	// maximum batch verification size divided by the epoch period.
+	schedulerCache, _ = lru.New(32)
+}
 
 // ecrecover extracts the Ethereum account address from a signed header.
 func ecrecover(header *types.Header, sigcache *lru.ARCCache) (common.Address, error) {
@@ -209,6 +220,7 @@ func (c *Oasys) VerifyHeaders(chain consensus.ChainHeaderReader, headers []*type
 
 	go func() {
 		for i, header := range headers {
+			uncommittedHashes.Add(header.Hash(), header.ParentHash)
 			err := c.verifyHeader(chain, header, headers[:i])
 
 			select {
@@ -322,10 +334,10 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 	}
 	scheduler, err := c.scheduler(chain, header, env, validators, stakes)
 	if err != nil {
-		log.Error("Failed to get scheduler", "in", "verifyCascadingFields", "number", number)
+		log.Error("Failed to get scheduler", "in", "verifyCascadingFields", "number", number, "err", err)
 		return err
 	}
-	if header.Time < parent.Time+env.BlockPeriod.Uint64()+scheduler.backOffTime(header.Coinbase) {
+	if header.Time < parent.Time+env.BlockPeriod.Uint64()+scheduler.backOffTime(number, header.Coinbase) {
 		return consensus.ErrFutureBlock
 	}
 
@@ -465,13 +477,13 @@ func (c *Oasys) verifySeal(chain consensus.ChainHeaderReader, header *types.Head
 	if validator != header.Coinbase {
 		return errCoinBaseMisMatch
 	}
-	if !scheduler.exists[validator] {
+	if !scheduler.exists(validator) {
 		return errUnauthorizedValidator
 	}
 
 	// Ensure that the difficulty corresponds to the turn-ness of the validator
 	if !c.fakeDiff {
-		difficulty := scheduler.difficulty(validator, c.chainConfig.IsForkedOasysExtendDifficulty(header.Number))
+		difficulty := scheduler.difficulty(number, validator, c.chainConfig.IsForkedOasysExtendDifficulty(header.Number))
 		if header.Difficulty.Cmp(difficulty) != 0 {
 			return errWrongDifficulty
 		}
@@ -521,7 +533,7 @@ func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 	}
 	scheduler, err := c.scheduler(chain, header, env, validators, stakes)
 	if err != nil {
-		log.Error("Failed to get scheduler", "in", "Prepare", "number", number)
+		log.Error("Failed to get scheduler", "in", "Prepare", "number", number, "err", err)
 		return err
 	}
 
@@ -529,14 +541,14 @@ func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 	header.Extra = append(header.Extra, make([]byte, extraSeal)...)
 
 	// Add the difficulty
-	header.Difficulty = scheduler.difficulty(c.signer, c.chainConfig.IsForkedOasysExtendDifficulty(header.Number))
+	header.Difficulty = scheduler.difficulty(number, c.signer, c.chainConfig.IsForkedOasysExtendDifficulty(header.Number))
 
 	// Ensure the timestamp has the correct delay
 	parent := chain.GetHeader(header.ParentHash, number-1)
 	if parent == nil {
 		return consensus.ErrUnknownAncestor
 	}
-	header.Time = parent.Time + env.BlockPeriod.Uint64() + scheduler.backOffTime(c.signer)
+	header.Time = parent.Time + env.BlockPeriod.Uint64() + scheduler.backOffTime(number, c.signer)
 	if header.Time < uint64(time.Now().Unix()) {
 		header.Time = uint64(time.Now().Unix())
 	}
@@ -590,7 +602,7 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 	}
 	scheduler, err := c.scheduler(chain, header, env, validators, stakes)
 	if err != nil {
-		log.Error("Failed to get scheduler", "in", "Finalize", "number", number)
+		log.Error("Failed to get scheduler", "in", "Finalize", "number", number, "err", err)
 		return err
 	}
 
@@ -612,9 +624,9 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 		if err != nil {
 			return err
 		}
-		if !scheduler.onSchedule(validator) {
-			if err := c.slash(scheduler.schedules[number], scheduler.schedules, state, header, cx, txs, receipts, systemTxs, usedGas, false); err != nil {
-				log.Error("Failed to slash validator", "in", "Finalize", "hash", hash, "number", number, "address", scheduler.schedules[number], "err", err)
+		if expected := *scheduler.expect(number); expected != validator {
+			if err := c.slash(expected, scheduler.schedules(), state, header, cx, txs, receipts, systemTxs, usedGas, false); err != nil {
+				log.Error("Failed to slash validator", "in", "Finalize", "hash", hash, "number", number, "address", expected, "err", err)
 			}
 		}
 	}
@@ -677,7 +689,7 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 	}
 	scheduler, err := c.scheduler(chain, header, env, validators, stakes)
 	if err != nil {
-		log.Error("Failed to get scheduler", "in", "FinalizeAndAssemble", "number", number)
+		log.Error("Failed to get scheduler", "in", "FinalizeAndAssemble", "number", number, "err", err)
 		return nil, nil, err
 	}
 
@@ -686,9 +698,11 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 		return nil, nil, err
 	}
 
-	if number >= c.config.Epoch && !scheduler.onSchedule(header.Coinbase) {
-		if err := c.slash(scheduler.schedules[number], scheduler.schedules, state, header, cx, &txs, &receipts, nil, &header.GasUsed, true); err != nil {
-			log.Error("Failed to slash validator", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "address", scheduler.schedules[number], "err", err)
+	if number >= c.config.Epoch {
+		if expected := *scheduler.expect(number); expected != header.Coinbase {
+			if err := c.slash(expected, scheduler.schedules(), state, header, cx, &txs, &receipts, nil, &header.GasUsed, true); err != nil {
+				log.Error("Failed to slash validator", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "address", expected, "err", err)
+			}
 		}
 	}
 
@@ -814,11 +828,11 @@ func (c *Oasys) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, p
 	}
 	scheduler, err := c.scheduler(chain, parent, env, validators, stakes)
 	if err != nil {
-		log.Error("Failed to get scheduler", "in", "CalcDifficulty", "number", number)
+		log.Error("Failed to get scheduler", "in", "CalcDifficulty", "number", number, "err", err)
 		return nil
 	}
 
-	return scheduler.difficulty(c.signer, c.chainConfig.IsForkedOasysExtendDifficulty(parent.Number))
+	return scheduler.difficulty(number, c.signer, c.chainConfig.IsForkedOasysExtendDifficulty(parent.Number))
 }
 
 // SealHash returns the hash of a block prior to it being sealed.
@@ -970,32 +984,55 @@ func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Hea
 		return nil, err
 	}
 
+	var env *environmentValue
 	if number%snap.Environment.EpochPeriod.Uint64() == 0 {
-		nextEnv, err := getNextEnvironmentValue(c.ethAPI, header.ParentHash)
-		if err != nil {
+		if env, err = getNextEnvironmentValue(c.ethAPI, header.ParentHash); err != nil {
 			log.Error("Failed to get environment value", "in", "environment", "hash", header.ParentHash, "number", number, "err", err)
 			return nil, err
 		}
-		return nextEnv, nil
+	} else {
+		env = snap.Environment
 	}
 
-	return snap.Environment, nil
+	if env.BlockPeriod.Cmp(common.Big0) == 0 {
+		return nil, errors.New("invalid block period")
+	}
+	if env.EpochPeriod.Cmp(common.Big0) == 0 {
+		return nil, errors.New("invalid epoch period")
+	}
+	if env.ValidatorThreshold.Cmp(common.Big0) == 0 {
+		return nil, errors.New("invalid validator threshold")
+	}
+
+	return env, nil
 }
 
 func (c *Oasys) scheduler(chain consensus.ChainHeaderReader, header *types.Header,
 	env *environmentValue, validators []common.Address, stakes []*big.Int) (*scheduler, error) {
-	var (
-		number = header.Number.Uint64()
-		seed   = int64(env.GetFirstBlock(number))
-	)
-	if seed > 0 {
-		if seedHash, err := getPrevEpochLastBlockHash(c.config, chain, env, header); err != nil {
-			return nil, err
-		} else if seedHash != emptyHash {
-			seed = seedHash.Big().Int64()
-		}
+	number := header.Number.Uint64()
+
+	// Previous epoch does not exists.
+	if number < c.config.Epoch {
+		return newScheduler(env, 0, newWeightedChooser(validators, stakes, 0)), nil
 	}
-	return newScheduler(env, validators, number, newWeightedChooser(validators, stakes, seed)), nil
+
+	// After the second epoch, the hash of the last block
+	// of the previous epoch is used as the random seed.
+	seedHash, err := getPrevEpochLastBlockHash(c.config, chain, env, header)
+	if err != nil {
+		return nil, err
+	} else if seedHash == emptyHash {
+		return nil, errors.New("invalid seed hash")
+	}
+
+	if cache, ok := schedulerCache.Get(seedHash); ok {
+		return cache.(*scheduler), nil
+	}
+
+	created := newScheduler(env, env.GetFirstBlock(number),
+		newWeightedChooser(validators, stakes, seedHash.Big().Int64()))
+	schedulerCache.Add(seedHash, created)
+	return created, nil
 }
 
 // Oasys transaction verification

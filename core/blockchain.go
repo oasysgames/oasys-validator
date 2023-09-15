@@ -2468,13 +2468,35 @@ func (bc *BlockChain) reportBlock(block *types.Block, receipts types.Receipts, e
 ########## BAD BLOCK #########
 Chain config: %v
 
+Validator: 0x%x
 Number: %v
 Hash: 0x%x
+ParentHash: 0x%x
+Time: %v
+Difficulty: %v
+ReceiptHash: 0x%x
+Root: 0x%x
+Extra: 0x%x
+Transactions: %d
 %v
 
 Error: %v
 ##############################
-`, bc.chainConfig, block.Number(), block.Hash(), receiptString, err))
+`,
+		bc.chainConfig,
+		block.Coinbase(),
+		block.Number(),
+		block.Hash(),
+		block.ParentHash(),
+		block.Time(),
+		block.Difficulty(),
+		block.ReceiptHash(),
+		block.Root(),
+		block.Extra(),
+		block.Transactions().Len(),
+		receiptString,
+		err,
+	))
 }
 
 // InsertHeaderChain attempts to insert the given header chain in to the local

@@ -126,14 +126,14 @@ func TestBackOffTimes(t *testing.T) {
 
 	for _, s := range wantSchedules {
 		chooser := newWeightedChooser(validators, stakes, int64(env.GetFirstBlock(s.block)))
-		scheduler := newScheduler(env, validators, s.block, chooser)
+		scheduler := newScheduler(env, env.GetFirstBlock(s.block), chooser)
 		for i, validator := range validators {
 			want := uint64(s.turns[i])
 			if want > 0 {
 				want += backoffWiggleTime
 			}
 
-			got := scheduler.backOffTime(validator)
+			got := scheduler.backOffTime(s.block, validator)
 			if got != want {
 				t.Errorf("backoff mismatch, block %v, validator %v, got %v, want %v", s.block, names[validator], got, want)
 			}
@@ -141,7 +141,7 @@ func TestBackOffTimes(t *testing.T) {
 	}
 }
 
-func TestSchedules(t *testing.T) {
+func TestExpect(t *testing.T) {
 	env := &environmentValue{
 		StartBlock:  common.Big0,
 		StartEpoch:  common.Big1,
@@ -150,7 +150,7 @@ func TestSchedules(t *testing.T) {
 
 	for _, s := range wantSchedules {
 		chooser := newWeightedChooser(validators, stakes, int64(env.GetFirstBlock(s.block)))
-		scheduler := newScheduler(env, validators, s.block, chooser)
+		scheduler := newScheduler(env, env.GetFirstBlock(s.block), chooser)
 
 		var want common.Address
 		for i, validator := range validators {
@@ -159,7 +159,7 @@ func TestSchedules(t *testing.T) {
 			}
 		}
 
-		got := scheduler.schedules[s.block]
+		got := *scheduler.expect(s.block)
 		if got != want {
 			t.Errorf("schedule mismatch, block %v, got %v, want %v", s.block, names[got], names[want])
 		}
@@ -176,7 +176,7 @@ func TestDifficulty(t *testing.T) {
 
 	for _, s := range wantSchedules {
 		chooser := newWeightedChooser(validators, stakes, int64(env.GetFirstBlock(s.block)))
-		scheduler := newScheduler(env, validators, s.block, chooser)
+		scheduler := newScheduler(env, env.GetFirstBlock(s.block), chooser)
 
 		for i, validator := range validators {
 			want1 := diffNoTurn.Uint64()
@@ -185,8 +185,8 @@ func TestDifficulty(t *testing.T) {
 			}
 			want2 := uint64(1000) * uint64(len(validators)-s.turns[i])
 
-			got1 := scheduler.difficulty(validator, false).Uint64()
-			got2 := scheduler.difficulty(validator, true).Uint64()
+			got1 := scheduler.difficulty(s.block, validator, false).Uint64()
+			got2 := scheduler.difficulty(s.block, validator, true).Uint64()
 			if got1 != want1 {
 				t.Errorf("difficulty mismatch, block %v, validator %v, got %v, want %v", s.block, names[validator], got1, want1)
 			}
