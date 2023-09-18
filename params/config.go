@@ -558,10 +558,10 @@ func (c *ChainConfig) OasysExtendDifficultyBlock() *big.Int {
 		return nil
 	}
 	if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
-		return big.NewInt(999_999_999)
+		return big.NewInt(2093240)
 	}
 	if c.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0 {
-		return big.NewInt(999_999_999)
+		return big.NewInt(2082220)
 	}
 	return big.NewInt(2)
 }
