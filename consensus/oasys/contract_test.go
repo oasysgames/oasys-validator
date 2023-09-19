@@ -107,7 +107,7 @@ func TestSlash(t *testing.T) {
 	}
 
 	validator := accounts[0].Address
-	schedule := map[uint64]common.Address{}
+	schedule := []*common.Address{}
 	header := &types.Header{
 		Number:     big.NewInt(50),
 		Coinbase:   accounts[0].Address,

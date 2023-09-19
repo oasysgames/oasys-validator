@@ -278,7 +278,8 @@ func (c *Oasys) IsSystemTransaction(tx *types.Transaction, header *types.Header)
 			return false, nil
 		} else if _, ok := methods[called.RawName]; ok {
 			log.Info("System method transacted",
-				"validator", header.Coinbase.Hex(), "tx", tx.Hash().Hex(),
+				"number", header.Number, "hash", header.Hash().Hex(),
+				"tx", tx.Hash().Hex(), "validator", header.Coinbase.Hex(),
 				"contract", contract.address.Hex(), "method", called.RawName)
 			return true, nil
 		}
@@ -332,7 +333,7 @@ func (c *Oasys) initializeSystemContracts(
 // Transact the `StakeManager.slash` method.
 func (c *Oasys) slash(
 	validator common.Address,
-	schedule map[uint64]common.Address,
+	schedules []*common.Address,
 	state *state.StateDB,
 	header *types.Header,
 	cx core.ChainContext,
@@ -343,8 +344,8 @@ func (c *Oasys) slash(
 	mining bool,
 ) error {
 	blocks := int64(0)
-	for _, address := range schedule {
-		if address == validator {
+	for _, address := range schedules {
+		if *address == validator {
 			blocks++
 		}
 	}
