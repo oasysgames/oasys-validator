@@ -47,6 +47,9 @@ type ChainHeaderReader interface {
 
 	// GetTd retrieves the total difficulty from the database by hash and number.
 	GetTd(hash common.Hash, number uint64) *big.Int
+
+	// GetCanonicalHash returns the canonical hash for a given block number
+	GetCanonicalHash(number uint64) common.Hash
 }
 
 // ChainReader defines a small collection of methods needed to access the local
