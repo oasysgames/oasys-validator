@@ -246,6 +246,9 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 
 	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine, eth.isLocalBlock)
 	eth.miner.SetExtra(makeExtraData(config.Miner.ExtraData))
+	// NOTE: Preseal is disabled to resolve testnet syncing issue
+	// https://github.com/oasysgames/oasys-validator/issues/42https://github.com/oasysgames/oasys-validator/issues/42
+	eth.miner.DisablePreseal()
 
 	gpoParams := config.GPO
 	if gpoParams.Default == nil {
