@@ -284,6 +284,10 @@ func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 	if header.GasLimit > params.MaxGasLimit {
 		return fmt.Errorf("invalid gasLimit: have %v, max %v", header.GasLimit, params.MaxGasLimit)
 	}
+	// Doesn't support `Shanghai` and `Cancun` in Oasys
+	if chain.Config().IsShanghai(header.Number, header.Time) || chain.Config().IsCancun(header.Number, header.Time) {
+		return errors.New("oasys does not support shanghai/cancun fork")
+	}
 	// All basic checks passed, verify cascading fields
 	return c.verifyCascadingFields(chain, header, parents, env)
 }
@@ -557,6 +561,9 @@ func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 // rewards given.
 func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs *[]*types.Transaction,
 	uncles []*types.Header, withdrawals []*types.Withdrawal, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64) error {
+	if len(withdrawals) > 0 {
+		return errors.New("oasys does not support withdrawals")
+	}
 	if err := verifyTx(header, *txs); err != nil {
 		return err
 	}
@@ -639,6 +646,9 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 // nor block rewards given, and returns the final block.
 func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
 	uncles []*types.Header, receipts []*types.Receipt, withdrawals []*types.Withdrawal) (*types.Block, []*types.Receipt, error) {
+	if len(withdrawals) > 0 {
+		return nil, receipts, errors.New("oasys does not support withdrawals")
+	}
 	if txs == nil {
 		txs = make([]*types.Transaction, 0)
 	}
