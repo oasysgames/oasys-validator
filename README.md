@@ -24,7 +24,6 @@ By running genesis.json on latest-release can operate testnet.
 All validator need to process following steps. 
 All full node installation requires **only `1`** in steps.
 
-
 1. [Run geth client](https://docs.oasys.games/docs/hub-validator/operate-validator/1-2-build-validator-node)
 2. [Join PoS system & delegage](https://docs.oasys.games/docs/hub-validator/operate-validator/1-4-join-validator-web)
 3. [Run verifier](https://docs.oasys.games/docs/hub-validator/operate-validator/1-5-setup-verifier)
@@ -33,8 +32,8 @@ All full node installation requires **only `1`** in steps.
 
 As a developer, sooner rather than later you'll want to start interacting with `geth` and the
 Ethereum network via your own programs and not manually through the console. To aid
-this, `geth` has built-in support for a JSON-RPC based APIs ([standard APIs](https://eth.wiki/json-rpc/API)
-and [`geth` specific APIs](https://geth.ethereum.org/docs/rpc/server)).
+this, `geth` has built-in support for a JSON-RPC based APIs ([standard APIs](https://ethereum.github.io/execution-apis/api-documentation/)
+and [`geth` specific APIs](https://geth.ethereum.org/docs/interacting-with-geth/rpc)).
 These can be exposed via HTTP, WebSockets and IPC (UNIX sockets on UNIX based
 platforms, and named pipes on Windows).
 
@@ -54,9 +53,9 @@ HTTP based JSON-RPC API options:
   * `--ws.addr` WS-RPC server listening interface (default: `localhost`)
   * `--ws.port` WS-RPC server listening port (default: `8546`)
   * `--ws.api` API's offered over the WS-RPC interface (default: `eth,net,web3`)
-  * `--ws.origins` Origins from which to accept websockets requests
+  * `--ws.origins` Origins from which to accept WebSocket requests
   * `--ipcdisable` Disable the IPC-RPC server
-  * `--ipcapi` API's offered over the IPC-RPC interface (default: `admin,debug,eth,miner,net,personal,shh,txpool,web3`)
+  * `--ipcapi` API's offered over the IPC-RPC interface (default: `admin,debug,eth,miner,net,personal,txpool,web3`)
   * `--ipcpath` Filename for IPC socket/pipe within the datadir (explicit paths escape it)
 
 You'll need to use your own programming environments' capabilities (libraries, tools, etc) to
@@ -119,6 +118,6 @@ The go-ethereum library (i.e. all code outside of the `cmd` directory) is licens
 [GNU Lesser General Public License v3.0](https://www.gnu.org/licenses/lgpl-3.0.en.html),
 also included in our repository in the `COPYING.LESSER` file.
 
-The go-ethereum binaries (i.e. all code inside of the `cmd` directory) is licensed under the
+The go-ethereum binaries (i.e. all code inside of the `cmd` directory) are licensed under the
 [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html), also
 included in our repository in the `COPYING` file.
