@@ -432,7 +432,8 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, genesis *Genesis
 // NewBlockChain returns a fully initialised block chain using information
 // available in the database. It initialises the default Ethereum Validator
 // and Processor.
-func NewBlockChainPhase1(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config, shouldPreserve func(header *types.Header) bool, txLookupLimit *uint64) (*BlockChain, error) {
+func NewBlockChainPhases(db ethdb.Database, cacheConfig *CacheConfig, genesis *Genesis, overrides *ChainOverrides, engine consensus.Engine, vmConfig vm.Config, shouldPreserve func(header *types.Header) bool, txLookupLimit *uint64) (*BlockChain, error) {
+	/* ********** Phase1 ********** */
 	if cacheConfig == nil {
 		cacheConfig = defaultCacheConfig
 	}
@@ -441,13 +442,27 @@ func NewBlockChainPhase1(db ethdb.Database, cacheConfig *CacheConfig, chainConfi
 		Cache:     cacheConfig.TrieCleanLimit,
 		Preimages: cacheConfig.Preimages,
 	})
+	// Setup the genesis block, commit the provided genesis specification
+	// to database if the genesis block is not present yet, or load the
+	// stored one from database.
+	chainConfig, genesisHash, genesisErr := SetupGenesisBlockWithOverride(db, triedb, genesis, overrides)
+	if _, ok := genesisErr.(*params.ConfigCompatError); genesisErr != nil && !ok {
+		return nil, genesisErr
+	}
+	log.Info("")
+	log.Info(strings.Repeat("-", 153))
+	for _, line := range strings.Split(chainConfig.Description(), "\n") {
+		log.Info(line)
+	}
+	log.Info(strings.Repeat("-", 153))
+	log.Info("")
 
 	bc := &BlockChain{
-		chainConfig: chainConfig,
-		cacheConfig: cacheConfig,
-		db:          db,
+		chainConfig:   chainConfig,
+		cacheConfig:   cacheConfig,
+		db:            db,
 		triedb:        triedb,
-		triegc:      prque.New[int64, common.Hash](nil),
+		triegc:        prque.New[int64, common.Hash](nil),
 		quit:          make(chan struct{}),
 		chainmu:       syncx.NewClosableMutex(),
 		bodyCache:     lru.NewCache[common.Hash, *types.Body](bodyCacheLimit),
@@ -546,10 +561,7 @@ func NewBlockChainPhase1(db ethdb.Database, cacheConfig *CacheConfig, chainConfi
 		}
 	}
 
-	return bc, nil
-}
-
-func NewBlockChainPhase2(bc *BlockChain, db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config, shouldPreserve func(header *types.Header) bool, txLookupLimit *uint64) (*BlockChain, error) {
+	/* ********** Phase2 ********** */
 	// If Geth is initialized with an external ancient store, re-initialize the
 	// missing chain indexes and chain flags. This procedure can survive crash
 	// and can be resumed in next restart since chain flags are updated in last step.
@@ -604,6 +616,16 @@ func NewBlockChainPhase2(bc *BlockChain, db ethdb.Database, cacheConfig *CacheCo
 	bc.wg.Add(1)
 	go bc.updateFutureBlocks()
 
+	// Rewind the chain in case of an incompatible config upgrade.
+	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
+		log.Warn("Rewinding chain to upgrade configuration", "err", compat)
+		if compat.RewindToTime > 0 {
+			bc.SetHeadWithTimestamp(compat.RewindToTime)
+		} else {
+			bc.SetHead(compat.RewindToBlock)
+		}
+		rawdb.WriteChainConfig(db, genesisHash, chainConfig)
+	}
 	// Start tx indexer/unindexer if required.
 	if txLookupLimit != nil {
 		bc.txLookupLimit = *txLookupLimit
@@ -611,6 +633,7 @@ func NewBlockChainPhase2(bc *BlockChain, db ethdb.Database, cacheConfig *CacheCo
 		bc.wg.Add(1)
 		go bc.maintainTxIndex()
 	}
+
 	return bc, nil
 }
 
