@@ -2553,7 +2553,7 @@ Root: 0x%x
 Extra: 0x%x
 Transactions: %d
 Error: %v
-Platform: %v%v
+Platform: %v
 Chain config: %#v
 Receipts: %v
 ##############################
