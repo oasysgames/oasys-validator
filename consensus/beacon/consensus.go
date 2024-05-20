@@ -347,10 +347,9 @@ func (beacon *Beacon) Prepare(chain consensus.ChainHeaderReader, header *types.H
 }
 
 // Finalize implements consensus.Engine and processes withdrawals on top.
-func (beacon *Beacon) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, withdrawals []*types.Withdrawal, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64) error {
+func (beacon *Beacon) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs *[]*types.Transaction, uncles []*types.Header, withdrawals []*types.Withdrawal, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64) error {
 	if !beacon.IsPoSHeader(header) {
-		beacon.ethone.Finalize(chain, header, state, txs, uncles, nil)
-		return
+		return beacon.ethone.Finalize(chain, header, state, txs, uncles, withdrawals, receipts, nil, nil)
 	}
 	// Withdrawals processing.
 	for _, w := range withdrawals {
@@ -377,17 +376,19 @@ func (beacon *Beacon) FinalizeAndAssemble(chain consensus.ChainHeaderReader, hea
 		}
 	} else {
 		if len(withdrawals) > 0 {
-			return nil, errors.New("withdrawals set before Shanghai activation")
+			return nil, receipts, errors.New("withdrawals set before Shanghai activation")
 		}
 	}
 	// Finalize and assemble the block.
-	beacon.Finalize(chain, header, state, txs, uncles, withdrawals)
+	if err := beacon.Finalize(chain, header, state, &txs, uncles, withdrawals, &receipts, nil, nil); err != nil {
+		return nil, receipts, err
+	}
 
 	// Assign the final state root to header.
 	header.Root = state.IntermediateRoot(true)
 
 	// Assemble and return the final block.
-	return types.NewBlockWithWithdrawals(header, txs, uncles, receipts, withdrawals, trie.NewStackTrie(nil)), nil, nil
+	return types.NewBlockWithWithdrawals(header, txs, uncles, receipts, withdrawals, trie.NewStackTrie(nil)), receipts, nil
 }
 
 // Seal generates a new sealing request for the given input block and pushes

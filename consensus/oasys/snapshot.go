@@ -21,7 +21,7 @@ import (
 type Snapshot struct {
 	config   *params.ChainConfig // Consensus engine parameters to fine tune behavior
 	sigcache *lru.ARCCache       // Cache of recent block signatures to speed up ecrecover
-	ethAPI   *ethapi.PublicBlockChainAPI
+	ethAPI   *ethapi.BlockChainAPI
 
 	Number     uint64                      `json:"number"`     // Block number where the snapshot was created
 	Hash       common.Hash                 `json:"hash"`       // Block hash where the snapshot was created
@@ -40,7 +40,7 @@ func (s validatorsAscending) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 // newSnapshot creates a new snapshot with the specified startup parameters. This
 // method does not initialize the set of recent validators, so only ever use if for
 // the genesis block.
-func newSnapshot(config *params.ChainConfig, sigcache *lru.ARCCache, ethAPI *ethapi.PublicBlockChainAPI,
+func newSnapshot(config *params.ChainConfig, sigcache *lru.ARCCache, ethAPI *ethapi.BlockChainAPI,
 	number uint64, hash common.Hash, validators []common.Address, environment *environmentValue) *Snapshot {
 	snap := &Snapshot{
 		config:      config,
@@ -58,7 +58,7 @@ func newSnapshot(config *params.ChainConfig, sigcache *lru.ARCCache, ethAPI *eth
 }
 
 // loadSnapshot loads an existing snapshot from the database.
-func loadSnapshot(config *params.ChainConfig, sigcache *lru.ARCCache, ethAPI *ethapi.PublicBlockChainAPI,
+func loadSnapshot(config *params.ChainConfig, sigcache *lru.ARCCache, ethAPI *ethapi.BlockChainAPI,
 	db ethdb.Database, hash common.Hash) (*Snapshot, error) {
 	blob, err := db.Get(append([]byte("oasys-"), hash[:]...))
 	if err != nil {

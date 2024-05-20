@@ -120,22 +120,20 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	}
 	bloomProcessors.Close()
 
-	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
-	err := p.engine.Finalize(p.bc, header, statedb, &generalTxs, block.Uncles(), &receipts, &systemTxs, usedGas)
-	if err != nil {
-		return nil, nil, 0, err
-	}
-
-	for _, receipt := range receipts {
-		allLogs = append(allLogs, receipt.Logs...)
-	}
 	// Fail if Shanghai not enabled and len(withdrawals) is non-zero.
 	withdrawals := block.Withdrawals()
 	if len(withdrawals) > 0 && !p.config.IsShanghai(block.Number(), block.Time()) {
 		return nil, nil, 0, errors.New("withdrawals before shanghai")
 	}
+
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
-	p.engine.Finalize(p.bc, header, statedb, block.Transactions(), block.Uncles(), withdrawals)
+	err := p.engine.Finalize(p.bc, header, statedb, &generalTxs, block.Uncles(), withdrawals, &receipts, &systemTxs, usedGas)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	for _, receipt := range receipts {
+		allLogs = append(allLogs, receipt.Logs...)
+	}
 
 	return receipts, allLogs, *usedGas, nil
 }

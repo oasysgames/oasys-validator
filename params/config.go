@@ -564,7 +564,7 @@ func (c *ChainConfig) OasysPublicationBlock() *big.Int {
 
 // IsOasysPublication returns true if num is equal to or greater than the Oasys Publication fork block.
 func (c *ChainConfig) IsForkedOasysPublication(num *big.Int) bool {
-	return isForked(c.OasysPublicationBlock(), num)
+	return isBlockForked(c.OasysPublicationBlock(), num)
 }
 
 // OasysExtendDifficultyBlock returns the hard fork of Oasys.
@@ -583,7 +583,7 @@ func (c *ChainConfig) OasysExtendDifficultyBlock() *big.Int {
 
 // IsForkedOasysExtendDifficulty returns true if num is equal to or greater than the Oasys fork block.
 func (c *ChainConfig) IsForkedOasysExtendDifficulty(num *big.Int) bool {
-	return isForked(c.OasysExtendDifficultyBlock(), num)
+	return isBlockForked(c.OasysExtendDifficultyBlock(), num)
 }
 
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.

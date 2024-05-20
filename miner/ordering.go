@@ -145,3 +145,7 @@ func (t *transactionsByPriceAndNonce) Shift() {
 func (t *transactionsByPriceAndNonce) Pop() {
 	heap.Pop(&t.heads)
 }
+
+func (t *transactionsByPriceAndNonce) CurrentSize() int {
+	return len(t.heads)
+}
