@@ -284,6 +284,10 @@ func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 	if header.GasLimit > params.MaxGasLimit {
 		return fmt.Errorf("invalid gasLimit: have %v, max %v", header.GasLimit, params.MaxGasLimit)
 	}
+	// Verify the non-existence of withdrawalsHash.
+	if header.WithdrawalsHash != nil {
+		return fmt.Errorf("invalid withdrawalsHash: have %x, expected nil", header.WithdrawalsHash)
+	}
 	// All basic checks passed, verify cascading fields
 	return c.verifyCascadingFields(chain, header, parents, env)
 }
@@ -557,6 +561,10 @@ func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 // rewards given.
 func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs *[]*types.Transaction,
 	uncles []*types.Header, withdrawals []*types.Withdrawal, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64) error {
+	if len(withdrawals) > 0 {
+		return errors.New("oasys does not support withdrawals")
+	}
+
 	if err := verifyTx(header, *txs); err != nil {
 		return err
 	}
@@ -646,6 +654,9 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 		receipts = make([]*types.Receipt, 0)
 	}
 
+	if len(withdrawals) > 0 {
+		return nil, receipts, errors.New("oasys does not support withdrawals")
+	}
 	if err := verifyTx(header, txs); err != nil {
 		return nil, nil, err
 	}
