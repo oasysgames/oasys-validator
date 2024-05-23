@@ -30,6 +30,7 @@ import (
 
 // Constants to match up protocol versions and messages
 const (
+	ETH66 = 66
 	ETH67 = 67
 	ETH68 = 68
 )
@@ -40,11 +41,11 @@ const ProtocolName = "eth"
 
 // ProtocolVersions are the supported versions of the `eth` protocol (first
 // is primary).
-var ProtocolVersions = []uint{ETH68, ETH67}
+var ProtocolVersions = []uint{ETH68, ETH67, ETH66}
 
 // protocolLengths are the number of implemented message corresponding to
 // different protocol versions.
-var protocolLengths = map[uint]uint64{ETH68: 17, ETH67: 17}
+var protocolLengths = map[uint]uint64{ETH68: 17, ETH67: 17, ETH66: 17}
 
 // maxMessageSize is the maximum cap on the size of a protocol message.
 const maxMessageSize = 10 * 1024 * 1024
@@ -61,6 +62,8 @@ const (
 	NewPooledTransactionHashesMsg = 0x08
 	GetPooledTransactionsMsg      = 0x09
 	PooledTransactionsMsg         = 0x0a
+	GetNodeDataMsg                = 0x0d
+	NodeDataMsg                   = 0x0e
 	GetReceiptsMsg                = 0x0f
 	ReceiptsMsg                   = 0x10
 )
@@ -253,6 +256,24 @@ func (p *BlockBodiesResponse) Unpack() ([][]*types.Transaction, [][]*types.Heade
 		txset[i], uncleset[i], withdrawalset[i] = body.Transactions, body.Uncles, body.Withdrawals
 	}
 	return txset, uncleset, withdrawalset
+}
+
+// GetNodeDataPacket represents a trie node data query.
+type GetNodeDataPacket []common.Hash
+
+// GetNodeDataPacket represents a trie node data query over eth/66.
+type GetNodeDataPacket66 struct {
+	RequestId uint64
+	GetNodeDataPacket
+}
+
+// NodeDataPacket is the network packet for trie node data distribution.
+type NodeDataPacket [][]byte
+
+// NodeDataPacket is the network packet for trie node data distribution over eth/66.
+type NodeDataPacket66 struct {
+	RequestId uint64
+	NodeDataPacket
 }
 
 // GetReceiptsRequest represents a block receipts query.

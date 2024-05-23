@@ -44,6 +44,10 @@ const (
 	// nowadays, the practical limit will always be softResponseLimit.
 	maxBodiesServe = 1024
 
+	// maxNodeDataServe is the maximum number of state trie nodes to serve. This
+	// number is there to limit the number of disk lookups.
+	maxNodeDataServe = 1024
+
 	// maxReceiptsServe is the maximum number of block receipts to serve. This
 	// number is mostly there to limit the number of disk lookups. With block
 	// containing 200+ transactions nowadays, the practical limit will always
@@ -166,6 +170,23 @@ type Decoder interface {
 	Time() time.Time
 }
 
+var eth66 = map[uint64]msgHandler{
+	NewBlockHashesMsg:             handleNewBlockhashes,
+	NewBlockMsg:                   handleNewBlock,
+	TransactionsMsg:               handleTransactions,
+	NewPooledTransactionHashesMsg: handleNewPooledTransactionHashes67,
+	GetBlockHeadersMsg:            handleGetBlockHeaders,
+	BlockHeadersMsg:               handleGetBlockHeaders,
+	GetBlockBodiesMsg:             handleGetBlockBodies,
+	BlockBodiesMsg:                handleBlockBodies,
+	GetNodeDataMsg:                handleGetNodeData66,
+	NodeDataMsg:                   handleNodeData66,
+	GetReceiptsMsg:                handleGetReceipts,
+	ReceiptsMsg:                   handleReceipts,
+	GetPooledTransactionsMsg:      handleGetPooledTransactions,
+	PooledTransactionsMsg:         handlePooledTransactions,
+}
+
 var eth67 = map[uint64]msgHandler{
 	NewBlockHashesMsg:             handleNewBlockhashes,
 	NewBlockMsg:                   handleNewBlock,
@@ -209,7 +230,10 @@ func handleMessage(backend Backend, peer *Peer) error {
 	}
 	defer msg.Discard()
 
-	var handlers = eth67
+	var handlers = eth66
+	if peer.Version() >= ETH67 {
+		handlers = eth67
+	}
 	if peer.Version() >= ETH68 {
 		handlers = eth68
 	}
