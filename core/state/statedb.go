@@ -1374,6 +1374,11 @@ func (s *StateDB) AddressInAccessList(addr common.Address) bool {
 
 // SlotInAccessList returns true if the given (address, slot)-tuple is in the access list.
 func (s *StateDB) SlotInAccessList(addr common.Address, slot common.Hash) (addressPresent bool, slotPresent bool) {
+	// Follow the same way as BSC
+	// Ref: https://github.com/bnb-chain/bsc/blob/master/core/state/statedb.go#L1875-L1877
+	if s.accessList == nil {
+		return false, false
+	}
 	return s.accessList.Contains(addr, slot)
 }
 
