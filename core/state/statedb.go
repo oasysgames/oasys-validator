@@ -935,6 +935,9 @@ func (s *StateDB) IntermediateRoot(deleteEmptyObjects bool) common.Hash {
 func (s *StateDB) SetTxContext(thash common.Hash, ti int) {
 	s.thash = thash
 	s.txIndex = ti
+	// Follow the same way as BSC
+	// Ref: https://github.com/bnb-chain/bsc/blob/master/core/state/statedb.go#L1255
+	s.accessList = nil // can't delete this line now, because StateDB.Prepare is not called before processsing a system transaction
 }
 
 func (s *StateDB) clearJournalAndRefund() {
