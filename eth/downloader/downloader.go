@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -344,7 +345,13 @@ func (d *Downloader) LegacySync(id string, head common.Hash, td, ttd *big.Int, m
 			// Timeouts can occur if e.g. compaction hits at the wrong time, and can be ignored
 			log.Warn("Downloader wants to drop peer, but peerdrop-function is not set", "peer", id)
 		} else {
-			d.dropPeer(id)
+			if strings.Contains(err.Error(), "header for hash not found") {
+				// Don't drop the peer, As the peer is sending correct block.
+				// Ref: https://github.com/oasysgames/oasys-validator/issues/48
+				log.Info("Skipping drop peer due to header not found", "peer", id)
+			} else {
+				d.dropPeer(id)
+			}
 		}
 		return err
 	}

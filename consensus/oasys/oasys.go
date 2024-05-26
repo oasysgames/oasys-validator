@@ -314,6 +314,7 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 		return consensus.ErrUnknownAncestor
 	}
 
+	// Ensure that the block's timestamp is older than the scheduled validator backoff time
 	var (
 		validators []common.Address
 		stakes     []*big.Int
