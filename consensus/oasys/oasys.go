@@ -256,10 +256,13 @@ func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 		return errMissingSignature
 	}
 	// Ensure that the extra-data contains a validator list on checkpoint, but none otherwise
-	env, err := c.environment(chain, header, parents)
-	if err != nil {
-		return err
-	}
+	// Use the inital environment for header verification,
+	// assuming the following properties never has to be checked
+	//  - StartBlock  ->> 0
+	//  - StartEpoch  ->> 1
+	//  - BlockPeriod ->> 15
+	//  - EpochPeriod ->> 5760
+	env := getInitialEnvironment(c.config)
 	validatorBytes := len(header.Extra) - extraVanity - extraSeal
 	if env.IsEpoch(number) {
 		if err := c.verifyExtraHeaderLengthInEpoch(header.Number, validatorBytes); err != nil {
@@ -320,6 +323,8 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 		stakes     []*big.Int
 	)
 	if number > 0 && env.IsEpoch(number) {
+		// TODO: Extract the validators from header extra data
+		// As stakes are not included in the header, we need to store them as well
 		result, err := getNextValidators(c.chainConfig, c.ethAPI, header.ParentHash, env.Epoch(number), number)
 		if err != nil {
 			log.Error("Failed to get validators", "in", "verifyCascadingFields", "hash", header.ParentHash, "number", number, "err", err)
