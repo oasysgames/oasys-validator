@@ -256,7 +256,7 @@ func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 		return errMissingSignature
 	}
 	// Ensure that the extra-data contains a validator list on checkpoint, but none otherwise
-	// Use the inital environment for header verification,
+	// Use the initial environment for header verification,
 	// assuming the following properties never has to be checked
 	//  - StartBlock  ->> 0
 	//  - StartEpoch  ->> 1
@@ -585,7 +585,6 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 			log.Error("Failed to initialize system contracts", "in", "Finalize", "hash", hash, "number", number, "err", err)
 			return err
 		}
-
 	}
 
 	env, err := c.environment(chain, header, nil)
