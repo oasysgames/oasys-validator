@@ -2564,7 +2564,7 @@ Root: 0x%x
 Extra: 0x%x
 Transactions: %d
 Error: %v
-Platform: %v
+Platform: %v%v
 Chain config: %#v
 Receipts: %v
 ##############################
@@ -2581,6 +2581,7 @@ Receipts: %v
 		block.Transactions().Len(),
 		err,
 		platform,
+		vcs,
 		config,
 		receiptString,
 	)
