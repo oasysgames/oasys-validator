@@ -609,14 +609,10 @@ func (c *ChainConfig) IsTerminalPoWBlock(parentTotalDiff *big.Int, totalDiff *bi
 
 // IsShanghai returns whether time is either equal to the Shanghai fork time or greater.
 func (c *ChainConfig) IsShanghai(num *big.Int, time uint64) bool {
-	if c.Oasys == nil {
-		return c.IsLondon(num) && isTimestampForked(c.ShanghaiTime, time)
-	}
-	shanghaiTime := newUint64(0) // 0 means that Shanghai is activated
+	shanghaiTime := c.ShanghaiTime
 	if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
 		shanghaiTime = OasysMainnetChainConfig.ShanghaiTime
-	}
-	if c.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0 {
+	} else if c.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0 {
 		shanghaiTime = OasysTestnetChainConfig.ShanghaiTime
 	}
 	return c.IsLondon(num) && isTimestampForked(shanghaiTime, time)
