@@ -324,7 +324,8 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 	)
 	if number > 0 && env.IsEpoch(number) {
 		// TODO: Extract the validators from header extra data
-		// As stakes are not included in the header, we need to store them as well
+		// Now the keccak256 hash of the validators is stored in the extra data.
+		// To avoid ethapi call, we need to store each validator's address and stake amount.
 		result, err := getNextValidators(c.chainConfig, c.ethAPI, header.ParentHash, env.Epoch(number), number)
 		if err != nil {
 			log.Error("Failed to get validators", "in", "verifyCascadingFields", "hash", header.ParentHash, "number", number, "err", err)
