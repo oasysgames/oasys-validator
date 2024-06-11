@@ -166,14 +166,14 @@ type Config struct {
 // CreateConsensusEngine creates a consensus engine for the given chain config.
 // Clique is allowed for now to live standalone, but ethash is forbidden and can
 // only exist on already merged networks.
-func CreateConsensusEngine(config *params.ChainConfig, db ethdb.Database, ethAPI *ethapi.PublicBlockChainAPI) (consensus.Engine, error) {
+func CreateConsensusEngine(config *params.ChainConfig, db ethdb.Database, ethAPI *ethapi.BlockChainAPI) (consensus.Engine, error) {
 	// If proof-of-authority is requested, set it up
 	if config.Clique != nil {
 		return beacon.New(clique.New(config.Clique, db)), nil
 	}
 	// If proof-of-stake is requested, set it up
 	if config.Oasys != nil {
-		return oasys.New(config, config.Oasys, db, ethAPI)
+		return oasys.New(config, config.Oasys, db, ethAPI), nil
 	}
 	// If defaulting to proof-of-work, enforce an already merged network since
 	// we cannot run PoW algorithms anymore, so we cannot even follow a chain

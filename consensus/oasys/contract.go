@@ -358,7 +358,7 @@ func (c *Oasys) slash(
 }
 
 type blockchainAPI interface {
-	Call(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *ethapi.StateOverride) (hexutil.Bytes, error)
+	Call(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash *rpc.BlockNumberOrHash, overrides *ethapi.StateOverride, blockOverrides *ethapi.BlockOverrides) (hexutil.Bytes, error)
 }
 
 // view functions
@@ -394,14 +394,17 @@ func callGetValidators(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*n
 		}
 
 		hexData := (hexutil.Bytes)(data)
+		blockNrOrHash := rpc.BlockNumberOrHashWithHash(hash, false)
 		rbytes, err := ethAPI.Call(
 			ctx,
 			ethapi.TransactionArgs{
 				To:   &stakeManager.address,
 				Data: &hexData,
 			},
-			rpc.BlockNumberOrHashWithHash(hash, false),
-			nil)
+			&blockNrOrHash,
+			nil,
+			nil,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -451,14 +454,17 @@ func callGetHighStakes(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*n
 		}
 
 		hexData := (hexutil.Bytes)(data)
+		blockNrOrHash := rpc.BlockNumberOrHashWithHash(hash, false)
 		rbytes, err := ethAPI.Call(
 			ctx,
 			ethapi.TransactionArgs{
 				To:   &candidateManager.address,
 				Data: &hexData,
 			},
-			rpc.BlockNumberOrHashWithHash(hash, false),
-			nil)
+			&blockNrOrHash,
+			nil,
+			nil,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -510,14 +516,17 @@ func getValidatorOwners(ethAPI blockchainAPI, hash common.Hash) ([]common.Addres
 		}
 
 		hexData := (hexutil.Bytes)(data)
+		blockNrOrHash := rpc.BlockNumberOrHashWithHash(hash, false)
 		rbytes, err := ethAPI.Call(
 			ctx,
 			ethapi.TransactionArgs{
 				To:   &stakeManager.address,
 				Data: &hexData,
 			},
-			rpc.BlockNumberOrHashWithHash(hash, false),
-			nil)
+			&blockNrOrHash,
+			nil,
+			nil,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -575,14 +584,17 @@ func getRewards(ethAPI blockchainAPI, hash common.Hash) (*big.Int, error) {
 		}
 
 		hexData := (hexutil.Bytes)(data)
+		blockNrOrHash := rpc.BlockNumberOrHashWithHash(hash, false)
 		rbytes, err := ethAPI.Call(
 			ctx,
 			ethapi.TransactionArgs{
 				To:   &stakeManager.address,
 				Data: &hexData,
 			},
-			rpc.BlockNumberOrHashWithHash(hash, false),
-			nil)
+			&blockNrOrHash,
+			nil,
+			nil,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -611,14 +623,17 @@ func getNextEnvironmentValue(ethAPI blockchainAPI, hash common.Hash) (*environme
 	}
 
 	hexData := (hexutil.Bytes)(data)
+	blockNrOrHash := rpc.BlockNumberOrHashWithHash(hash, false)
 	rbytes, err := ethAPI.Call(
 		ctx,
 		ethapi.TransactionArgs{
 			To:   &environment.address,
 			Data: &hexData,
 		},
-		rpc.BlockNumberOrHashWithHash(hash, false),
-		nil)
+		&blockNrOrHash,
+		nil,
+		nil,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -669,7 +684,7 @@ func (c *Oasys) applyTransaction(
 		expectedTx = actualTx
 		*systemTxs = (*systemTxs)[1:]
 	}
-	state.Prepare(expectedTx.Hash(), len(*txs))
+	state.SetTxContext(expectedTx.Hash(), len(*txs))
 	gasUsed, err := applyMessage(msg, state, header, c.chainConfig, cx)
 	if err != nil {
 		return err
@@ -686,7 +701,7 @@ func (c *Oasys) applyTransaction(
 	receipt.TxHash = expectedTx.Hash()
 	receipt.GasUsed = gasUsed
 
-	receipt.Logs = state.GetLogs(expectedTx.Hash(), common.Hash{})
+	receipt.Logs = state.GetLogs(expectedTx.Hash(), header.Number.Uint64(), common.Hash{})
 	receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
 	receipt.BlockHash = common.Hash{}
 	receipt.BlockNumber = header.Number

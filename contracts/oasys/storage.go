@@ -109,7 +109,7 @@ func setStorage(storage map[common.Hash]common.Hash, slot common.Hash, val inter
 	case common.Hash:
 		storage[slot] = t
 	case common.Address:
-		storage[slot] = t.Hash()
+		storage[slot] = common.BytesToHash(t.Bytes())
 	case *big.Int:
 		storage[slot] = common.BigToHash(t)
 	case array:

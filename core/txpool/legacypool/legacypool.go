@@ -609,7 +609,7 @@ func (pool *LegacyPool) validateTxBasics(tx *types.Transaction, local bool) erro
 // rules and adheres to some heuristic limits of the local node (price and size).
 func (pool *LegacyPool) validateTx(tx *types.Transaction, local bool) error {
 	// Oasys transaction verification
-	if err := VerifyTx(tx); err != nil {
+	if err := core.VerifyTx(tx); err != nil {
 		return err
 	}
 	opts := &txpool.ValidationOptionsWithState{

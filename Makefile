@@ -19,6 +19,9 @@ all:
 test: all
 	$(GORUN) build/ci.go test
 
+test-oasys:
+	go test -v ./consensus/oasys/...
+
 lint: ## Run linters.
 	$(GORUN) build/ci.go lint
 

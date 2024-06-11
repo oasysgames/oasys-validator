@@ -228,6 +228,7 @@ var (
 		MuirGlacierBlock:    big.NewInt(0),
 		BerlinBlock:         big.NewInt(0),
 		LondonBlock:         big.NewInt(0),
+		ShanghaiTime:        newUint64(1800000000),
 
 		Oasys: &OasysConfig{
 			Period: 15,
@@ -248,6 +249,7 @@ var (
 		MuirGlacierBlock:    big.NewInt(0),
 		BerlinBlock:         big.NewInt(0),
 		LondonBlock:         big.NewInt(0),
+		ShanghaiTime:        newUint64(1800000000),
 
 		Oasys: &OasysConfig{
 			Period: 15,
@@ -472,7 +474,18 @@ func (c *ChainConfig) Description() string {
 	if c.OasysExtendDifficultyBlock() != nil {
 		banner += fmt.Sprintf(" - Oasys Extend Difficulty:     #%-8v (https://github.com/oasysgames/oasys-validator/releases/tag/v1.3.0)\n", c.OasysExtendDifficultyBlock())
 	}
-
+	if c.ShanghaiTime != nil {
+		banner += fmt.Sprintf(" - Shanghai:                    @%-10v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/shanghai.md)\n", *c.ShanghaiTime)
+	}
+	if c.CancunTime != nil {
+		banner += fmt.Sprintf(" - Cancun:                      @%-10v\n", *c.CancunTime)
+	}
+	if c.PragueTime != nil {
+		banner += fmt.Sprintf(" - Prague:                      @%-10v\n", *c.PragueTime)
+	}
+	if c.VerkleTime != nil {
+		banner += fmt.Sprintf(" - Verkle:                      @%-10v\n", *c.VerkleTime)
+	}
 	return banner
 }
 
@@ -564,7 +577,7 @@ func (c *ChainConfig) OasysPublicationBlock() *big.Int {
 
 // IsOasysPublication returns true if num is equal to or greater than the Oasys Publication fork block.
 func (c *ChainConfig) IsForkedOasysPublication(num *big.Int) bool {
-	return isForked(c.OasysPublicationBlock(), num)
+	return isBlockForked(c.OasysPublicationBlock(), num)
 }
 
 // OasysExtendDifficultyBlock returns the hard fork of Oasys.
@@ -583,7 +596,7 @@ func (c *ChainConfig) OasysExtendDifficultyBlock() *big.Int {
 
 // IsForkedOasysExtendDifficulty returns true if num is equal to or greater than the Oasys fork block.
 func (c *ChainConfig) IsForkedOasysExtendDifficulty(num *big.Int) bool {
-	return isForked(c.OasysExtendDifficultyBlock(), num)
+	return isBlockForked(c.OasysExtendDifficultyBlock(), num)
 }
 
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.
@@ -596,7 +609,13 @@ func (c *ChainConfig) IsTerminalPoWBlock(parentTotalDiff *big.Int, totalDiff *bi
 
 // IsShanghai returns whether time is either equal to the Shanghai fork time or greater.
 func (c *ChainConfig) IsShanghai(num *big.Int, time uint64) bool {
-	return c.IsLondon(num) && isTimestampForked(c.ShanghaiTime, time)
+	shanghaiTime := c.ShanghaiTime
+	if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
+		shanghaiTime = OasysMainnetChainConfig.ShanghaiTime
+	} else if c.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0 {
+		shanghaiTime = OasysTestnetChainConfig.ShanghaiTime
+	}
+	return c.IsLondon(num) && isTimestampForked(shanghaiTime, time)
 }
 
 // IsCancun returns whether num is either equal to the Cancun fork time or greater.
