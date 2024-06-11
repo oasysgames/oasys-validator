@@ -326,6 +326,14 @@ func (p *Peer) ReplyBlockBodiesRLP(id uint64, bodies []rlp.RawValue) error {
 	})
 }
 
+// ReplyNodeData is the eth/66 response to GetNodeData.
+func (p *Peer) ReplyNodeData(id uint64, data [][]byte) error {
+	return p2p.Send(p.rw, NodeDataMsg, NodeDataPacket66{
+		RequestId:      id,
+		NodeDataPacket: data,
+	})
+}
+
 // ReplyReceiptsRLP is the response to GetReceipts.
 func (p *Peer) ReplyReceiptsRLP(id uint64, receipts []rlp.RawValue) error {
 	return p2p.Send(p.rw, ReceiptsMsg, &ReceiptsRLPPacket{

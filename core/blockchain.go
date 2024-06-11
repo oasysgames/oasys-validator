@@ -407,10 +407,17 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, genesis *Genesis
 			}
 		}
 	}
+
+	// Separate the following logic, named `ReconstructVerificationDataForHeadBlock`,
+	// as this will fail if the engine is Oasys.
+	// The `ethAPI` internally called by the Oasys engine refers to the `BlockChain` struct via the `Ethereum` struct.
+	// This needs to be called after eth.blockchain = core.NewBlockChain in backend.go.
+	// Otherwise, encounter a panic: `runtime error: invalid memory address or nil pointer dereference`.
+	// ----------------------------------------------
 	// The first thing the node will do is reconstruct the verification data for
 	// the head block (ethash cache or clique voting snapshot). Might as well do
 	// it in advance.
-	bc.engine.VerifyHeader(bc, bc.CurrentHeader())
+	// bc.engine.VerifyHeader(bc, bc.CurrentHeader())
 
 	// Check the current state of the block hashes and make sure that we do not have any of the bad blocks in our chain
 	for hash := range BadHashes {
@@ -472,6 +479,10 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, genesis *Genesis
 		go bc.maintainTxIndex()
 	}
 	return bc, nil
+}
+
+func (bc *BlockChain) ReconstructVerificationDataForHeadBlock() {
+	bc.engine.VerifyHeader(bc, bc.CurrentHeader())
 }
 
 // empty returns an indicator whether the blockchain is empty.
@@ -2570,6 +2581,7 @@ Receipts: %v
 		block.Transactions().Len(),
 		err,
 		platform,
+		vcs,
 		config,
 		receiptString,
 	)
