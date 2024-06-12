@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
+	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -168,7 +169,7 @@ type Oasys struct {
 	signFn SignerFn       // Signer function to authorize hashes with
 	lock   sync.RWMutex   // Protects the signer fields
 
-	ethAPI   *ethapi.PublicBlockChainAPI
+	ethAPI   *ethapi.BlockChainAPI
 	txSigner types.Signer
 	txSignFn TxSignerFn
 
@@ -178,7 +179,7 @@ type Oasys struct {
 
 // New creates a Oasys proof-of-stake consensus engine with the initial
 // signers set to the ones provided by the user.
-func New(chainConfig *params.ChainConfig, config *params.OasysConfig, db ethdb.Database, ethAPI *ethapi.PublicBlockChainAPI) *Oasys {
+func New(chainConfig *params.ChainConfig, config *params.OasysConfig, db ethdb.Database, ethAPI *ethapi.BlockChainAPI) *Oasys {
 	// Set any missing consensus parameters to their defaults
 	conf := *config
 	if conf.Epoch == 0 {
@@ -196,7 +197,7 @@ func New(chainConfig *params.ChainConfig, config *params.OasysConfig, db ethdb.D
 		signatures:  signatures,
 		proposals:   make(map[common.Address]bool),
 		ethAPI:      ethAPI,
-		txSigner:    types.MakeSigner(chainConfig, common.Big0),
+		txSigner:    types.MakeSigner(chainConfig, common.Big0, 0),
 	}
 }
 
@@ -207,14 +208,14 @@ func (c *Oasys) Author(header *types.Header) (common.Address, error) {
 }
 
 // VerifyHeader checks whether a header conforms to the consensus rules.
-func (c *Oasys) VerifyHeader(chain consensus.ChainHeaderReader, header *types.Header, seal bool) error {
+func (c *Oasys) VerifyHeader(chain consensus.ChainHeaderReader, header *types.Header) error {
 	return c.verifyHeader(chain, header, nil)
 }
 
 // VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers. The
 // method returns a quit channel to abort the operations and a results channel to
 // retrieve the async verifications (the order is that of the input slice).
-func (c *Oasys) VerifyHeaders(chain consensus.ChainHeaderReader, headers []*types.Header, seals []bool) (chan<- struct{}, <-chan error) {
+func (c *Oasys) VerifyHeaders(chain consensus.ChainHeaderReader, headers []*types.Header) (chan<- struct{}, <-chan error) {
 	abort := make(chan struct{})
 	results := make(chan error, len(headers))
 
@@ -255,10 +256,13 @@ func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 		return errMissingSignature
 	}
 	// Ensure that the extra-data contains a validator list on checkpoint, but none otherwise
-	env, err := c.environment(chain, header, parents)
-	if err != nil {
-		return err
-	}
+	// Use the initial environment for header verification,
+	// assuming the following properties never has to be checked
+	//  - StartBlock  ->> 0
+	//  - StartEpoch  ->> 1
+	//  - BlockPeriod ->> 15
+	//  - EpochPeriod ->> 5760
+	env := getInitialEnvironment(c.config)
 	validatorBytes := len(header.Extra) - extraVanity - extraSeal
 	if env.IsEpoch(number) {
 		if err := c.verifyExtraHeaderLengthInEpoch(header.Number, validatorBytes); err != nil {
@@ -283,9 +287,21 @@ func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 	if header.GasLimit > params.MaxGasLimit {
 		return fmt.Errorf("invalid gasLimit: have %v, max %v", header.GasLimit, params.MaxGasLimit)
 	}
-	// If all checks passed, validate any special fields for hard forks
-	if err := misc.VerifyForkHashes(chain.Config(), header, false); err != nil {
-		return err
+	// Verify the non-existence of withdrawalsHash.
+	if header.WithdrawalsHash != nil {
+		return fmt.Errorf("invalid withdrawalsHash: have %x, expected nil", header.WithdrawalsHash)
+	}
+	if chain.Config().IsCancun(header.Number, header.Time) {
+		return errors.New("oasys does not support cancun fork")
+	}
+	// Verify the non-existence of cancun-specific header fields
+	switch {
+	case header.ExcessBlobGas != nil:
+		return fmt.Errorf("invalid excessBlobGas: have %d, expected nil", header.ExcessBlobGas)
+	case header.BlobGasUsed != nil:
+		return fmt.Errorf("invalid blobGasUsed: have %d, expected nil", header.BlobGasUsed)
+	case header.ParentBeaconRoot != nil:
+		return fmt.Errorf("invalid parentBeaconRoot, have %#x, expected nil", header.ParentBeaconRoot)
 	}
 	// All basic checks passed, verify cascading fields
 	return c.verifyCascadingFields(chain, header, parents, env)
@@ -313,11 +329,15 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 		return consensus.ErrUnknownAncestor
 	}
 
+	// Ensure that the block's timestamp is older than the scheduled validator backoff time
 	var (
 		validators []common.Address
 		stakes     []*big.Int
 	)
 	if number > 0 && env.IsEpoch(number) {
+		// TODO: Extract the validators from header extra data
+		// Now the keccak256 hash of the validators is stored in the extra data.
+		// To avoid ethapi call, we need to store each validator's address and stake amount.
 		result, err := getNextValidators(c.chainConfig, c.ethAPI, header.ParentHash, env.Epoch(number), number)
 		if err != nil {
 			log.Error("Failed to get validators", "in", "verifyCascadingFields", "hash", header.ParentHash, "number", number, "err", err)
@@ -353,7 +373,7 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 		if err := misc.VerifyGaslimit(parent.GasLimit, header.GasLimit); err != nil {
 			return err
 		}
-	} else if err := misc.VerifyEip1559Header(chain.Config(), parent, header); err != nil {
+	} else if err := eip1559.VerifyEIP1559Header(chain.Config(), parent, header); err != nil {
 		// Verify the header's EIP-1559 attributes.
 		return err
 	}
@@ -559,7 +579,11 @@ func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 // Finalize implements consensus.Engine, ensuring no uncles are set, nor block
 // rewards given.
 func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs *[]*types.Transaction,
-	uncles []*types.Header, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64) error {
+	uncles []*types.Header, withdrawals []*types.Withdrawal, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64) error {
+	if len(withdrawals) > 0 {
+		return errors.New("oasys does not support withdrawals")
+	}
+
 	if err := verifyTx(header, *txs); err != nil {
 		return err
 	}
@@ -574,7 +598,6 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 			log.Error("Failed to initialize system contracts", "in", "Finalize", "hash", hash, "number", number, "err", err)
 			return err
 		}
-
 	}
 
 	env, err := c.environment(chain, header, nil)
@@ -640,7 +663,8 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 
 // FinalizeAndAssemble implements consensus.Engine, ensuring no uncles are set,
 // nor block rewards given, and returns the final block.
-func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, []*types.Receipt, error) {
+func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
+	uncles []*types.Header, receipts []*types.Receipt, withdrawals []*types.Withdrawal) (*types.Block, []*types.Receipt, error) {
 	if txs == nil {
 		txs = make([]*types.Transaction, 0)
 	}
@@ -648,6 +672,9 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 		receipts = make([]*types.Receipt, 0)
 	}
 
+	if len(withdrawals) > 0 {
+		return nil, receipts, errors.New("oasys does not support withdrawals")
+	}
 	if err := verifyTx(header, txs); err != nil {
 		return nil, nil, err
 	}
@@ -944,6 +971,18 @@ func encodeSigHeader(w io.Writer, header *types.Header) {
 	}
 	if header.BaseFee != nil {
 		enc = append(enc, header.BaseFee)
+	}
+	if header.WithdrawalsHash != nil {
+		panic("unexpected withdrawal hash value in oasys")
+	}
+	if header.ExcessBlobGas != nil {
+		panic("unexpected excess blob gas value in oasys")
+	}
+	if header.BlobGasUsed != nil {
+		panic("unexpected blob gas used value in oasys")
+	}
+	if header.ParentBeaconRoot != nil {
+		panic("unexpected parent beacon root value in oasys")
 	}
 	if err := rlp.Encode(w, enc); err != nil {
 		panic("can't encode: " + err.Error())
