@@ -380,7 +380,7 @@ func (w *wallet) selfDerive() {
 					// of legacy-ledger, the first account on the legacy-path will
 					// be shown to the user, even if we don't actively track it
 					if i < len(nextAddrs)-1 {
-						w.log.Info("Skipping trakcking first account on legacy path, use personal.deriveAccount(<url>,<path>, false) to track",
+						w.log.Info("Skipping tracking first account on legacy path, use personal.deriveAccount(<url>,<path>, false) to track",
 							"path", path, "address", nextAddrs[i])
 						break
 					}
@@ -483,6 +483,10 @@ func (w *wallet) Derive(path accounts.DerivationPath, pin bool) (accounts.Accoun
 	w.stateLock.Lock()
 	defer w.stateLock.Unlock()
 
+	if w.device == nil {
+		return accounts.Account{}, accounts.ErrWalletClosed
+	}
+
 	if _, ok := w.paths[address]; !ok {
 		w.accounts = append(w.accounts, account)
 		w.paths[address] = make(accounts.DerivationPath, len(path))
@@ -526,7 +530,6 @@ func (w *wallet) signHash(account accounts.Account, hash []byte) ([]byte, error)
 
 // SignData signs keccak256(data). The mimetype parameter describes the type of data being signed
 func (w *wallet) SignData(account accounts.Account, mimeType string, data []byte) ([]byte, error) {
-
 	// Unless we are doing 712 signing, simply dispatch to signHash
 	if !(mimeType == accounts.MimetypeTypedData && len(data) == 66 && data[0] == 0x19 && data[1] == 0x01) {
 		return w.signHash(account, crypto.Keccak256(data))
@@ -625,7 +628,7 @@ func (w *wallet) SignTx(account accounts.Account, tx *types.Transaction, chainID
 	return signed, nil
 }
 
-// SignHashWithPassphrase implements accounts.Wallet, however signing arbitrary
+// SignTextWithPassphrase implements accounts.Wallet, however signing arbitrary
 // data is not supported for Ledger wallets, so this method will always return
 // an error.
 func (w *wallet) SignTextWithPassphrase(account accounts.Account, passphrase string, text []byte) ([]byte, error) {

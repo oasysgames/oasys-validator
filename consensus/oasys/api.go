@@ -107,12 +107,12 @@ func (api *API) Discard(address common.Address) {
 	delete(api.oasys.proposals, address)
 }
 
-type status struct {
-	InturnPercent float64                `json:"inturnPercent"`
-	SigningStatus map[common.Address]int `json:"sealerActivity"`
-	NumBlocks     uint64                 `json:"numBlocks"`
-}
-
+// type status struct {
+// 	InturnPercent float64                `json:"inturnPercent"`
+// 	SigningStatus map[common.Address]int `json:"sealerActivity"`
+// 	NumBlocks     uint64                 `json:"numBlocks"`
+// }
+//
 // // Status returns the status of the last N blocks,
 // // - the number of active signers,
 // // - the number of signers,

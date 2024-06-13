@@ -18,6 +18,7 @@ package eth
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"sync"
 
@@ -41,7 +42,7 @@ var (
 	errPeerNotRegistered = errors.New("peer not registered")
 
 	// errSnapWithoutEth is returned if a peer attempts to connect only on the
-	// snap protocol without advertizing the eth main protocol.
+	// snap protocol without advertising the eth main protocol.
 	errSnapWithoutEth = errors.New("peer connected on snap without compatible eth support")
 )
 
@@ -74,7 +75,7 @@ func (ps *peerSet) registerSnapExtension(peer *snap.Peer) error {
 	// Reject the peer if it advertises `snap` without `eth` as `snap` is only a
 	// satellite protocol meaningful with the chain selection of `eth`
 	if !peer.RunningCap(eth.ProtocolName, eth.ProtocolVersions) {
-		return errSnapWithoutEth
+		return fmt.Errorf("%w: have %v", errSnapWithoutEth, peer.Caps())
 	}
 	// Ensure nobody can double connect
 	ps.lock.Lock()
@@ -230,7 +231,7 @@ func (ps *peerSet) snapLen() int {
 }
 
 // peerWithHighestTD retrieves the known peer with the currently highest total
-// difficulty.
+// difficulty, but below the given PoS switchover threshold.
 func (ps *peerSet) peerWithHighestTD() *eth.Peer {
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
