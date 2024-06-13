@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"os"
 	"testing"
@@ -107,7 +106,7 @@ func TestSlash(t *testing.T) {
 	}
 
 	validator := accounts[0].Address
-	schedule := map[uint64]common.Address{}
+	schedule := []*common.Address{}
 	header := &types.Header{
 		Number:     big.NewInt(50),
 		Coinbase:   accounts[0].Address,
@@ -396,12 +395,14 @@ func TestGetNextEnvironmentValue(t *testing.T) {
 	}
 }
 
+var _ blockchainAPI = (*testBlockchainAPI)(nil)
+
 type testBlockchainAPI struct {
 	rbytes map[common.Address][][]byte
 	count  map[common.Address]int
 }
 
-func (p *testBlockchainAPI) Call(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *ethapi.StateOverride) (hexutil.Bytes, error) {
+func (p *testBlockchainAPI) Call(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash *rpc.BlockNumberOrHash, overrides *ethapi.StateOverride, blockOverrides *ethapi.BlockOverrides) (hexutil.Bytes, error) {
 	if p.count == nil {
 		p.count = map[common.Address]int{}
 	}
@@ -418,7 +419,7 @@ type testEnv struct {
 }
 
 func makeKeyStore() (*keystore.KeyStore, func(), error) {
-	d, err := ioutil.TempDir("", "tmp-keystore")
+	d, err := os.MkdirTemp("", "tmp-keystore")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -473,6 +474,7 @@ func makeEnv(wallet accounts.Wallet, account accounts.Account) (*testEnv, error)
 			},
 		}
 		genspec = &core.Genesis{
+			Config:    chainConfig,
 			ExtraData: make([]byte, extraVanity+common.AddressLength+extraSeal),
 			BaseFee:   big.NewInt(params.InitialBaseFee),
 			Alloc: map[common.Address]core.GenesisAccount{
@@ -538,22 +540,18 @@ func makeEnv(wallet accounts.Wallet, account accounts.Account) (*testEnv, error)
 		}
 	)
 
-	// Generate genesis block
-	copy(genspec.ExtraData[extraVanity:], account.Address[:])
-	genspec.MustCommit(db)
-
 	// Generate consensus engine
 	engine := New(chainConfig, chainConfig.Oasys, db, nil)
 	engine.Authorize(account.Address, wallet.SignData, wallet.SignTx)
 
 	// Generate a batch of blocks, each properly signed
-	chain, err := core.NewBlockChain(db, nil, chainConfig, engine, vm.Config{}, nil, nil)
+	chain, err := core.NewBlockChain(db, nil, genspec, nil, engine, vm.Config{}, nil, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	// Generate StateDB
-	_, statedb := tests.MakePreState(db, genspec.Alloc, false)
+	_, _, statedb := tests.MakePreState(db, genspec.Alloc, false, rawdb.HashScheme)
 
 	// Replace artifact bytecode
 	environment.artifact.DeployedBytecode = fmt.Sprintf("0x%s", hex.EncodeToString(genspec.Alloc[_environmentAddress].Code))
