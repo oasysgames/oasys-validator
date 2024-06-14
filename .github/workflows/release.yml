@@ -27,7 +27,8 @@ jobs:
             -w ${{ github.workspace }} \
             -e GOOS=${{ matrix.os }} \
             -e GOARCH=${{ matrix.arch }} \
-            golang:1.17.8-buster make geth
+            -e GOFLAGS='-buildvcs=false' \
+            golang:1.20.14-bookworm make geth
 
       - name: Build Binary - ${{ matrix.os }} ${{ matrix.arch }}
         if: matrix.arch == 'arm64'
@@ -38,7 +39,8 @@ jobs:
             -w ${{ github.workspace }} \
             -e GOOS=${{ matrix.os }} \
             -e GOARCH=${{ matrix.arch }} \
-            arm64v8/golang:1.17.8-buster make geth
+            -e GOFLAGS='-buildvcs=false' \
+            arm64v8/golang:1.20.14-bookworm make geth
 
       - name: Check version label
         if: matrix.arch == 'amd64'
