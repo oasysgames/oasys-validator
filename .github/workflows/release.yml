@@ -19,6 +19,9 @@ jobs:
         with:
           submodules: true
 
+      - name: Set up a Git safe directory
+        run: git config --global --add safe.directory ${{ github.workspace }}
+
       - name: Build Binary - ${{ matrix.os }} ${{ matrix.arch }}
         if: matrix.arch == 'amd64'
         run: |
@@ -27,8 +30,7 @@ jobs:
             -w ${{ github.workspace }} \
             -e GOOS=${{ matrix.os }} \
             -e GOARCH=${{ matrix.arch }} \
-            -e GOFLAGS='-buildvcs=false' \
-            golang:1.20.14-bookworm make geth
+            golang:1.20.14-bookworm sh -c "git config --global --add safe.directory ${{ github.workspace }} && make geth"
 
       - name: Build Binary - ${{ matrix.os }} ${{ matrix.arch }}
         if: matrix.arch == 'arm64'
@@ -39,8 +41,7 @@ jobs:
             -w ${{ github.workspace }} \
             -e GOOS=${{ matrix.os }} \
             -e GOARCH=${{ matrix.arch }} \
-            -e GOFLAGS='-buildvcs=false' \
-            arm64v8/golang:1.20.14-bookworm make geth
+            arm64v8/golang:1.20.14-bookworm sh -c "git config --global --add safe.directory ${{ github.workspace }} && make geth"
 
       - name: Check version label
         if: matrix.arch == 'amd64'
