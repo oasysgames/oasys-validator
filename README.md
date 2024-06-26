@@ -71,9 +71,9 @@ directory.
 All validator need to process following steps.
 All full node installation requires **only `1`** in steps.
 
-1. [Run geth client](https://docs.oasys.games/docs/hub-validator/operate-validator/1-2-build-validator-node)
-2. [Join PoS system & delegage](https://docs.oasys.games/docs/hub-validator/operate-validator/1-4-join-validator-web)
-3. [Run verifier](https://docs.oasys.games/docs/hub-validator/operate-validator/1-5-setup-verifier)
+1. [Run geth client](https://docs.oasys.games/docs/hub-validator/operate-validator/build-validator-node)
+2. [Join PoS system & delegage](https://docs.oasys.games/docs/hub-validator/operate-validator/join-validator)
+3. [Run verifier](https://docs.oasys.games/docs/hub-validator/operate-validator/setup-verifier)
 
 ### Programmatically interfacing `geth` nodes
 
