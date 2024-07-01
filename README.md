@@ -12,7 +12,7 @@ Automated builds are available for stable releases and the unstable master branc
 archives are published at https://github.com/oasysgames/oasys-validator/releases.
 ## Running `geth` on Oasys
 
-Read following manual on [**Oasys docs**](https://docs.oasys.games/docs/hub-validator/operate-validator/1-2-build-validator-node).
+Read following manual on [**Oasys docs**](https://docs.oasys.games/docs/hub-validator/operate-validator/build-validator-node).
 
 ### Hardware Requirements
 
