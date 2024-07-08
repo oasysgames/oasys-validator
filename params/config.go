@@ -228,7 +228,7 @@ var (
 		MuirGlacierBlock:    big.NewInt(0),
 		BerlinBlock:         big.NewInt(0),
 		LondonBlock:         big.NewInt(0),
-		ShanghaiTime:        newUint64(1721305800), // Thu Jul 18 2024 21:30:00 GMT+0900
+		ShanghaiTime:        newUint64(1721910600), // Thu Jul 25 2024 21:30:00 GMT+0900
 
 		Oasys: &OasysConfig{
 			Period: 15,
