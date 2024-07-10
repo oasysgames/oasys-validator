@@ -60,11 +60,22 @@ jobs:
           (cd binaries/linux_amd64 && zip -q - geth) > geth-${{ github.ref_name }}-linux-amd64.zip 
           (cd binaries/linux_arm64 && zip -q - geth) > geth-${{ github.ref_name }}-linux-arm64.zip
 
+      - name: Create genesis.zip
+        run: zip -r genesis.zip genesis
+
+      - name: Create setup.sh
+        run: |
+          sed -e 's#__REPOSITORY__#${{ github.repository }}#' .github/setup_template.sh | \
+          sed -e 's#__RELEASE__#${{ github.ref_name }}#' > setup.sh
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ github.ref_name }}
-          path: geth-*.zip
+          path: |
+            geth-*.zip
+            genesis.zip
+            setup.sh
 
   release:
     name: Release
@@ -88,5 +99,5 @@ jobs:
           name: Release ${{ github.ref_name }}
           draft: true
           files: |
-            artifacts/*.zip
+            artifacts/*
             sha256sums.txt
