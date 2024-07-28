@@ -59,6 +59,7 @@ var (
 	headFastBlockGauge      = metrics.NewRegisteredGauge("chain/head/receipt", nil)
 	headFinalizedBlockGauge = metrics.NewRegisteredGauge("chain/head/finalized", nil)
 	headSafeBlockGauge      = metrics.NewRegisteredGauge("chain/head/safe", nil)
+	justifiedBlockGauge     = metrics.NewRegisteredGauge("chain/head/justified", nil)
 
 	chainInfoGauge = metrics.NewRegisteredGaugeInfo("chain/info", nil)
 
@@ -228,6 +229,8 @@ type BlockChain struct {
 	blockProcFeed event.Feed
 	scope         event.SubscriptionScope
 	genesisBlock  *types.Block
+	// for finality
+	finalizedHeaderFeed event.Feed
 
 	// This mutex synchronizes chain write operations.
 	// Readers don't need to take it, they can just read the database.
@@ -499,6 +502,19 @@ func (bc *BlockChain) empty() bool {
 	return true
 }
 
+// GetJustifiedNumber returns the highest justified blockNumber on the branch including and before `header`.
+func (bc *BlockChain) GetJustifiedNumber(header *types.Header) uint64 {
+	if p, ok := bc.engine.(consensus.PoS); ok {
+		justifiedBlockNumber, _, err := p.GetJustifiedNumberAndHash(bc, []*types.Header{header})
+		if err == nil {
+			return justifiedBlockNumber
+		}
+	}
+	// return 0 when err!=nil
+	// so the input `header` will at a disadvantage during reorg
+	return 0
+}
+
 // loadLastState loads the last known chain state from the database. This method
 // assumes that the chain manager mutex is held.
 func (bc *BlockChain) loadLastState() error {
@@ -519,6 +535,7 @@ func (bc *BlockChain) loadLastState() error {
 	// Everything seems to be fine, set as the head block
 	bc.currentBlock.Store(headBlock.Header())
 	headBlockGauge.Update(int64(headBlock.NumberU64()))
+	justifiedBlockGauge.Update(int64(bc.GetJustifiedNumber(headBlock.Header())))
 
 	// Restore the last known head header
 	headHeader := headBlock.Header()
@@ -846,6 +863,7 @@ func (bc *BlockChain) SnapSyncCommitHead(hash common.Hash) error {
 	}
 	bc.currentBlock.Store(block.Header())
 	headBlockGauge.Update(int64(block.NumberU64()))
+	justifiedBlockGauge.Update(int64(bc.GetJustifiedNumber(block.Header())))
 	bc.chainmu.Unlock()
 
 	// Destroy any existing state snapshot and regenerate it in the background,
@@ -887,6 +905,7 @@ func (bc *BlockChain) ResetWithGenesisBlock(genesis *types.Block) error {
 	bc.genesisBlock = genesis
 	bc.currentBlock.Store(bc.genesisBlock.Header())
 	headBlockGauge.Update(int64(bc.genesisBlock.NumberU64()))
+	justifiedBlockGauge.Update(int64(bc.genesisBlock.NumberU64()))
 	bc.hc.SetGenesis(bc.genesisBlock.Header())
 	bc.hc.SetCurrentHeader(bc.genesisBlock.Header())
 	bc.currentSnapBlock.Store(bc.genesisBlock.Header())
@@ -958,6 +977,7 @@ func (bc *BlockChain) writeHeadBlock(block *types.Block) {
 
 	bc.currentBlock.Store(block.Header())
 	headBlockGauge.Update(int64(block.NumberU64()))
+	justifiedBlockGauge.Update(int64(bc.GetJustifiedNumber(block.Header())))
 }
 
 // stopWithoutSaving stops the blockchain service. If any imports are currently in progress
@@ -1527,6 +1547,12 @@ func (bc *BlockChain) writeBlockAndSetHead(block *types.Block, receipts []*types
 		if len(logs) > 0 {
 			bc.logsFeed.Send(logs)
 		}
+		var finalizedHeader *types.Header
+		if pos, ok := bc.Engine().(consensus.PoS); ok {
+			if finalizedHeader = pos.GetFinalizedHeader(bc, block.Header()); finalizedHeader != nil {
+				bc.SetFinalized(finalizedHeader)
+			}
+		}
 		// In theory, we should fire a ChainHeadEvent when we inject
 		// a canonical block, but sometimes we can insert a batch of
 		// canonical blocks. Avoid firing too many ChainHeadEvents,
@@ -1534,6 +1560,9 @@ func (bc *BlockChain) writeBlockAndSetHead(block *types.Block, receipts []*types
 		// event here.
 		if emitHeadEvent {
 			bc.chainHeadFeed.Send(ChainHeadEvent{Block: block})
+			if finalizedHeader != nil {
+				bc.finalizedHeaderFeed.Send(FinalizedHeaderEvent{finalizedHeader})
+			}
 		}
 	} else {
 		bc.chainSideFeed.Send(ChainSideEvent{Block: block})
@@ -1620,6 +1649,11 @@ func (bc *BlockChain) insertChain(chain types.Blocks, setHead bool) (int, error)
 	defer func() {
 		if lastCanon != nil && bc.CurrentBlock().Hash() == lastCanon.Hash() {
 			bc.chainHeadFeed.Send(ChainHeadEvent{lastCanon})
+			if pos, ok := bc.Engine().(consensus.PoS); ok {
+				if finalizedHeader := pos.GetFinalizedHeader(bc, lastCanon.Header()); finalizedHeader != nil {
+					bc.finalizedHeaderFeed.Send(FinalizedHeaderEvent{finalizedHeader})
+				}
+			}
 		}
 	}()
 	// Start the parallel header verifier

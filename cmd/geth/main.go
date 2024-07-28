@@ -144,6 +144,11 @@ var (
 		utils.GpoMaxGasPriceFlag,
 		utils.GpoIgnoreGasPriceFlag,
 		configFileFlag,
+		utils.VotingEnabledFlag,
+		utils.DisableVoteAttestationFlag,
+		utils.BLSPasswordFileFlag,
+		utils.BLSWalletDirFlag,
+		utils.VoteJournalDirFlag,
 		utils.LogDebugFlag,
 		utils.LogBacktraceAtFlag,
 	}, utils.NetworkFlags, utils.DatabaseFlags)
@@ -235,6 +240,7 @@ func init() {
 		snapshotCommand,
 		// See verkle.go
 		verkleCommand,
+		blsCommand,
 	}
 	if logTestCommand != nil {
 		app.Commands = append(app.Commands, logTestCommand)
