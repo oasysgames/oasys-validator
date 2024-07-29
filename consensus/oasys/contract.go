@@ -203,16 +203,23 @@ type nextValidators struct {
 	Owners    []common.Address
 	Operators []common.Address
 	Stakes    []*big.Int
+	// for finality
+	Indexes       []int
+	VoteAddresses []types.BLSPublicKey
 }
 
 func (p *nextValidators) Copy() *nextValidators {
 	cpy := nextValidators{
-		Owners:    make([]common.Address, len(p.Owners)),
-		Operators: make([]common.Address, len(p.Operators)),
-		Stakes:    make([]*big.Int, len(p.Stakes)),
+		Owners:        make([]common.Address, len(p.Owners)),
+		Operators:     make([]common.Address, len(p.Operators)),
+		Stakes:        make([]*big.Int, len(p.Stakes)),
+		Indexes:       make([]int, len(p.Indexes)),
+		VoteAddresses: make([]types.BLSPublicKey, len(p.VoteAddresses)),
 	}
 	copy(cpy.Owners, p.Owners)
 	copy(cpy.Operators, p.Operators)
+	copy(cpy.Indexes, p.Indexes)
+	copy(cpy.VoteAddresses, p.VoteAddresses)
 	for i, v := range p.Stakes {
 		cpy.Stakes[i] = new(big.Int).Set(v)
 	}
@@ -369,6 +376,9 @@ func getNextValidators(
 	epoch uint64,
 	block uint64,
 ) (*nextValidators, error) {
+	if config.IsFinalizerEnabled(new(big.Int).SetUint64(block)) {
+		// TODO:
+	}
 	if config.IsForkedOasysPublication(new(big.Int).SetUint64(block)) {
 		return callGetHighStakes(ethAPI, hash, epoch)
 	}
