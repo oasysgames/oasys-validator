@@ -42,6 +42,7 @@ const (
 	extraVanity = 32                     // Fixed number of extra-data prefix bytes reserved for signer vanity
 	extraSeal   = crypto.SignatureLength // Fixed number of extra-data suffix bytes reserved for signer seal
 
+	envValuesLen          = 32 * 9
 	addressBytesLen       = common.AddressLength
 	stakeBytesLen         = 32
 	validatorInfoBytesLen = addressBytesLen*2 + stakeBytesLen + types.BLSPublicKeyLength
@@ -126,6 +127,9 @@ var (
 
 	// errCoinBaseMisMatch is returned if a header's coinbase do not match with signature
 	errCoinBaseMisMatch = errors.New("coinbase do not match with signature")
+
+	// errNoEnvironmentValue is returned if the extra data does not contain the environment value
+	errNoEnvironmentValue = errors.New("no environment value in the extra data")
 )
 
 var (
@@ -270,20 +274,22 @@ func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 	if len(header.Extra) < extraVanity+extraSeal {
 		return errMissingSignature
 	}
-	// Ensure that the extra-data contains a validator list on checkpoint, but none otherwise
-	// Use the initial environment for header verification,
-	// assuming the following properties never has to be checked
-	//  - StartBlock  ->> 0
-	//  - StartEpoch  ->> 1
-	//  - BlockPeriod ->> 15
-	//  - EpochPeriod ->> 5760
-	env := getInitialEnvironment(c.config)
-	validatorBytes := len(header.Extra) - extraVanity - extraSeal
+	// Get the environment value from the header if the block is epoch block
+	env, err := getEnvironmentFromHeader(header)
+	if errors.Is(err, errNoEnvironmentValue) {
+		// Get from snapshot if the block is not epoch block
+		env, err = c.environment(chain, header, parents)
+	}
+	if err != nil {
+		return err
+	}
+	// Ensure that the extra-data contains extra data aside from the vanity and seal
+	extraLenExceptVanityAndSeal := len(header.Extra) - extraVanity - extraSeal
 	if env.IsEpoch(number) {
-		if err := c.verifyExtraHeaderLengthInEpoch(header.Number, validatorBytes); err != nil {
+		if err := c.verifyExtraHeaderLengthInEpoch(header.Number, extraLenExceptVanityAndSeal); err != nil {
 			return err
 		}
-	} else if validatorBytes != 0 {
+	} else if extraLenExceptVanityAndSeal != 0 {
 		return errExtraSigners
 	}
 	// Ensure that the mix digest is zero as we don't have fork protection currently
@@ -520,16 +526,16 @@ func (o *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header 
 
 // getValidatorsFromHeader returns the next validators extracted from the header's extra field if exists.
 // The validators bytes would be contained only in the epoch block's header, and its each validator bytes length is fixed.
-// Layout: |--Extra Vanity--|--Validator Number--|--Owner(or Empty)--|--Operator(or Empty)--|---Stake(or Empty)--|--Vote Address(or Empty)--|--Vote Attestation(or Empty)--|--Extra Seal--|
+// Layout: |--Extra Vanity--|--EnvironmentValue--| --Validator Number--|--Owner(or Empty)--|--Operator(or Empty)--|---Stake(or Empty)--|--Vote Address(or Empty)--|--Vote Attestation(or Empty)--|--Extra Seal--|
 func getValidatorsFromHeader(header *types.Header) (*nextValidators, error) {
 	if len(header.Extra) <= extraVanity+extraSeal {
 		return nil, fmt.Errorf("no validators in the extra data, extra length: %d", len(header.Extra))
 	}
 
-	num := int(header.Extra[extraVanity])
-	lenNoAttestation := extraVanity + extraSeal + validatorNumberSize + num*validatorInfoBytesLen
+	num := int(header.Extra[extraVanity+envValuesLen])
+	lenNoAttestation := extraVanity + envValuesLen + validatorNumberSize + num*validatorInfoBytesLen
 	if num == 0 || len(header.Extra) < lenNoAttestation {
-		return nil, fmt.Errorf("size of extra data is not enough, val-num: %d, expected: %d, actual: %d", num, lenNoAttestation, len(header.Extra))
+		return nil, fmt.Errorf("missing validator info in the extra data, extra length: %d", len(header.Extra))
 	}
 
 	vals := &nextValidators{
@@ -539,20 +545,45 @@ func getValidatorsFromHeader(header *types.Header) (*nextValidators, error) {
 		Indexes:       make([]int, num),
 		VoteAddresses: make([]types.BLSPublicKey, num),
 	}
-	start := extraVanity + validatorNumberSize
+	start := extraVanity + envValuesLen + validatorNumberSize
 	for i := 0; i < num; i++ {
 		copy(vals.Owners[i][:], header.Extra[start:start+addressBytesLen])
 		start += addressBytesLen
 		copy(vals.Operators[i][:], header.Extra[start:start+addressBytesLen])
 		start += addressBytesLen
-		stake := new(big.Int).SetBytes(header.Extra[start : start+stakeBytesLen])
-		vals.Stakes[i] = stake
+		vals.Stakes[i] = new(big.Int).SetBytes(header.Extra[start : start+stakeBytesLen])
 		start += stakeBytesLen
 		copy(vals.VoteAddresses[i][:], header.Extra[start:start+types.BLSPublicKeyLength])
 		start += types.BLSPublicKeyLength
+		vals.Indexes[i] = i
 	}
 
 	return vals, nil
+}
+
+func getEnvironmentFromHeader(header *types.Header) (*environmentValue, error) {
+	if len(header.Extra) <= extraVanity+extraSeal {
+		return nil, errNoEnvironmentValue
+	}
+
+	if len(header.Extra) < extraVanity+envValuesLen+extraSeal {
+		return nil, fmt.Errorf("missing environment value in the extra data, extra length: %d", len(header.Extra))
+	}
+
+	start := extraVanity
+	fmt.Println(header.Extra[start:start+32], header.Extra[start+32:start+64])
+	env := &environmentValue{
+		StartBlock:         new(big.Int).SetBytes(header.Extra[start : start+32]),
+		StartEpoch:         new(big.Int).SetBytes(header.Extra[start+32 : start+64]),
+		BlockPeriod:        new(big.Int).SetBytes(header.Extra[start+64 : start+96]),
+		EpochPeriod:        new(big.Int).SetBytes(header.Extra[start+96 : start+128]),
+		RewardRate:         new(big.Int).SetBytes(header.Extra[start+128 : start+160]),
+		CommissionRate:     new(big.Int).SetBytes(header.Extra[start+160 : start+192]),
+		ValidatorThreshold: new(big.Int).SetBytes(header.Extra[start+192 : start+224]),
+		JailThreshold:      new(big.Int).SetBytes(header.Extra[start+224 : start+256]),
+		JailPeriod:         new(big.Int).SetBytes(header.Extra[start+256 : start+288]),
+	}
+	return env, nil
 }
 
 // getVoteAttestationFromHeader returns the vote attestation extracted from the header's extra field if exists.
@@ -570,7 +601,7 @@ func getVoteAttestationFromHeader(header *types.Header, chainConfig *params.Chai
 	if !env.IsEpoch(header.Number.Uint64()) {
 		attestationBytes = header.Extra[extraVanity : len(header.Extra)-extraSeal]
 	} else {
-		num := int(header.Extra[extraVanity])
+		num := int(header.Extra[extraVanity+envValuesLen])
 		if len(header.Extra) <= extraVanity+extraSeal+validatorNumberSize+num*validatorInfoBytesLen {
 			return nil, nil
 		}
@@ -726,11 +757,23 @@ func assembleValidators(validators *nextValidators) []byte {
 	for i := 0; i < len(validators.Owners); i++ {
 		extra = append(extra, validators.Owners[i].Bytes()...)
 		extra = append(extra, validators.Operators[i].Bytes()...)
-		var stakeBytes [32]byte
-		copy(stakeBytes[:], validators.Stakes[i].Bytes())
-		extra = append(extra, stakeBytes[:]...)
+		extra = append(extra, bigTo32BytesLeftPadding(validators.Stakes[i])...)
 		extra = append(extra, validators.VoteAddresses[i][:]...)
 	}
+	return extra
+}
+
+func assembleEnvironmentValue(env *environmentValue) []byte {
+	extra := make([]byte, 0, envValuesLen)
+	extra = append(extra, bigTo32BytesLeftPadding(env.StartBlock)...)
+	extra = append(extra, bigTo32BytesLeftPadding(env.StartEpoch)...)
+	extra = append(extra, bigTo32BytesLeftPadding(env.BlockPeriod)...)
+	extra = append(extra, bigTo32BytesLeftPadding(env.EpochPeriod)...)
+	extra = append(extra, bigTo32BytesLeftPadding(env.RewardRate)...)
+	extra = append(extra, bigTo32BytesLeftPadding(env.CommissionRate)...)
+	extra = append(extra, bigTo32BytesLeftPadding(env.ValidatorThreshold)...)
+	extra = append(extra, bigTo32BytesLeftPadding(env.JailThreshold)...)
+	extra = append(extra, bigTo32BytesLeftPadding(env.JailPeriod)...)
 	return extra
 }
 
@@ -849,6 +892,9 @@ func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 			return err
 		}
 		validators, stakes = result.Operators, result.Stakes
+		if c.chainConfig.IsFinalizerEnabled(header.Number) {
+			header.Extra = append(header.Extra, assembleEnvironmentValue(env)...)
+		}
 		header.Extra = append(header.Extra, c.getExtraHeaderValueInEpoch(header.Number, result)...)
 	} else {
 		snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
@@ -923,7 +969,7 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 		}
 		// If the block is a epoch block, verify the validator list or hash
 		actual := header.Extra[extraVanity : len(header.Extra)-extraSeal]
-		if err := c.verifyExtraHeaderValueInEpoch(header, actual, result); err != nil {
+		if err := c.verifyExtraHeaderValueInEpoch(header, actual, env, result); err != nil {
 			return err
 		}
 		validators, stakes = result.Operators, result.Stakes
@@ -1328,18 +1374,27 @@ func (c *Oasys) getExtraHeaderValueInEpoch(number *big.Int, validators *nextVali
 
 // Verify the length of the Extra header field.
 func (c *Oasys) verifyExtraHeaderLengthInEpoch(number *big.Int, length int) error {
-	if c.chainConfig.IsForkedOasysPublication(number) {
-		if length != crypto.DigestLength {
-			return errInvalidEpochHash
+	if !c.chainConfig.IsFinalizerEnabled(number) {
+		if c.chainConfig.IsForkedOasysPublication(number) {
+			if length != crypto.DigestLength {
+				return errInvalidEpochHash
+			}
+		} else if length%common.AddressLength != 0 {
+			return errInvalidCheckpointValidators
 		}
-	} else if length%common.AddressLength != 0 {
-		return errInvalidCheckpointValidators
+	}
+	if length < envValuesLen {
+		return fmt.Errorf("missing environment value in extra header, length: %d", length)
+	}
+	length -= envValuesLen - validatorNumberSize
+	if length%validatorInfoBytesLen != 0 {
+		return fmt.Errorf("missing validator info in extra header, no-env-length: %d", length)
 	}
 	return nil
 }
 
 // Verify the value of the Extra header field.
-func (c *Oasys) verifyExtraHeaderValueInEpoch(header *types.Header, actual []byte, actualValidators *nextValidators) error {
+func (c *Oasys) verifyExtraHeaderValueInEpoch(header *types.Header, actual []byte, actualEnv *environmentValue, actualValidators *nextValidators) error {
 	if !c.chainConfig.IsFinalizerEnabled(header.Number) {
 		expect := c.getExtraHeaderValueInEpoch(header.Number, actualValidators)
 		if bytes.Equal(actual, expect) {
@@ -1349,6 +1404,38 @@ func (c *Oasys) verifyExtraHeaderValueInEpoch(header *types.Header, actual []byt
 			return errMismatchingEpochHash
 		}
 		return errMismatchingEpochValidators
+	}
+
+	env, err := getEnvironmentFromHeader(header)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(actualEnv.StartBlock.Bytes(), env.StartBlock.Bytes()) {
+		return fmt.Errorf("mismatching start block, expected: %v, real: %v", env.StartBlock, actualEnv.StartBlock)
+	}
+	if !bytes.Equal(actualEnv.StartEpoch.Bytes(), env.StartEpoch.Bytes()) {
+		return fmt.Errorf("mismatching start epoch, expected: %v, real: %v", env.StartEpoch, actualEnv.StartEpoch)
+	}
+	if !bytes.Equal(actualEnv.BlockPeriod.Bytes(), env.BlockPeriod.Bytes()) {
+		return fmt.Errorf("mismatching block period, expected: %v, real: %v", env.BlockPeriod, actualEnv.BlockPeriod)
+	}
+	if !bytes.Equal(actualEnv.EpochPeriod.Bytes(), env.EpochPeriod.Bytes()) {
+		return fmt.Errorf("mismatching epoch period, expected: %v, real: %v", env.EpochPeriod, actualEnv.EpochPeriod)
+	}
+	if !bytes.Equal(actualEnv.RewardRate.Bytes(), env.RewardRate.Bytes()) {
+		return fmt.Errorf("mismatching reward rate, expected: %v, real: %v", env.RewardRate, actualEnv.RewardRate)
+	}
+	if !bytes.Equal(actualEnv.CommissionRate.Bytes(), env.CommissionRate.Bytes()) {
+		return fmt.Errorf("mismatching commission rate, expected: %v, real: %v", env.CommissionRate, actualEnv.CommissionRate)
+	}
+	if !bytes.Equal(actualEnv.ValidatorThreshold.Bytes(), env.ValidatorThreshold.Bytes()) {
+		return fmt.Errorf("mismatching validator threshold, expected: %v, real: %v", env.ValidatorThreshold, actualEnv.ValidatorThreshold)
+	}
+	if !bytes.Equal(actualEnv.JailThreshold.Bytes(), env.JailThreshold.Bytes()) {
+		return fmt.Errorf("mismatching jail threshold, expected: %v, real: %v", env.JailThreshold, actualEnv.JailThreshold)
+	}
+	if !bytes.Equal(actualEnv.JailPeriod.Bytes(), env.JailPeriod.Bytes()) {
+		return fmt.Errorf("mismatching jail period, expected: %v, real: %v", env.JailPeriod, actualEnv.JailPeriod)
 	}
 
 	validators, err := getValidatorsFromHeader(header)
@@ -1549,4 +1636,11 @@ func verifyTx(header *types.Header, txs []*types.Transaction) error {
 		}
 	}
 	return nil
+}
+
+func bigTo32BytesLeftPadding(value *big.Int) []byte {
+	var byteArray [32]byte
+	byteSlice := value.Bytes()
+	copy(byteArray[32-len(byteSlice):], byteSlice)
+	return byteArray[:]
 }
