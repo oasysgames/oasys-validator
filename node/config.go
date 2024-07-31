@@ -198,6 +198,17 @@ type Config struct {
 	// AllowUnprotectedTxs allows non EIP-155 protected transactions to be send over RPC.
 	AllowUnprotectedTxs bool `toml:",omitempty"`
 
+	// BLSPasswordFile is the file that contains BLS wallet password.
+	BLSPasswordFile string `toml:",omitempty"`
+
+	// BLSWalletDir is the file system folder of BLS wallet. The directory can
+	// be specified as a relative path, in which case it is resolved relative to the
+	// current directory.
+	BLSWalletDir string `toml:",omitempty"`
+
+	// VoteJournalDir is the directory to store votes in the fast finality feature.
+	VoteJournalDir string `toml:",omitempty"`
+
 	// BatchRequestLimit is the maximum number of requests in a batch.
 	BatchRequestLimit int `toml:",omitempty"`
 

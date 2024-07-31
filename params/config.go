@@ -599,6 +599,26 @@ func (c *ChainConfig) IsForkedOasysExtendDifficulty(num *big.Int) bool {
 	return isBlockForked(c.OasysExtendDifficultyBlock(), num)
 }
 
+// OasysFinalizerEnabledBlock returns the hard fork of Oasys.
+// TODO: Set correct block number for mainnet and testnet.
+func (c *ChainConfig) OasysFinalizerEnabledBlock() *big.Int {
+	if c.Oasys == nil {
+		return nil
+	}
+	if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
+		return big.NewInt(2093240)
+	}
+	if c.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0 {
+		return big.NewInt(2082220)
+	}
+	return big.NewInt(2)
+}
+
+// IsFinalizerEnabled returns whether num is either equal to the first fast finality fork block or greater.
+func (c *ChainConfig) IsFinalizerEnabled(num *big.Int) bool {
+	return isBlockForked(c.OasysFinalizerEnabledBlock(), num)
+}
+
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.
 func (c *ChainConfig) IsTerminalPoWBlock(parentTotalDiff *big.Int, totalDiff *big.Int) bool {
 	if c.TerminalTotalDifficulty == nil {

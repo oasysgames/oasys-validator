@@ -37,6 +37,8 @@ const (
 	MiscCategory       = "MISC"
 	TestingCategory    = "TESTING"
 	DeprecatedCategory = "ALIASED (deprecated)"
+	// for finality
+	FastFinalityCategory = "FAST FINALITY"
 )
 
 func init() {
