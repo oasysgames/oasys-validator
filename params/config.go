@@ -599,6 +599,17 @@ func (c *ChainConfig) IsForkedOasysExtendDifficulty(num *big.Int) bool {
 	return isBlockForked(c.OasysExtendDifficultyBlock(), num)
 }
 
+// OasysShortenedBlockTimeBlock returns the hard fork of Oasys.
+func (c *ChainConfig) OasysShortenedBlockTimeStartEpoch() *big.Int {
+	if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
+		return big.NewInt(999) // TODO
+	}
+	if c.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0 {
+		return big.NewInt(999) // TODO
+	}
+	return big.NewInt(5)
+}
+
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.
 func (c *ChainConfig) IsTerminalPoWBlock(parentTotalDiff *big.Int, totalDiff *big.Int) bool {
 	if c.TerminalTotalDifficulty == nil {
