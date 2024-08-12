@@ -141,6 +141,10 @@ type handler struct {
 	voteCh        chan core.NewVoteEvent
 	votesSub      event.Subscription
 
+	// Used for calcurate average difficulty per block
+	firstTDInBroadcastVote     *big.Int
+	firstHeightInBroadcastVote uint64
+
 	requiredBlocks map[uint64]common.Hash
 
 	// channels for fetcher, syncer, txsyncLoop
@@ -730,10 +734,22 @@ func (h *handler) BroadcastVote(vote *types.VoteEnvelope) {
 	peers := h.peers.peersWithoutVote(vote.Hash())
 	headBlock := h.chain.CurrentBlock()
 	currentTD := h.chain.GetTd(headBlock.Hash(), headBlock.Number.Uint64())
+	var averageDifficulty *big.Int
+	if h.firstTDInBroadcastVote == nil || h.firstHeightInBroadcastVote == 0 {
+		h.firstTDInBroadcastVote = currentTD
+		h.firstHeightInBroadcastVote = headBlock.Number.Uint64()
+	} else if headBlock.Number.Uint64() > h.firstHeightInBroadcastVote {
+		averageDifficulty = new(big.Int).Div(new(big.Int).Sub(currentTD, h.firstTDInBroadcastVote), big.NewInt(int64(headBlock.Number.Uint64()-h.firstHeightInBroadcastVote)))
+	}
 	for _, peer := range peers {
 		_, peerTD := peer.Head()
 		deltaTD := new(big.Int).Abs(new(big.Int).Sub(currentTD, peerTD))
-		if deltaTD.Cmp(big.NewInt(deltaTdThreshold)) < 1 && peer.bscExt != nil {
+		// broadcast if
+		// - bscExt is set
+		// - the first time (averageDifficulty is not set)
+		// - The total difficultiy of peer is within the [+|-] range of average difficulity per block * deltaTdThreshold (blocks)
+		broadCasts := peer.bscExt != nil && (averageDifficulty == nil || deltaTD.Cmp(new(big.Int).Mul(big.NewInt(deltaTdThreshold), averageDifficulty)) < 1)
+		if broadCasts {
 			voteMap[peer] = vote
 		}
 	}
@@ -744,7 +760,7 @@ func (h *handler) BroadcastVote(vote *types.VoteEnvelope) {
 		votes := []*types.VoteEnvelope{_vote}
 		peer.bscExt.AsyncSendVotes(votes)
 	}
-	log.Debug("Vote broadcast", "vote packs", directPeers, "broadcast vote", directCount)
+	log.Debug("Vote broadcast", "vote packs", directPeers, "broadcast vote", directCount, "source", vote.Data.SourceNumber, "target", vote.Data.TargetNumber)
 }
 
 // minedBroadcastLoop sends mined blocks to connected peers.
