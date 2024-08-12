@@ -104,8 +104,6 @@ func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, engine c
 	}
 	hc.currentHeaderHash = hc.CurrentHeader().Hash()
 	headHeaderGauge.Update(hc.CurrentHeader().Number.Int64())
-	justifiedBlockGauge.Update(int64(hc.getJustifiedNumber(hc.CurrentHeader())))
-	headFinalizedBlockGauge.Update(int64(hc.getFinalizedNumber(hc.CurrentHeader())))
 	return hc, nil
 }
 
@@ -560,8 +558,6 @@ func (hc *HeaderChain) SetCurrentHeader(head *types.Header) {
 	hc.currentHeader.Store(head)
 	hc.currentHeaderHash = head.Hash()
 	headHeaderGauge.Update(head.Number.Int64())
-	justifiedBlockGauge.Update(int64(hc.getJustifiedNumber(head)))
-	headFinalizedBlockGauge.Update(int64(hc.getFinalizedNumber(head)))
 }
 
 type (

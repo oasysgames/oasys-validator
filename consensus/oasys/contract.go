@@ -39,6 +39,7 @@ const (
 var (
 	//go:embed oasys-genesis-contract-cfb3cd0/artifacts/contracts/Environment.sol/Environment.json
 	//go:embed oasys-genesis-contract-cfb3cd0/artifacts/contracts/StakeManager.sol/StakeManager.json
+	//go:embed oasys-genesis-contract-6037082/artifacts/contracts/StakeManager.sol/StakeManager.json
 	//go:embed oasys-genesis-contract-6037082/artifacts/contracts/CandidateValidatorManager.sol/CandidateValidatorManager.json
 	artifacts embed.FS
 
@@ -49,10 +50,16 @@ var (
 			path: filepath.FromSlash("oasys-genesis-contract-cfb3cd0/artifacts/contracts/Environment.sol/Environment.json"),
 		},
 	}
-	stakeManager = &genesisContract{
+	initalStakeManager = &genesisContract{
 		address: common.HexToAddress(stakeManagerAddress),
 		artifact: &artifact{
 			path: filepath.FromSlash("oasys-genesis-contract-cfb3cd0/artifacts/contracts/StakeManager.sol/StakeManager.json"),
+		},
+	}
+	stakeManager = &genesisContract{
+		address: common.HexToAddress(stakeManagerAddress),
+		artifact: &artifact{
+			path: filepath.FromSlash("oasys-genesis-contract-6037082/artifacts/contracts/StakeManager.sol/StakeManager.json"),
 		},
 	}
 	systemMethods = map[*genesisContract]map[string]int{
@@ -73,6 +80,9 @@ var (
 func init() {
 	// Parse the system contract ABI
 	if err := environment.parseABI(); err != nil {
+		panic(err)
+	}
+	if err := initalStakeManager.parseABI(); err != nil {
 		panic(err)
 	}
 	if err := stakeManager.parseABI(); err != nil {
@@ -321,14 +331,14 @@ func (c *Oasys) initializeSystemContracts(
 	}
 
 	// Initialize StakeManager contract
-	if !stakeManager.verifyCode(state) {
+	if !initalStakeManager.verifyCode(state) {
 		return errors.New("invalid contract code: StakeManager")
 	}
-	data, err = stakeManager.abi.Pack("initialize", environment.address, common.HexToAddress(allowListAddress))
+	data, err = initalStakeManager.abi.Pack("initialize", environment.address, common.HexToAddress(allowListAddress))
 	if err != nil {
 		return err
 	}
-	msg = getMessage(header.Coinbase, stakeManager.address, data, common.Big0)
+	msg = getMessage(header.Coinbase, initalStakeManager.address, data, common.Big0)
 	err = c.applyTransaction(msg, state, header, cx, txs, receipts, systemTxs, usedGas, mining)
 	if err != nil {
 		return err
@@ -376,9 +386,6 @@ func getNextValidators(
 	epoch uint64,
 	block uint64,
 ) (*nextValidators, error) {
-	if config.IsFinalizerEnabled(new(big.Int).SetUint64(block)) {
-		// TODO:
-	}
 	if config.IsForkedOasysPublication(new(big.Int).SetUint64(block)) {
 		return callGetHighStakes(ethAPI, hash, epoch)
 	}
@@ -420,11 +427,12 @@ func callGetValidators(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*n
 		}
 
 		var recv struct {
-			Owners     []common.Address
-			Operators  []common.Address
-			Stakes     []*big.Int
-			Candidates []bool
-			NewCursor  *big.Int
+			Owners        []common.Address
+			Operators     []common.Address
+			Stakes        []*big.Int
+			BlsPublicKeys [][]byte
+			Candidates    []bool
+			NewCursor     *big.Int
 		}
 		if err := stakeManager.abi.UnpackIntoInterface(&recv, method, rbytes); err != nil {
 			return nil, err
@@ -480,11 +488,12 @@ func callGetHighStakes(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*n
 		}
 
 		var recv struct {
-			Owners     []common.Address
-			Operators  []common.Address
-			Stakes     []*big.Int
-			Candidates []bool
-			NewCursor  *big.Int
+			Owners        []common.Address
+			Operators     []common.Address
+			Stakes        []*big.Int
+			BlsPublicKeys [][]byte
+			Candidates    []bool
+			NewCursor     *big.Int
 
 			// unused
 			Actives, Jailed []bool
@@ -501,6 +510,13 @@ func callGetHighStakes(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*n
 				result.Owners = append(result.Owners, recv.Owners[i])
 				result.Operators = append(result.Operators, recv.Operators[i])
 				result.Stakes = append(result.Stakes, recv.Stakes[i])
+				result.Indexes = append(result.Indexes, i)
+				if len(recv.BlsPublicKeys[i]) == types.BLSPublicKeyLength {
+					result.VoteAddresses = append(result.VoteAddresses, types.BLSPublicKey(recv.BlsPublicKeys[i]))
+				} else {
+					// set empty key if bls pub key is not registered on contract
+					result.VoteAddresses = append(result.VoteAddresses, types.BLSPublicKey{})
+				}
 			}
 		}
 	}

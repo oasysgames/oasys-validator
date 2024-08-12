@@ -272,11 +272,11 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		eth.votePool = votePool
 		if oasys, ok := eth.engine.(*oasys.Oasys); ok {
 			if !config.Miner.DisableVoteAttestation {
-				// if there is no VotePool in Parlia Engine, the miner can't get votes for assembling
+				// if there is no VotePool in Oasys Engine, the miner can't get votes for assembling
 				oasys.VotePool = votePool
 			}
 		} else {
-			return nil, errors.New("Engine is not Parlia type")
+			return nil, errors.New("Engine is not Oasys type")
 		}
 		log.Info("Create votePool successfully")
 		eth.handler.votepool = votePool

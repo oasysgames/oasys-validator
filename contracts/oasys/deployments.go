@@ -806,6 +806,8 @@ var (
 			971800:  deploymentSet{deployments7},
 			1529980: deploymentSet{deployments9},
 			1892000: deploymentSet{deployments10},
+			// TODO: set correct value
+			9999999: deploymentSet{deployments11},
 		},
 		params.OasysTestnetGenesisHash: {
 			1:       deploymentSet{deployments0},
@@ -818,6 +820,8 @@ var (
 			955400:  deploymentSet{deployments7, deployments8},
 			1519840: deploymentSet{deployments9},
 			1880660: deploymentSet{deployments10},
+			// TODO: set correct value
+			9999999: deploymentSet{deployments11},
 		},
 		defaultGenesisHash: {
 			2: deploymentSet{
@@ -832,6 +836,7 @@ var (
 				deployments8,
 				deployments9,
 				deployments10,
+				deployments11,
 			},
 		},
 	}

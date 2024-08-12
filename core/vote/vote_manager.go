@@ -60,7 +60,7 @@ func NewVoteManager(eth Backend, chain *core.BlockChain, pool *VotePool, journal
 	if err != nil {
 		return nil, err
 	}
-	log.Info("Create voteSigner successfully")
+	log.Info("Create voteSigner successfully", "pubKey", common.Bytes2Hex(voteSigner.PubKey[:]))
 	voteManager.signer = voteSigner
 
 	// Create voteJournal
@@ -144,7 +144,7 @@ func (voteManager *VoteManager) loop() {
 				func(bLSPublicKey *types.BLSPublicKey) bool {
 					return bytes.Equal(voteManager.signer.PubKey[:], bLSPublicKey[:])
 				}) {
-				log.Debug("cur validator is not within the validatorSet at curHead")
+				log.Debug("cur validator is not within the validatorSet at curHead", "signer", common.Bytes2Hex(voteManager.signer.PubKey[:]))
 				continue
 			}
 

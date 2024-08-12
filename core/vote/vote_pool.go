@@ -174,8 +174,6 @@ func (pool *VotePool) putVote(m map[common.Hash]*VoteBox, votesPq *votesPriority
 	targetHash := vote.Data.TargetHash
 	targetNumber := vote.Data.TargetNumber
 
-	log.Debug("The vote info to put is:", "voteBlockNumber", targetNumber, "voteBlockHash", targetHash)
-
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 	if _, ok := m[targetHash]; !ok {
@@ -199,7 +197,7 @@ func (pool *VotePool) putVote(m map[common.Hash]*VoteBox, votesPq *votesPriority
 	m[targetHash].voteMessages = append(m[targetHash].voteMessages, vote)
 	// Add into received vote to avoid future duplicated vote comes.
 	pool.receivedVotes.Add(voteHash)
-	log.Debug("VoteHash put into votepool is:", "voteHash", voteHash)
+	log.Debug("VoteHash put into votepool is:", "voteHash", voteHash, "sourceNumber", vote.Data.SourceNumber, "targetNumber", vote.Data.TargetNumber, "signer", common.Bytes2Hex(vote.VoteAddress[:]))
 
 	if isFutureVote {
 		localFutureVotesCounter.Inc(1)
@@ -338,7 +336,7 @@ func (pool *VotePool) basicVerify(vote *types.VoteEnvelope, headNumber uint64, m
 
 	// Check duplicate voteMessage firstly.
 	if pool.receivedVotes.Contains(voteHash) {
-		log.Debug("Vote pool already contained the same vote", "voteHash", voteHash)
+		log.Debug("Vote pool already contained the same vote", "voteHash", voteHash, "sourceNumber", vote.Data.SourceNumber, "targetNumber", vote.Data.TargetNumber)
 		return false
 	}
 

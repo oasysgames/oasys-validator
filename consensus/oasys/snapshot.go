@@ -125,13 +125,13 @@ func (s *Snapshot) copy() *Snapshot {
 	return cpy
 }
 
-func (s *Snapshot) updateAttestation(header *types.Header, chainConfig *params.ChainConfig, parliaConfig *params.OasysConfig) {
+func (s *Snapshot) updateAttestation(header *types.Header, chainConfig *params.ChainConfig, oasysConfig *params.OasysConfig) {
 	if !chainConfig.IsFinalizerEnabled(header.Number) {
 		return
 	}
 
 	// The attestation should have been checked in verify header, update directly
-	attestation, _ := getVoteAttestationFromHeader(header, chainConfig, parliaConfig)
+	attestation, _ := getVoteAttestationFromHeader(header, chainConfig, oasysConfig)
 	if attestation == nil {
 		return
 	}
@@ -188,12 +188,22 @@ func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderRea
 
 		var exists bool
 		if number > 0 && number%snap.Environment.EpochPeriod.Uint64() == 0 {
-			nextValidator, err := getNextValidators(s.config, s.ethAPI, header.ParentHash, snap.Environment.Epoch(number), number)
+			var nextValidator *nextValidators
+			if s.config.IsFinalizerEnabled(header.Number) {
+				nextValidator, err = getValidatorsFromHeader(header)
+			} else {
+				nextValidator, err = getNextValidators(s.config, s.ethAPI, header.ParentHash, snap.Environment.Epoch(number), number)
+			}
 			if err != nil {
 				log.Error("Failed to get validators", "in", "Snapshot.apply", "hash", header.ParentHash, "number", number, "err", err)
 				return nil, err
 			}
-			nextEnv, err := getNextEnvironmentValue(s.ethAPI, header.ParentHash)
+			var nextEnv *environmentValue
+			if s.config.IsFinalizerEnabled(header.Number) {
+				nextEnv, err = getEnvironmentFromHeader(header)
+			} else {
+				nextEnv, err = getNextEnvironmentValue(s.ethAPI, header.ParentHash)
+			}
 			if err != nil {
 				log.Error("Failed to get environment value", "in", "Snapshot.apply", "hash", header.ParentHash, "number", number, "err", err)
 				return nil, err
@@ -203,8 +213,9 @@ func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderRea
 			snap.Validators = make(map[common.Address]*ValidatorInfo, len(nextValidator.Operators))
 			for i, address := range nextValidator.Operators {
 				snap.Validators[address] = &ValidatorInfo{
-					Index: i,
-					Stake: nextValidator.Stakes[i],
+					Index:       i,
+					Stake:       nextValidator.Stakes[i],
+					VoteAddress: nextValidator.VoteAddresses[i],
 				}
 			}
 

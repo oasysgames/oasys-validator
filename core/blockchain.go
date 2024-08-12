@@ -535,7 +535,6 @@ func (bc *BlockChain) loadLastState() error {
 	// Everything seems to be fine, set as the head block
 	bc.currentBlock.Store(headBlock.Header())
 	headBlockGauge.Update(int64(headBlock.NumberU64()))
-	justifiedBlockGauge.Update(int64(bc.GetJustifiedNumber(headBlock.Header())))
 
 	// Restore the last known head header
 	headHeader := headBlock.Header()
@@ -571,7 +570,7 @@ func (bc *BlockChain) loadLastState() error {
 	// Issue a status log for the user
 	var (
 		currentSnapBlock  = bc.CurrentSnapBlock()
-		currentFinalBlock = bc.CurrentFinalBlock()
+		currentFinalBlock = bc.currentFinalBlock.Load() // load directly to prevent panic by acccesing ethapi before it set during startup
 
 		headerTd = bc.GetTd(headHeader.Hash(), headHeader.Number.Uint64())
 		blockTd  = bc.GetTd(headBlock.Hash(), headBlock.NumberU64())

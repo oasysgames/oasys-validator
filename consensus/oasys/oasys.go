@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"math/big"
 	"sort"
 	"sync"
@@ -63,10 +62,10 @@ var (
 	ether       = big.NewInt(1_000_000_000_000_000_000)
 	totalSupply = new(big.Int).Mul(big.NewInt(10_000_000_000), ether) // From WhitePaper
 
-	verifyVoteAttestationErrorCounter = metrics.NewRegisteredCounter("parlia/verifyVoteAttestation/error", nil)
-	updateAttestationErrorCounter     = metrics.NewRegisteredCounter("parlia/updateAttestation/error", nil)
-	validVotesfromSelfCounter         = metrics.NewRegisteredCounter("parlia/VerifyVote/self", nil)
-	doubleSignCounter                 = metrics.NewRegisteredCounter("parlia/doublesign", nil)
+	verifyVoteAttestationErrorCounter = metrics.NewRegisteredCounter("oasys/verifyVoteAttestation/error", nil)
+	updateAttestationErrorCounter     = metrics.NewRegisteredCounter("oasys/updateAttestation/error", nil)
+	validVotesfromSelfCounter         = metrics.NewRegisteredCounter("oasys/VerifyVote/self", nil)
+	doubleSignCounter                 = metrics.NewRegisteredCounter("oasys/doublesign", nil)
 )
 
 // Various error messages to mark blocks invalid. These should be private to
@@ -85,10 +84,6 @@ var (
 	// errMissingSignature is returned if a block's extra-data section doesn't seem
 	// to contain a 65 byte secp256k1 signature.
 	errMissingSignature = errors.New("extra-data 65 byte signature suffix missing")
-
-	// errExtraSigners is returned if non-checkpoint block contain signer data in
-	// their extra-data fields.
-	errExtraSigners = errors.New("non-checkpoint block contains extra signer list")
 
 	// errInvalidCheckpointValidators is returned if a checkpoint block contains an
 	// invalid list of validators (i.e. non divisible by 20 bytes).
@@ -161,7 +156,7 @@ func ecrecover(header *types.Header, sigcache *lru.ARCCache) (common.Address, er
 	signature := header.Extra[len(header.Extra)-extraSeal:]
 
 	// Recover the public key and the Ethereum address
-	pubkey, err := crypto.Ecrecover(SealHash(header).Bytes(), signature)
+	pubkey, err := crypto.Ecrecover(types.SealHash(header).Bytes(), signature)
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -289,8 +284,6 @@ func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 		if err := c.verifyExtraHeaderLengthInEpoch(header.Number, extraLenExceptVanityAndSeal); err != nil {
 			return err
 		}
-	} else if extraLenExceptVanityAndSeal != 0 {
-		return errExtraSigners
 	}
 	// Ensure that the mix digest is zero as we don't have fork protection currently
 	if header.MixDigest != (common.Hash{}) {
@@ -351,31 +344,32 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 	}
 
 	// Ensure that the block's timestamp is older than the scheduled validator backoff time
-	var (
-		validators []common.Address
-		stakes     []*big.Int
-	)
+	var validators *nextValidators
 	if number > 0 && env.IsEpoch(number) {
-		var result *nextValidators
 		if c.chainConfig.IsFinalizerEnabled(header.Number) {
-			result, err = getValidatorsFromHeader(header)
+			validators, err = getValidatorsFromHeader(header)
 		} else {
-			result, err = getNextValidators(c.chainConfig, c.ethAPI, header.ParentHash, env.Epoch(number), number)
+			validators, err = getNextValidators(c.chainConfig, c.ethAPI, header.ParentHash, env.Epoch(number), number)
 		}
 		if err != nil {
 			log.Error("Failed to get validators", "in", "verifyCascadingFields", "hash", header.ParentHash, "number", number, "err", err)
 			return err
 		}
-		validators, stakes = result.Operators, result.Stakes
 	} else {
 		// Retrieve the snapshot needed to verify this header and cache it
 		snap, err := c.snapshot(chain, number-1, header.ParentHash, parents)
 		if err != nil {
 			return err
 		}
-		validators, stakes, _, _ = snap.validatorsToTuple()
+		vals, stakes, indexes, pubkey := snap.validatorsToTuple()
+		validators = &nextValidators{
+			Operators:     vals,
+			Stakes:        stakes,
+			Indexes:       indexes,
+			VoteAddresses: pubkey,
+		}
 	}
-	scheduler, err := c.scheduler(chain, header, env, validators, stakes)
+	scheduler, err := c.scheduler(chain, header, env, validators.Operators, validators.Stakes)
 	if err != nil {
 		log.Error("Failed to get scheduler", "in", "verifyCascadingFields", "number", number, "err", err)
 		return err
@@ -402,7 +396,7 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 	}
 
 	// Verify vote attestation for fast finality.
-	if err := c.verifyVoteAttestation(chain, header, parents); err != nil {
+	if err := c.verifyVoteAttestation(chain, header, parents, validators); err != nil {
 		log.Warn("Verify vote attestation failed", "error", err, "hash", header.Hash(), "number", header.Number,
 			"parent", header.ParentHash, "coinbase", header.Coinbase, "extra", common.Bytes2Hex(header.Extra))
 		verifyVoteAttestationErrorCounter.Inc(1)
@@ -432,7 +426,7 @@ func (o *Oasys) getParent(chain consensus.ChainHeaderReader, header *types.Heade
 }
 
 // verifyVoteAttestation checks whether the vote attestation in the header is valid.
-func (o *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header) error {
+func (o *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header, validators *nextValidators) error {
 	attestation, err := getVoteAttestationFromHeader(header, o.chainConfig, o.config)
 	if err != nil {
 		return err
@@ -477,30 +471,18 @@ func (o *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header 
 			justifiedBlockNumber, justifiedBlockHash, sourceNumber, sourceHash)
 	}
 
-	// The snapshot should be the targetNumber-1 block's snapshot.
-	if len(parents) > 1 {
-		parents = parents[:len(parents)-1]
-	} else {
-		parents = nil
-	}
-	snap, err := o.snapshot(chain, parent.Number.Uint64()-1, parent.ParentHash, parents)
-	if err != nil {
-		return err
-	}
-
 	// Filter out valid validator from attestation.
-	validators := snap.validators()
 	validatorsBitSet := bitset.From([]uint64{uint64(attestation.VoteAddressSet)})
-	if validatorsBitSet.Count() > uint(len(validators)) {
-		return errors.New("invalid attestation, vote number larger than validators number")
+	if validatorsBitSet.Count() > uint(len(validators.Indexes)) {
+		return fmt.Errorf("invalid attestation, vote number(=%d) larger than validators number(=%d)", validatorsBitSet.Count(), len(validators.Indexes))
 	}
 	votedAddrs := make([]bls.PublicKey, 0, validatorsBitSet.Count())
-	for index, val := range validators {
+	for i, index := range validators.Indexes {
 		if !validatorsBitSet.Test(uint(index)) {
 			continue
 		}
 
-		voteAddr, err := bls.PublicKeyFromBytes(snap.Validators[val].VoteAddress[:])
+		voteAddr, err := bls.PublicKeyFromBytes(validators.VoteAddresses[i][:])
 		if err != nil {
 			return fmt.Errorf("BLS public key converts failed: %v", err)
 		}
@@ -508,7 +490,7 @@ func (o *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header 
 	}
 
 	// The valid voted validators should be no less than 2/3 validators.
-	if len(votedAddrs) < cmath.CeilDiv(len(snap.Validators)*2, 3) {
+	if len(votedAddrs) < cmath.CeilDiv(len(validators.Indexes)*2, 3) {
 		return errors.New("invalid attestation, not enough validators voted")
 	}
 
@@ -562,16 +544,13 @@ func getValidatorsFromHeader(header *types.Header) (*nextValidators, error) {
 }
 
 func getEnvironmentFromHeader(header *types.Header) (*environmentValue, error) {
-	if len(header.Extra) <= extraVanity+extraSeal {
+	// As the vote attestation length is not determistically fixed, we omit the vote attestation info
+	// even if the vote attestations are included, the length is enough smaller than the environment value
+	if len(header.Extra) < extraVanity+envValuesLen+extraSeal {
 		return nil, errNoEnvironmentValue
 	}
 
-	if len(header.Extra) < extraVanity+envValuesLen+extraSeal {
-		return nil, fmt.Errorf("missing environment value in the extra data, extra length: %d", len(header.Extra))
-	}
-
 	start := extraVanity
-	fmt.Println(header.Extra[start:start+32], header.Extra[start+32:start+64])
 	env := &environmentValue{
 		StartBlock:         new(big.Int).SetBytes(header.Extra[start : start+32]),
 		StartEpoch:         new(big.Int).SetBytes(header.Extra[start+32 : start+64]),
@@ -605,9 +584,14 @@ func getVoteAttestationFromHeader(header *types.Header, chainConfig *params.Chai
 		if len(header.Extra) <= extraVanity+extraSeal+validatorNumberSize+num*validatorInfoBytesLen {
 			return nil, nil
 		}
-		start := extraVanity + validatorNumberSize + num*validatorInfoBytesLen
+		start := extraVanity + envValuesLen + validatorNumberSize + num*validatorInfoBytesLen
 		end := len(header.Extra) - extraSeal
 		attestationBytes = header.Extra[start:end]
+	}
+
+	// exit if no attestation info
+	if len(attestationBytes) == 0 {
+		return nil, nil
 	}
 
 	var attestation types.VoteAttestation
@@ -797,6 +781,7 @@ func (c *Oasys) assembleVoteAttestation(chain consensus.ChainHeaderReader, heade
 	}
 	votes := c.VotePool.FetchVoteByBlockHash(parent.Hash())
 	if len(votes) < cmath.CeilDiv(len(snap.Validators)*2, 3) {
+		log.Debug("vote number less than 2/3 validators, skip assemble vote attestation", "header", header.Hash(), "number", header.Number, "parent", parent.Hash(), "votes", len(votes))
 		return nil
 	}
 
@@ -835,7 +820,7 @@ func (c *Oasys) assembleVoteAttestation(chain consensus.ChainHeaderReader, heade
 	// Prepare vote address bitset.
 	for _, valInfo := range snap.Validators {
 		if _, ok := voteAddrSet[valInfo.VoteAddress]; ok {
-			attestation.VoteAddressSet |= 1 << (valInfo.Index - 1) // Index is offset by 1
+			attestation.VoteAddressSet |= 1 << valInfo.Index
 		}
 	}
 	validatorsBitSet := bitset.From([]uint64{uint64(attestation.VoteAddressSet)})
@@ -856,6 +841,8 @@ func (c *Oasys) assembleVoteAttestation(chain consensus.ChainHeaderReader, heade
 	extraSealBytes := header.Extra[extraSealStart:]
 	header.Extra = append(header.Extra[0:extraSealStart], buf.Bytes()...)
 	header.Extra = append(header.Extra, extraSealBytes...)
+
+	log.Debug("successfully assemble vote attestation", "header", header.Hash(), "number", header.Number, "justifiedBlockNumber", attestation.Data.TargetNumber, "finalizeBlockNumber", attestation.Data.SourceNumber)
 
 	return nil
 }
@@ -1141,7 +1128,7 @@ func (c *Oasys) VerifyVote(chain consensus.ChainHeaderReader, vote *types.VoteEn
 			if addr == c.signer {
 				validVotesfromSelfCounter.Inc(1)
 			}
-			metrics.GetOrRegisterCounter(fmt.Sprintf("parlia/VerifyVote/%s", addr.String()), nil).Inc(1)
+			metrics.GetOrRegisterCounter(fmt.Sprintf("oasys/VerifyVote/%s", addr.String()), nil).Inc(1)
 			return nil
 		}
 	}
@@ -1235,7 +1222,7 @@ func (c *Oasys) Seal(chain consensus.ChainHeaderReader, block *types.Block, resu
 		select {
 		case results <- block.WithSeal(header):
 		default:
-			log.Warn("Sealing result is not read by miner", "sealhash", SealHash(header))
+			log.Warn("Sealing result is not read by miner", "sealhash", types.SealHash(header))
 		}
 	}()
 
@@ -1279,9 +1266,13 @@ func (c *Oasys) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, p
 	return scheduler.difficulty(number, c.signer, c.chainConfig.IsForkedOasysExtendDifficulty(parent.Number))
 }
 
-// SealHash returns the hash of a block prior to it being sealed.
-func (c *Oasys) SealHash(header *types.Header) common.Hash {
-	return SealHash(header)
+// SealHash returns the hash of a block without vote attestation prior to it being sealed.
+// So it's not the real hash of a block, just used as unique id to distinguish task
+func (c *Oasys) SealHash(header *types.Header) (hash common.Hash) {
+	hasher := sha3.NewLegacyKeccak256()
+	types.EncodeSigHeaderWithoutVoteAttestation(hasher, header)
+	hasher.Sum(hash[:0])
+	return hash
 }
 
 // Close implements consensus.Engine. It's a noop for oasys as there are no background threads.
@@ -1309,7 +1300,7 @@ func (c *Oasys) GetJustifiedNumberAndHash(chain consensus.ChainHeaderReader, hea
 	head := headers[len(headers)-1]
 	snap, err := c.snapshot(chain, head.Number.Uint64(), head.Hash(), headers)
 	if err != nil {
-		log.Error("Unexpected error when getting snapshot",
+		log.Error("Unexpected error when getting snapshot in GetJustifiedNumberAndHash",
 			"error", err, "blockNumber", head.Number.Uint64(), "blockHash", head.Hash())
 		return 0, common.Hash{}, err
 	}
@@ -1334,7 +1325,7 @@ func (c *Oasys) GetFinalizedHeader(chain consensus.ChainHeaderReader, header *ty
 
 	snap, err := c.snapshot(chain, header.Number.Uint64(), header.Hash(), nil)
 	if err != nil {
-		log.Error("Unexpected error when getting snapshot",
+		log.Error("Unexpected error when getting snapshot in GetFinalizedHeader",
 			"error", err, "blockNumber", header.Number.Uint64(), "blockHash", header.Hash())
 		return nil
 	}
@@ -1386,9 +1377,9 @@ func (c *Oasys) verifyExtraHeaderLengthInEpoch(number *big.Int, length int) erro
 	if length < envValuesLen {
 		return fmt.Errorf("missing environment value in extra header, length: %d", length)
 	}
-	length -= envValuesLen - validatorNumberSize
-	if length%validatorInfoBytesLen != 0 {
-		return fmt.Errorf("missing validator info in extra header, no-env-length: %d", length)
+	// at least one validator info in extra header
+	if length < envValuesLen+validatorNumberSize+validatorInfoBytesLen {
+		return fmt.Errorf("missing validator info in extra header, length: %d", length)
 	}
 	return nil
 }
@@ -1460,15 +1451,6 @@ func (c *Oasys) verifyExtraHeaderValueInEpoch(header *types.Header, actual []byt
 	return nil
 }
 
-// SealHash returns the hash of a block without vote attestation prior to it being sealed.
-// So it's not the real hash of a block, just used as unique id to distinguish task
-func SealHash(header *types.Header) (hash common.Hash) {
-	hasher := sha3.NewLegacyKeccak256()
-	encodeSigHeaderWithoutVoteAttestation(hasher, header)
-	hasher.(crypto.KeccakState).Read(hash[:])
-	return hash
-}
-
 // OasysRLP returns the rlp bytes which needs to be signed for the proof-of-stake
 // sealing. The RLP to sign consists of the entire header apart from the 65 byte signature
 // contained at the end of the extra data.
@@ -1478,69 +1460,8 @@ func SealHash(header *types.Header) (hash common.Hash) {
 // or not), which could be abused to produce different hashes for the same header.
 func OasysRLP(header *types.Header) []byte {
 	b := new(bytes.Buffer)
-	encodeSigHeader(b, header)
+	types.EncodeSigHeader(b, header)
 	return b.Bytes()
-}
-
-func encodeSigHeader(w io.Writer, header *types.Header) {
-	enc := []interface{}{
-		header.ParentHash,
-		header.UncleHash,
-		header.Coinbase,
-		header.Root,
-		header.TxHash,
-		header.ReceiptHash,
-		header.Bloom,
-		header.Difficulty,
-		header.Number,
-		header.GasLimit,
-		header.GasUsed,
-		header.Time,
-		header.Extra[:len(header.Extra)-crypto.SignatureLength], // Yes, this will panic if extra is too short
-		header.MixDigest,
-		header.Nonce,
-	}
-	if header.BaseFee != nil {
-		enc = append(enc, header.BaseFee)
-	}
-	if header.WithdrawalsHash != nil {
-		panic("unexpected withdrawal hash value in oasys")
-	}
-	if header.ExcessBlobGas != nil {
-		panic("unexpected excess blob gas value in oasys")
-	}
-	if header.BlobGasUsed != nil {
-		panic("unexpected blob gas used value in oasys")
-	}
-	if header.ParentBeaconRoot != nil {
-		panic("unexpected parent beacon root value in oasys")
-	}
-	if err := rlp.Encode(w, enc); err != nil {
-		panic("can't encode: " + err.Error())
-	}
-}
-
-func encodeSigHeaderWithoutVoteAttestation(w io.Writer, header *types.Header) {
-	err := rlp.Encode(w, []interface{}{
-		header.ParentHash,
-		header.UncleHash,
-		header.Coinbase,
-		header.Root,
-		header.TxHash,
-		header.ReceiptHash,
-		header.Bloom,
-		header.Difficulty,
-		header.Number,
-		header.GasLimit,
-		header.GasUsed,
-		header.Time,
-		header.Extra[:extraVanity], // this will panic if extra is too short, should check before calling encodeSigHeaderWithoutVoteAttestation
-		header.MixDigest,
-		header.Nonce,
-	})
-	if err != nil {
-		panic("can't encode: " + err.Error())
-	}
 }
 
 func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash, number uint64, env *environmentValue) error {

@@ -477,6 +477,9 @@ func (c *ChainConfig) Description() string {
 	if c.ShanghaiTime != nil {
 		banner += fmt.Sprintf(" - Shanghai:                    @%-10v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/shanghai.md)\n", *c.ShanghaiTime)
 	}
+	if c.OasysFinalizerEnabledBlock() != nil {
+		banner += fmt.Sprintf(" - Oasys Finalizer Enabled:     #%-8v (https://github.com/oasysgames/oasys-validator/releases/tag/v1.6.0)\n", c.OasysFinalizerEnabledBlock())
+	}
 	if c.CancunTime != nil {
 		banner += fmt.Sprintf(" - Cancun:                      @%-10v\n", *c.CancunTime)
 	}

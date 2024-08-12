@@ -161,12 +161,14 @@ func TestGetNextValidators(t *testing.T) {
 	uint256ArrTy, _ := abi.NewType("uint256[]", "", nil)
 	boolArrTy, _ := abi.NewType("bool[]", "", nil)
 	uint256Ty, _ := abi.NewType("uint256", "", nil)
+	bytesTy, _ := abi.NewType("bytes[]", "", nil)
 
 	// Return value of the `StakeManager.getValidators` method.
 	returnTy1 := abi.Arguments{
 		{Type: addressArrTy}, // owners
 		{Type: addressArrTy}, // operators
 		{Type: uint256ArrTy}, // stakes
+		{Type: bytesTy},      // blsPubKeys
 		{Type: boolArrTy},    // candidates
 		{Type: uint256Ty},    // newCursor
 	}
@@ -178,6 +180,7 @@ func TestGetNextValidators(t *testing.T) {
 		{Type: boolArrTy},    // actives
 		{Type: boolArrTy},    // jailed
 		{Type: uint256ArrTy}, // stakes
+		{Type: bytesTy},      // blsPubKeys
 		{Type: boolArrTy},    // candidates
 		{Type: uint256Ty},    // newCursor
 	}
@@ -216,6 +219,7 @@ func TestGetNextValidators(t *testing.T) {
 			actives    = make([]bool, howMany)
 			jailed     = make([]bool, howMany)
 			stakes     = make([]*big.Int, howMany)
+			blsPubKeys = make([][]byte, howMany)
 			candidates = make([]bool, howMany)
 		)
 		for j := 0; j < howMany; j++ {
@@ -226,6 +230,7 @@ func TestGetNextValidators(t *testing.T) {
 				actives[j] = true
 				jailed[j] = false
 				stakes[j] = wantStakes[idx]
+				blsPubKeys[j] = []byte{0x0}
 				candidates[j] = true
 			} else {
 				owners[j] = common.Address{}
@@ -233,23 +238,24 @@ func TestGetNextValidators(t *testing.T) {
 				actives[j] = true
 				jailed[j] = false
 				stakes[j] = big.NewInt(0)
+				blsPubKeys[j] = []byte{0x0}
 				candidates[j] = false
 			}
 		}
 
 		bnewCursor := big.NewInt(int64(newCursor))
 
-		rbyte, _ := returnTy1.Pack(owners, operators, stakes, candidates, bnewCursor)
+		rbyte, _ := returnTy1.Pack(owners, operators, stakes, blsPubKeys, candidates, bnewCursor)
 		rbytes[stakeManager.address][i] = rbyte
 
-		rbyte, _ = returnTy2.Pack(owners, operators, actives, jailed, stakes, candidates, bnewCursor)
+		rbyte, _ = returnTy2.Pack(owners, operators, actives, jailed, stakes, blsPubKeys, candidates, bnewCursor)
 		rbytes[candidateManager.address][i] = rbyte
 
 		if i == page-1 {
-			rbyte, _ := returnTy1.Pack([]common.Address{}, []common.Address{}, []*big.Int{}, []bool{}, bnewCursor)
+			rbyte, _ := returnTy1.Pack([]common.Address{}, []common.Address{}, []*big.Int{}, [][]byte{}, []bool{}, bnewCursor)
 			rbytes[stakeManager.address] = append(rbytes[stakeManager.address], rbyte)
 
-			rbyte, _ = returnTy2.Pack([]common.Address{}, []common.Address{}, []bool{}, []bool{}, []*big.Int{}, []bool{}, bnewCursor)
+			rbyte, _ = returnTy2.Pack([]common.Address{}, []common.Address{}, []bool{}, []bool{}, []*big.Int{}, [][]byte{}, []bool{}, bnewCursor)
 			rbytes[candidateManager.address] = append(rbytes[candidateManager.address], rbyte)
 
 			break
@@ -555,7 +561,7 @@ func makeEnv(wallet accounts.Wallet, account accounts.Account) (*testEnv, error)
 
 	// Replace artifact bytecode
 	environment.artifact.DeployedBytecode = fmt.Sprintf("0x%s", hex.EncodeToString(genspec.Alloc[_environmentAddress].Code))
-	stakeManager.artifact.DeployedBytecode = fmt.Sprintf("0x%s", hex.EncodeToString(genspec.Alloc[_stakeManagerAddress].Code))
+	initalStakeManager.artifact.DeployedBytecode = fmt.Sprintf("0x%s", hex.EncodeToString(genspec.Alloc[_stakeManagerAddress].Code))
 
 	return &testEnv{engine, chain, statedb}, nil
 }
