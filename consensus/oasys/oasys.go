@@ -1033,6 +1033,7 @@ func (c *Oasys) scheduler(chain consensus.ChainHeaderReader, header *types.Heade
 
 	var seed int64
 	if env.Epoch(number) >= c.chainConfig.OasysShortenedBlockTimeStartEpoch().Uint64() {
+		// prevent overflow
 		seed = new(big.Int).Mod(seedHash.Big(), BigMaxInt64).Int64()
 	} else {
 		seed = seedHash.Big().Int64()
