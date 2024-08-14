@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"math/big"
 	"sort"
 	"sync"
@@ -52,6 +53,8 @@ var (
 
 	ether       = big.NewInt(1_000_000_000_000_000_000)
 	totalSupply = new(big.Int).Mul(big.NewInt(10_000_000_000), ether) // From WhitePaper
+
+	BigMaxInt64 = big.NewInt(math.MaxInt64)
 )
 
 // Various error messages to mark blocks invalid. These should be private to
@@ -1034,8 +1037,15 @@ func (c *Oasys) scheduler(chain consensus.ChainHeaderReader, header *types.Heade
 		return cache.(*scheduler), nil
 	}
 
+	var seed int64
+	if env.Epoch(number) >= c.chainConfig.OasysShortenedBlockTimeStartEpoch().Uint64() {
+		seed = new(big.Int).Mod(seedHash.Big(), BigMaxInt64).Int64()
+	} else {
+		seed = seedHash.Big().Int64()
+	}
+
 	created := newScheduler(env, env.EpochStartBlock(number),
-		newWeightedChooser(validators, stakes, seedHash.Big().Int64()))
+		newWeightedChooser(validators, stakes, seed))
 	schedulerCache.Add(seedHash, created)
 	return created, nil
 }
