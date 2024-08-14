@@ -25,13 +25,6 @@ func TestEnvironmentValue(t *testing.T) {
 	newVal.StartEpoch = big.NewInt(3)
 	newVal.StartBlock = new(big.Int).SetUint64(env.NewValueStartBlock(newVal))
 
-	if env.Equals(env) != true {
-		t.Error("Equals(): should be true")
-	}
-	if env.Equals(newVal) != false {
-		t.Error("Equals(): should be false")
-	}
-
 	// epoch 1
 	for i, number := range []uint64{0, 1, 2, 5757, 5758, 5759} {
 		if got := env.Epoch(number); got != 1 {

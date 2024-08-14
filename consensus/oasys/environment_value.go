@@ -45,27 +45,6 @@ func (p *environmentValue) Copy() *environmentValue {
 	}
 }
 
-// Check if all values are equal to `other`.
-func (p *environmentValue) Equals(other *environmentValue) bool {
-	comps := []int{
-		p.StartBlock.Cmp(other.StartBlock),
-		p.StartEpoch.Cmp(other.StartEpoch),
-		p.BlockPeriod.Cmp(other.BlockPeriod),
-		p.EpochPeriod.Cmp(other.EpochPeriod),
-		p.RewardRate.Cmp(other.RewardRate),
-		p.CommissionRate.Cmp(other.CommissionRate),
-		p.ValidatorThreshold.Cmp(other.ValidatorThreshold),
-		p.JailThreshold.Cmp(other.JailThreshold),
-		p.JailPeriod.Cmp(other.JailPeriod),
-	}
-	for _, c := range comps {
-		if c != 0 {
-			return false
-		}
-	}
-	return true
-}
-
 // Calculate epoch number from the given block number.
 func (p *environmentValue) Epoch(number uint64) uint64 {
 	return p.StartEpoch.Uint64() + (number-p.StartBlock.Uint64())/p.EpochPeriod.Uint64()
@@ -95,7 +74,7 @@ func (p *environmentValue) EpochStartBlock(number uint64) uint64 {
 
 // Determine if the given block number is suitable for deploying a new environment.
 func (p *environmentValue) ShouldUpdate(newValue *environmentValue, number uint64) bool {
-	if p.Equals(newValue) {
+	if p.StartEpoch.Cmp(newValue.StartEpoch) == 0 {
 		return false // skip if same value
 	}
 	if p.Epoch(number)+1 != newValue.StartEpoch.Uint64() {
