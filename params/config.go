@@ -607,7 +607,7 @@ func (c *ChainConfig) OasysShortenedBlockTimeStartEpoch() *big.Int {
 	if c.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0 {
 		return big.NewInt(999) // TODO
 	}
-	return big.NewInt(5)
+	return big.NewInt(10)
 }
 
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.

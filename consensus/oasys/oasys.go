@@ -587,6 +587,7 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 
 	hash := header.Hash()
 	number := header.Number.Uint64()
+	env, nextEnv := getEnvironmentValue(c.chainConfig, number)
 
 	cx := chainContext{Chain: chain, oasys: c}
 	if number == 1 {
@@ -595,9 +596,16 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 			log.Error("Failed to initialize system contracts", "in", "Finalize", "hash", hash, "number", number, "err", err)
 			return err
 		}
+		log.Info("Initialized system contracts", "in", "Finalize", "hash", hash, "number", number)
 	}
-
-	env, _ := getEnvironmentValue(c.chainConfig, number)
+	if nextEnv != nil && env.ShouldUpdate(nextEnv, number) {
+		err := c.updateEnvironmentValue(nextEnv, state, header, cx, txs, receipts, systemTxs, usedGas, false)
+		if err != nil {
+			log.Error("Failed to update environment value", "in", "Finalize", "hash", hash, "number", number, "err", err)
+			return err
+		}
+		log.Info("Updated environment value", "in", "Finalize", "hash", hash, "number", number)
+	}
 
 	var (
 		validators []common.Address
@@ -675,6 +683,7 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 
 	hash := header.Hash()
 	number := header.Number.Uint64()
+	env, nextEnv := getEnvironmentValue(c.chainConfig, number)
 
 	cx := chainContext{Chain: chain, oasys: c}
 	if number == 1 {
@@ -683,9 +692,16 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 			log.Error("Failed to initialize system contracts", "in", "FinalizeAndAssemble", "hash", hash, "err", err)
 			return nil, nil, err
 		}
+		log.Info("Initialized system contracts", "in", "FinalizeAndAssemble", "hash", hash, "number", number)
 	}
-
-	env, _ := getEnvironmentValue(c.chainConfig, number)
+	if nextEnv != nil && env.ShouldUpdate(nextEnv, number) {
+		err := c.updateEnvironmentValue(nextEnv, state, header, cx, &txs, &receipts, nil, &header.GasUsed, true)
+		if err != nil {
+			log.Error("Failed to update environment value", "in", "FinalizeAndAssemble", "hash", hash, "err", err)
+			return nil, nil, err
+		}
+		log.Info("Updated environment value", "in", "FinalizeAndAssemble", "hash", hash, "number", number)
+	}
 
 	var (
 		validators []common.Address

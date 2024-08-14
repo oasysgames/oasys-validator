@@ -52,6 +52,9 @@ func TestEnvironmentValue(t *testing.T) {
 		if got := env.ShouldUpdate(newVal, number); got {
 			t.Errorf("ShouldUpdate(newVal, %d): should be false", number)
 		}
+		if got := env.ShouldUpdate(env, number); got {
+			t.Errorf("ShouldUpdate(newVal, %d): should be false", number)
+		}
 
 		if got := newVal.Started(number); got {
 			t.Errorf("Started(%d): should be false", number)
@@ -75,6 +78,9 @@ func TestEnvironmentValue(t *testing.T) {
 			t.Errorf("EpochStartBlock(%d): want=5760 got=%d", number, got)
 		}
 		if got := env.ShouldUpdate(newVal, number); (number == 8640 && !got) || (number != 8640 && got) {
+			t.Errorf("ShouldUpdate(newVal, %d): should be false", number)
+		}
+		if got := env.ShouldUpdate(env, number); got {
 			t.Errorf("ShouldUpdate(newVal, %d): should be false", number)
 		}
 

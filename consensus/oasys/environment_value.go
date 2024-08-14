@@ -95,19 +95,22 @@ func (p *environmentValue) EpochStartBlock(number uint64) uint64 {
 
 // Determine if the given block number is suitable for deploying a new environment.
 func (p *environmentValue) ShouldUpdate(newValue *environmentValue, number uint64) bool {
-	if p.Epoch(number)-1 != newValue.StartEpoch.Uint64() {
-		// past or future epoch
-		return false
+	if p.Equals(newValue) {
+		return false // skip if same value
 	}
-	// check if it is in the middle of the epoch
+	if p.Epoch(number)+1 != newValue.StartEpoch.Uint64() {
+		return false // skip if not the previous epoch
+	}
+	// check if it is in the middle of the previous epoch
 	return (number - p.EpochStartBlock(number)) == p.EpochPeriod.Uint64()/2
 }
 
 // Returns the environment value to be used under the given block
 // and the environment value that is pending application next.
-// The value returned by `next` is the environment value that should be deployed
-// via the `Environment.updateValue(...)` contract method. It is not the environment
-// value that should be applied in the next block or epoch.
+// Must not process consensus using the value of `next`. The value
+// returned by `next` is the new value that should be updated with
+// the `Environment.updateValue(...)` contract method
+// if `curr.ShouldUpdate(next, number)` returns true.
 var getEnvironmentValue = func() func(cfg *params.ChainConfig, number uint64) (curr, next *environmentValue) {
 	updates := []func(cfg *params.ChainConfig, env *environmentValue){
 		// Genesis
@@ -168,9 +171,6 @@ var getEnvironmentValue = func() func(cfg *params.ChainConfig, number uint64) (c
 			curr = next
 		}
 
-		if next == nil {
-			next = curr.Copy()
-		}
 		return curr, next
 	}
 }()

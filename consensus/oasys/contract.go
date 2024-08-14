@@ -269,6 +269,26 @@ func (c *Oasys) initializeSystemContracts(
 	return nil
 }
 
+// Transact the `Environment.updateValue` method.
+func (c *Oasys) updateEnvironmentValue(
+	newValue *environmentValue,
+	state *state.StateDB,
+	header *types.Header,
+	cx core.ChainContext,
+	txs *[]*types.Transaction,
+	receipts *[]*types.Receipt,
+	systemTxs *[]*types.Transaction,
+	usedGas *uint64,
+	mining bool,
+) error {
+	data, err := environment.abi.Pack("updateValue", newValue)
+	if err != nil {
+		return err
+	}
+	msg := getMessage(header.Coinbase, environment.address, data, common.Big0)
+	return c.applyTransaction(msg, state, header, cx, txs, receipts, systemTxs, usedGas, mining)
+}
+
 // Transact the `StakeManager.slash` method.
 func (c *Oasys) slash(
 	validator common.Address,
