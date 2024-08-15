@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	maxCurVoteAmountPerBlock    = 21
-	maxFutureVoteAmountPerBlock = 50
+	maxCurVoteAmountPerBlock    = 50
+	maxFutureVoteAmountPerBlock = 100
 
 	voteBufferForPut = 256
 	// votes in the range (currentBlockNum-256,currentBlockNum+11] will be stored
@@ -340,8 +340,8 @@ func (pool *VotePool) basicVerify(vote *types.VoteEnvelope, headNumber uint64, m
 		return false
 	}
 
-	// To prevent DOS attacks, make sure no more than 21 votes per blockHash if not futureVotes
-	// and no more than 50 votes per blockHash if futureVotes.
+	// To prevent DOS attacks, make sure no more than 50 votes per blockHash if not futureVotes
+	// and no more than 100 votes per blockHash if futureVotes.
 	maxVoteAmountPerBlock := maxCurVoteAmountPerBlock
 	if isFutureVote {
 		maxVoteAmountPerBlock = maxFutureVoteAmountPerBlock
