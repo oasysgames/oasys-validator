@@ -747,7 +747,7 @@ func (h *handler) BroadcastVote(vote *types.VoteEnvelope) {
 		// broadcast if
 		// - bscExt is set
 		// - the first time (averageDifficulty is not set)
-		// - The total difficultiy of peer is within the [+|-] range of average difficulity per block * deltaTdThreshold (blocks)
+		// - The total difficulty of peer is within the [+|-] range of average difficulty per block * deltaTdThreshold (blocks)
 		broadCasts := peer.bscExt != nil && (averageDifficulty == nil || deltaTD.Cmp(new(big.Int).Mul(big.NewInt(deltaTdThreshold), averageDifficulty)) < 1)
 		if broadCasts {
 			voteMap[peer] = vote

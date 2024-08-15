@@ -65,7 +65,6 @@ var (
 	verifyVoteAttestationErrorCounter = metrics.NewRegisteredCounter("oasys/verifyVoteAttestation/error", nil)
 	updateAttestationErrorCounter     = metrics.NewRegisteredCounter("oasys/updateAttestation/error", nil)
 	validVotesfromSelfCounter         = metrics.NewRegisteredCounter("oasys/VerifyVote/self", nil)
-	doubleSignCounter                 = metrics.NewRegisteredCounter("oasys/doublesign", nil)
 )
 
 // Various error messages to mark blocks invalid. These should be private to
