@@ -63,48 +63,11 @@ func TestInitializeSystemContracts(t *testing.T) {
 		t.Error("Block.GasUsed is zero")
 	}
 
-	envInitialized := env.statedb.GetState(_environmentAddress, common.HexToHash("0x00")).Big().Uint64()
-	envStartBlock := env.statedb.GetState(_environmentAddress, common.HexToHash("0x02")).Big().Uint64()
-	envStartEpoch := env.statedb.GetState(_environmentAddress, common.HexToHash("0x03")).Big().Uint64()
-	envBlockPeriod := env.statedb.GetState(_environmentAddress, common.HexToHash("0x04")).Big().Uint64()
-	envEpochPeriod := env.statedb.GetState(_environmentAddress, common.HexToHash("0x05")).Big().Uint64()
-	envRewardRate := env.statedb.GetState(_environmentAddress, common.HexToHash("0x06")).Big().Uint64()
-	envCommissionRate := env.statedb.GetState(_environmentAddress, common.HexToHash("0x07")).Big().Uint64()
-	envValidatorThreshold := env.statedb.GetState(_environmentAddress, common.HexToHash("0x08"))
-	envJailThreshold := env.statedb.GetState(_environmentAddress, common.HexToHash("0x09")).Big().Uint64()
-	envJailPeriod := env.statedb.GetState(_environmentAddress, common.HexToHash("0x0a")).Big().Uint64()
-	if envInitialized != 1 {
-		t.Errorf("Environment.initialize: want=1 got=%d", envInitialized)
-	}
-	if envStartBlock != 0 {
-		t.Errorf("Environment.startBlock: want=0 got=%d", envStartBlock)
-	}
-	if envStartEpoch != 1 {
-		t.Errorf("Environment.startEpoch: want=1 got=%d", envStartEpoch)
-	}
-	if envBlockPeriod != 15 {
-		t.Errorf("Environment.blockPeriod: want=15 got=%d", envBlockPeriod)
-	}
-	if envEpochPeriod != 5760 {
-		t.Errorf("Environment.epochPeriod: want=5760 got=%d", envEpochPeriod)
-	}
-	if envRewardRate != 10 {
-		t.Errorf("Environment.rewardRate: want=10 got=%d", envRewardRate)
-	}
-	if envCommissionRate != 10 {
-		t.Errorf("Environment.commissionRate: want=10 got=%d", envCommissionRate)
-	}
-	if new(big.Int).Div(envValidatorThreshold.Big(), big.NewInt(params.Ether)).Uint64() != 10000000 {
-		t.Errorf("Environment.validatorThreshold: want=10000000000000000000000000 got=%d", envValidatorThreshold)
-	}
-	if envJailThreshold != 500 {
-		t.Errorf("Environment.jailThreshold: want=500 got=%d", envJailThreshold)
-	}
-	if envJailPeriod != 2 {
-		t.Errorf("Environment.jailPeriod: want=2 got=%d", envJailPeriod)
-	}
-
+	environmentInitialized := env.statedb.GetState(_environmentAddress, common.HexToHash("0x00"))
 	stakeManagerInitialized := env.statedb.GetState(_stakeManagerAddress, common.HexToHash("0x00"))
+	if environmentInitialized.Big().Uint64() != 1 {
+		t.Errorf("Environment.initialize not called")
+	}
 	if stakeManagerInitialized.Big().Uint64() != 1 {
 		t.Errorf("StakeManager.initialize not called")
 	}
@@ -128,113 +91,6 @@ func TestInitializeSystemContracts(t *testing.T) {
 	}
 	if env.statedb.GetNonce(env.engine.signer) != 2 {
 		t.Errorf("account nonce value, got %v, want 2", env.statedb.GetNonce(env.engine.signer))
-	}
-}
-
-func TestUpdateEnvironmentValue(t *testing.T) {
-	wallets, accounts, err := makeWallets(1)
-	if err != nil {
-		t.Fatalf("failed to create test wallets: %v", err)
-	}
-
-	env, err := makeEnv(*wallets[0], *accounts[0])
-	if err != nil {
-		t.Fatalf("failed to create test env: %v", err)
-	}
-
-	header := &types.Header{
-		Number:     big.NewInt(50),
-		Coinbase:   accounts[0].Address,
-		Difficulty: diffInTurn,
-	}
-	cx := env.chain
-	txs := make([]*types.Transaction, 0)
-	receipts := make([]*types.Receipt, 0)
-	systemTxs := make([]*types.Transaction, 0)
-	usedGas := uint64(0)
-	mining := true
-
-	err = env.engine.updateEnvironmentValue(&environmentValue{
-		StartBlock:         big.NewInt(10),
-		StartEpoch:         big.NewInt(11),
-		BlockPeriod:        big.NewInt(12),
-		EpochPeriod:        big.NewInt(13),
-		RewardRate:         big.NewInt(14),
-		CommissionRate:     big.NewInt(15),
-		ValidatorThreshold: big.NewInt(16),
-		JailThreshold:      big.NewInt(17),
-		JailPeriod:         big.NewInt(18),
-	}, env.statedb, header, cx, &txs, &receipts, &systemTxs, &usedGas, mining)
-
-	if err != nil {
-		t.Fatalf("failed to call updateValue method: %v", err)
-	}
-	if len(receipts) != 1 {
-		t.Errorf("len(receipts), got %v, want 1", len(receipts))
-	}
-	if usedGas == 0 {
-		t.Error("Block.GasUsed is zero")
-	}
-
-	envUpdated := env.statedb.GetState(_environmentAddress, common.HexToHash("0x01")).Big().Uint64()
-	envStartBlock := env.statedb.GetState(_environmentAddress, common.HexToHash("0x02")).Big().Uint64()
-	envStartEpoch := env.statedb.GetState(_environmentAddress, common.HexToHash("0x03")).Big().Uint64()
-	envBlockPeriod := env.statedb.GetState(_environmentAddress, common.HexToHash("0x04")).Big().Uint64()
-	envEpochPeriod := env.statedb.GetState(_environmentAddress, common.HexToHash("0x05")).Big().Uint64()
-	envRewardRate := env.statedb.GetState(_environmentAddress, common.HexToHash("0x06")).Big().Uint64()
-	envCommissionRate := env.statedb.GetState(_environmentAddress, common.HexToHash("0x07")).Big().Uint64()
-	envValidatorThreshold := env.statedb.GetState(_environmentAddress, common.HexToHash("0x08")).Big().Uint64()
-	envJailThreshold := env.statedb.GetState(_environmentAddress, common.HexToHash("0x09")).Big().Uint64()
-	envJailPeriod := env.statedb.GetState(_environmentAddress, common.HexToHash("0x0a")).Big().Uint64()
-	if envUpdated != 1 {
-		t.Errorf("Environment.updated: want=1 got=%d", envUpdated)
-	}
-	if envStartBlock != 10 {
-		t.Errorf("Environment.startBlock: want=1 got=%d", envStartBlock)
-	}
-	if envStartEpoch != 11 {
-		t.Errorf("Environment.startEpoch: want=2 got=%d", envStartEpoch)
-	}
-	if envBlockPeriod != 12 {
-		t.Errorf("Environment.blockPeriod: want=3 got=%d", envBlockPeriod)
-	}
-	if envEpochPeriod != 13 {
-		t.Errorf("Environment.epochPeriod: want=4 got=%d", envEpochPeriod)
-	}
-	if envRewardRate != 14 {
-		t.Errorf("Environment.rewardRate: want=5 got=%d", envRewardRate)
-	}
-	if envCommissionRate != 15 {
-		t.Errorf("Environment.commissionRate: want=6 got=%d", envCommissionRate)
-	}
-	if envValidatorThreshold != 16 {
-		t.Errorf("Environment.validatorThreshold: want=7 got=%d", envValidatorThreshold)
-	}
-	if envJailThreshold != 17 {
-		t.Errorf("Environment.jailThreshold: want=8 got=%d", envJailThreshold)
-	}
-	if envJailPeriod != 18 {
-		t.Errorf("Environment.jailPeriod: want=9 got=%d", envJailPeriod)
-	}
-
-	receipt := receipts[0]
-	if receipt.TxHash == (common.Hash{0x00}) {
-		t.Error("receipt.TxHash is empty")
-	}
-	if receipt.GasUsed == 0 {
-		t.Error("receipt.GasUsed is zero")
-	}
-	if len(receipt.Logs) != 1 {
-		t.Errorf("len(receipt.Logs), got %v, want 1", len(receipt.Logs))
-	}
-	if receipt.Bloom == (types.Bloom{}) {
-		t.Error("receipt.Bloom is empty")
-	}
-	if receipt.BlockNumber.Uint64() != 50 {
-		t.Errorf("receipt.BlockNumber, got %v, want 50", receipt.BlockNumber)
-	}
-	if env.statedb.GetNonce(env.engine.signer) != 1 {
-		t.Errorf("account nonce value, got %v, want 1", env.statedb.GetNonce(env.engine.signer))
 	}
 }
 
@@ -285,6 +141,9 @@ func TestSlash(t *testing.T) {
 	}
 	if receipt.GasUsed == 0 {
 		t.Error("receipt.GasUsed is zero")
+	}
+	if len(receipt.Logs) != 1 {
+		t.Errorf("len(receipt.Logs), got %v, want 1", len(receipt.Logs))
 	}
 	if receipt.Bloom == (types.Bloom{}) {
 		t.Error("receipt.Bloom is empty")
@@ -458,6 +317,84 @@ func TestGetRewards(t *testing.T) {
 	}
 }
 
+func TestGetNextEnvironmentValue(t *testing.T) {
+	want := &environmentValue{
+		StartBlock:         common.Big0,
+		StartEpoch:         common.Big1,
+		BlockPeriod:        big.NewInt(3),
+		EpochPeriod:        big.NewInt(20),
+		RewardRate:         big.NewInt(10),
+		CommissionRate:     big.NewInt(15),
+		ValidatorThreshold: new(big.Int).Mul(big.NewInt(params.Ether), big.NewInt(10_000_000)),
+		JailThreshold:      big.NewInt(500),
+		JailPeriod:         big.NewInt(2),
+	}
+
+	uint256Ty, _ := abi.NewType("uint256", "", nil)
+	arguments := abi.Arguments{
+		{Type: uint256Ty},
+		{Type: uint256Ty},
+		{Type: uint256Ty},
+		{Type: uint256Ty},
+		{Type: uint256Ty},
+		{Type: uint256Ty},
+		{Type: uint256Ty},
+		{Type: uint256Ty},
+		{Type: uint256Ty},
+	}
+
+	rbyte, _ := arguments.Pack(
+		want.StartBlock,
+		want.StartEpoch,
+		want.BlockPeriod,
+		want.EpochPeriod,
+		want.RewardRate,
+		want.CommissionRate,
+		want.ValidatorThreshold,
+		want.JailThreshold,
+		want.JailPeriod,
+	)
+
+	ethapi := &testBlockchainAPI{rbytes: map[common.Address][][]byte{environment.address: {rbyte}}}
+	got, _ := getNextEnvironmentValue(ethapi, common.Hash{})
+
+	if got.StartBlock.Cmp(want.StartBlock) != 0 {
+		t.Errorf("StartBlock, got %v, want: %v", got.StartBlock, want.StartBlock)
+	}
+
+	if got.StartEpoch.Cmp(want.StartEpoch) != 0 {
+		t.Errorf("StartEpoch, got %v, want: %v", got.StartEpoch, want.StartEpoch)
+	}
+
+	if got.BlockPeriod.Cmp(want.BlockPeriod) != 0 {
+		t.Errorf("BlockPeriod, got %v, want: %v", got.BlockPeriod, want.BlockPeriod)
+	}
+
+	if got.EpochPeriod.Cmp(want.EpochPeriod) != 0 {
+		t.Errorf("EpochPeriod, got %v, want: %v", got.EpochPeriod, want.EpochPeriod)
+	}
+
+	if got.RewardRate.Cmp(want.RewardRate) != 0 {
+		t.Errorf("RewardRate, got %v, want: %v", got.RewardRate, want.RewardRate)
+	}
+
+	if got.CommissionRate.Cmp(want.CommissionRate) != 0 {
+		t.Errorf("CommissionRate, got %v, want: %v", got.CommissionRate, want.CommissionRate)
+	}
+
+	if got.ValidatorThreshold.Cmp(want.ValidatorThreshold) != 0 {
+		t.Errorf("ValidatorThreshold, got %v, want: %v", got.ValidatorThreshold, want.ValidatorThreshold)
+	}
+
+	if got.JailThreshold.Cmp(want.JailThreshold) != 0 {
+		t.Errorf("JailThreshold, got %v, want: %v", got.JailThreshold, want.JailThreshold)
+	}
+
+	if got.JailPeriod.Cmp(want.JailPeriod) != 0 {
+		t.Errorf("JailPeriod, got %v, want: %v", got.JailPeriod, want.JailPeriod)
+	}
+}
+
 var _ blockchainAPI = (*testBlockchainAPI)(nil)
 
 type testBlockchainAPI struct {
@@ -519,7 +456,7 @@ func makeEnv(wallet accounts.Wallet, account accounts.Account) (*testEnv, error)
 	var (
 		db          = rawdb.NewMemoryDatabase()
 		chainConfig = &params.ChainConfig{
-			ChainID:             big.NewInt(248),
+			ChainID:             big.NewInt(12345),
 			HomesteadBlock:      common.Big0,
 			EIP150Block:         common.Big0,
 			EIP155Block:         common.Big0,
@@ -532,8 +469,8 @@ func makeEnv(wallet accounts.Wallet, account accounts.Account) (*testEnv, error)
 			BerlinBlock:         common.Big0,
 			LondonBlock:         common.Big0,
 			Oasys: &params.OasysConfig{
-				Period: 15,
-				Epoch:  5760,
+				Period: 0,
+				Epoch:  100,
 			},
 		}
 		genspec = &core.Genesis{
@@ -549,63 +486,29 @@ func makeEnv(wallet accounts.Wallet, account accounts.Account) (*testEnv, error)
 						pragma solidity ^0.8.2;
 
 						contract Environment {
-							struct EnvironmentValue {
-								uint256 startBlock;
-								uint256 startEpoch;
-								uint256 blockPeriod;
-								uint256 epochPeriod;
-								uint256 rewardRate;
+						    struct EnvironmentValue {
+						        uint256 startBlock;
+						        uint256 startEpoch;
+						        uint256 blockPeriod;
+						        uint256 epochPeriod;
+						        uint256 rewardRate;
 								uint256 commissionRate;
-								uint256 validatorThreshold;
-								uint256 jailThreshold;
-								uint256 jailPeriod;
-							}
+						        uint256 validatorThreshold;
+						        uint256 jailThreshold;
+						        uint256 jailPeriod;
+						    }
 
-							event Initialized();
-							event Updated();
+						    event Initialized();
 
-							address public initialized;
-							address public updated;
-							address public startBlock;
-							address public startEpoch;
-							address public blockPeriod;
-							address public epochPeriod;
-							address public rewardRate;
-							address public commissionRate;
-							address public validatorThreshold;
-							address public jailThreshold;
-							address public jailPeriod;
+						    address public initialized;
 
-							function initialize(EnvironmentValue memory initialValue) external {
-								initialized = address(1);
-								_set(initialValue);
-								emit Initialized();
-							}
-
-							function updateValue(EnvironmentValue memory newValue) external {
-								updated = address(1);
-								_set(newValue);
-								emit Updated();
-							}
-
-							function _set(EnvironmentValue memory val) internal {
-								startBlock = _conv(val.startBlock);
-								startEpoch = _conv(val.startEpoch);
-								blockPeriod = _conv(val.blockPeriod);
-								epochPeriod = _conv(val.epochPeriod);
-								rewardRate = _conv(val.rewardRate);
-								commissionRate = _conv(val.commissionRate);
-								validatorThreshold = _conv(val.validatorThreshold);
-								jailThreshold = _conv(val.jailThreshold);
-								jailPeriod = _conv(val.jailPeriod);
-							}
-
-							function _conv(uint256 val) internal pure returns (address) {
-								return address(uint160(val));
-							}
+						    function initialize(Environment.EnvironmentValue memory initialValue) external {
+						        initialized = address(1);
+						        emit Initialized();
+						    }
 						}
 					*/
-					Code:    common.FromHex("0x608060405234801561001057600080fd5b50600436106100cf5760003560e01c80637b0a47ee1161008c578063af0dfd3e11610066578063af0dfd3e1461019d578063b5b7a184146101b0578063bd4eff19146101c3578063de833b50146101d657600080fd5b80637b0a47ee146101645780637b2aab0314610177578063a2c8b1771461018a57600080fd5b806308a54356146100d4578063158ef93e146100e957806348cd4cb1146101185780634fd101d71461012b5780635ea1d6f81461013e578063660f5c1714610151575b600080fd5b6100e76100e2366004610372565b6101e9565b005b6000546100fc906001600160a01b031681565b6040516001600160a01b03909116815260200160405180910390f35b6002546100fc906001600160a01b031681565b6008546100fc906001600160a01b031681565b6007546100fc906001600160a01b031681565b600a546100fc906001600160a01b031681565b6006546100fc906001600160a01b031681565b6001546100fc906001600160a01b031681565b6003546100fc906001600160a01b031681565b6004546100fc906001600160a01b031681565b6005546100fc906001600160a01b031681565b6100e76101d1366004610372565b610231565b6009546100fc906001600160a01b031681565b600080546001600160a01b031916600117905561020581610278565b6040517f5daa87a0e9463431830481fd4b6e3403442dfb9a12b9c07597e9f61d50b633c890600090a150565b600180546001600160a01b0319168117905561024c81610278565b6040517ff2e795d4a33ae9a0d3282888375b8ae781ea4de1cbf101ac96150aa95ccff0b490600090a150565b8051600280546001600160a01b03199081166001600160a01b0393841617909155602083015160038054831691841691909117905560408301516004805483169184169190911790556060830151600580548316918416919091179055608083015160068054831691841691909117905560a083015160078054831691841691909117905560c083015160088054831691841691909117905560e083015160098054831691841691909117905561010090920151600a80549093169116179055565b604051610120810167ffffffffffffffff8111828210171561036c57634e487b7160e01b600052604160045260246000fd5b60405290565b6000610120828403121561038557600080fd5b61038d61033a565b823581526020830135602082015260408301356040820152606083013560608201526080830135608082015260a083013560a082015260c083013560c082015260e083013560e0820152610100808401358183015250809150509291505056fea2646970667358221220b3a402d60729e72e8f9f0637840b4c292983cb008e033e7489e294fa7d9ab98b64736f6c634300080c0033"),
+					Code:    common.FromHex("0x608060405234801561001057600080fd5b50600436106100365760003560e01c806308a543561461003b578063158ef93e14610050575b600080fd5b61004e6100493660046100f4565b61007f565b005b600054610063906001600160a01b031681565b6040516001600160a01b03909116815260200160405180910390f35b600080546001600160a01b03191660011781556040517f5daa87a0e9463431830481fd4b6e3403442dfb9a12b9c07597e9f61d50b633c89190a150565b604051610120810167ffffffffffffffff811182821017156100ee57634e487b7160e01b600052604160045260246000fd5b60405290565b6000610120828403121561010757600080fd5b61010f6100bc565b823581526020830135602082015260408301356040820152606083013560608201526080830135608082015260a083013560a082015260c083013560c082015260e083013560e0820152610100808401358183015250809150509291505056fea264697066735822122041f32989a5b45778808b251b74c621d5d19de8c37be0b731a89cb63b775dd07b64736f6c634300080c0033"),
 					Balance: common.Big0,
 				},
 				_stakeManagerAddress: {

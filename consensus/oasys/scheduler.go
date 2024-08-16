@@ -93,7 +93,7 @@ func (s *scheduler) schedules() []*common.Address {
 }
 
 func (s *scheduler) expect(number uint64) *common.Address {
-	return s.schedules()[number-s.env.EpochStartBlock(number)]
+	return s.schedules()[number-s.env.GetFirstBlock(number)]
 }
 
 func (s *scheduler) difficulty(number uint64, validator common.Address, ext bool) *big.Int {
@@ -133,7 +133,7 @@ func (s *scheduler) turn(number uint64, validator common.Address) (uint64, error
 		s.turns.Add(number, turns)
 	}
 
-	for bpos := number - s.env.EpochStartBlock(number); ; bpos++ {
+	for bpos := number - s.env.GetFirstBlock(number); ; bpos++ {
 		if turn, ok := turns[s.ptrmap[validator]]; ok {
 			return turn, nil
 		}
@@ -266,7 +266,7 @@ func getPrevEpochLastBlockHash(
 ) (common.Hash, error) {
 	var (
 		number     = header.Number.Uint64()
-		epochStart = env.EpochStartBlock(number)
+		epochStart = env.GetFirstBlock(number)
 		parent     = header.ParentHash
 	)
 	for ; number > epochStart; number-- {

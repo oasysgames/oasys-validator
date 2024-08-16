@@ -26,6 +26,8 @@ type Snapshot struct {
 	Number     uint64                      `json:"number"`     // Block number where the snapshot was created
 	Hash       common.Hash                 `json:"hash"`       // Block hash where the snapshot was created
 	Validators map[common.Address]*big.Int `json:"validators"` // Set of authorized validators and stakes at this moment
+
+	Environment *environmentValue `json:"environment"`
 }
 
 // validatorsAscending implements the sort interface to allow sorting a list of addresses
@@ -39,14 +41,15 @@ func (s validatorsAscending) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 // method does not initialize the set of recent validators, so only ever use if for
 // the genesis block.
 func newSnapshot(config *params.ChainConfig, sigcache *lru.ARCCache, ethAPI *ethapi.BlockChainAPI,
-	number uint64, hash common.Hash, validators []common.Address) *Snapshot {
+	number uint64, hash common.Hash, validators []common.Address, environment *environmentValue) *Snapshot {
 	snap := &Snapshot{
-		config:     config,
-		sigcache:   sigcache,
-		ethAPI:     ethAPI,
-		Number:     number,
-		Hash:       hash,
-		Validators: make(map[common.Address]*big.Int),
+		config:      config,
+		sigcache:    sigcache,
+		ethAPI:      ethAPI,
+		Number:      number,
+		Hash:        hash,
+		Validators:  make(map[common.Address]*big.Int),
+		Environment: environment.Copy(),
 	}
 	for _, address := range validators {
 		snap.Validators[address] = new(big.Int).Set(common.Big0)
@@ -84,12 +87,13 @@ func (s *Snapshot) store(db ethdb.Database) error {
 // copy creates a deep copy of the snapshot, though not the individual votes.
 func (s *Snapshot) copy() *Snapshot {
 	cpy := &Snapshot{
-		config:     s.config,
-		sigcache:   s.sigcache,
-		ethAPI:     s.ethAPI,
-		Number:     s.Number,
-		Hash:       s.Hash,
-		Validators: make(map[common.Address]*big.Int),
+		config:      s.config,
+		sigcache:    s.sigcache,
+		ethAPI:      s.ethAPI,
+		Number:      s.Number,
+		Hash:        s.Hash,
+		Validators:  make(map[common.Address]*big.Int),
+		Environment: s.Environment.Copy(),
 	}
 	for address, stake := range s.Validators {
 		cpy.Validators[address] = new(big.Int).Set(stake)
@@ -118,7 +122,6 @@ func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderRea
 
 	for _, header := range headers {
 		number := header.Number.Uint64()
-		env, _ := getEnvironmentValue(s.config, number)
 
 		validator, err := ecrecover(header, s.sigcache)
 		if err != nil {
@@ -126,13 +129,19 @@ func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderRea
 		}
 
 		var exists bool
-		if number > 0 && env.IsEpochStartBlock(number) {
-			nextValidator, err := getNextValidators(s.config, s.ethAPI, header.ParentHash, env.Epoch(number), number)
+		if number > 0 && number%snap.Environment.EpochPeriod.Uint64() == 0 {
+			nextValidator, err := getNextValidators(s.config, s.ethAPI, header.ParentHash, snap.Environment.Epoch(number), number)
 			if err != nil {
 				log.Error("Failed to get validators", "in", "Snapshot.apply", "hash", header.ParentHash, "number", number, "err", err)
 				return nil, err
 			}
+			nextEnv, err := getNextEnvironmentValue(s.ethAPI, header.ParentHash)
+			if err != nil {
+				log.Error("Failed to get environment value", "in", "Snapshot.apply", "hash", header.ParentHash, "number", number, "err", err)
+				return nil, err
+			}
 
+			snap.Environment = nextEnv.Copy()
 			snap.Validators = map[common.Address]*big.Int{}
 			for i, address := range nextValidator.Operators {
 				snap.Validators[address] = nextValidator.Stakes[i]

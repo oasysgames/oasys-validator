@@ -125,8 +125,8 @@ func TestBackOffTimes(t *testing.T) {
 	}
 
 	for _, s := range wantSchedules {
-		chooser := newWeightedChooser(validators, stakes, int64(env.EpochStartBlock(s.block)))
-		scheduler := newScheduler(env, env.EpochStartBlock(s.block), chooser)
+		chooser := newWeightedChooser(validators, stakes, int64(env.GetFirstBlock(s.block)))
+		scheduler := newScheduler(env, env.GetFirstBlock(s.block), chooser)
 		for i, validator := range validators {
 			want := uint64(s.turns[i])
 			if want > 0 {
@@ -149,8 +149,8 @@ func TestExpect(t *testing.T) {
 	}
 
 	for _, s := range wantSchedules {
-		chooser := newWeightedChooser(validators, stakes, int64(env.EpochStartBlock(s.block)))
-		scheduler := newScheduler(env, env.EpochStartBlock(s.block), chooser)
+		chooser := newWeightedChooser(validators, stakes, int64(env.GetFirstBlock(s.block)))
+		scheduler := newScheduler(env, env.GetFirstBlock(s.block), chooser)
 
 		var want common.Address
 		for i, validator := range validators {
@@ -175,8 +175,8 @@ func TestDifficulty(t *testing.T) {
 	}
 
 	for _, s := range wantSchedules {
-		chooser := newWeightedChooser(validators, stakes, int64(env.EpochStartBlock(s.block)))
-		scheduler := newScheduler(env, env.EpochStartBlock(s.block), chooser)
+		chooser := newWeightedChooser(validators, stakes, int64(env.GetFirstBlock(s.block)))
+		scheduler := newScheduler(env, env.GetFirstBlock(s.block), chooser)
 
 		for i, validator := range validators {
 			want1 := diffNoTurn.Uint64()

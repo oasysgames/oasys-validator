@@ -259,9 +259,12 @@ func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 		return errMissingSignature
 	}
 	// Ensure that the extra-data contains a validator list on checkpoint, but none otherwise
-	env, _ := getEnvironmentValue(c.chainConfig, number)
+	env, err := c.environment(chain, header, parents)
+	if err != nil {
+		return err
+	}
 	validatorBytes := len(header.Extra) - extraVanity - extraSeal
-	if env.IsEpochStartBlock(number) {
+	if env.IsEpoch(number) {
 		if err := c.verifyExtraHeaderLengthInEpoch(header.Number, validatorBytes); err != nil {
 			return err
 		}
@@ -331,7 +334,7 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 		validators []common.Address
 		stakes     []*big.Int
 	)
-	if number > 0 && env.IsEpochStartBlock(number) {
+	if number > 0 && env.IsEpoch(number) {
 		// TODO: Extract the validators from header extra data
 		// Now the keccak256 hash of the validators is stored in the extra data.
 		// To avoid ethapi call, we need to store each validator's address and stake amount.
@@ -415,7 +418,7 @@ func (c *Oasys) snapshot(chain consensus.ChainHeaderReader, number uint64, hash 
 					return nil, err
 				}
 
-				snap = newSnapshot(c.chainConfig, c.signatures, c.ethAPI, number, hash, validators)
+				snap = newSnapshot(c.chainConfig, c.signatures, c.ethAPI, number, hash, validators, getInitialEnvironment(c.config))
 				if err := snap.store(c.db); err != nil {
 					return nil, err
 				}
@@ -518,7 +521,10 @@ func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 	// Mix digest is reserved for now, set to empty
 	header.MixDigest = common.Hash{}
 
-	env, _ := getEnvironmentValue(c.chainConfig, number)
+	env, err := c.environment(chain, header, nil)
+	if err != nil {
+		return err
+	}
 
 	// Ensure the extra data has all its components
 	if len(header.Extra) < extraVanity {
@@ -530,7 +536,7 @@ func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 		validators []common.Address
 		stakes     []*big.Int
 	)
-	if number > 0 && env.IsEpochStartBlock(number) {
+	if number > 0 && env.IsEpoch(number) {
 		result, err := getNextValidators(c.chainConfig, c.ethAPI, header.ParentHash, env.Epoch(number), number)
 		if err != nil {
 			log.Error("Failed to get validators", "in", "Prepare", "hash", header.ParentHash, "number", number, "err", err)
@@ -584,7 +590,6 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 
 	hash := header.Hash()
 	number := header.Number.Uint64()
-	env, nextEnv := getEnvironmentValue(c.chainConfig, number)
 
 	cx := chainContext{Chain: chain, oasys: c}
 	if number == 1 {
@@ -593,22 +598,18 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 			log.Error("Failed to initialize system contracts", "in", "Finalize", "hash", hash, "number", number, "err", err)
 			return err
 		}
-		log.Info("Initialized system contracts", "in", "Finalize", "hash", hash, "number", number)
 	}
-	if nextEnv != nil && env.ShouldUpdate(nextEnv, number) {
-		err := c.updateEnvironmentValue(nextEnv, state, header, cx, txs, receipts, systemTxs, usedGas, false)
-		if err != nil {
-			log.Error("Failed to update environment value", "in", "Finalize", "hash", hash, "number", number, "err", err)
-			return err
-		}
-		log.Info("Updated environment value", "in", "Finalize", "hash", hash, "number", number)
+
+	env, err := c.environment(chain, header, nil)
+	if err != nil {
+		return err
 	}
 
 	var (
 		validators []common.Address
 		stakes     []*big.Int
 	)
-	if env.IsEpochStartBlock(number) {
+	if env.IsEpoch(number) {
 		result, err := getNextValidators(c.chainConfig, c.ethAPI, header.ParentHash, env.Epoch(number), number)
 		if err != nil {
 			log.Error("Failed to get validators", "in", "Finalize", "hash", header.ParentHash, "number", number, "err", err)
@@ -633,7 +634,7 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 		return err
 	}
 
-	if env.IsEpochStartBlock(number) {
+	if env.IsEpoch(number) {
 		// If the block is a epoch block, verify the validator list or hash
 		actual := header.Extra[extraVanity : len(header.Extra)-extraSeal]
 		if err := c.verifyExtraHeaderValueInEpoch(header.Number, actual, validators); err != nil {
@@ -680,7 +681,6 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 
 	hash := header.Hash()
 	number := header.Number.Uint64()
-	env, nextEnv := getEnvironmentValue(c.chainConfig, number)
 
 	cx := chainContext{Chain: chain, oasys: c}
 	if number == 1 {
@@ -689,22 +689,18 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 			log.Error("Failed to initialize system contracts", "in", "FinalizeAndAssemble", "hash", hash, "err", err)
 			return nil, nil, err
 		}
-		log.Info("Initialized system contracts", "in", "FinalizeAndAssemble", "hash", hash, "number", number)
 	}
-	if nextEnv != nil && env.ShouldUpdate(nextEnv, number) {
-		err := c.updateEnvironmentValue(nextEnv, state, header, cx, &txs, &receipts, nil, &header.GasUsed, true)
-		if err != nil {
-			log.Error("Failed to update environment value", "in", "FinalizeAndAssemble", "hash", hash, "err", err)
-			return nil, nil, err
-		}
-		log.Info("Updated environment value", "in", "FinalizeAndAssemble", "hash", hash, "number", number)
+
+	env, err := c.environment(chain, header, nil)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	var (
 		validators []common.Address
 		stakes     []*big.Int
 	)
-	if env.IsEpochStartBlock(number) {
+	if env.IsEpoch(number) {
 		result, err := getNextValidators(c.chainConfig, c.ethAPI, header.ParentHash, env.Epoch(number), number)
 		if err != nil {
 			log.Error("Failed to get validators", "in", "FinalizeAndAssemble", "hash", header.ParentHash, "number", number, "err", err)
@@ -776,11 +772,14 @@ func (c *Oasys) Seal(chain consensus.ChainHeaderReader, block *types.Block, resu
 	validator, signFn := c.signer, c.signFn
 	c.lock.RUnlock()
 
-	env, _ := getEnvironmentValue(c.chainConfig, number)
+	env, err := c.environment(chain, header, nil)
+	if err != nil {
+		return err
+	}
 
 	// Bail out if we're unauthorized to sign a block
 	var exists bool
-	if number > 0 && env.IsEpochStartBlock(number) {
+	if number > 0 && env.IsEpoch(number) {
 		result, err := getNextValidators(c.chainConfig, c.ethAPI, header.ParentHash, env.Epoch(number), number)
 		if err != nil {
 			log.Error("Failed to get validators", "in", "Seal", "hash", header.ParentHash, "number", number, "err", err)
@@ -830,13 +829,17 @@ func (c *Oasys) Seal(chain consensus.ChainHeaderReader, block *types.Block, resu
 // that a new block should have:
 func (c *Oasys) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, parent *types.Header) *big.Int {
 	number := parent.Number.Uint64()
-	env, _ := getEnvironmentValue(c.chainConfig, number)
+
+	env, err := c.environment(chain, parent, nil)
+	if err != nil {
+		return nil
+	}
 
 	var (
 		validators []common.Address
 		stakes     []*big.Int
 	)
-	if env.IsEpochStartBlock(number) {
+	if env.IsEpoch(number) {
 		result, err := getNextValidators(c.chainConfig, c.ethAPI, parent.Hash(), env.Epoch(number), number)
 		if err != nil {
 			log.Error("Failed to get validators", "in", "Seal", "hash", parent.Hash(), "number", number, "err", err)
@@ -987,7 +990,7 @@ func encodeSigHeader(w io.Writer, header *types.Header) {
 }
 
 func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash, number uint64, env *environmentValue) error {
-	if !env.IsEpochStartBlock(number) || env.Epoch(number) < 3 || env.Epoch(number) > 60 {
+	if !env.IsEpoch(number) || env.Epoch(number) < 3 || env.Epoch(number) > 60 {
 		return nil
 	}
 
@@ -1007,6 +1010,40 @@ func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash,
 	state.AddBalance(stakeManager.address, rewards)
 	log.Info("Balance added to stake manager", "hash", hash, "amount", rewards.String())
 	return nil
+}
+
+func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header) (*environmentValue, error) {
+	number := header.Number.Uint64()
+	if number < c.config.Epoch {
+		return getInitialEnvironment(c.config), nil
+	}
+
+	snap, err := c.snapshot(chain, number-1, header.ParentHash, parents)
+	if err != nil {
+		return nil, err
+	}
+
+	var env *environmentValue
+	if number%snap.Environment.EpochPeriod.Uint64() == 0 {
+		if env, err = getNextEnvironmentValue(c.ethAPI, header.ParentHash); err != nil {
+			log.Error("Failed to get environment value", "in", "environment", "hash", header.ParentHash, "number", number, "err", err)
+			return nil, err
+		}
+	} else {
+		env = snap.Environment
+	}
+
+	if env.BlockPeriod.Cmp(common.Big0) == 0 {
+		return nil, errors.New("invalid block period")
+	}
+	if env.EpochPeriod.Cmp(common.Big0) == 0 {
+		return nil, errors.New("invalid epoch period")
+	}
+	if env.ValidatorThreshold.Cmp(common.Big0) == 0 {
+		return nil, errors.New("invalid validator threshold")
+	}
+
+	return env, nil
 }
 
 func (c *Oasys) scheduler(chain consensus.ChainHeaderReader, header *types.Header,
@@ -1039,7 +1076,7 @@ func (c *Oasys) scheduler(chain consensus.ChainHeaderReader, header *types.Heade
 		seed = seedHash.Big().Int64()
 	}
 
-	created := newScheduler(env, env.EpochStartBlock(number),
+	created := newScheduler(env, env.GetFirstBlock(number),
 		newWeightedChooser(validators, stakes, seed))
 	schedulerCache.Add(seedHash, created)
 	return created, nil
