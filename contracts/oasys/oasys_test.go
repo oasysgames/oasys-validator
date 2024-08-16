@@ -1050,12 +1050,12 @@ func _deployments10(genesisHash common.Hash, contracts wantContracts) {
 func _deployments11(genesisHash common.Hash, contracts wantContracts) {
 	contracts["0x0000000000000000000000000000000000001000"] = &wantContract{
 		name:     "Environment",
-		codeHash: "34cf69fefaeeaa6fec9a43b903615dcb",
+		codeHash: "b5179d9d111d56ec8a1a865780cf5e91",
 		storage:  map[string]string{},
 	}
 
 	// StakeManager
-	contracts["0x0000000000000000000000000000000000001001"].codeHash = "a9eed94b67ff9b3784c44004542ec88a"
+	contracts["0x0000000000000000000000000000000000001001"].codeHash = "ea125544d254ee6a1129efb7d8a54a8e"
 }
 
 func TestDeploy(t *testing.T) {
