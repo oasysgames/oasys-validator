@@ -71,9 +71,9 @@ type deployment struct {
 }
 
 // Deploy the contract.
-func (d *deployment) deploy(state StateDB, block uint64) {
+func (d *deployment) deploy(cfg *params.ChainConfig, state StateDB, block uint64) {
 	d.deployCode(state)
-	d.deployStorage(state)
+	d.deployStorage(cfg, state)
 	log.Info("Deploy contract", "block", block,
 		"name", d.contract.name, "address", d.contract.address)
 }
@@ -84,8 +84,8 @@ func (d *deployment) deployCode(state StateDB) {
 	}
 }
 
-func (d *deployment) deployStorage(state StateDB) {
-	storage, err := d.storage.build()
+func (d *deployment) deployStorage(cfg *params.ChainConfig, state StateDB) {
+	storage, err := d.storage.build(cfg)
 	if err != nil {
 		panic(fmt.Errorf("failed to build %s contract storage map: %s",
 			d.contract.name, err.Error()))

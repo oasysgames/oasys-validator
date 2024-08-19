@@ -28,7 +28,7 @@ var deployments9 = []*deployment{
 			"0x00": candidateValidatorManager.address,
 			// mapping(address => uint256) private _ids
 			"0x01": genesismap{
-				params.OasysMainnetGenesisHash: mapping{
+				params.OasysMainnetGenesisHash: &mapping{
 					keyFn: addressKeyFn,
 					values: map[string]interface{}{
 						"0x86652fE437425AC63211C55b6b067B3181BBcB17": big.NewInt(1),
@@ -57,7 +57,7 @@ var deployments9 = []*deployment{
 						"0x4e5963c92bFE4De6f319b0859B2Efcf95267E3Ae": big.NewInt(24),
 					},
 				},
-				params.OasysTestnetGenesisHash: mapping{
+				params.OasysTestnetGenesisHash: &mapping{
 					keyFn: addressKeyFn,
 					values: map[string]interface{}{
 						"0xF886672205399c186638abfA9Dc155dEe9CBBD2e": big.NewInt(1),
@@ -66,7 +66,7 @@ var deployments9 = []*deployment{
 			},
 			// address[] private _addresses
 			"0x02": genesismap{
-				params.OasysMainnetGenesisHash: array{
+				params.OasysMainnetGenesisHash: &array{
 					values: map[int64]interface{}{
 						0:  "0x86652fE437425AC63211C55b6b067B3181BBcB17",
 						1:  "0xa505014a84e8BdC4A620470A53EAd872b0c1CA5b",
@@ -94,7 +94,7 @@ var deployments9 = []*deployment{
 						23: "0x4e5963c92bFE4De6f319b0859B2Efcf95267E3Ae",
 					},
 				},
-				params.OasysTestnetGenesisHash: array{
+				params.OasysTestnetGenesisHash: &array{
 					values: map[int64]interface{}{
 						0: "0xF886672205399c186638abfA9Dc155dEe9CBBD2e",
 					},

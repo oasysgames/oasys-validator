@@ -19,7 +19,7 @@ var deployments2 = []*deployment{
 			"0x05": "0x1",
 			// Pool > Pauser : mapping(address => bool) public pausers
 			"0x07": genesismap{
-				params.OasysMainnetGenesisHash: mapping{
+				params.OasysMainnetGenesisHash: &mapping{
 					keyFn: addressKeyFn,
 					values: map[string]interface{}{
 						"0x1b9dFC56e38b0F92448659C114e2347Bd803911c": "0x1",
@@ -30,7 +30,7 @@ var deployments2 = []*deployment{
 						"0x1a0aEc0fC48F1B5cc538BE74A90E340b278189e4": "0x1",
 					},
 				},
-				defaultGenesisHash: mapping{
+				defaultGenesisHash: &mapping{
 					keyFn: addressKeyFn,
 					values: map[string]interface{}{
 						"0x58b529F9084D7eAA598EB3477Fe36064C5B7bbC1": "0x1",
@@ -39,7 +39,7 @@ var deployments2 = []*deployment{
 			},
 			// Pool > VolumeControl > Governor : mapping(address => bool) public governors
 			"0x08": genesismap{
-				params.OasysMainnetGenesisHash: mapping{
+				params.OasysMainnetGenesisHash: &mapping{
 					keyFn: addressKeyFn,
 					values: map[string]interface{}{
 						"0x1b9dFC56e38b0F92448659C114e2347Bd803911c": "0x1",
@@ -48,7 +48,7 @@ var deployments2 = []*deployment{
 						"0x8e9174ed59eA4b81E70d0aE0DE13242e2329106c": "0x1",
 					},
 				},
-				defaultGenesisHash: mapping{
+				defaultGenesisHash: &mapping{
 					keyFn: addressKeyFn,
 					values: map[string]interface{}{
 						"0x58b529F9084D7eAA598EB3477Fe36064C5B7bbC1": "0x1",
@@ -74,7 +74,7 @@ var deployments2 = []*deployment{
 			},
 			// Pauser : mapping(address => bool) public pausers
 			"0x02": genesismap{
-				params.OasysMainnetGenesisHash: mapping{
+				params.OasysMainnetGenesisHash: &mapping{
 					keyFn: addressKeyFn,
 					values: map[string]interface{}{
 						"0x1b9dFC56e38b0F92448659C114e2347Bd803911c": "0x1",
@@ -85,7 +85,7 @@ var deployments2 = []*deployment{
 						"0x1a0aEc0fC48F1B5cc538BE74A90E340b278189e4": "0x1",
 					},
 				},
-				defaultGenesisHash: mapping{
+				defaultGenesisHash: &mapping{
 					keyFn: addressKeyFn,
 					values: map[string]interface{}{
 						"0x58b529F9084D7eAA598EB3477Fe36064C5B7bbC1": "0x1",
@@ -94,7 +94,7 @@ var deployments2 = []*deployment{
 			},
 			// VolumeControl > Governor : mapping(address => bool) public governors
 			"0x03": genesismap{
-				params.OasysMainnetGenesisHash: mapping{
+				params.OasysMainnetGenesisHash: &mapping{
 					keyFn: addressKeyFn,
 					values: map[string]interface{}{
 						"0x1b9dFC56e38b0F92448659C114e2347Bd803911c": "0x1",
@@ -103,7 +103,7 @@ var deployments2 = []*deployment{
 						"0x8e9174ed59eA4b81E70d0aE0DE13242e2329106c": "0x1",
 					},
 				},
-				defaultGenesisHash: mapping{
+				defaultGenesisHash: &mapping{
 					keyFn: addressKeyFn,
 					values: map[string]interface{}{
 						"0x58b529F9084D7eAA598EB3477Fe36064C5B7bbC1": "0x1",
@@ -127,7 +127,7 @@ var deployments2 = []*deployment{
 			},
 			// Pauser : mapping(address => bool) public pausers
 			"0x01": genesismap{
-				params.OasysMainnetGenesisHash: mapping{
+				params.OasysMainnetGenesisHash: &mapping{
 					keyFn: addressKeyFn,
 					values: map[string]interface{}{
 						"0x1b9dFC56e38b0F92448659C114e2347Bd803911c": "0x1",
@@ -138,7 +138,7 @@ var deployments2 = []*deployment{
 						"0x1a0aEc0fC48F1B5cc538BE74A90E340b278189e4": "0x1",
 					},
 				},
-				defaultGenesisHash: mapping{
+				defaultGenesisHash: &mapping{
 					keyFn: addressKeyFn,
 					values: map[string]interface{}{
 						"0x58b529F9084D7eAA598EB3477Fe36064C5B7bbC1": "0x1",
@@ -147,7 +147,7 @@ var deployments2 = []*deployment{
 			},
 			// VolumeControl > Governor : mapping(address => bool) public governors
 			"0x02": genesismap{
-				params.OasysMainnetGenesisHash: mapping{
+				params.OasysMainnetGenesisHash: &mapping{
 					keyFn: addressKeyFn,
 					values: map[string]interface{}{
 						"0x1b9dFC56e38b0F92448659C114e2347Bd803911c": "0x1",
@@ -156,7 +156,7 @@ var deployments2 = []*deployment{
 						"0x8e9174ed59eA4b81E70d0aE0DE13242e2329106c": "0x1",
 					},
 				},
-				defaultGenesisHash: mapping{
+				defaultGenesisHash: &mapping{
 					keyFn: addressKeyFn,
 					values: map[string]interface{}{
 						"0x58b529F9084D7eAA598EB3477Fe36064C5B7bbC1": "0x1",

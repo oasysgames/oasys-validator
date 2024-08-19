@@ -33,7 +33,7 @@ var deployments0 = []*deployment{
 			// string private _symbol
 			"0x04": "SOAS",
 			// address[] public allowedAddresses
-			"0x05": array{
+			"0x05": &array{
 				values: map[int64]interface{}{
 					0: StakeManagerAddress,
 					1: l1BuildDeposit.address,
@@ -102,7 +102,7 @@ var deployments0 = []*deployment{
 			// address public agentAddress
 			"0x03": l1BuildAgent.address,
 			// address[] public allowedTokens
-			"0x04": array{
+			"0x04": &array{
 				values: map[int64]interface{}{
 					0: stakableOAS.address,
 				},
@@ -209,14 +209,14 @@ var deployments0 = []*deployment{
 		storage: storage{
 			// mapping(address => address) internal administrators
 			"0x00": genesismap{
-				params.OasysMainnetGenesisHash: mapping{
+				params.OasysMainnetGenesisHash: &mapping{
 					keyFn: addressKeyFn,
 					values: map[string]interface{}{
 						"0x0000000000000000000000000000000000000001": "0x2273e9bD041d1405cB3f9DCa42fafC9358b07f79",
 						"0x2273e9bD041d1405cB3f9DCa42fafC9358b07f79": "0x0000000000000000000000000000000000000001",
 					},
 				},
-				defaultGenesisHash: mapping{
+				defaultGenesisHash: &mapping{
 					keyFn: addressKeyFn,
 					values: map[string]interface{}{
 						"0x0000000000000000000000000000000000000001": "0x377b21b3D7d6F9B1dBf00176f96cCf4CABD100d2",
