@@ -40,7 +40,7 @@ func init() {
 
 type scheduler struct {
 	mu  sync.Mutex
-	env *environmentValue
+	env *params.EnvironmentValue
 
 	// WARNING: Consensus engine should not use this value directly.
 	chooser *weightedChooser
@@ -64,7 +64,7 @@ type scheduler struct {
 	//   Note: The turn is random, so it will not always be [A,B,C].
 }
 
-func newScheduler(env *environmentValue, epochStart uint64, chooser *weightedChooser) *scheduler {
+func newScheduler(env *params.EnvironmentValue, epochStart uint64, chooser *weightedChooser) *scheduler {
 	period := env.EpochPeriod.Uint64()
 	s := &scheduler{
 		env:     env,
@@ -261,7 +261,7 @@ func newWeightedChooser(
 func getPrevEpochLastBlockHash(
 	config *params.OasysConfig,
 	chain consensus.ChainHeaderReader,
-	env *environmentValue,
+	env *params.EnvironmentValue,
 	header *types.Header,
 ) (common.Hash, error) {
 	var (

@@ -27,7 +27,7 @@ type Snapshot struct {
 	Hash       common.Hash                 `json:"hash"`       // Block hash where the snapshot was created
 	Validators map[common.Address]*big.Int `json:"validators"` // Set of authorized validators and stakes at this moment
 
-	Environment *environmentValue `json:"environment"`
+	Environment *params.EnvironmentValue `json:"environment"`
 }
 
 // validatorsAscending implements the sort interface to allow sorting a list of addresses
@@ -41,7 +41,7 @@ func (s validatorsAscending) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 // method does not initialize the set of recent validators, so only ever use if for
 // the genesis block.
 func newSnapshot(config *params.ChainConfig, sigcache *lru.ARCCache, ethAPI *ethapi.BlockChainAPI,
-	number uint64, hash common.Hash, validators []common.Address, environment *environmentValue) *Snapshot {
+	number uint64, hash common.Hash, validators []common.Address, environment *params.EnvironmentValue) *Snapshot {
 	snap := &Snapshot{
 		config:      config,
 		sigcache:    sigcache,

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 var (
@@ -118,7 +119,7 @@ var (
 )
 
 func TestBackOffTimes(t *testing.T) {
-	env := &environmentValue{
+	env := &params.EnvironmentValue{
 		StartBlock:  common.Big0,
 		StartEpoch:  common.Big1,
 		EpochPeriod: epochPeriod,
@@ -142,7 +143,7 @@ func TestBackOffTimes(t *testing.T) {
 }
 
 func TestExpect(t *testing.T) {
-	env := &environmentValue{
+	env := &params.EnvironmentValue{
 		StartBlock:  common.Big0,
 		StartEpoch:  common.Big1,
 		EpochPeriod: epochPeriod,
@@ -167,7 +168,7 @@ func TestExpect(t *testing.T) {
 }
 
 func TestDifficulty(t *testing.T) {
-	env := &environmentValue{
+	env := &params.EnvironmentValue{
 		StartBlock:         common.Big0,
 		StartEpoch:         common.Big1,
 		EpochPeriod:        epochPeriod,

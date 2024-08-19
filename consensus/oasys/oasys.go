@@ -311,7 +311,7 @@ func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 // rather depend on a batch of previous headers. The caller may optionally pass
 // in a batch of parents (ascending order) to avoid looking those up from the
 // database. This is useful for concurrently verifying a batch of new headers.
-func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header, env *environmentValue) error {
+func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header, env *params.EnvironmentValue) error {
 	// The genesis block is the always valid dead-end
 	number := header.Number.Uint64()
 	if number == 0 {
@@ -418,7 +418,8 @@ func (c *Oasys) snapshot(chain consensus.ChainHeaderReader, number uint64, hash 
 					return nil, err
 				}
 
-				snap = newSnapshot(c.chainConfig, c.signatures, c.ethAPI, number, hash, validators, getInitialEnvironment(c.config))
+				snap = newSnapshot(c.chainConfig, c.signatures, c.ethAPI,
+					number, hash, validators, params.InitialEnvironmentValue(c.chainConfig))
 				if err := snap.store(c.db); err != nil {
 					return nil, err
 				}
@@ -989,7 +990,7 @@ func encodeSigHeader(w io.Writer, header *types.Header) {
 	}
 }
 
-func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash, number uint64, env *environmentValue) error {
+func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash, number uint64, env *params.EnvironmentValue) error {
 	if !env.IsEpoch(number) || env.Epoch(number) < 3 || env.Epoch(number) > 60 {
 		return nil
 	}
@@ -1012,10 +1013,10 @@ func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash,
 	return nil
 }
 
-func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header) (*environmentValue, error) {
+func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header) (*params.EnvironmentValue, error) {
 	number := header.Number.Uint64()
 	if number < c.config.Epoch {
-		return getInitialEnvironment(c.config), nil
+		return params.InitialEnvironmentValue(c.chainConfig), nil
 	}
 
 	snap, err := c.snapshot(chain, number-1, header.ParentHash, parents)
@@ -1023,7 +1024,7 @@ func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Hea
 		return nil, err
 	}
 
-	var env *environmentValue
+	var env *params.EnvironmentValue
 	if number%snap.Environment.EpochPeriod.Uint64() == 0 {
 		if env, err = getNextEnvironmentValue(c.ethAPI, header.ParentHash); err != nil {
 			log.Error("Failed to get environment value", "in", "environment", "hash", header.ParentHash, "number", number, "err", err)
@@ -1047,7 +1048,7 @@ func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Hea
 }
 
 func (c *Oasys) scheduler(chain consensus.ChainHeaderReader, header *types.Header,
-	env *environmentValue, validators []common.Address, stakes []*big.Int) (*scheduler, error) {
+	env *params.EnvironmentValue, validators []common.Address, stakes []*big.Int) (*scheduler, error) {
 	number := header.Number.Uint64()
 
 	// Previous epoch does not exists.
