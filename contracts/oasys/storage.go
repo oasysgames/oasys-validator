@@ -43,20 +43,21 @@ type genesismap map[common.Hash]interface{}
 
 // Add values to storage.
 func (g genesismap) apply(cfg *params.ChainConfig, storage map[common.Hash]common.Hash, rootSlot common.Hash) error {
-	if val, ok := g[GenesisHash]; ok {
-		return setStorage(cfg, storage, rootSlot, val)
-	}
-	if val, ok := g[defaultGenesisHash]; ok {
+	if val := g.value(); val != nil {
 		return setStorage(cfg, storage, rootSlot, val)
 	}
 	return nil
 }
 
-// Returns storage values based on the chain configuration.
-type chainconfig func(cfg *params.ChainConfig) interface{}
-
-func (fn chainconfig) apply(cfg *params.ChainConfig, storage map[common.Hash]common.Hash, rootSlot common.Hash) error {
-	return setStorage(cfg, storage, rootSlot, fn(cfg))
+// Return the mapped value.
+func (g genesismap) value() interface{} {
+	if val, ok := g[GenesisHash]; ok {
+		return val
+	}
+	if val, ok := g[defaultGenesisHash]; ok {
+		return val
+	}
+	return nil
 }
 
 // `array` type storage.
@@ -163,6 +164,8 @@ func setStorage(cfg *params.ChainConfig, storage map[common.Hash]common.Hash, sl
 		}
 	case dynamicSlotValue:
 		return t.apply(cfg, storage, slot)
+	case func(cfg *params.ChainConfig) interface{}:
+		return setStorage(cfg, storage, slot, t(cfg))
 	default:
 		return fmt.Errorf("unsupported type: %s, slot: %s", t, slot.String())
 	}
@@ -192,10 +195,19 @@ func leftZeroPad(s string, l int) string {
 }
 
 func structSize(cfg *params.ChainConfig, val interface{}) int64 {
-	if t, ok := val.(chainconfig); ok {
-		val = t(cfg)
+	// Resolve the value until reaching either primitive or Solidity's data structure.
+	var extract func(val interface{}) interface{}
+	extract = func(val interface{}) interface{} {
+		switch t := val.(type) {
+		case genesismap:
+			return extract(t.value())
+		case func(cfg *params.ChainConfig) interface{}:
+			return extract(t(cfg))
+		}
+		return val
 	}
-	if t, ok := val.(structvalue); ok {
+
+	if t, ok := extract(val).(structvalue); ok {
 		return int64(len(t))
 	}
 	return 0

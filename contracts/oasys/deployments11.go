@@ -1,6 +1,8 @@
 package oasys
 
 import (
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -14,29 +16,39 @@ var deployments11 = []*deployment{
 			"0x01": &array{
 				length: 2,
 				values: map[int64]interface{}{
-					1: (chainconfig)(func(cfg *params.ChainConfig) interface{} {
-						return cfg.OasysShortenedBlockTimeStartEpoch()
-					}),
+					1: genesismap{
+						params.OasysMainnetGenesisHash: big.NewInt(params.SHORT_BLOCK_TIME_FORK_EPOCH_MAINNET),
+						params.OasysTestnetGenesisHash: big.NewInt(params.SHORT_BLOCK_TIME_FORK_EPOCH_TESTNET),
+						defaultGenesisHash:             big.NewInt(params.SHORT_BLOCK_TIME_FORK_EPOCH_OTHERS),
+					},
 				},
 			},
 			// EnvironmentValue[] public values
 			"0x02": &array{
 				length: 2,
 				values: map[int64]interface{}{
-					1: (chainconfig)(func(cfg *params.ChainConfig) interface{} {
-						env := params.ShortenedBlockTimeEnvironmentValue(cfg)
+					1: func(cfg *params.ChainConfig) interface{} {
+						initial := params.InitialEnvironmentValue(cfg.Oasys)
+
+						updated := initial.Copy()
+						updated.StartEpoch = cfg.OasysShortenedBlockTimeStartEpoch()
+						updated.StartBlock = new(big.Int).SetUint64(
+							initial.NewValueStartBlock(updated.StartEpoch.Uint64()))
+						updated.BlockPeriod = big.NewInt(params.SHORT_BLOCK_TIME_SECONDS)
+						updated.EpochPeriod = big.NewInt(params.SHORT_BLOCK_TIME_EPOCH_PERIOD)
+
 						return structvalue{
-							env.StartBlock,
-							env.StartEpoch,
-							env.BlockPeriod,
-							env.EpochPeriod,
-							env.RewardRate,
-							env.CommissionRate,
-							env.ValidatorThreshold,
-							env.JailThreshold,
-							env.JailPeriod,
+							updated.StartBlock,
+							updated.StartEpoch,
+							updated.BlockPeriod,
+							updated.EpochPeriod,
+							updated.RewardRate,
+							updated.CommissionRate,
+							updated.ValidatorThreshold,
+							updated.JailThreshold,
+							updated.JailPeriod,
 						}
-					}),
+					},
 				},
 			},
 		},

@@ -419,7 +419,7 @@ func (c *Oasys) snapshot(chain consensus.ChainHeaderReader, number uint64, hash 
 				}
 
 				snap = newSnapshot(c.chainConfig, c.signatures, c.ethAPI,
-					number, hash, validators, params.InitialEnvironmentValue(c.chainConfig))
+					number, hash, validators, params.InitialEnvironmentValue(c.config))
 				if err := snap.store(c.db); err != nil {
 					return nil, err
 				}
@@ -1016,7 +1016,7 @@ func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash,
 func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header) (*params.EnvironmentValue, error) {
 	number := header.Number.Uint64()
 	if number < c.config.Epoch {
-		return params.InitialEnvironmentValue(c.chainConfig), nil
+		return params.InitialEnvironmentValue(c.config), nil
 	}
 
 	snap, err := c.snapshot(chain, number-1, header.ParentHash, parents)

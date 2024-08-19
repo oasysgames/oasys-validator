@@ -608,12 +608,12 @@ func (c *ChainConfig) OasysShortenedBlockTimeStartEpoch() *big.Int {
 		return nil
 	}
 	if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
-		return big.NewInt(999) // TODO
+		return big.NewInt(SHORT_BLOCK_TIME_FORK_EPOCH_MAINNET)
 	}
 	if c.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0 {
-		return big.NewInt(999) // TODO
+		return big.NewInt(SHORT_BLOCK_TIME_FORK_EPOCH_TESTNET)
 	}
-	return big.NewInt(10)
+	return big.NewInt(SHORT_BLOCK_TIME_FORK_EPOCH_OTHERS)
 }
 
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.

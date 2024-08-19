@@ -6,6 +6,15 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+const (
+	SHORT_BLOCK_TIME_SECONDS      = 6
+	SHORT_BLOCK_TIME_EPOCH_PERIOD = 14400 // 6 sec * 14400 block = 1 days
+
+	SHORT_BLOCK_TIME_FORK_EPOCH_MAINNET = 999 // TODO
+	SHORT_BLOCK_TIME_FORK_EPOCH_TESTNET = 999 // TODO
+	SHORT_BLOCK_TIME_FORK_EPOCH_OTHERS  = 10  // for local chain
+)
+
 // EnvironmentValue is a representation of `Environment.EnvironmentValue`.
 type EnvironmentValue struct {
 	// Block and epoch to which this setting applies
@@ -65,32 +74,16 @@ func (p *EnvironmentValue) Copy() *EnvironmentValue {
 }
 
 // Returns the environment value in Genesis.
-func InitialEnvironmentValue(cfg *ChainConfig) *EnvironmentValue {
+func InitialEnvironmentValue(cfg *OasysConfig) *EnvironmentValue {
 	return &EnvironmentValue{
 		StartBlock:         common.Big0,
 		StartEpoch:         common.Big1,
-		BlockPeriod:        big.NewInt(int64(cfg.Oasys.Period)),
-		EpochPeriod:        big.NewInt(int64(cfg.Oasys.Epoch)),
+		BlockPeriod:        new(big.Int).SetUint64(cfg.Period),
+		EpochPeriod:        new(big.Int).SetUint64(cfg.Epoch),
 		RewardRate:         big.NewInt(10),
 		CommissionRate:     big.NewInt(10),
 		ValidatorThreshold: new(big.Int).Mul(big.NewInt(Ether), big.NewInt(10_000_000)),
 		JailThreshold:      big.NewInt(500),
 		JailPeriod:         big.NewInt(2),
 	}
-}
-
-// Return the environment value updated in Sep 2024.
-func ShortenedBlockTimeEnvironmentValue(cfg *ChainConfig) *EnvironmentValue {
-	prev := InitialEnvironmentValue(cfg)
-	next := prev.Copy()
-
-	next.StartEpoch = cfg.OasysShortenedBlockTimeStartEpoch()
-	next.StartBlock = new(big.Int).SetUint64(prev.NewValueStartBlock(next.StartEpoch.Uint64()))
-
-	if cfg.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 ||
-		cfg.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0 {
-		next.BlockPeriod = big.NewInt(6)
-		next.EpochPeriod = big.NewInt(14400)
-	}
-	return next
 }

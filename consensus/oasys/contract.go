@@ -241,7 +241,7 @@ func (c *Oasys) initializeSystemContracts(
 	if !environment.verifyCode(state) {
 		return errors.New("invalid contract code: Environment")
 	}
-	data, err := environment.abi.Pack("initialize", params.InitialEnvironmentValue(c.chainConfig))
+	data, err := environment.abi.Pack("initialize", params.InitialEnvironmentValue(c.config))
 	if err != nil {
 		return err
 	}
