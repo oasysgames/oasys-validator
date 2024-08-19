@@ -475,7 +475,7 @@ func (c *ChainConfig) Description() string {
 		banner += fmt.Sprintf(" - Oasys Extend Difficulty:     #%-8v (https://github.com/oasysgames/oasys-validator/releases/tag/v1.3.0)\n", c.OasysExtendDifficultyBlock())
 	}
 	if c.OasysShortenedBlockTimeStartEpoch() != nil {
-		banner += fmt.Sprintf(" - Oasys Shorten BlockTime:     Epoch#%-3v (https://github.com/oasysgames/oasys-validator/releases/tag/v1.4.2)\n", c.OasysShortenedBlockTimeStartEpoch())
+		banner += fmt.Sprintf(" - Oasys Shorten BlockTime:     Epoch#%-3v (https://github.com/oasysgames/oasys-validator/releases/tag/v1.5.0)\n", c.OasysShortenedBlockTimeStartEpoch())
 	}
 	if c.ShanghaiTime != nil {
 		banner += fmt.Sprintf(" - Shanghai:                    @%-10v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/shanghai.md)\n", *c.ShanghaiTime)
