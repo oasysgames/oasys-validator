@@ -2,6 +2,10 @@ package oasys
 
 var (
 	// Genesis
+	environment = &contract{
+		name:    "Environment",
+		address: "0x0000000000000000000000000000000000001000",
+	}
 	stakeManager = &contract{
 		name:    "StakeManager",
 		address: "0x0000000000000000000000000000000000001001",

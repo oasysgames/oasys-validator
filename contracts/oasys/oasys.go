@@ -42,7 +42,7 @@ func Deploy(chainConfig *params.ChainConfig, state StateDB, block uint64) {
 	if deploymentSet, ok := deploymentMap[block]; ok {
 		for _, deployments := range deploymentSet {
 			for _, d := range deployments {
-				d.deploy(state, block)
+				d.deploy(chainConfig, state, block)
 			}
 		}
 	}

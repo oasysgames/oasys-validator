@@ -150,54 +150,6 @@ func (c chainContext) GetHeader(hash common.Hash, number uint64) *types.Header {
 	return c.Chain.GetHeader(hash, number)
 }
 
-// environmentValue
-type environmentValue struct {
-	// Block and epoch to which this setting applies
-	StartBlock *big.Int
-	StartEpoch *big.Int
-	// Block generation interval(by seconds)
-	BlockPeriod *big.Int
-	// Number of blocks in epoch
-	EpochPeriod *big.Int
-	// Annual rate of staking reward
-	RewardRate *big.Int
-	// Validator commission rate
-	CommissionRate *big.Int
-	// Amount of tokens required to become a validator
-	ValidatorThreshold *big.Int
-	// Number of not sealed to jailing the validator
-	JailThreshold *big.Int
-	// Number of epochs to jailing the validator
-	JailPeriod *big.Int
-}
-
-func (p *environmentValue) IsEpoch(number uint64) bool {
-	return (number-p.StartBlock.Uint64())%p.EpochPeriod.Uint64() == 0
-}
-
-func (p *environmentValue) Epoch(number uint64) uint64 {
-	return p.StartEpoch.Uint64() + (number-p.StartBlock.Uint64())/p.EpochPeriod.Uint64()
-}
-
-func (p *environmentValue) GetFirstBlock(number uint64) uint64 {
-	elapsedEpoch := p.Epoch(number) - p.StartEpoch.Uint64()
-	return p.StartBlock.Uint64() + elapsedEpoch*p.EpochPeriod.Uint64()
-}
-
-func (p *environmentValue) Copy() *environmentValue {
-	return &environmentValue{
-		StartBlock:         new(big.Int).Set(p.StartBlock),
-		StartEpoch:         new(big.Int).Set(p.StartEpoch),
-		BlockPeriod:        new(big.Int).Set(p.BlockPeriod),
-		EpochPeriod:        new(big.Int).Set(p.EpochPeriod),
-		RewardRate:         new(big.Int).Set(p.RewardRate),
-		CommissionRate:     new(big.Int).Set(p.CommissionRate),
-		ValidatorThreshold: new(big.Int).Set(p.ValidatorThreshold),
-		JailThreshold:      new(big.Int).Set(p.JailThreshold),
-		JailPeriod:         new(big.Int).Set(p.JailPeriod),
-	}
-}
-
 // nextValidators
 type nextValidators struct {
 	Owners    []common.Address
@@ -226,20 +178,6 @@ func (p *nextValidators) Exists(validator common.Address) bool {
 		}
 	}
 	return false
-}
-
-func getInitialEnvironment(config *params.OasysConfig) *environmentValue {
-	return &environmentValue{
-		StartBlock:         common.Big0,
-		StartEpoch:         common.Big1,
-		BlockPeriod:        big.NewInt(int64(config.Period)),
-		EpochPeriod:        big.NewInt(int64(config.Epoch)),
-		RewardRate:         big.NewInt(10),
-		CommissionRate:     big.NewInt(10),
-		ValidatorThreshold: new(big.Int).Mul(big.NewInt(params.Ether), big.NewInt(10_000_000)),
-		JailThreshold:      big.NewInt(500),
-		JailPeriod:         big.NewInt(2),
-	}
 }
 
 // callmsg
@@ -303,7 +241,7 @@ func (c *Oasys) initializeSystemContracts(
 	if !environment.verifyCode(state) {
 		return errors.New("invalid contract code: Environment")
 	}
-	data, err := environment.abi.Pack("initialize", getInitialEnvironment(c.config))
+	data, err := environment.abi.Pack("initialize", params.InitialEnvironmentValue(c.config))
 	if err != nil {
 		return err
 	}
@@ -611,7 +549,7 @@ func getRewards(ethAPI blockchainAPI, hash common.Hash) (*big.Int, error) {
 }
 
 // Call the `Environment.nextValue` method.
-func getNextEnvironmentValue(ethAPI blockchainAPI, hash common.Hash) (*environmentValue, error) {
+func getNextEnvironmentValue(ethAPI blockchainAPI, hash common.Hash) (*params.EnvironmentValue, error) {
 	method := "nextValue"
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -638,7 +576,7 @@ func getNextEnvironmentValue(ethAPI blockchainAPI, hash common.Hash) (*environme
 		return nil, err
 	}
 
-	var recv struct{ Result environmentValue }
+	var recv struct{ Result params.EnvironmentValue }
 	if err := environment.abi.UnpackIntoInterface(&recv, method, rbytes); err != nil {
 		return nil, err
 	}
