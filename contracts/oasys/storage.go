@@ -119,6 +119,7 @@ func (m *mapping) apply(cfg *params.ChainConfig, storage map[common.Hash]common.
 }
 
 // `struct` type value.
+// Assumes that each contained value is exactly one slot in length (32 bytes).
 type structvalue []interface{}
 
 // Add members to storage.
