@@ -198,6 +198,9 @@ type Config struct {
 	// AllowUnprotectedTxs allows non EIP-155 protected transactions to be send over RPC.
 	AllowUnprotectedTxs bool `toml:",omitempty"`
 
+	// EnableMaliciousVoteMonitor is a flag that whether to enable the malicious vote checker
+	EnableMaliciousVoteMonitor bool `toml:",omitempty"`
+
 	// BLSPasswordFile is the file that contains BLS wallet password.
 	BLSPasswordFile string `toml:",omitempty"`
 

@@ -927,6 +927,12 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 		Category: flags.AccountCategory,
 	}
 
+	EnableMaliciousVoteMonitorFlag = &cli.BoolFlag{
+		Name:     "monitor.maliciousvote",
+		Usage:    "Enable malicious vote monitor to check whether any validator violates the voting rules of fast finality",
+		Category: flags.FastFinalityCategory,
+	}
+
 	BLSWalletDirFlag = &flags.DirectoryFlag{
 		Name:     "blswallet",
 		Usage:    "Path for the blsWallet dir in fast finality feature (default = inside the datadir)",
@@ -1244,6 +1250,13 @@ func setLes(ctx *cli.Context, cfg *ethconfig.Config) {
 	}
 }
 
+// setMonitors enable monitors from the command line flags.
+func setMonitors(ctx *cli.Context, cfg *node.Config) {
+	if ctx.Bool(EnableMaliciousVoteMonitorFlag.Name) {
+		cfg.EnableMaliciousVoteMonitor = true
+	}
+}
+
 // MakeDatabaseHandles raises out the number of allowed file handles per process
 // for Geth and returns half of the allowance to assign to the database.
 func MakeDatabaseHandles(max int) int {
@@ -1400,6 +1413,7 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	setNodeUserIdent(ctx, cfg)
 	SetDataDir(ctx, cfg)
 	setSmartCard(ctx, cfg)
+	setMonitors(ctx, cfg)
 	setBLSWalletDir(ctx, cfg)
 	setVoteJournalDir(ctx, cfg)
 

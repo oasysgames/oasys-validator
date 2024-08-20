@@ -146,6 +146,7 @@ var (
 		configFileFlag,
 		utils.VotingEnabledFlag,
 		utils.DisableVoteAttestationFlag,
+		utils.EnableMaliciousVoteMonitorFlag,
 		utils.BLSPasswordFileFlag,
 		utils.BLSWalletDirFlag,
 		utils.VoteJournalDirFlag,

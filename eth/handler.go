@@ -29,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/beacon"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/forkid"
+	"github.com/ethereum/go-ethereum/core/monitor"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -140,6 +141,9 @@ type handler struct {
 	minedBlockSub *event.TypeMuxSubscription
 	voteCh        chan core.NewVoteEvent
 	votesSub      event.Subscription
+
+	voteMonitorSub       event.Subscription
+	maliciousVoteMonitor *monitor.MaliciousVoteMonitor
 
 	// Used for calcurate average difficulty per block
 	firstTDInBroadcastVote     *big.Int
@@ -586,6 +590,11 @@ func (h *handler) Start(maxPeers int) {
 		h.voteCh = make(chan core.NewVoteEvent, voteChanSize)
 		h.votesSub = h.votepool.SubscribeNewVoteEvent(h.voteCh)
 		go h.voteBroadcastLoop()
+
+		if h.maliciousVoteMonitor != nil {
+			h.wg.Add(1)
+			go h.startMaliciousVoteMonitor()
+		}
 	}
 
 	// broadcast mined blocks
@@ -607,6 +616,9 @@ func (h *handler) Stop() {
 	h.minedBlockSub.Unsubscribe() // quits blockBroadcastLoop
 	if h.votepool != nil {
 		h.votesSub.Unsubscribe() // quits voteBroadcastLoop
+		if h.maliciousVoteMonitor != nil {
+			h.voteMonitorSub.Unsubscribe()
+		}
 	}
 
 	// Quit chainSync and txsync64.
@@ -798,6 +810,21 @@ func (h *handler) voteBroadcastLoop() {
 			// so one vote will be sent instantly without waiting for other votes for batch sending by design.
 			h.BroadcastVote(event.Vote)
 		case <-h.votesSub.Err():
+			return
+		}
+	}
+}
+
+func (h *handler) startMaliciousVoteMonitor() {
+	defer h.wg.Done()
+	voteCh := make(chan core.NewVoteEvent, voteChanSize)
+	h.voteMonitorSub = h.votepool.SubscribeNewVoteEvent(voteCh)
+	for {
+		select {
+		case event := <-voteCh:
+			pendingBlockNumber := h.chain.CurrentHeader().Number.Uint64() + 1
+			h.maliciousVoteMonitor.ConflictDetect(event.Vote, pendingBlockNumber)
+		case <-h.voteMonitorSub.Err():
 			return
 		}
 	}

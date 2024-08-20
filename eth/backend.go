@@ -33,6 +33,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/oasys"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/bloombits"
+	"github.com/ethereum/go-ethereum/core/monitor"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state/pruner"
 	"github.com/ethereum/go-ethereum/core/txpool"
@@ -280,10 +281,10 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		}
 		log.Info("Create votePool successfully")
 		eth.handler.votepool = votePool
-		// if stack.Config().EnableMaliciousVoteMonitor {
-		// 	eth.handler.maliciousVoteMonitor = monitor.NewMaliciousVoteMonitor()
-		// 	log.Info("Create MaliciousVoteMonitor successfully")
-		// }
+		if stack.Config().EnableMaliciousVoteMonitor {
+			eth.handler.maliciousVoteMonitor = monitor.NewMaliciousVoteMonitor()
+			log.Info("Create MaliciousVoteMonitor successfully")
+		}
 
 		if config.Miner.VoteEnable {
 			conf := stack.Config()
