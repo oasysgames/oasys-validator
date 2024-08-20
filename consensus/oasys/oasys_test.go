@@ -67,6 +67,46 @@ func TestAssembleEnvAndValidators(t *testing.T) {
 	}
 }
 
+func TestIsSufficientVotes(t *testing.T) {
+	var (
+		size       = 5
+		validators = &nextValidators{
+			Stakes:        make([]*big.Int, 0, size),
+			VoteAddresses: make([]types.BLSPublicKey, 0, size),
+		}
+	)
+	for i := 1; i <= size; i++ {
+		validators.Stakes = append(validators.Stakes, newEth(int64(i)))
+		validators.VoteAddresses = append(validators.VoteAddresses, randomBLSPublicKey())
+	}
+
+	tests := []struct {
+		name       string
+		validators *nextValidators
+		votedAddrs []types.BLSPublicKey
+		expected   bool
+	}{
+		{
+			name:       "sufficient votes",
+			validators: validators,
+			votedAddrs: []types.BLSPublicKey{validators.VoteAddresses[0], validators.VoteAddresses[3], validators.VoteAddresses[4]},
+			expected:   true,
+		},
+		{
+			name:       "insufficient votes",
+			validators: validators,
+			votedAddrs: []types.BLSPublicKey{validators.VoteAddresses[3], validators.VoteAddresses[4]},
+			expected:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.expected, isSufficientVotes(tt.votedAddrs, tt.validators))
+		})
+	}
+}
+
 func newEth(n int64) *big.Int {
 	return new(big.Int).Mul(big.NewInt(n), big.NewInt(params.Ether))
 }

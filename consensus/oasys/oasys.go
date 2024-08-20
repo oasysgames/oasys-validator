@@ -11,7 +11,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
-	cmath "github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
@@ -475,21 +474,22 @@ func (o *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header 
 	if validatorsBitSet.Count() > uint(len(validators.Indexes)) {
 		return fmt.Errorf("invalid attestation, vote number(=%d) larger than validators number(=%d)", validatorsBitSet.Count(), len(validators.Indexes))
 	}
-	votedAddrs := make([]bls.PublicKey, 0, validatorsBitSet.Count())
+	votedAddrs := make([]types.BLSPublicKey, 0, validatorsBitSet.Count())
+	votedPubKeys := make([]bls.PublicKey, 0, validatorsBitSet.Count())
 	for i, index := range validators.Indexes {
 		if !validatorsBitSet.Test(uint(index)) {
 			continue
 		}
-
-		voteAddr, err := bls.PublicKeyFromBytes(validators.VoteAddresses[i][:])
+		votedAddrs = append(votedAddrs, validators.VoteAddresses[i])
+		votedPubKey, err := bls.PublicKeyFromBytes(validators.VoteAddresses[i][:])
 		if err != nil {
 			return fmt.Errorf("BLS public key converts failed: %v", err)
 		}
-		votedAddrs = append(votedAddrs, voteAddr)
+		votedPubKeys = append(votedPubKeys, votedPubKey)
 	}
 
 	// The valid voted validators should be no less than 2/3 validators.
-	if len(votedAddrs) < cmath.CeilDiv(len(validators.Indexes)*2, 3) {
+	if !isSufficientVotes(votedAddrs, validators) {
 		return errors.New("invalid attestation, not enough validators voted")
 	}
 
@@ -498,11 +498,29 @@ func (o *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header 
 	if err != nil {
 		return fmt.Errorf("BLS signature converts failed: %v", err)
 	}
-	if !aggSig.FastAggregateVerify(votedAddrs, attestation.Data.Hash()) {
+	if !aggSig.FastAggregateVerify(votedPubKeys, attestation.Data.Hash()) {
 		return errors.New("invalid attestation, signature verify failed")
 	}
 
 	return nil
+}
+
+func isSufficientVotes(votedAddrs []types.BLSPublicKey, validators *nextValidators) bool {
+	totalStake := big.NewInt(0)
+	voterTotalStake := big.NewInt(0)
+	for i, stake := range validators.Stakes {
+		totalStake.Add(totalStake, stake)
+		for _, voteAddr := range votedAddrs {
+			if voteAddr == validators.VoteAddresses[i] {
+				voterTotalStake.Add(voterTotalStake, stake)
+				break
+			}
+		}
+	}
+	// the voter's total stake should be greater than 2/3 of the total stake
+	threshold := new(big.Int).Mul(totalStake, big.NewInt(2))
+	threshold.Div(threshold, big.NewInt(3))
+	return voterTotalStake.Cmp(threshold) >= 0
 }
 
 // getValidatorsFromHeader returns the next validators extracted from the header's extra field if exists.
@@ -779,7 +797,21 @@ func (c *Oasys) assembleVoteAttestation(chain consensus.ChainHeaderReader, heade
 		return err
 	}
 	votes := c.VotePool.FetchVoteByBlockHash(parent.Hash())
-	if len(votes) < cmath.CeilDiv(len(snap.Validators)*2, 3) {
+
+	// Check if the number of votes is sufficient
+	votedAddrs := make([]types.BLSPublicKey, 0, len(votes))
+	validators := &nextValidators{
+		Stakes:        make([]*big.Int, 0, len(snap.Validators)),
+		VoteAddresses: make([]types.BLSPublicKey, 0, len(snap.Validators)),
+	}
+	for _, vote := range votes {
+		votedAddrs = append(votedAddrs, vote.VoteAddress)
+	}
+	for _, info := range snap.Validators {
+		validators.Stakes = append(validators.Stakes, info.Stake)
+		validators.VoteAddresses = append(validators.VoteAddresses, info.VoteAddress)
+	}
+	if !isSufficientVotes(votedAddrs, validators) {
 		log.Debug("vote number less than 2/3 validators, skip assemble vote attestation", "header", header.Hash(), "number", header.Number, "parent", parent.Hash(), "votes", len(votes))
 		return nil
 	}
