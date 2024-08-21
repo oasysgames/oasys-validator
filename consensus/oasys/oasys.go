@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"sort"
 	"sync"
@@ -58,6 +59,7 @@ var (
 	diffInTurn = big.NewInt(2) // Block difficulty for in-turn signatures
 	diffNoTurn = big.NewInt(1) // Block difficulty for out-of-turn signatures
 
+	bigMaxInt64 = big.NewInt(math.MaxInt64)
 	ether       = big.NewInt(1_000_000_000_000_000_000)
 	totalSupply = new(big.Int).Mul(big.NewInt(10_000_000_000), ether) // From WhitePaper
 
@@ -323,7 +325,7 @@ func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 // rather depend on a batch of previous headers. The caller may optionally pass
 // in a batch of parents (ascending order) to avoid looking those up from the
 // database. This is useful for concurrently verifying a batch of new headers.
-func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header, env *environmentValue) (err error) {
+func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header, env *params.EnvironmentValue) error {
 	// The genesis block is the always valid dead-end
 	number := header.Number.Uint64()
 	if number == 0 {
@@ -344,6 +346,7 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 	// Ensure that the block's timestamp is older than the scheduled validator backoff time
 	var validators *nextValidators
 	if number > 0 && env.IsEpoch(number) {
+		var err error
 		if c.chainConfig.IsFinalizerEnabled(header.Number) {
 			validators, err = getValidatorsFromHeader(header)
 		} else {
@@ -560,7 +563,7 @@ func getValidatorsFromHeader(header *types.Header) (*nextValidators, error) {
 	return vals, nil
 }
 
-func getEnvironmentFromHeader(header *types.Header) (*environmentValue, error) {
+func getEnvironmentFromHeader(header *types.Header) (*params.EnvironmentValue, error) {
 	// As the vote attestation length is not determistically fixed, we omit the vote attestation info
 	// even if the vote attestations are included, the length is enough smaller than the environment value
 	if len(header.Extra) < extraVanity+envValuesLen+extraSeal {
@@ -568,7 +571,7 @@ func getEnvironmentFromHeader(header *types.Header) (*environmentValue, error) {
 	}
 
 	start := extraVanity
-	env := &environmentValue{
+	env := &params.EnvironmentValue{
 		StartBlock:         new(big.Int).SetBytes(header.Extra[start : start+32]),
 		StartEpoch:         new(big.Int).SetBytes(header.Extra[start+32 : start+64]),
 		BlockPeriod:        new(big.Int).SetBytes(header.Extra[start+64 : start+96]),
@@ -592,7 +595,7 @@ func getVoteAttestationFromHeader(header *types.Header, chainConfig *params.Chai
 		return nil, nil
 	}
 
-	env := getInitialEnvironment(oasysConfig)
+	env := params.InitialEnvironmentValue(oasysConfig)
 	var attestationBytes []byte
 	if !env.IsEpoch(header.Number.Uint64()) {
 		attestationBytes = header.Extra[extraVanity : len(header.Extra)-extraSeal]
@@ -657,7 +660,8 @@ func (c *Oasys) snapshot(chain consensus.ChainHeaderReader, number uint64, hash 
 					return nil, err
 				}
 
-				snap = newSnapshot(c.chainConfig, c.signatures, c.ethAPI, number, hash, validators, getInitialEnvironment(c.config))
+				snap = newSnapshot(c.chainConfig, c.signatures, c.ethAPI,
+					number, hash, validators, params.InitialEnvironmentValue(c.config))
 				if err := snap.store(c.db); err != nil {
 					return nil, err
 				}
@@ -764,7 +768,7 @@ func assembleValidators(validators *nextValidators) []byte {
 	return extra
 }
 
-func assembleEnvironmentValue(env *environmentValue) []byte {
+func assembleEnvironmentValue(env *params.EnvironmentValue) []byte {
 	extra := make([]byte, 0, envValuesLen)
 	extra = append(extra, bigTo32BytesLeftPadding(env.StartBlock)...)
 	extra = append(extra, bigTo32BytesLeftPadding(env.StartEpoch)...)
@@ -1416,7 +1420,7 @@ func (c *Oasys) verifyExtraHeaderLengthInEpoch(number *big.Int, length int) erro
 }
 
 // Verify the value of the Extra header field.
-func (c *Oasys) verifyExtraHeaderValueInEpoch(header *types.Header, actual []byte, actualEnv *environmentValue, actualValidators *nextValidators) error {
+func (c *Oasys) verifyExtraHeaderValueInEpoch(header *types.Header, actual []byte, actualEnv *params.EnvironmentValue, actualValidators *nextValidators) error {
 	if !c.chainConfig.IsFinalizerEnabled(header.Number) {
 		expect := c.getExtraHeaderValueInEpoch(header.Number, actualValidators)
 		if bytes.Equal(actual, expect) {
@@ -1495,7 +1499,7 @@ func OasysRLP(header *types.Header) []byte {
 	return b.Bytes()
 }
 
-func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash, number uint64, env *environmentValue) error {
+func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash, number uint64, env *params.EnvironmentValue) error {
 	if !env.IsEpoch(number) || env.Epoch(number) < 3 || env.Epoch(number) > 60 {
 		return nil
 	}
@@ -1518,10 +1522,10 @@ func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash,
 	return nil
 }
 
-func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header) (*environmentValue, error) {
+func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header) (*params.EnvironmentValue, error) {
 	number := header.Number.Uint64()
 	if number < c.config.Epoch {
-		return getInitialEnvironment(c.config), nil
+		return params.InitialEnvironmentValue(c.config), nil
 	}
 
 	snap, err := c.snapshot(chain, number-1, header.ParentHash, parents)
@@ -1529,7 +1533,7 @@ func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Hea
 		return nil, err
 	}
 
-	var env *environmentValue
+	var env *params.EnvironmentValue
 	if number%snap.Environment.EpochPeriod.Uint64() == 0 {
 		if env, err = getNextEnvironmentValue(c.ethAPI, header.ParentHash); err != nil {
 			log.Error("Failed to get environment value", "in", "environment", "hash", header.ParentHash, "number", number, "err", err)
@@ -1553,7 +1557,7 @@ func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Hea
 }
 
 func (c *Oasys) scheduler(chain consensus.ChainHeaderReader, header *types.Header,
-	env *environmentValue, validators []common.Address, stakes []*big.Int) (*scheduler, error) {
+	env *params.EnvironmentValue, validators []common.Address, stakes []*big.Int) (*scheduler, error) {
 	number := header.Number.Uint64()
 
 	// Previous epoch does not exists.
@@ -1574,8 +1578,16 @@ func (c *Oasys) scheduler(chain consensus.ChainHeaderReader, header *types.Heade
 		return cache.(*scheduler), nil
 	}
 
+	var seed int64
+	if env.Epoch(number) >= c.chainConfig.OasysShortenedBlockTimeStartEpoch().Uint64() {
+		// This has nothing to do with reducing block time, but it has been fixed for possible overflow.
+		seed = new(big.Int).Mod(seedHash.Big(), bigMaxInt64).Int64()
+	} else {
+		seed = seedHash.Big().Int64()
+	}
+
 	created := newScheduler(env, env.GetFirstBlock(number),
-		newWeightedChooser(validators, stakes, seedHash.Big().Int64()))
+		newWeightedChooser(validators, stakes, seed))
 	schedulerCache.Add(seedHash, created)
 	return created, nil
 }

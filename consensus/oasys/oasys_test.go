@@ -15,7 +15,7 @@ func TestAssembleEnvAndValidators(t *testing.T) {
 	var (
 		header     = &types.Header{Extra: make([]byte, extraVanity)}
 		config     = &params.OasysConfig{Period: 15, Epoch: 5760}
-		env        = getInitialEnvironment(config)
+		env        = params.InitialEnvironmentValue(config)
 		size       = 20
 		validators = &nextValidators{
 			Owners:        make([]common.Address, size),

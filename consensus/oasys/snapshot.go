@@ -29,7 +29,7 @@ type Snapshot struct {
 	Validators  map[common.Address]*ValidatorInfo `json:"validators"`            // Set of authorized validators and stakes at this moment
 	Attestation *types.VoteData                   `json:"attestation:omitempty"` // Attestation for fast finality, but `Source` used as `Finalized`
 
-	Environment *environmentValue `json:"environment"`
+	Environment *params.EnvironmentValue `json:"environment"`
 }
 
 type ValidatorInfo struct {
@@ -49,7 +49,7 @@ func (s validatorsAscending) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 // method does not initialize the set of recent validators, so only ever use if for
 // the genesis block.
 func newSnapshot(config *params.ChainConfig, sigcache *lru.ARCCache, ethAPI *ethapi.BlockChainAPI,
-	number uint64, hash common.Hash, validators []common.Address, environment *environmentValue) *Snapshot {
+	number uint64, hash common.Hash, validators []common.Address, environment *params.EnvironmentValue) *Snapshot {
 	snap := &Snapshot{
 		config:      config,
 		sigcache:    sigcache,
@@ -187,7 +187,7 @@ func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderRea
 		}
 
 		var exists bool
-		if number > 0 && number%snap.Environment.EpochPeriod.Uint64() == 0 {
+		if number > 0 && snap.Environment.IsEpoch(number) {
 			var nextValidator *nextValidators
 			if s.config.IsFinalizerEnabled(header.Number) {
 				nextValidator, err = getValidatorsFromHeader(header)
@@ -198,7 +198,7 @@ func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderRea
 				log.Error("Failed to get validators", "in", "Snapshot.apply", "hash", header.ParentHash, "number", number, "err", err)
 				return nil, err
 			}
-			var nextEnv *environmentValue
+			var nextEnv *params.EnvironmentValue
 			if s.config.IsFinalizerEnabled(header.Number) {
 				nextEnv, err = getEnvironmentFromHeader(header)
 			} else {
