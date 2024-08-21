@@ -126,7 +126,7 @@ func (s *Snapshot) copy() *Snapshot {
 }
 
 func (s *Snapshot) updateAttestation(header *types.Header, chainConfig *params.ChainConfig, oasysConfig *params.OasysConfig) {
-	if !chainConfig.IsFinalizerEnabled(header.Number) {
+	if !chainConfig.IsFastFinalityEnabled(header.Number) {
 		return
 	}
 
@@ -189,7 +189,7 @@ func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderRea
 		var exists bool
 		if number > 0 && snap.Environment.IsEpoch(number) {
 			var nextValidator *nextValidators
-			if s.config.IsFinalizerEnabled(header.Number) {
+			if s.config.IsFastFinalityEnabled(header.Number) {
 				nextValidator, err = getValidatorsFromHeader(header)
 			} else {
 				nextValidator, err = getNextValidators(s.config, s.ethAPI, header.ParentHash, snap.Environment.Epoch(number), number)
@@ -199,7 +199,7 @@ func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderRea
 				return nil, err
 			}
 			var nextEnv *params.EnvironmentValue
-			if s.config.IsFinalizerEnabled(header.Number) {
+			if s.config.IsFastFinalityEnabled(header.Number) {
 				nextEnv, err = getEnvironmentFromHeader(header)
 			} else {
 				nextEnv, err = getNextEnvironmentValue(s.ethAPI, header.ParentHash)

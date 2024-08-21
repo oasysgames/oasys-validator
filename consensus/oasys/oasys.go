@@ -347,7 +347,7 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 	var validators *nextValidators
 	if number > 0 && env.IsEpoch(number) {
 		var err error
-		if c.chainConfig.IsFinalizerEnabled(header.Number) {
+		if c.chainConfig.IsFastFinalityEnabled(header.Number) {
 			validators, err = getValidatorsFromHeader(header)
 		} else {
 			validators, err = getNextValidators(c.chainConfig, c.ethAPI, header.ParentHash, env.Epoch(number), number)
@@ -401,7 +401,7 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 		log.Warn("Verify vote attestation failed", "error", err, "hash", header.Hash(), "number", header.Number,
 			"parent", header.ParentHash, "coinbase", header.Coinbase, "extra", common.Bytes2Hex(header.Extra))
 		verifyVoteAttestationErrorCounter.Inc(1)
-		if chain.Config().IsFinalizerEnabled(header.Number) {
+		if chain.Config().IsFastFinalityEnabled(header.Number) {
 			return err
 		}
 	}
@@ -591,7 +591,7 @@ func getVoteAttestationFromHeader(header *types.Header, chainConfig *params.Chai
 		return nil, nil
 	}
 
-	if !chainConfig.IsFinalizerEnabled(header.Number) {
+	if !chainConfig.IsFastFinalityEnabled(header.Number) {
 		return nil, nil
 	}
 
@@ -783,7 +783,7 @@ func assembleEnvironmentValue(env *params.EnvironmentValue) []byte {
 }
 
 func (c *Oasys) assembleVoteAttestation(chain consensus.ChainHeaderReader, header *types.Header) error {
-	if !c.chainConfig.IsFinalizerEnabled(header.Number) || header.Number.Uint64() < 2 {
+	if !c.chainConfig.IsFastFinalityEnabled(header.Number) || header.Number.Uint64() < 2 {
 		return nil
 	}
 
@@ -914,7 +914,7 @@ func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 			return err
 		}
 		validators, stakes = result.Operators, result.Stakes
-		if c.chainConfig.IsFinalizerEnabled(header.Number) {
+		if c.chainConfig.IsFastFinalityEnabled(header.Number) {
 			header.Extra = append(header.Extra, assembleEnvironmentValue(env)...)
 		}
 		header.Extra = append(header.Extra, c.getExtraHeaderValueInEpoch(header.Number, result)...)
@@ -1341,7 +1341,7 @@ func (c *Oasys) GetJustifiedNumberAndHash(chain consensus.ChainHeaderReader, hea
 	}
 
 	if snap.Attestation == nil {
-		if c.chainConfig.IsFinalizerEnabled(head.Number) {
+		if c.chainConfig.IsFastFinalityEnabled(head.Number) {
 			log.Debug("once one attestation generated, attestation of snap would not be nil forever basically")
 		}
 		return 0, chain.GetHeaderByNumber(0).Hash(), nil
@@ -1354,7 +1354,7 @@ func (c *Oasys) GetFinalizedHeader(chain consensus.ChainHeaderReader, header *ty
 	if chain == nil || header == nil {
 		return nil
 	}
-	if !chain.Config().IsFinalizerEnabled(header.Number) {
+	if !chain.Config().IsFastFinalityEnabled(header.Number) {
 		return chain.GetHeaderByNumber(0)
 	}
 
@@ -1374,7 +1374,7 @@ func (c *Oasys) GetFinalizedHeader(chain consensus.ChainHeaderReader, header *ty
 
 // Converting the validator list for the extra header field.
 func (c *Oasys) getExtraHeaderValueInEpoch(number *big.Int, validators *nextValidators) []byte {
-	if !c.chainConfig.IsFinalizerEnabled(number) {
+	if !c.chainConfig.IsFastFinalityEnabled(number) {
 		cpy := make([]common.Address, len(validators.Operators))
 		copy(cpy, validators.Operators)
 
@@ -1400,7 +1400,7 @@ func (c *Oasys) getExtraHeaderValueInEpoch(number *big.Int, validators *nextVali
 
 // Verify the length of the Extra header field.
 func (c *Oasys) verifyExtraHeaderLengthInEpoch(number *big.Int, length int) error {
-	if !c.chainConfig.IsFinalizerEnabled(number) {
+	if !c.chainConfig.IsFastFinalityEnabled(number) {
 		if c.chainConfig.IsForkedOasysPublication(number) {
 			if length != crypto.DigestLength {
 				return errInvalidEpochHash
@@ -1421,7 +1421,7 @@ func (c *Oasys) verifyExtraHeaderLengthInEpoch(number *big.Int, length int) erro
 
 // Verify the value of the Extra header field.
 func (c *Oasys) verifyExtraHeaderValueInEpoch(header *types.Header, actual []byte, actualEnv *params.EnvironmentValue, actualValidators *nextValidators) error {
-	if !c.chainConfig.IsFinalizerEnabled(header.Number) {
+	if !c.chainConfig.IsFastFinalityEnabled(header.Number) {
 		expect := c.getExtraHeaderValueInEpoch(header.Number, actualValidators)
 		if bytes.Equal(actual, expect) {
 			return nil
