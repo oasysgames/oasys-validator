@@ -1025,7 +1025,7 @@ func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Hea
 	}
 
 	var env *params.EnvironmentValue
-	if number%snap.Environment.EpochPeriod.Uint64() == 0 {
+	if snap.Environment.IsEpoch(number) {
 		if env, err = getNextEnvironmentValue(c.ethAPI, header.ParentHash); err != nil {
 			log.Error("Failed to get environment value", "in", "environment", "hash", header.ParentHash, "number", number, "err", err)
 			return nil, err
