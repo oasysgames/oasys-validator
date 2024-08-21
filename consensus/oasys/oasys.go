@@ -488,9 +488,9 @@ func (o *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header 
 		votedPubKeys = append(votedPubKeys, votedPubKey)
 	}
 
-	// The valid voted validators should be no less than 2/3 validators.
+	// The valid voted validators should be no less than 2/3 voting power.
 	if !isSufficientVotes(votedAddrs, validators) {
-		return errors.New("invalid attestation, not enough validators voted")
+		return errors.New("invalid attestation, not enough voting power voted")
 	}
 
 	// Verify the aggregated signature.
@@ -812,7 +812,7 @@ func (c *Oasys) assembleVoteAttestation(chain consensus.ChainHeaderReader, heade
 		validators.VoteAddresses = append(validators.VoteAddresses, info.VoteAddress)
 	}
 	if !isSufficientVotes(votedAddrs, validators) {
-		log.Debug("vote number less than 2/3 validators, skip assemble vote attestation", "header", header.Hash(), "number", header.Number, "parent", parent.Hash(), "votes", len(votes))
+		log.Debug("vote number less than 2/3 voting power, skip assemble vote attestation", "header", header.Hash(), "number", header.Number, "parent", parent.Hash(), "votes", len(votes))
 		return nil
 	}
 
