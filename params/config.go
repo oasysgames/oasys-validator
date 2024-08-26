@@ -228,7 +228,7 @@ var (
 		MuirGlacierBlock:    big.NewInt(0),
 		BerlinBlock:         big.NewInt(0),
 		LondonBlock:         big.NewInt(0),
-		ShanghaiTime:        newUint64(1721305800), // Thu Jul 18 2024 21:30:00 GMT+0900
+		ShanghaiTime:        newUint64(1721910600), // Thu Jul 25 2024 21:30:00 GMT+0900
 
 		Oasys: &OasysConfig{
 			Period: 15,
@@ -474,6 +474,9 @@ func (c *ChainConfig) Description() string {
 	if c.OasysExtendDifficultyBlock() != nil {
 		banner += fmt.Sprintf(" - Oasys Extend Difficulty:     #%-8v (https://github.com/oasysgames/oasys-validator/releases/tag/v1.3.0)\n", c.OasysExtendDifficultyBlock())
 	}
+	if c.OasysShortenedBlockTimeStartEpoch() != nil {
+		banner += fmt.Sprintf(" - Oasys Shorten BlockTime:     Epoch#%-3v (https://github.com/oasysgames/oasys-validator/releases/tag/v1.5.0)\n", c.OasysShortenedBlockTimeStartEpoch())
+	}
 	if c.ShanghaiTime != nil {
 		banner += fmt.Sprintf(" - Shanghai:                    @%-10v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/shanghai.md)\n", *c.ShanghaiTime)
 	}
@@ -597,6 +600,20 @@ func (c *ChainConfig) OasysExtendDifficultyBlock() *big.Int {
 // IsForkedOasysExtendDifficulty returns true if num is equal to or greater than the Oasys fork block.
 func (c *ChainConfig) IsForkedOasysExtendDifficulty(num *big.Int) bool {
 	return isBlockForked(c.OasysExtendDifficultyBlock(), num)
+}
+
+// OasysShortenedBlockTimeBlock returns the hard fork of Oasys.
+func (c *ChainConfig) OasysShortenedBlockTimeStartEpoch() *big.Int {
+	if c.Oasys == nil {
+		return nil
+	}
+	if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
+		return big.NewInt(SHORT_BLOCK_TIME_FORK_EPOCH_MAINNET)
+	}
+	if c.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0 {
+		return big.NewInt(SHORT_BLOCK_TIME_FORK_EPOCH_TESTNET)
+	}
+	return big.NewInt(SHORT_BLOCK_TIME_FORK_EPOCH_OTHERS)
 }
 
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.

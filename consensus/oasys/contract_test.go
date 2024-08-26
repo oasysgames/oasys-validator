@@ -318,7 +318,7 @@ func TestGetRewards(t *testing.T) {
 }
 
 func TestGetNextEnvironmentValue(t *testing.T) {
-	want := &environmentValue{
+	want := &params.EnvironmentValue{
 		StartBlock:         common.Big0,
 		StartEpoch:         common.Big1,
 		BlockPeriod:        big.NewInt(3),
