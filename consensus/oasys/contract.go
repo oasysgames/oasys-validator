@@ -39,8 +39,8 @@ const (
 var (
 	//go:embed oasys-genesis-contract-cfb3cd0/artifacts/contracts/Environment.sol/Environment.json
 	//go:embed oasys-genesis-contract-cfb3cd0/artifacts/contracts/StakeManager.sol/StakeManager.json
-	//go:embed oasys-genesis-contract-6037082/artifacts/contracts/StakeManager.sol/StakeManager.json
-	//go:embed oasys-genesis-contract-6037082/artifacts/contracts/CandidateValidatorManager.sol/CandidateValidatorManager.json
+	//go:embed oasys-genesis-contract-5675779/artifacts/contracts/StakeManager.sol/StakeManager.json
+	//go:embed oasys-genesis-contract-5675779/artifacts/contracts/CandidateValidatorManager.sol/CandidateValidatorManager.json
 	artifacts embed.FS
 
 	// Oasys genesis contracts
@@ -59,7 +59,7 @@ var (
 	stakeManager = &genesisContract{
 		address: common.HexToAddress(stakeManagerAddress),
 		artifact: &artifact{
-			path: filepath.FromSlash("oasys-genesis-contract-6037082/artifacts/contracts/StakeManager.sol/StakeManager.json"),
+			path: filepath.FromSlash("oasys-genesis-contract-5675779/artifacts/contracts/StakeManager.sol/StakeManager.json"),
 		},
 	}
 	systemMethods = map[*genesisContract]map[string]int{
@@ -72,7 +72,7 @@ var (
 	candidateManager = &builtinContract{
 		address: common.HexToAddress(candidateManagerAddress),
 		artifact: &artifact{
-			path: filepath.FromSlash("oasys-genesis-contract-6037082/artifacts/contracts/CandidateValidatorManager.sol/CandidateValidatorManager.json"),
+			path: filepath.FromSlash("oasys-genesis-contract-5675779/artifacts/contracts/CandidateValidatorManager.sol/CandidateValidatorManager.json"),
 		},
 	}
 )
