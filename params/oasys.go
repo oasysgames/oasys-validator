@@ -11,8 +11,8 @@ const (
 	SHORT_BLOCK_TIME_EPOCH_PERIOD = 14400 // 6 sec * 14400 block = 1 days
 
 	SHORT_BLOCK_TIME_FORK_EPOCH_MAINNET = 999 // TODO
-	SHORT_BLOCK_TIME_FORK_EPOCH_TESTNET = 999 // TODO
-	SHORT_BLOCK_TIME_FORK_EPOCH_OTHERS  = 10  // for local chain
+	SHORT_BLOCK_TIME_FORK_EPOCH_TESTNET = 699
+	SHORT_BLOCK_TIME_FORK_EPOCH_OTHERS  = 10 // for local chain
 )
 
 // EnvironmentValue is a representation of `Environment.EnvironmentValue`.
