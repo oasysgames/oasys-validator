@@ -802,6 +802,11 @@ func (c *Oasys) assembleVoteAttestation(chain consensus.ChainHeaderReader, heade
 	}
 	votes := c.VotePool.FetchVoteByBlockHash(parent.Hash())
 
+	if len(votes) == 0 {
+		log.Debug("no votes found, skip assemble vote attestation", "header", header.Hash(), "number", header.Number, "parent", parent.Hash())
+		return nil
+	}
+
 	// Check if the number of votes is sufficient
 	votedAddrs := make([]types.BLSPublicKey, 0, len(votes))
 	validators := &nextValidators{
