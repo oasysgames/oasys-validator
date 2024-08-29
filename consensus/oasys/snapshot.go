@@ -131,7 +131,7 @@ func (s *Snapshot) updateAttestation(header *types.Header, chainConfig *params.C
 	}
 
 	// The attestation should have been checked in verify header, update directly
-	attestation, _ := getVoteAttestationFromHeader(header, chainConfig, oasysConfig)
+	attestation, _ := getVoteAttestationFromHeader(header, chainConfig, oasysConfig, s.Environment)
 	if attestation == nil {
 		return
 	}
@@ -265,6 +265,16 @@ func (s *Snapshot) validatorsToTuple() ([]common.Address, []*big.Int, []int, []t
 		i++
 	}
 	return operators, stakes, indexes, voteAddresses
+}
+
+func (s *Snapshot) nextValidators() *nextValidators {
+	operators, stakes, indexes, voteAddresses := s.validatorsToTuple()
+	return &nextValidators{
+		Operators:     operators,
+		Stakes:        stakes,
+		Indexes:       indexes,
+		VoteAddresses: voteAddresses,
+	}
 }
 
 func parseValidatorBytes(validatorBytes []byte) ([]common.Address, error) {

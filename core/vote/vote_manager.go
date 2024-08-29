@@ -144,7 +144,7 @@ func (voteManager *VoteManager) loop() {
 				func(bLSPublicKey *types.BLSPublicKey) bool {
 					return bytes.Equal(voteManager.signer.PubKey[:], bLSPublicKey[:])
 				}) {
-				log.Debug("cur validator is not within the validatorSet at curHead", "signer", common.Bytes2Hex(voteManager.signer.PubKey[:]))
+				log.Debug("cur validator is not within the validatorSet at curHead or registered blsPubKey does not match", "signer", common.Bytes2Hex(voteManager.signer.PubKey[:]), "curHead", curHead.Number)
 				continue
 			}
 
