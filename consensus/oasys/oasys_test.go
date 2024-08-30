@@ -21,7 +21,6 @@ func TestAssembleEnvAndValidators(t *testing.T) {
 			Owners:        make([]common.Address, size),
 			Operators:     make([]common.Address, size),
 			Stakes:        make([]*big.Int, size),
-			Indexes:       make([]int, size),
 			VoteAddresses: make([]types.BLSPublicKey, size),
 		}
 	)
@@ -30,7 +29,6 @@ func TestAssembleEnvAndValidators(t *testing.T) {
 		validators.Owners[i] = testutil.RandomAddress()
 		validators.Operators[i] = testutil.RandomAddress()
 		validators.Stakes[i] = newEth(int64(i))
-		validators.Indexes[i] = i
 		validators.VoteAddresses[i] = randomBLSPublicKey()
 	}
 
@@ -62,7 +60,6 @@ func TestAssembleEnvAndValidators(t *testing.T) {
 		require.ElementsMatch(t, validators.Operators[i].Bytes(), actualVals.Operators[i].Bytes())
 		require.ElementsMatch(t, validators.Owners[i].Bytes(), actualVals.Owners[i].Bytes())
 		require.ElementsMatch(t, validators.Stakes[i].Bytes(), actualVals.Stakes[i].Bytes())
-		require.Equal(t, validators.Indexes[i], actualVals.Indexes[i])
 		require.ElementsMatch(t, validators.VoteAddresses[i].Bytes(), actualVals.VoteAddresses[i].Bytes())
 	}
 }

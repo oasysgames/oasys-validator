@@ -33,6 +33,7 @@ type Snapshot struct {
 }
 
 type ValidatorInfo struct {
+	// The index is determined by the sorted order of the validator owner address
 	Index       int                `json:"index:omitempty"` // The index should offset by 1
 	Stake       *big.Int           `json:"stake:omitempty"` // The stake amount
 	VoteAddress types.BLSPublicKey `json:"vote_address,omitempty"`
@@ -59,8 +60,9 @@ func newSnapshot(config *params.ChainConfig, sigcache *lru.ARCCache, ethAPI *eth
 		Validators:  make(map[common.Address]*ValidatorInfo),
 		Environment: environment.Copy(),
 	}
-	for _, address := range validators {
+	for i, address := range validators {
 		snap.Validators[address] = &ValidatorInfo{
+			Index: i + 1,
 			Stake: new(big.Int).Set(common.Big0),
 		}
 	}
@@ -190,13 +192,15 @@ func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderRea
 		if number > 0 && snap.Environment.IsEpoch(number) {
 			var nextValidator *nextValidators
 			if s.config.IsFastFinalityEnabled(header.Number) {
-				nextValidator, err = getValidatorsFromHeader(header)
-			} else {
-				nextValidator, err = getNextValidators(s.config, s.ethAPI, header.ParentHash, snap.Environment.Epoch(number), number)
+				if nextValidator, err = getValidatorsFromHeader(header); err != nil {
+					log.Warn("failed to get validators from header", "in", "Snapshot.apply", "hash", header.Hash(), "number", number, "err", err)
+				}
 			}
-			if err != nil {
-				log.Error("Failed to get validators", "in", "Snapshot.apply", "hash", header.ParentHash, "number", number, "err", err)
-				return nil, err
+			if nextValidator == nil {
+				if nextValidator, err = getNextValidators(s.config, s.ethAPI, header.ParentHash, snap.Environment.Epoch(number), number); err != nil {
+					return nil, fmt.Errorf("failed to get validators, in Snapshot.apply, err: %w", err)
+				}
+				nextValidator.SortByOwner() // sort by owner for fast finality
 			}
 			var nextEnv *params.EnvironmentValue
 			if s.config.IsFastFinalityEnabled(header.Number) {
@@ -212,8 +216,9 @@ func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderRea
 			snap.Environment = nextEnv.Copy()
 			snap.Validators = make(map[common.Address]*ValidatorInfo, len(nextValidator.Operators))
 			for i, address := range nextValidator.Operators {
+				voterIndex := i + 1
 				snap.Validators[address] = &ValidatorInfo{
-					Index:       i,
+					Index:       voterIndex,
 					Stake:       nextValidator.Stakes[i],
 					VoteAddress: nextValidator.VoteAddresses[i],
 				}
@@ -251,28 +256,21 @@ func (s *Snapshot) exists(validator common.Address) bool {
 	return ok
 }
 
-func (s *Snapshot) validatorsToTuple() ([]common.Address, []*big.Int, []int, []types.BLSPublicKey) {
+func (s *Snapshot) ToNextValidators() *nextValidators {
 	operators := make([]common.Address, len(s.Validators))
 	stakes := make([]*big.Int, len(s.Validators))
-	indexes := make([]int, len(s.Validators))
 	voteAddresses := make([]types.BLSPublicKey, len(s.Validators))
-	i := 0
 	for address, info := range s.Validators {
+		// Make sure the voterIndex is reserved for fast finality
+		i := info.Index - 1
 		operators[i] = address
 		stakes[i] = new(big.Int).Set(info.Stake)
-		indexes[i] = info.Index
 		copy(voteAddresses[i][:], info.VoteAddress[:])
-		i++
 	}
-	return operators, stakes, indexes, voteAddresses
-}
-
-func (s *Snapshot) nextValidators() *nextValidators {
-	operators, stakes, indexes, voteAddresses := s.validatorsToTuple()
 	return &nextValidators{
+		Owners:        make([]common.Address, len(operators)), // take care the owners is empty
 		Operators:     operators,
 		Stakes:        stakes,
-		Indexes:       indexes,
 		VoteAddresses: voteAddresses,
 	}
 }
