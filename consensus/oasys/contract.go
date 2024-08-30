@@ -11,6 +11,7 @@ import (
 	"math"
 	"math/big"
 	"path/filepath"
+	"sort"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts"
@@ -166,7 +167,6 @@ type nextValidators struct {
 	Operators []common.Address
 	Stakes    []*big.Int
 	// for finality
-	Indexes       []int
 	VoteAddresses []types.BLSPublicKey
 }
 
@@ -175,12 +175,10 @@ func (p *nextValidators) Copy() *nextValidators {
 		Owners:        make([]common.Address, len(p.Owners)),
 		Operators:     make([]common.Address, len(p.Operators)),
 		Stakes:        make([]*big.Int, len(p.Stakes)),
-		Indexes:       make([]int, len(p.Indexes)),
 		VoteAddresses: make([]types.BLSPublicKey, len(p.VoteAddresses)),
 	}
 	copy(cpy.Owners, p.Owners)
 	copy(cpy.Operators, p.Operators)
-	copy(cpy.Indexes, p.Indexes)
 	copy(cpy.VoteAddresses, p.VoteAddresses)
 	for i, v := range p.Stakes {
 		cpy.Stakes[i] = new(big.Int).Set(v)
@@ -195,6 +193,39 @@ func (p *nextValidators) Exists(validator common.Address) bool {
 		}
 	}
 	return false
+}
+
+func (p *nextValidators) SortByOwner() {
+	// Create a slice of indices based on the length of the Owners slice
+	indices := make([]int, len(p.Owners))
+	for i := range indices {
+		indices[i] = i
+	}
+
+	// Sort the indices based on the Owners slice
+	sort.Slice(indices, func(i, j int) bool {
+		return bytes.Compare(p.Owners[indices[i]][:], p.Owners[indices[j]][:]) < 0
+	})
+
+	// Create new slices to hold the sorted data
+	sortedOwners := make([]common.Address, len(p.Owners))
+	sortedOperators := make([]common.Address, len(p.Owners))
+	sortedStakes := make([]*big.Int, len(p.Owners))
+	sortedVoteAddresses := make([]types.BLSPublicKey, len(p.Owners))
+
+	// Rearrange all slices according to the sorted indices
+	for i, idx := range indices {
+		sortedOwners[i] = p.Owners[idx]
+		sortedOperators[i] = p.Operators[idx]
+		sortedStakes[i] = p.Stakes[idx]
+		sortedVoteAddresses[i] = p.VoteAddresses[idx]
+	}
+
+	// Assign sorted slices back to the struct fields
+	p.Owners = sortedOwners
+	p.Operators = sortedOperators
+	p.Stakes = sortedStakes
+	p.VoteAddresses = sortedVoteAddresses
 }
 
 // callmsg
@@ -448,7 +479,6 @@ func callGetHighStakes(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*n
 				result.Owners = append(result.Owners, recv.Owners[i])
 				result.Operators = append(result.Operators, recv.Operators[i])
 				result.Stakes = append(result.Stakes, recv.Stakes[i])
-				result.Indexes = append(result.Indexes, i)
 				if len(recv.BlsPublicKeys[i]) == types.BLSPublicKeyLength {
 					result.VoteAddresses = append(result.VoteAddresses, types.BLSPublicKey(recv.BlsPublicKeys[i]))
 				} else {
