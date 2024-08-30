@@ -50,7 +50,7 @@ var deploymentSets = map[common.Hash]map[uint64]deploymentSet{
 			deployments8,
 			deployments9,
 			deployments10,
-			deployments11,
+			// deployments11, // Disable this feature as it changes the epoch, which can impact development.
 			deployments12,
 		},
 	},
