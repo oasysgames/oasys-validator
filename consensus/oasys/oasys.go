@@ -269,14 +269,15 @@ func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 	if len(header.Extra) < extraVanity+extraSeal {
 		return errMissingSignature
 	}
-	// Get the environment value from the header if the block is epoch block
-	env, err := getEnvironmentFromHeader(header)
-	if errors.Is(err, errNoEnvironmentValue) {
-		// Get from snapshot if the block is not epoch block
-		env, err = c.environment(chain, header, parents)
-	}
+	// Apply parent headers to the snapshot, the snapshot updates is only processed here.
+	snap, err := c.snapshot(chain, number-1, header.ParentHash, parents)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to retrieve snapshot, in: verifyHeader, blockNumber: %d, parentHash: %x, err: %v", number, header.ParentHash, err)
+	}
+	// Get the environment value from snapshot except the block is epoch block
+	env, err := c.environment(chain, header, snap, true)
+	if err != nil {
+		return fmt.Errorf("failed to get environment value, in: verifyHeader, err: %v", err)
 	}
 	// Ensure that the extra-data contains extra data aside from the vanity and seal
 	extraLenExceptVanityAndSeal := len(header.Extra) - extraVanity - extraSeal
@@ -318,14 +319,14 @@ func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 		return fmt.Errorf("invalid parentBeaconRoot, have %#x, expected nil", header.ParentBeaconRoot)
 	}
 	// All basic checks passed, verify cascading fields
-	return c.verifyCascadingFields(chain, header, parents, env)
+	return c.verifyCascadingFields(chain, header, parents, snap, env)
 }
 
 // verifyCascadingFields verifies all the header fields that are not standalone,
 // rather depend on a batch of previous headers. The caller may optionally pass
 // in a batch of parents (ascending order) to avoid looking those up from the
 // database. This is useful for concurrently verifying a batch of new headers.
-func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header, env *params.EnvironmentValue) error {
+func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header, snap *Snapshot, env *params.EnvironmentValue) error {
 	// The genesis block is the always valid dead-end
 	number := header.Number.Uint64()
 	if number == 0 {
@@ -343,16 +344,15 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 		return consensus.ErrUnknownAncestor
 	}
 
-	// Ensure that the block's timestamp is older than the scheduled validator backoff time
-	validators, err := c.getNextValidators(chain, env, header, true)
+	// Get the validators from snapshot except the block is epoch block
+	validators, err := c.getNextValidators(chain, header, snap, true)
 	if err != nil {
-		log.Error("Failed to get validators", "in", "verifyCascadingFields", "hash", header.ParentHash, "number", number, "err", err)
-		return err
+		return fmt.Errorf("failed to get validators, in: verifyCascadingFields, err: %v", err)
 	}
+	// Ensure that the block's timestamp is older than the scheduled validator backoff time
 	scheduler, err := c.scheduler(chain, header, env, validators.Operators, validators.Stakes)
 	if err != nil {
-		log.Error("Failed to get scheduler", "in", "verifyCascadingFields", "number", number, "err", err)
-		return err
+		return fmt.Errorf("failed to get scheduler. blockNumber: %d, in: verifyCascadingFields, err: %v", number, err)
 	}
 	if header.Time < parent.Time+env.BlockPeriod.Uint64()+scheduler.backOffTime(number, header.Coinbase) {
 		return consensus.ErrFutureBlock
@@ -376,7 +376,7 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 	}
 
 	// Verify vote attestation for fast finality.
-	if err := c.verifyVoteAttestation(chain, header, parents, env); err != nil {
+	if err := c.verifyVoteAttestation(chain, header, parents, env, validators); err != nil {
 		log.Warn("Verify vote attestation failed", "error", err, "hash", header.Hash(), "number", header.Number,
 			"parent", header.ParentHash, "coinbase", header.Coinbase, "extra", common.Bytes2Hex(header.Extra))
 		verifyVoteAttestationErrorCounter.Inc(1)
@@ -406,7 +406,7 @@ func (o *Oasys) getParent(chain consensus.ChainHeaderReader, header *types.Heade
 }
 
 // verifyVoteAttestation checks whether the vote attestation in the header is valid.
-func (o *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header, env *params.EnvironmentValue) error {
+func (o *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header, env *params.EnvironmentValue, validators *nextValidators) error {
 	attestation, err := getVoteAttestationFromHeader(header, o.chainConfig, o.config, env)
 	if err != nil {
 		return err
@@ -452,18 +452,15 @@ func (o *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header 
 	}
 
 	// Filter out valid validator from attestation.
-	validators, err := o.getNextValidators(chain, env, parent, true)
-	if err != nil {
-		log.Error("Failed to get validators", "in", "verifyVoteAttestation", "hash", header.ParentHash, "number", header.Number, "err", err)
-	}
 	validatorsBitSet := bitset.From([]uint64{uint64(attestation.VoteAddressSet)})
-	if validatorsBitSet.Count() > uint(len(validators.Indexes)) {
-		return fmt.Errorf("invalid attestation, vote number(=%d) larger than validators number(=%d)", validatorsBitSet.Count(), len(validators.Indexes))
+	if validatorsBitSet.Count() > uint(len(validators.Operators)) {
+		return fmt.Errorf("invalid attestation, vote number(=%d) larger than validators number(=%d)", validatorsBitSet.Count(), len(validators.Operators))
 	}
 	votedAddrs := make([]types.BLSPublicKey, 0, validatorsBitSet.Count())
 	votedPubKeys := make([]bls.PublicKey, 0, validatorsBitSet.Count())
-	for i, index := range validators.Indexes {
-		if !validatorsBitSet.Test(uint(index)) {
+	for i := range validators.Operators {
+		voterIndex := i + 1
+		if !validatorsBitSet.Test(uint(voterIndex)) {
 			continue
 		}
 		votedAddrs = append(votedAddrs, validators.VoteAddresses[i])
@@ -527,7 +524,6 @@ func getValidatorsFromHeader(header *types.Header) (*nextValidators, error) {
 		Owners:        make([]common.Address, num),
 		Operators:     make([]common.Address, num),
 		Stakes:        make([]*big.Int, num),
-		Indexes:       make([]int, num),
 		VoteAddresses: make([]types.BLSPublicKey, num),
 	}
 	start := extraVanity + envValuesLen + validatorNumberSize
@@ -540,7 +536,6 @@ func getValidatorsFromHeader(header *types.Header) (*nextValidators, error) {
 		start += stakeBytesLen
 		copy(vals.VoteAddresses[i][:], header.Extra[start:start+types.BLSPublicKeyLength])
 		start += types.BLSPublicKeyLength
-		vals.Indexes[i] = i
 	}
 
 	return vals, nil
@@ -739,9 +734,9 @@ func (c *Oasys) verifySeal(chain consensus.ChainHeaderReader, header *types.Head
 func assembleValidators(validators *nextValidators) []byte {
 	extra := make([]byte, 0, 1+len(validators.Operators)*common.AddressLength)
 	// add validator number
-	extra = append(extra, byte(len(validators.Owners)))
+	extra = append(extra, byte(len(validators.Operators)))
 	// add validator info
-	for i := 0; i < len(validators.Owners); i++ {
+	for i := 0; i < len(validators.Operators); i++ {
 		extra = append(extra, validators.Owners[i].Bytes()...)
 		extra = append(extra, validators.Operators[i].Bytes()...)
 		extra = append(extra, bigTo32BytesLeftPadding(validators.Stakes[i])...)
@@ -830,7 +825,8 @@ func (c *Oasys) assembleVoteAttestation(chain consensus.ChainHeaderReader, heade
 	// Prepare vote address bitset.
 	for i, voteAddr := range validators.VoteAddresses {
 		if _, ok := voteAddrSet[voteAddr]; ok {
-			attestation.VoteAddressSet |= 1 << validators.Indexes[i]
+			voterIndex := i + 1
+			attestation.VoteAddressSet |= 1 << voterIndex
 		}
 	}
 	validatorsBitSet := bitset.From([]uint64{uint64(attestation.VoteAddressSet)})
@@ -867,27 +863,31 @@ func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 	// Mix digest is reserved for now, set to empty
 	header.MixDigest = common.Hash{}
 
-	env, err := c.environment(chain, header, nil)
-	if err != nil {
-		return err
-	}
-
 	// Ensure the extra data has all its components
 	if len(header.Extra) < extraVanity {
 		header.Extra = append(header.Extra, bytes.Repeat([]byte{0x00}, extraVanity-len(header.Extra))...)
 	}
 	header.Extra = header.Extra[:extraVanity]
 
-	validators, err := c.getNextValidators(chain, env, header, false)
+	snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
 	if err != nil {
-		log.Error("Failed to get validators", "in", "Prepare", "hash", header.ParentHash, "number", number, "err", err)
-		return err
+		return fmt.Errorf("failed to retrieve snapshot, in: Prepare, blockNumber: %d, parentHash: %x, err: %v", number, header.ParentHash, err)
 	}
+	env, err := c.environment(chain, header, snap, false)
+	if err != nil {
+		return fmt.Errorf("failed to get environment, in: Prepare, err: %v", err)
+	}
+	validators, err := c.getNextValidators(chain, header, snap, false)
+	if err != nil {
+		return fmt.Errorf("failed to get validators, in: Prepare, err: %v", err)
+	}
+
+	// Add the difficulty
 	scheduler, err := c.scheduler(chain, header, env, validators.Operators, validators.Stakes)
 	if err != nil {
-		log.Error("Failed to get scheduler", "in", "Prepare", "number", number, "err", err)
-		return err
+		return fmt.Errorf("failed to get scheduler, in: Prepare, blockNumber: %d, err: %v", number, err)
 	}
+	header.Difficulty = scheduler.difficulty(number, c.signer, c.chainConfig.IsForkedOasysExtendDifficulty(header.Number))
 
 	// Add validators to the extra data
 	if env.IsEpoch(number) {
@@ -899,9 +899,6 @@ func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 
 	// Add extra seal
 	header.Extra = append(header.Extra, make([]byte, extraSeal)...)
-
-	// Add the difficulty
-	header.Difficulty = scheduler.difficulty(number, c.signer, c.chainConfig.IsForkedOasysExtendDifficulty(header.Number))
 
 	// Ensure the timestamp has the correct delay
 	parent := chain.GetHeader(header.ParentHash, number-1)
@@ -935,25 +932,21 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 	if number == 1 {
 		err := c.initializeSystemContracts(state, header, cx, txs, receipts, systemTxs, usedGas, false)
 		if err != nil {
-			log.Error("Failed to initialize system contracts", "in", "Finalize", "hash", hash, "number", number, "err", err)
-			return err
+			return fmt.Errorf("failed to initialize system contracts, in: Finalize, blockNumber: %d, blockHash: %s, err: %v", number, hash, err)
 		}
 	}
 
-	env, err := c.environment(chain, header, nil)
+	snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to retrieve snapshot, in: Finalize, blockNumber: %d, parentHash: %x, err: %v", number, header.ParentHash, err)
 	}
-
-	validators, err := c.getNextValidators(chain, env, header, false)
+	env, err := c.environment(chain, header, snap, false)
 	if err != nil {
-		log.Error("Failed to get validators", "in", "Finalize", "hash", header.ParentHash, "number", number, "err", err)
-		return err
+		return fmt.Errorf("failed to get environment, in: Finalize, err: %v", err)
 	}
-	scheduler, err := c.scheduler(chain, header, env, validators.Operators, validators.Stakes)
+	validators, err := c.getNextValidators(chain, header, snap, false)
 	if err != nil {
-		log.Error("Failed to get scheduler", "in", "Finalize", "number", number, "err", err)
-		return err
+		return fmt.Errorf("failed to get validators, in: Finalize, err: %v", err)
 	}
 
 	// If the block is a epoch block, verify the validator list or hash
@@ -965,8 +958,7 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 	}
 
 	if err := c.addBalanceToStakeManager(state, header.ParentHash, number, env); err != nil {
-		log.Error("Failed to add balance to staking contract", "in", "Finalize", "hash", header.ParentHash, "number", number, "err", err)
-		return err
+		return fmt.Errorf("failed to add balance to staking contract, in: Finalize, blockNumber: %d, blockHash: %s, err: %v", number, hash, err)
 	}
 
 	if number >= c.config.Epoch {
@@ -974,9 +966,13 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 		if err != nil {
 			return err
 		}
+		scheduler, err := c.scheduler(chain, header, env, validators.Operators, validators.Stakes)
+		if err != nil {
+			return fmt.Errorf("failed to get scheduler, in: Finalize, blockNumber: %d, blockHash: %s, err: %v", number, hash, err)
+		}
 		if expected := *scheduler.expect(number); expected != validator {
 			if err := c.slash(expected, scheduler.schedules(), state, header, cx, txs, receipts, systemTxs, usedGas, false); err != nil {
-				log.Error("Failed to slash validator", "in", "Finalize", "hash", hash, "number", number, "address", expected, "err", err)
+				log.Warn("failed to slash validator", "in", "Finalize", "hash", hash, "number", number, "address", expected, "err", err)
 			}
 		}
 	}
@@ -1013,36 +1009,36 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 	if number == 1 {
 		err := c.initializeSystemContracts(state, header, cx, &txs, &receipts, nil, &header.GasUsed, true)
 		if err != nil {
-			log.Error("Failed to initialize system contracts", "in", "FinalizeAndAssemble", "hash", hash, "err", err)
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("failed to initialize system contracts, in: FinalizeAndAssemble, blockNumber: %d, blockHash: %s, err: %v", number, hash, err)
 		}
 	}
 
-	env, err := c.environment(chain, header, nil)
+	snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed to retrieve snapshot, in: FinalizeAndAssemble, blockNumber: %d, parentHash: %x, err: %v", number, header.ParentHash, err)
+	}
+	env, err := c.environment(chain, header, snap, false)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get environment, in: FinalizeAndAssemble, err: %v", err)
+	}
+	validators, err := c.getNextValidators(chain, header, snap, false)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get validators, in: FinalizeAndAssemble, err: %v", err)
 	}
 
-	validators, err := c.getNextValidators(chain, env, header, false)
-	if err != nil {
-		log.Error("Failed to get validators", "in", "FinalizeAndAssemble", "hash", header.ParentHash, "number", number, "err", err)
-		return nil, nil, err
-	}
 	scheduler, err := c.scheduler(chain, header, env, validators.Operators, validators.Stakes)
 	if err != nil {
-		log.Error("Failed to get scheduler", "in", "FinalizeAndAssemble", "number", number, "err", err)
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed to get scheduler, in: FinalizeAndAssemble, blockNumber: %d, blockHash: %s, err: %v", number, hash, err)
 	}
 
 	if err := c.addBalanceToStakeManager(state, header.ParentHash, number, env); err != nil {
-		log.Error("Failed to add balance to staking contract", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "err", err)
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed to add balance to staking contract, in: FinalizeAndAssemble, blockNumber: %d, blockHash: %s, err: %v", number, hash, err)
 	}
 
 	if number >= c.config.Epoch {
 		if expected := *scheduler.expect(number); expected != header.Coinbase {
 			if err := c.slash(expected, scheduler.schedules(), state, header, cx, &txs, &receipts, nil, &header.GasUsed, true); err != nil {
-				log.Error("Failed to slash validator", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "address", expected, "err", err)
+				log.Warn("failed to slash validator", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "address", expected, "err", err)
 			}
 		}
 	}
@@ -1057,12 +1053,15 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 }
 
 func (c *Oasys) IsActiveValidatorAt(chain consensus.ChainHeaderReader, header *types.Header, checkVoteKeyFn func(bLSPublicKey *types.BLSPublicKey) bool) bool {
-	env, err := c.environment(chain, header, nil)
+	number := header.Number.Uint64()
+	snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
 	if err != nil {
+		log.Warn("failed to get snapshot", "in", "IsActiveValidatorAt", "parentHash", header.ParentHash, "number", number, "err", err)
 		return false
 	}
-	validators, err := c.getNextValidators(chain, env, header, true)
+	validators, err := c.getNextValidators(chain, header, snap, true)
 	if err != nil {
+		log.Warn("failed to get validators", "in", "IsActiveValidatorAt", "err", err)
 		return false
 	}
 	for i, operator := range validators.Operators {
@@ -1091,7 +1090,7 @@ func (c *Oasys) VerifyVote(chain consensus.ChainHeaderReader, vote *types.VoteEn
 
 	justifiedBlockNumber, justifiedBlockHash, err := c.GetJustifiedNumberAndHash(chain, []*types.Header{header})
 	if err != nil {
-		log.Error("failed to get the highest justified number and hash", "headerNumber", header.Number, "headerHash", header.Hash())
+		log.Warn("failed to get the highest justified number and hash", "headerNumber", header.Number, "headerHash", header.Hash())
 		return errors.New("unexpected error when getting the highest justified number and hash")
 	}
 	if vote.Data.SourceNumber != justifiedBlockNumber || vote.Data.SourceHash != justifiedBlockHash {
@@ -1101,18 +1100,18 @@ func (c *Oasys) VerifyVote(chain consensus.ChainHeaderReader, vote *types.VoteEn
 	number := header.Number.Uint64()
 	snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
 	if err != nil {
-		log.Error("failed to get the snapshot from consensus", "error", err)
-		return errors.New("failed to get the snapshot from consensus")
+		return fmt.Errorf("failed to get the snapshot, in: VerifyVote, blockNumber: %d, parentHash: %s, err: %v", number, header.ParentHash, err)
 	}
-
-	validators := snap.Validators
-	voteAddress := vote.VoteAddress
-	for addr, validator := range validators {
-		if validator.VoteAddress == voteAddress {
-			if addr == c.signer {
+	validators, err := c.getNextValidators(chain, header, snap, true)
+	if err != nil {
+		return fmt.Errorf("failed to get the validators, in: VerifyVote, err: %v", err)
+	}
+	for i := range validators.Operators {
+		if validators.VoteAddresses[i] == vote.VoteAddress {
+			if validators.Operators[i] == c.signer {
 				validVotesfromSelfCounter.Inc(1)
 			}
-			metrics.GetOrRegisterCounter(fmt.Sprintf("oasys/VerifyVote/%s", addr.String()), nil).Inc(1)
+			metrics.GetOrRegisterCounter(fmt.Sprintf("oasys/VerifyVote/%s", validators.Operators[i].String()), nil).Inc(1)
 			return nil
 		}
 	}
@@ -1150,16 +1149,14 @@ func (c *Oasys) Seal(chain consensus.ChainHeaderReader, block *types.Block, resu
 	validator, signFn := c.signer, c.signFn
 	c.lock.RUnlock()
 
-	env, err := c.environment(chain, header, nil)
-	if err != nil {
-		return err
-	}
-
 	// Bail out if we're unauthorized to sign a block
-	validators, err := c.getNextValidators(chain, env, header, false)
+	snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
 	if err != nil {
-		log.Error("Failed to get validators", "in", "Seal", "hash", header.ParentHash, "number", number, "err", err)
-		return err
+		return fmt.Errorf("failed to retrieve snapshot, in: Seal, blockNumber: %d, parentHash: %s, err: %v", number, header.ParentHash, err)
+	}
+	validators, err := c.getNextValidators(chain, header, snap, true)
+	if err != nil {
+		return fmt.Errorf("failed to get validators, in: Seal, err: %v", err)
 	}
 	if !validators.Exists(validator) {
 		return errUnauthorizedValidator
@@ -1207,19 +1204,24 @@ func (c *Oasys) Seal(chain consensus.ChainHeaderReader, block *types.Block, resu
 func (c *Oasys) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, parent *types.Header) *big.Int {
 	number := parent.Number.Uint64()
 
-	env, err := c.environment(chain, parent, nil)
-	if err != nil {
-		return nil
-	}
-
 	snap, err := c.snapshot(chain, number, parent.Hash(), nil)
 	if err != nil {
+		log.Error("failed to get the snapshot", "in", "CalcDifficulty", "hash", parent.Hash(), "number", number, "err", err)
 		return nil
 	}
-	validators, stakes, _, _ := snap.validatorsToTuple()
-	scheduler, err := c.scheduler(chain, parent, env, validators, stakes)
+	env, err := c.environment(chain, parent, snap, true)
 	if err != nil {
-		log.Error("Failed to get scheduler", "in", "CalcDifficulty", "number", number, "err", err)
+		log.Error("failed to get the environment value", "in", "CalcDifficulty", "hash", parent.Hash(), "number", number, "err", err)
+		return nil
+	}
+	validators, err := c.getNextValidators(chain, parent, snap, true)
+	if err != nil {
+		log.Error("failed to get validators", "in", "CalcDifficulty", "hash", parent.Hash(), "number", number, "err", err)
+		return nil
+	}
+	scheduler, err := c.scheduler(chain, parent, env, validators.Operators, validators.Stakes)
+	if err != nil {
+		log.Error("failed to get scheduler", "in", "CalcDifficulty", "hash", parent.Hash(), "number", number, "err", err)
 		return nil
 	}
 
@@ -1258,11 +1260,12 @@ func (c *Oasys) GetJustifiedNumberAndHash(chain consensus.ChainHeaderReader, hea
 		return 0, common.Hash{}, errors.New("illegal chain or header")
 	}
 	head := headers[len(headers)-1]
-	snap, err := c.snapshot(chain, head.Number.Uint64(), head.Hash(), headers)
+	if !chain.Config().IsFastFinalityEnabled(head.Number) {
+		return 0, chain.GetHeaderByNumber(0).Hash(), nil
+	}
+	snap, err := c.snapshot(chain, head.Number.Uint64(), head.Hash(), nil)
 	if err != nil {
-		log.Error("Unexpected error when getting snapshot in GetJustifiedNumberAndHash",
-			"error", err, "blockNumber", head.Number.Uint64(), "blockHash", head.Hash())
-		return 0, common.Hash{}, err
+		return 0, common.Hash{}, fmt.Errorf("unexpected error when getting snapshot in GetJustifiedNumberAndHash, blockNumber: %d, blockHash: %s, error: %v", head.Number.Uint64(), head.Hash(), err)
 	}
 
 	if snap.Attestation == nil {
@@ -1282,10 +1285,9 @@ func (c *Oasys) GetFinalizedHeader(chain consensus.ChainHeaderReader, header *ty
 	if !chain.Config().IsFastFinalityEnabled(header.Number) {
 		return chain.GetHeaderByNumber(0)
 	}
-
 	snap, err := c.snapshot(chain, header.Number.Uint64(), header.Hash(), nil)
 	if err != nil {
-		log.Error("Unexpected error when getting snapshot in GetFinalizedHeader",
+		log.Warn("Unexpected error when getting snapshot in GetFinalizedHeader",
 			"error", err, "blockNumber", header.Number.Uint64(), "blockHash", header.Hash())
 		return nil
 	}
@@ -1293,24 +1295,29 @@ func (c *Oasys) GetFinalizedHeader(chain consensus.ChainHeaderReader, header *ty
 	if snap.Attestation == nil {
 		return chain.GetHeaderByNumber(0) // keep consistent with GetJustifiedNumberAndHash
 	}
-
 	return chain.GetHeader(snap.Attestation.SourceHash, snap.Attestation.SourceNumber)
 }
 
-func (c *Oasys) getNextValidators(chain consensus.ChainHeaderReader, env *params.EnvironmentValue, header *types.Header, fromHeader bool) (*nextValidators, error) {
+func (c *Oasys) getNextValidators(chain consensus.ChainHeaderReader, header *types.Header, snap *Snapshot, fromHeader bool) (validators *nextValidators, err error) {
 	number := header.Number.Uint64()
-	if env.IsEpoch(number) {
+	if snap.Environment.IsEpoch(number) {
 		if fromHeader && c.chainConfig.IsFastFinalityEnabled(header.Number) {
-			return getValidatorsFromHeader(header)
+			if validators, err = getValidatorsFromHeader(header); err != nil {
+				log.Warn("failed to get validators from header", "in", "getNextValidators", "hash", header.Hash(), "number", number, "err", err)
+			}
 		}
-		return getNextValidators(c.chainConfig, c.ethAPI, header.ParentHash, env.Epoch(number), number)
+		// If not fast finality or failed to get validators from header
+		if validators == nil {
+			if validators, err = getNextValidators(c.chainConfig, c.ethAPI, header.ParentHash, snap.Environment.Epoch(number), number); err != nil {
+				err = fmt.Errorf("failed to get next validators, blockNumber: %d, parentHash: %s, error: %v", number, header.ParentHash, err)
+			}
+			validators.SortByOwner() // sort by owner for fast finality
+		}
+	} else {
+		// Notice! The owner list is empty, Don't access owners from validators taken from the snapshot.
+		validators = snap.ToNextValidators()
 	}
-
-	snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
-	if err != nil {
-		return nil, err
-	}
-	return snap.nextValidators(), nil
+	return
 }
 
 // Converting the validator list for the extra header field.
@@ -1354,6 +1361,7 @@ func (c *Oasys) verifyExtraHeaderLengthInEpoch(number *big.Int, length int) erro
 		return fmt.Errorf("missing environment value in extra header, length: %d", length)
 	}
 	// at least one validator info in extra header
+	// The exact extra header validation will be done in verifyExtraHeaderValueInEpoch during Finalize
 	if length < envValuesLen+validatorNumberSize+validatorInfoBytesLen {
 		return fmt.Errorf("missing validator info in extra header, length: %d", length)
 	}
@@ -1373,6 +1381,7 @@ func (c *Oasys) verifyExtraHeaderValueInEpoch(header *types.Header, actual []byt
 		return errMismatchingEpochValidators
 	}
 
+	// After Fast Finality enabled, go through following checks.
 	env, err := getEnvironmentFromHeader(header)
 	if err != nil {
 		return err
@@ -1409,15 +1418,12 @@ func (c *Oasys) verifyExtraHeaderValueInEpoch(header *types.Header, actual []byt
 	if err != nil {
 		return err
 	}
-	for i := 0; i < len(validators.Owners); i++ {
+	for i := 0; i < len(validators.Operators); i++ {
 		if !bytes.Equal(actualValidators.Operators[i].Bytes(), validators.Operators[i].Bytes()) {
 			return fmt.Errorf("mismatching operator, i: %d, expected: %v, real: %v", i, validators.Operators[i], actualValidators.Operators[i])
 		}
 		if !bytes.Equal(actualValidators.Stakes[i].Bytes(), validators.Stakes[i].Bytes()) {
 			return fmt.Errorf("mismatching stake, i: %d, expected: %v, real: %v", i, validators.Stakes[i], actualValidators.Stakes[i])
-		}
-		if actualValidators.Indexes[i] != validators.Indexes[i] {
-			return fmt.Errorf("mismatching index, i: %d, expected: %d, real: %d", i, validators.Indexes[i], actualValidators.Indexes[i])
 		}
 		if !bytes.Equal(actualValidators.VoteAddresses[i][:], validators.VoteAddresses[i][:]) {
 			return fmt.Errorf("mismatching vote address, i: %d, expected: %v, real: %v", i, validators.VoteAddresses[i], actualValidators.VoteAddresses[i])
@@ -1449,10 +1455,8 @@ func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash,
 		rewards *big.Int
 		err     error
 	)
-
 	if rewards, err = getRewards(c.ethAPI, hash); err != nil {
-		log.Error("Failed to get rewards", "hash", hash, "err", err)
-		return err
+		return fmt.Errorf("failed to get rewards, blockNumber: %d, blockHash: %s, error: %v", number, hash, err)
 	}
 	if rewards.Cmp(common.Big0) == 0 {
 		return nil
@@ -1463,22 +1467,23 @@ func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash,
 	return nil
 }
 
-func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header) (*params.EnvironmentValue, error) {
+func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Header, snap *Snapshot, fromHeader bool) (env *params.EnvironmentValue, err error) {
 	number := header.Number.Uint64()
 	if number < c.config.Epoch {
 		return params.InitialEnvironmentValue(c.config), nil
 	}
 
-	snap, err := c.snapshot(chain, number-1, header.ParentHash, parents)
-	if err != nil {
-		return nil, err
-	}
-
-	var env *params.EnvironmentValue
 	if snap.Environment.IsEpoch(number) {
-		if env, err = getNextEnvironmentValue(c.ethAPI, header.ParentHash); err != nil {
-			log.Error("Failed to get environment value", "in", "environment", "hash", header.ParentHash, "number", number, "err", err)
-			return nil, err
+		if fromHeader && chain.Config().IsFastFinalityEnabled(header.Number) {
+			if env, err = getEnvironmentFromHeader(header); err != nil {
+				log.Warn("failed to get environment value from header", "in", "environment", "hash", header.Hash(), "number", number, "err", err)
+			}
+		}
+		// If not fast finality or failed to get environment from header
+		if env == nil {
+			if env, err = getNextEnvironmentValue(c.ethAPI, header.ParentHash); err != nil {
+				return nil, fmt.Errorf("failed to get environment value, blockNumber: %d, parentHash: %s, error: %v", number, header.ParentHash, err)
+			}
 		}
 	} else {
 		env = snap.Environment

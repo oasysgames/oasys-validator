@@ -34,9 +34,9 @@ type Snapshot struct {
 
 type ValidatorInfo struct {
 	// The index is determined by the sorted order of the validator owner address
-	Index       int                `json:"index:omitempty"` // The index should offset by 1
-	Stake       *big.Int           `json:"stake:omitempty"` // The stake amount
-	VoteAddress types.BLSPublicKey `json:"vote_address,omitempty"`
+	Stake       *big.Int           `json:"stake:omitempty"`        // The stake amount
+	Index       int                `json:"index:omitempty"`        // The index should offset by 1
+	VoteAddress types.BLSPublicKey `json:"vote_address,omitempty"` // The vote address
 }
 
 // validatorsAscending implements the sort interface to allow sorting a list of addresses
@@ -261,14 +261,14 @@ func (s *Snapshot) ToNextValidators() *nextValidators {
 	stakes := make([]*big.Int, len(s.Validators))
 	voteAddresses := make([]types.BLSPublicKey, len(s.Validators))
 	for address, info := range s.Validators {
-		// Make sure the voterIndex is reserved for fast finality
+		// No worry, voterIndex is assured when creating snapshot
 		i := info.Index - 1
 		operators[i] = address
 		stakes[i] = new(big.Int).Set(info.Stake)
 		copy(voteAddresses[i][:], info.VoteAddress[:])
 	}
 	return &nextValidators{
-		Owners:        make([]common.Address, len(operators)), // take care the owners is empty
+		Owners:        make([]common.Address, len(operators)), // take care the owners are empty
 		Operators:     operators,
 		Stakes:        stakes,
 		VoteAddresses: voteAddresses,
