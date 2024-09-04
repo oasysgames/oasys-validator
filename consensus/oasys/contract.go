@@ -166,7 +166,7 @@ type nextValidators struct {
 	Owners    []common.Address
 	Operators []common.Address
 	Stakes    []*big.Int
-	// for finality
+	// for finality, vote address is unique in validators
 	VoteAddresses []types.BLSPublicKey
 }
 
