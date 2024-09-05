@@ -1021,7 +1021,8 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get environment, in: FinalizeAndAssemble, err: %v", err)
 	}
-	validators, err := c.getNextValidators(chain, header, snap, false)
+	fromHeader := false // Not retrieve validators from header to be sure, even it's already in the header
+	validators, err := c.getNextValidators(chain, header, snap, fromHeader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get validators, in: FinalizeAndAssemble, err: %v", err)
 	}
@@ -1154,7 +1155,8 @@ func (c *Oasys) Seal(chain consensus.ChainHeaderReader, block *types.Block, resu
 	if err != nil {
 		return fmt.Errorf("failed to retrieve snapshot, in: Seal, blockNumber: %d, parentHash: %s, err: %v", number, header.ParentHash, err)
 	}
-	validators, err := c.getNextValidators(chain, header, snap, true)
+	fromHeader := true // ok from header as the validators are assembled in `Prepare` phase
+	validators, err := c.getNextValidators(chain, header, snap, fromHeader)
 	if err != nil {
 		return fmt.Errorf("failed to get validators, in: Seal, err: %v", err)
 	}
