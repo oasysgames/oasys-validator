@@ -944,7 +944,8 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 	if err != nil {
 		return fmt.Errorf("failed to get environment, in: Finalize, err: %v", err)
 	}
-	validators, err := c.getNextValidators(chain, header, snap, false)
+	fromHeader := false // Don't retrieve validators from header, as the retrieved validators are compared with the header's validators in verifyExtraHeaderValueInEpoch
+	validators, err := c.getNextValidators(chain, header, snap, fromHeader)
 	if err != nil {
 		return fmt.Errorf("failed to get validators, in: Finalize, err: %v", err)
 	}
