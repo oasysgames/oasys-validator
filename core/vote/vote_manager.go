@@ -3,7 +3,6 @@ package vote
 import (
 	"bytes"
 	"fmt"
-	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
@@ -98,7 +97,6 @@ func (voteManager *VoteManager) loop() {
 
 	startVote := true
 	blockCountSinceMining := 0
-	var once sync.Once
 	for {
 		select {
 		case ev := <-dlEventCh:
@@ -147,14 +145,6 @@ func (voteManager *VoteManager) loop() {
 				log.Debug("cur validator is not within the validatorSet at curHead or registered blsPubKey does not match", "signer", common.Bytes2Hex(voteManager.signer.PubKey[:]), "curHead", curHead.Number)
 				continue
 			}
-
-			// Add VoteKey to `miner-info`
-			once.Do(func() {
-				minerInfo := metrics.Get("miner-info")
-				if minerInfo != nil {
-					minerInfo.(metrics.Label).Value()["VoteKey"] = common.Bytes2Hex(voteManager.signer.PubKey[:])
-				}
-			})
 
 			// Vote for curBlockHeader block.
 			vote := &types.VoteData{
