@@ -1359,7 +1359,10 @@ func (c *Oasys) verifyExtraHeaderLengthInEpoch(number *big.Int, length int) erro
 		} else if length%common.AddressLength != 0 {
 			return errInvalidCheckpointValidators
 		}
+		return nil
 	}
+
+	// After Fast Finality enabled, go through following checks.
 	if length < envValuesLen {
 		return fmt.Errorf("missing environment value in extra header, length: %d", length)
 	}

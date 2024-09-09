@@ -626,10 +626,10 @@ func (c *ChainConfig) OasysFastFinalityEnabledBlock() *big.Int {
 		return nil
 	}
 	if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
-		return big.NewInt(2093240)
+		return big.NewInt(9999999)
 	}
 	if c.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0 {
-		return big.NewInt(2082220)
+		return big.NewInt(9999999)
 	}
 	return big.NewInt(2)
 }
