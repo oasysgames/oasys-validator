@@ -169,7 +169,6 @@ func TestGetNextValidators(t *testing.T) {
 		{Type: addressArrTy}, // owners
 		{Type: addressArrTy}, // operators
 		{Type: uint256ArrTy}, // stakes
-		{Type: bytesTy},      // blsPubKeys
 		{Type: boolArrTy},    // candidates
 		{Type: uint256Ty},    // newCursor
 	}
@@ -246,14 +245,14 @@ func TestGetNextValidators(t *testing.T) {
 
 		bnewCursor := big.NewInt(int64(newCursor))
 
-		rbyte, _ := returnTy1.Pack(owners, operators, stakes, blsPubKeys, candidates, bnewCursor)
+		rbyte, _ := returnTy1.Pack(owners, operators, stakes, candidates, bnewCursor)
 		rbytes[stakeManager.address][i] = rbyte
 
 		rbyte, _ = returnTy2.Pack(owners, operators, actives, jailed, stakes, blsPubKeys, candidates, bnewCursor)
 		rbytes[candidateManager.address][i] = rbyte
 
 		if i == page-1 {
-			rbyte, _ := returnTy1.Pack([]common.Address{}, []common.Address{}, []*big.Int{}, [][]byte{}, []bool{}, bnewCursor)
+			rbyte, _ := returnTy1.Pack([]common.Address{}, []common.Address{}, []*big.Int{}, []bool{}, bnewCursor)
 			rbytes[stakeManager.address] = append(rbytes[stakeManager.address], rbyte)
 
 			rbyte, _ = returnTy2.Pack([]common.Address{}, []common.Address{}, []bool{}, []bool{}, []*big.Int{}, [][]byte{}, []bool{}, bnewCursor)
@@ -269,7 +268,10 @@ func TestGetNextValidators(t *testing.T) {
 	ethapi := &testBlockchainAPI{rbytes: rbytes}
 
 	for _, block := range []uint64{1, 10} {
-		got, _ := getNextValidators(config, ethapi, common.Hash{}, 1, block)
+		got, err := getNextValidators(config, ethapi, common.Hash{}, 1, block)
+		if err != nil {
+			t.Fatalf("failed to call getNextValidators method: %v", err)
+		}
 
 		if len(got.Owners) != len(wantOwners) {
 			t.Errorf("invalid owners length, got: %d, want: %d", len(got.Owners), len(wantOwners))
@@ -603,7 +605,7 @@ func makeEnv(wallet accounts.Wallet, account accounts.Account) (*testEnv, error)
 
 	// Replace artifact bytecode
 	environment.artifact.DeployedBytecode = fmt.Sprintf("0x%s", hex.EncodeToString(genspec.Alloc[_environmentAddress].Code))
-	initalStakeManager.artifact.DeployedBytecode = fmt.Sprintf("0x%s", hex.EncodeToString(genspec.Alloc[_stakeManagerAddress].Code))
+	stakeManager.artifact.DeployedBytecode = fmt.Sprintf("0x%s", hex.EncodeToString(genspec.Alloc[_stakeManagerAddress].Code))
 
 	return &testEnv{engine, chain, statedb}, nil
 }
