@@ -531,11 +531,20 @@ func callGetHighStakesCommon(ethAPI blockchainAPI, hash common.Hash, epoch uint6
 
 		if err := manager.abi.UnpackIntoInterface(v, method, rbytes); err != nil {
 			return err
-		} else if reflect.ValueOf(v).Elem().FieldByName("Owners").Len() == 0 {
+		}
+
+		// we assume that the `Owners` field and the `NewCursor` field are always present
+		vOwners := reflect.ValueOf(v).Elem().FieldByName("Owners")
+		vCursor := reflect.ValueOf(v).Elem().FieldByName("NewCursor")
+		if !vOwners.IsValid() || !vCursor.IsValid() {
+			panic("Owners or NewCursor field are not found. unexpected value is present as getHighStakes's output")
+		}
+
+		if vOwners.Len() == 0 {
 			break
 		}
 
-		cursor, _ = reflect.ValueOf(v).Elem().FieldByName("NewCursor").Interface().(*big.Int)
+		cursor, _ = vCursor.Interface().(*big.Int)
 		processCallResult() // callback to process the received data
 	}
 
