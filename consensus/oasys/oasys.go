@@ -1313,6 +1313,7 @@ func (c *Oasys) getNextValidators(chain consensus.ChainHeaderReader, header *typ
 		if validators == nil {
 			if validators, err = getNextValidators(c.chainConfig, c.ethAPI, header.ParentHash, snap.Environment.Epoch(number), number); err != nil {
 				err = fmt.Errorf("failed to get next validators, blockNumber: %d, parentHash: %s, error: %v", number, header.ParentHash, err)
+				return
 			}
 			validators.SortByOwner() // sort by owner for fast finality
 		}
