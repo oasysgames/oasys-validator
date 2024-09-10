@@ -453,7 +453,7 @@ func callGetHighStakes(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*n
 			}
 		}
 	)
-	if err := callGetHighStakesCommon(ethAPI, hash, epoch, candidateManager2, &recv, processCallResult); err != nil {
+	if err := callGetHighStakesCommon(ethAPI, hash, epoch, candidateManager, &recv, processCallResult); err != nil {
 		return nil, err
 	}
 
