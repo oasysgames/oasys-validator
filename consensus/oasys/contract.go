@@ -11,6 +11,7 @@ import (
 	"math"
 	"math/big"
 	"path/filepath"
+	"reflect"
 	"sort"
 
 	"github.com/ethereum/go-ethereum"
@@ -40,7 +41,7 @@ const (
 var (
 	//go:embed oasys-genesis-contract-cfb3cd0/artifacts/contracts/Environment.sol/Environment.json
 	//go:embed oasys-genesis-contract-cfb3cd0/artifacts/contracts/StakeManager.sol/StakeManager.json
-	//go:embed oasys-genesis-contract-5675779/artifacts/contracts/StakeManager.sol/StakeManager.json
+	//go:embed oasys-genesis-contract-6037082/artifacts/contracts/CandidateValidatorManager.sol/CandidateValidatorManager.json
 	//go:embed oasys-genesis-contract-5675779/artifacts/contracts/CandidateValidatorManager.sol/CandidateValidatorManager.json
 	artifacts embed.FS
 
@@ -51,16 +52,25 @@ var (
 			path: filepath.FromSlash("oasys-genesis-contract-cfb3cd0/artifacts/contracts/Environment.sol/Environment.json"),
 		},
 	}
-	initalStakeManager = &genesisContract{
+	stakeManager = &genesisContract{
 		address: common.HexToAddress(stakeManagerAddress),
 		artifact: &artifact{
 			path: filepath.FromSlash("oasys-genesis-contract-cfb3cd0/artifacts/contracts/StakeManager.sol/StakeManager.json"),
 		},
 	}
-	stakeManager = &genesisContract{
-		address: common.HexToAddress(stakeManagerAddress),
+	candidateManager = &builtinContract{
+		address: common.HexToAddress(candidateManagerAddress),
 		artifact: &artifact{
-			path: filepath.FromSlash("oasys-genesis-contract-5675779/artifacts/contracts/StakeManager.sol/StakeManager.json"),
+			path: filepath.FromSlash("oasys-genesis-contract-6037082/artifacts/contracts/CandidateValidatorManager.sol/CandidateValidatorManager.json"),
+		},
+	}
+	// This contract corresponds to v1.6.0 of the genesis contract.
+	// `2` is not majar version of the genesis contract.
+	// Just increment the version number to avoid the conflict.
+	candidateManager2 = &builtinContract{
+		address: common.HexToAddress(candidateManagerAddress),
+		artifact: &artifact{
+			path: filepath.FromSlash("oasys-genesis-contract-5675779/artifacts/contracts/CandidateValidatorManager.sol/CandidateValidatorManager.json"),
 		},
 	}
 	systemMethods = map[*genesisContract]map[string]int{
@@ -69,13 +79,6 @@ var (
 		environment:  {"initialize": 0, "updateValue": 0},
 		stakeManager: {"initialize": 0, "slash": 0},
 	}
-
-	candidateManager = &builtinContract{
-		address: common.HexToAddress(candidateManagerAddress),
-		artifact: &artifact{
-			path: filepath.FromSlash("oasys-genesis-contract-5675779/artifacts/contracts/CandidateValidatorManager.sol/CandidateValidatorManager.json"),
-		},
-	}
 )
 
 func init() {
@@ -83,13 +86,13 @@ func init() {
 	if err := environment.parseABI(); err != nil {
 		panic(err)
 	}
-	if err := initalStakeManager.parseABI(); err != nil {
-		panic(err)
-	}
 	if err := stakeManager.parseABI(); err != nil {
 		panic(err)
 	}
 	if err := candidateManager.parseABI(); err != nil {
+		panic(err)
+	}
+	if err := candidateManager2.parseABI(); err != nil {
 		panic(err)
 	}
 
@@ -300,14 +303,14 @@ func (c *Oasys) initializeSystemContracts(
 	}
 
 	// Initialize StakeManager contract
-	if !initalStakeManager.verifyCode(state) {
+	if !stakeManager.verifyCode(state) {
 		return errors.New("invalid contract code: StakeManager")
 	}
-	data, err = initalStakeManager.abi.Pack("initialize", environment.address, common.HexToAddress(allowListAddress))
+	data, err = stakeManager.abi.Pack("initialize", environment.address, common.HexToAddress(allowListAddress))
 	if err != nil {
 		return err
 	}
-	msg = getMessage(header.Coinbase, initalStakeManager.address, data, common.Big0)
+	msg = getMessage(header.Coinbase, stakeManager.address, data, common.Big0)
 	err = c.applyTransaction(msg, state, header, cx, txs, receipts, systemTxs, usedGas, mining)
 	if err != nil {
 		return err
@@ -355,6 +358,9 @@ func getNextValidators(
 	epoch uint64,
 	block uint64,
 ) (*nextValidators, error) {
+	if config.IsFastFinalityEnabled(new(big.Int).SetUint64(block)) {
+		return callGetHighStakes2(ethAPI, hash, epoch)
+	}
 	if config.IsForkedOasysPublication(new(big.Int).SetUint64(block)) {
 		return callGetHighStakes(ethAPI, hash, epoch)
 	}
@@ -396,12 +402,11 @@ func callGetValidators(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*n
 		}
 
 		var recv struct {
-			Owners        []common.Address
-			Operators     []common.Address
-			Stakes        []*big.Int
-			BlsPublicKeys [][]byte
-			Candidates    []bool
-			NewCursor     *big.Int
+			Owners     []common.Address
+			Operators  []common.Address
+			Stakes     []*big.Int
+			Candidates []bool
+			NewCursor  *big.Int
 		}
 		if err := stakeManager.abi.UnpackIntoInterface(&recv, method, rbytes); err != nil {
 			return nil, err
@@ -415,6 +420,8 @@ func callGetValidators(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*n
 				result.Owners = append(result.Owners, recv.Owners[i])
 				result.Operators = append(result.Operators, recv.Operators[i])
 				result.Stakes = append(result.Stakes, recv.Stakes[i])
+				// set empty key, as the older than v1.6.0 stake manager does not return bls pub key
+				result.VoteAddresses = append(result.VoteAddresses, types.BLSPublicKey{})
 			}
 		}
 	}
@@ -424,20 +431,86 @@ func callGetValidators(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*n
 
 // Call the `CandidateValidatorManager.getHighStakes` method.
 func callGetHighStakes(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*nextValidators, error) {
+	var (
+		recv struct {
+			Owners          []common.Address
+			Operators       []common.Address
+			Stakes          []*big.Int
+			Candidates      []bool
+			NewCursor       *big.Int
+			Actives, Jailed []bool // unused
+		}
+		result            nextValidators
+		processCallResult = func() {
+			for i := range recv.Owners {
+				if recv.Candidates[i] {
+					result.Owners = append(result.Owners, recv.Owners[i])
+					result.Operators = append(result.Operators, recv.Operators[i])
+					result.Stakes = append(result.Stakes, recv.Stakes[i])
+					// set empty key, as the older than v1.6.0 stake manager does not return bls pub key
+					result.VoteAddresses = append(result.VoteAddresses, types.BLSPublicKey{})
+				}
+			}
+		}
+	)
+	if err := callGetHighStakesCommon(ethAPI, hash, epoch, candidateManager2, &recv, processCallResult); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// Call the `CandidateValidatorManager.getHighStakes` method.
+// This function is for the v1.6.0 contract.
+func callGetHighStakes2(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*nextValidators, error) {
+	var (
+		recv struct {
+			Owners          []common.Address
+			Operators       []common.Address
+			Stakes          []*big.Int
+			BlsPublicKeys   [][]byte
+			Candidates      []bool
+			NewCursor       *big.Int
+			Actives, Jailed []bool // unused
+		}
+		result            nextValidators
+		processCallResult = func() {
+			for i := range recv.Owners {
+				if recv.Candidates[i] {
+					result.Owners = append(result.Owners, recv.Owners[i])
+					result.Operators = append(result.Operators, recv.Operators[i])
+					result.Stakes = append(result.Stakes, recv.Stakes[i])
+					if len(recv.BlsPublicKeys[i]) == types.BLSPublicKeyLength {
+						result.VoteAddresses = append(result.VoteAddresses, types.BLSPublicKey(recv.BlsPublicKeys[i]))
+					} else {
+						// set empty key if bls pub key is not registered on contract
+						result.VoteAddresses = append(result.VoteAddresses, types.BLSPublicKey{})
+					}
+				}
+			}
+		}
+	)
+	if err := callGetHighStakesCommon(ethAPI, hash, epoch, candidateManager2, &recv, processCallResult); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+func callGetHighStakesCommon(ethAPI blockchainAPI, hash common.Hash, epoch uint64, manager *builtinContract, v interface{}, processCallResult func()) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	var (
 		method  = "getHighStakes"
-		result  nextValidators
 		bpoch   = new(big.Int).SetUint64(epoch)
 		cursor  = big.NewInt(0)
 		howMany = big.NewInt(100)
 	)
 	for {
-		data, err := candidateManager.abi.Pack(method, bpoch, cursor, howMany)
+		data, err := manager.abi.Pack(method, bpoch, cursor, howMany)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		hexData := (hexutil.Bytes)(data)
@@ -445,7 +518,7 @@ func callGetHighStakes(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*n
 		rbytes, err := ethAPI.Call(
 			ctx,
 			ethapi.TransactionArgs{
-				To:   &candidateManager.address,
+				To:   &manager.address,
 				Data: &hexData,
 			},
 			&blockNrOrHash,
@@ -453,43 +526,20 @@ func callGetHighStakes(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*n
 			nil,
 		)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
-		var recv struct {
-			Owners        []common.Address
-			Operators     []common.Address
-			Stakes        []*big.Int
-			BlsPublicKeys [][]byte
-			Candidates    []bool
-			NewCursor     *big.Int
-
-			// unused
-			Actives, Jailed []bool
-		}
-		if err := candidateManager.abi.UnpackIntoInterface(&recv, method, rbytes); err != nil {
-			return nil, err
-		} else if len(recv.Owners) == 0 {
+		if err := manager.abi.UnpackIntoInterface(v, method, rbytes); err != nil {
+			return err
+		} else if reflect.ValueOf(v).Elem().FieldByName("Owners").Len() == 0 {
 			break
 		}
 
-		cursor = recv.NewCursor
-		for i := range recv.Owners {
-			if recv.Candidates[i] {
-				result.Owners = append(result.Owners, recv.Owners[i])
-				result.Operators = append(result.Operators, recv.Operators[i])
-				result.Stakes = append(result.Stakes, recv.Stakes[i])
-				if len(recv.BlsPublicKeys[i]) == types.BLSPublicKeyLength {
-					result.VoteAddresses = append(result.VoteAddresses, types.BLSPublicKey(recv.BlsPublicKeys[i]))
-				} else {
-					// set empty key if bls pub key is not registered on contract
-					result.VoteAddresses = append(result.VoteAddresses, types.BLSPublicKey{})
-				}
-			}
-		}
+		cursor, _ = reflect.ValueOf(v).Elem().FieldByName("NewCursor").Interface().(*big.Int)
+		processCallResult() // callback to process the received data
 	}
 
-	return &result, nil
+	return nil
 }
 
 // Call the `StakeManager.getValidatorOwners` method.
