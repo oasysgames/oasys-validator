@@ -1315,7 +1315,6 @@ func (c *Oasys) getNextValidators(chain consensus.ChainHeaderReader, header *typ
 				err = fmt.Errorf("failed to get next validators, blockNumber: %d, parentHash: %s, error: %v", number, header.ParentHash, err)
 				return
 			}
-			validators.SortByOwner() // sort by owner for fast finality
 		}
 	} else {
 		// Notice! The owner list is empty, Don't access owners from validators taken from the snapshot.

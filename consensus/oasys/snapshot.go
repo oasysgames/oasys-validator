@@ -200,7 +200,6 @@ func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderRea
 				if nextValidator, err = getNextValidators(s.config, s.ethAPI, header.ParentHash, snap.Environment.Epoch(number), number); err != nil {
 					return nil, fmt.Errorf("failed to get validators, in Snapshot.apply, err: %w", err)
 				}
-				nextValidator.SortByOwner() // sort by owner for fast finality
 			}
 			var nextEnv *params.EnvironmentValue
 			if s.config.IsFastFinalityEnabled(header.Number) {

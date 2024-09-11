@@ -359,7 +359,12 @@ func getNextValidators(
 	block uint64,
 ) (*nextValidators, error) {
 	if config.IsFastFinalityEnabled(new(big.Int).SetUint64(block)) {
-		return callGetHighStakes2(ethAPI, hash, epoch)
+		validators, err := callGetHighStakes2(ethAPI, hash, epoch)
+		if err != nil {
+			return nil, err
+		}
+		validators.SortByOwner() // sort by owner for fast finality
+		return validators, nil
 	}
 	if config.IsForkedOasysPublication(new(big.Int).SetUint64(block)) {
 		return callGetHighStakes(ethAPI, hash, epoch)
