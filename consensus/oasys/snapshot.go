@@ -27,16 +27,38 @@ type Snapshot struct {
 	Number      uint64                            `json:"number"`                // Block number where the snapshot was created
 	Hash        common.Hash                       `json:"hash"`                  // Block hash where the snapshot was created
 	Validators  map[common.Address]*ValidatorInfo `json:"validators"`            // Set of authorized validators and stakes at this moment
-	Attestation *types.VoteData                   `json:"attestation:omitempty"` // Attestation for fast finality, but `Source` used as `Finalized`
+	Attestation *types.VoteData                   `json:"attestation,omitempty"` // Attestation for fast finality, but `Source` used as `Finalized`
 
 	Environment *params.EnvironmentValue `json:"environment"`
 }
 
 type ValidatorInfo struct {
 	// The index is determined by the sorted order of the validator owner address
-	Stake       *big.Int           `json:"stake:omitempty"`        // The stake amount
-	Index       int                `json:"index:omitempty"`        // The index should offset by 1
+	Stake       *big.Int           `json:"stake,omitempty"`        // The stake amount
+	Index       int                `json:"index,omitempty"`        // The index should offset by 1
 	VoteAddress types.BLSPublicKey `json:"vote_address,omitempty"` // The vote address
+}
+
+// Note: This code can be removed after each validators has been upgraded to v1.6.0.
+func (info *ValidatorInfo) UnmarshalJSON(b []byte) error {
+	// v1.5.0 or earlier
+	bigint := new(big.Int)
+	if err := json.Unmarshal(b, bigint); err == nil {
+		info.Stake = bigint
+		return nil
+	}
+
+	// v1.6.0 or later
+	type Alias ValidatorInfo
+	alias := new(Alias)
+	if err := json.Unmarshal(b, alias); err != nil {
+		return err
+	}
+
+	info.Stake = alias.Stake
+	info.Index = alias.Index
+	info.VoteAddress = alias.VoteAddress
+	return nil
 }
 
 // validatorsAscending implements the sort interface to allow sorting a list of addresses
