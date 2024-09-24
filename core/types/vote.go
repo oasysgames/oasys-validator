@@ -80,7 +80,8 @@ func (v *VoteEnvelope) calcVoteHash() common.Hash {
 func (b BLSPublicKey) Bytes() []byte  { return b[:] }
 func (b BLSPublicKey) String() string { return hexutil.Encode(b[:]) }
 
-// MarshalText gets implements encoding.TextMarshaler
+// MarshalText gets implements encoding.TextMarshaler. Since BLSPublicKey is stored as JSON in the
+// consensus engine's snapshot db, it is converted to a hex-string to improve readability and reduce size.
 func (b BLSPublicKey) MarshalText() ([]byte, error) {
 	return hexutil.Bytes(b[:]).MarshalText()
 }
