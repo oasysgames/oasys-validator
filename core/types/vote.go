@@ -3,12 +3,14 @@ package types
 import (
 	"bytes"
 	"math/big"
+	"reflect"
 	"sync/atomic"
 
 	"github.com/pkg/errors"
 	"github.com/prysmaticlabs/prysm/v5/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
 const (
@@ -16,6 +18,10 @@ const (
 	BLSSignatureLength = 96
 
 	MaxAttestationExtraLength = 256
+)
+
+var (
+	blsPublicKeyT = reflect.TypeOf(BLSPublicKey{})
 )
 
 type BLSPublicKey [BLSPublicKeyLength]byte
@@ -71,7 +77,19 @@ func (v *VoteEnvelope) calcVoteHash() common.Hash {
 	return rlpHash(vote)
 }
 
-func (b BLSPublicKey) Bytes() []byte { return b[:] }
+func (b BLSPublicKey) Bytes() []byte  { return b[:] }
+func (b BLSPublicKey) String() string { return hexutil.Encode(b[:]) }
+
+// MarshalText gets implements encoding.TextMarshaler. Since BLSPublicKey is stored as JSON in the
+// consensus engine's snapshot db, it is converted to a hex-string to improve readability and reduce size.
+func (b BLSPublicKey) MarshalText() ([]byte, error) {
+	return hexutil.Bytes(b[:]).MarshalText()
+}
+
+// UnmarshalJSON decodes the input as a string with 0x prefix
+func (b *BLSPublicKey) UnmarshalJSON(input []byte) error {
+	return hexutil.UnmarshalFixedJSON(blsPublicKeyT, input, b[:])
+}
 
 // Verify vote using BLS.
 func (vote *VoteEnvelope) Verify() error {
