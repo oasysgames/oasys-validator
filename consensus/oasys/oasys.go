@@ -549,16 +549,10 @@ func getEnvironmentFromHeader(header *types.Header) (*params.EnvironmentValue, e
 	}
 
 	start := extraVanity
-	env := &params.EnvironmentValue{
-		StartBlock:         new(big.Int).SetBytes(header.Extra[start : start+32]),
-		StartEpoch:         new(big.Int).SetBytes(header.Extra[start+32 : start+64]),
-		BlockPeriod:        new(big.Int).SetBytes(header.Extra[start+64 : start+96]),
-		EpochPeriod:        new(big.Int).SetBytes(header.Extra[start+96 : start+128]),
-		RewardRate:         new(big.Int).SetBytes(header.Extra[start+128 : start+160]),
-		CommissionRate:     new(big.Int).SetBytes(header.Extra[start+160 : start+192]),
-		ValidatorThreshold: new(big.Int).SetBytes(header.Extra[start+192 : start+224]),
-		JailThreshold:      new(big.Int).SetBytes(header.Extra[start+224 : start+256]),
-		JailPeriod:         new(big.Int).SetBytes(header.Extra[start+256 : start+288]),
+	end := start + envValuesLen
+	env := new(params.EnvironmentValue)
+	if err := environment.abi.UnpackIntoInterface(&env, "value", header.Extra[start:end]); err != nil {
+		return nil, err
 	}
 	return env, nil
 }
