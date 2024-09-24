@@ -281,9 +281,16 @@ func (s *Snapshot) ToNextValidators() *nextValidators {
 	operators := make([]common.Address, len(s.Validators))
 	stakes := make([]*big.Int, len(s.Validators))
 	voteAddresses := make([]types.BLSPublicKey, len(s.Validators))
+	var counter int
 	for address, info := range s.Validators {
-		// No worry, voterIndex is assured when creating snapshot
+		// Basically, voterIndex is assured when creating snapshot
 		i := info.Index - 1
+		if info.Index == 0 {
+			// The is one scenario that the index is 0, which is the first run after the upgrade(v1.6.0).
+			// In this case, As the snapshot is loaded from disk, the format is old one.
+			i = counter
+			counter++
+		}
 		operators[i] = address
 		stakes[i] = new(big.Int).Set(info.Stake)
 		copy(voteAddresses[i][:], info.VoteAddress[:])
