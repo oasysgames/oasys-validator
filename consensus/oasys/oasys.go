@@ -726,14 +726,21 @@ func (c *Oasys) verifySeal(chain consensus.ChainHeaderReader, header *types.Head
 }
 
 func assembleValidators(validators *nextValidators) []byte {
-	extra := make([]byte, 0, 1+len(validators.Operators)*common.AddressLength)
+	extra := make([]byte, 0, validatorNumberSize+len(validators.Operators)*common.AddressLength)
 	// add validator number
 	extra = append(extra, byte(len(validators.Operators)))
+	// sanity check
+	if 256 < len(validators.Operators) {
+		// As the number of validators is stored in a single byte, it should be less than 256
+		// Though the logically max number of validators is 1000(10M*1000=supply),
+		// the practical max is around 100, as the average staking of a validator is 100M.
+		panic("too many validators")
+	}
 	// add validator info
 	for i := 0; i < len(validators.Operators); i++ {
 		extra = append(extra, validators.Owners[i].Bytes()...)
 		extra = append(extra, validators.Operators[i].Bytes()...)
-		extra = append(extra, bigTo32BytesLeftPadding(validators.Stakes[i])...)
+		extra = append(extra, common.LeftPadBytes(validators.Stakes[i].Bytes(), 32)...)
 		extra = append(extra, validators.VoteAddresses[i][:]...)
 	}
 	return extra
@@ -741,15 +748,15 @@ func assembleValidators(validators *nextValidators) []byte {
 
 func assembleEnvironmentValue(env *params.EnvironmentValue) []byte {
 	extra := make([]byte, 0, envValuesLen)
-	extra = append(extra, bigTo32BytesLeftPadding(env.StartBlock)...)
-	extra = append(extra, bigTo32BytesLeftPadding(env.StartEpoch)...)
-	extra = append(extra, bigTo32BytesLeftPadding(env.BlockPeriod)...)
-	extra = append(extra, bigTo32BytesLeftPadding(env.EpochPeriod)...)
-	extra = append(extra, bigTo32BytesLeftPadding(env.RewardRate)...)
-	extra = append(extra, bigTo32BytesLeftPadding(env.CommissionRate)...)
-	extra = append(extra, bigTo32BytesLeftPadding(env.ValidatorThreshold)...)
-	extra = append(extra, bigTo32BytesLeftPadding(env.JailThreshold)...)
-	extra = append(extra, bigTo32BytesLeftPadding(env.JailPeriod)...)
+	extra = append(extra, common.LeftPadBytes(env.StartBlock.Bytes(), 32)...)
+	extra = append(extra, common.LeftPadBytes(env.StartEpoch.Bytes(), 32)...)
+	extra = append(extra, common.LeftPadBytes(env.BlockPeriod.Bytes(), 32)...)
+	extra = append(extra, common.LeftPadBytes(env.EpochPeriod.Bytes(), 32)...)
+	extra = append(extra, common.LeftPadBytes(env.RewardRate.Bytes(), 32)...)
+	extra = append(extra, common.LeftPadBytes(env.CommissionRate.Bytes(), 32)...)
+	extra = append(extra, common.LeftPadBytes(env.ValidatorThreshold.Bytes(), 32)...)
+	extra = append(extra, common.LeftPadBytes(env.JailThreshold.Bytes(), 32)...)
+	extra = append(extra, common.LeftPadBytes(env.JailPeriod.Bytes(), 32)...)
 	return extra
 }
 
@@ -934,11 +941,13 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 	if err != nil {
 		return fmt.Errorf("failed to retrieve snapshot, in: Finalize, blockNumber: %d, parentHash: %x, err: %v", number, header.ParentHash, err)
 	}
-	env, err := c.environment(chain, header, snap, false)
+	// Get from contract, not from header.
+	// This value is made sure to be the same as the value from header in verifyExtraHeaderValueInEpoch.
+	fromHeader := false
+	env, err := c.environment(chain, header, snap, fromHeader)
 	if err != nil {
 		return fmt.Errorf("failed to get environment, in: Finalize, err: %v", err)
 	}
-	fromHeader := false // Don't retrieve validators from header, as the retrieved validators are compared with the header's validators in verifyExtraHeaderValueInEpoch
 	validators, err := c.getNextValidators(chain, header, snap, fromHeader)
 	if err != nil {
 		return fmt.Errorf("failed to get validators, in: Finalize, err: %v", err)
@@ -1012,11 +1021,11 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to retrieve snapshot, in: FinalizeAndAssemble, blockNumber: %d, parentHash: %x, err: %v", number, header.ParentHash, err)
 	}
-	env, err := c.environment(chain, header, snap, false)
+	fromHeader := false // Not retrieve from header to be safe, even it's already in the header
+	env, err := c.environment(chain, header, snap, fromHeader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get environment, in: FinalizeAndAssemble, err: %v", err)
 	}
-	fromHeader := false // Not retrieve validators from header to be sure, even it's already in the header
 	validators, err := c.getNextValidators(chain, header, snap, fromHeader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get validators, in: FinalizeAndAssemble, err: %v", err)
@@ -1546,11 +1555,4 @@ func verifyTx(header *types.Header, txs []*types.Transaction) error {
 		}
 	}
 	return nil
-}
-
-func bigTo32BytesLeftPadding(value *big.Int) []byte {
-	var byteArray [32]byte
-	byteSlice := value.Bytes()
-	copy(byteArray[32-len(byteSlice):], byteSlice)
-	return byteArray[:]
 }
