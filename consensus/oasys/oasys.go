@@ -85,6 +85,10 @@ var (
 	// to contain a 65 byte secp256k1 signature.
 	errMissingSignature = errors.New("extra-data 65 byte signature suffix missing")
 
+	// errExtraSigners is returned if non-checkpoint block contain signer data in
+	// their extra-data fields.
+	errExtraSigners = errors.New("non-checkpoint block contains extra signer list")
+
 	// errInvalidCheckpointValidators is returned if a checkpoint block contains an
 	// invalid list of validators (i.e. non divisible by 20 bytes).
 	errInvalidCheckpointValidators = errors.New("invalid validator list on checkpoint block")
@@ -285,6 +289,8 @@ func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 		if err := c.verifyExtraHeaderLengthInEpoch(header.Number, extraLenExceptVanityAndSeal); err != nil {
 			return err
 		}
+	} else if !c.chainConfig.IsFastFinalityEnabled(header.Number) && extraLenExceptVanityAndSeal != 0 {
+		return errExtraSigners
 	}
 	// Ensure that the mix digest is zero as we don't have fork protection currently
 	if header.MixDigest != (common.Hash{}) {
@@ -376,7 +382,7 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 	}
 
 	// Verify vote attestation for fast finality.
-	if err := c.verifyVoteAttestation(chain, header, parents, env, validators); err != nil {
+	if err := c.verifyVoteAttestation(chain, header, parents, env); err != nil {
 		log.Warn("Verify vote attestation failed", "error", err, "hash", header.Hash(), "number", header.Number,
 			"parent", header.ParentHash, "coinbase", header.Coinbase, "extra", common.Bytes2Hex(header.Extra))
 		verifyVoteAttestationErrorCounter.Inc(1)
@@ -406,7 +412,7 @@ func (o *Oasys) getParent(chain consensus.ChainHeaderReader, header *types.Heade
 }
 
 // verifyVoteAttestation checks whether the vote attestation in the header is valid.
-func (o *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header, env *params.EnvironmentValue, validators *nextValidators) error {
+func (o *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header, env *params.EnvironmentValue) error {
 	attestation, err := getVoteAttestationFromHeader(header, o.chainConfig, o.config, env)
 	if err != nil {
 		return err
@@ -449,6 +455,16 @@ func (o *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header 
 	if sourceNumber != justifiedBlockNumber || sourceHash != justifiedBlockHash {
 		return fmt.Errorf("invalid attestation, source mismatch, expected block: %d, hash: %s; real block: %d, hash: %s",
 			justifiedBlockNumber, justifiedBlockHash, sourceNumber, sourceHash)
+	}
+
+	// The snapshot should be the targetNumber-1 block's snapshot.
+	snap, err := o.snapshot(chain, parent.Number.Uint64()-1, parent.ParentHash, nil)
+	if err != nil {
+		return err
+	}
+	validators, err := o.getNextValidators(chain, header, snap, true)
+	if err != nil {
+		return fmt.Errorf("failed to get validators, in: verifyVoteAttestation, err: %v", err)
 	}
 
 	// Filter out valid validator from attestation.
@@ -760,7 +776,7 @@ func assembleEnvironmentValue(env *params.EnvironmentValue) []byte {
 	return extra
 }
 
-func (c *Oasys) assembleVoteAttestation(chain consensus.ChainHeaderReader, header *types.Header, validators *nextValidators) error {
+func (c *Oasys) assembleVoteAttestation(chain consensus.ChainHeaderReader, header *types.Header) error {
 	if !c.chainConfig.IsFastFinalityEnabled(header.Number) || header.Number.Uint64() < 2 {
 		return nil
 	}
@@ -775,10 +791,19 @@ func (c *Oasys) assembleVoteAttestation(chain consensus.ChainHeaderReader, heade
 		return errors.New("parent not found")
 	}
 	votes := c.VotePool.FetchVoteByBlockHash(parent.Hash())
-
 	if len(votes) == 0 {
 		log.Debug("no votes found, skip assemble vote attestation", "header", header.Hash(), "number", header.Number, "parent", parent.Hash())
 		return nil
+	}
+
+	// Get validators of target block(=parent block)
+	snap, err := c.snapshot(chain, parent.Number.Uint64()-1, parent.ParentHash, nil)
+	if err != nil {
+		return err
+	}
+	validators, err := c.getNextValidators(chain, header, snap, true)
+	if err != nil {
+		return fmt.Errorf("failed to get validators, in: assembleVoteAttestation, err: %v", err)
 	}
 
 	// Check if the number of votes is sufficient
@@ -1180,7 +1205,7 @@ func (c *Oasys) Seal(chain consensus.ChainHeaderReader, block *types.Block, resu
 		case <-time.After(delay):
 		}
 
-		err := c.assembleVoteAttestation(chain, header, validators)
+		err := c.assembleVoteAttestation(chain, header)
 		if err != nil {
 			/* If the vote attestation can't be assembled successfully, the blockchain won't get
 			   fast finalized, but it can be tolerated, so just report this error here. */
