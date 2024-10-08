@@ -218,6 +218,7 @@ func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderRea
 					log.Warn("failed to get validators from header", "in", "Snapshot.apply", "hash", header.Hash(), "number", number, "err", err)
 				}
 			}
+			// If not fast finality or failed to get validators from header
 			if nextValidator == nil {
 				if nextValidator, err = getNextValidators(s.config, s.ethAPI, header.ParentHash, snap.Environment.Epoch(number), number); err != nil {
 					return nil, fmt.Errorf("failed to get validators, in Snapshot.apply, err: %w", err)
