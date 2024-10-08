@@ -1425,32 +1425,8 @@ func (c *Oasys) verifyExtraHeaderValueInEpoch(header *types.Header, actual []byt
 	if err != nil {
 		return err
 	}
-	if !bytes.Equal(actualEnv.StartBlock.Bytes(), env.StartBlock.Bytes()) {
-		return fmt.Errorf("mismatching start block, expected: %v, real: %v", env.StartBlock, actualEnv.StartBlock)
-	}
-	if !bytes.Equal(actualEnv.StartEpoch.Bytes(), env.StartEpoch.Bytes()) {
-		return fmt.Errorf("mismatching start epoch, expected: %v, real: %v", env.StartEpoch, actualEnv.StartEpoch)
-	}
-	if !bytes.Equal(actualEnv.BlockPeriod.Bytes(), env.BlockPeriod.Bytes()) {
-		return fmt.Errorf("mismatching block period, expected: %v, real: %v", env.BlockPeriod, actualEnv.BlockPeriod)
-	}
-	if !bytes.Equal(actualEnv.EpochPeriod.Bytes(), env.EpochPeriod.Bytes()) {
-		return fmt.Errorf("mismatching epoch period, expected: %v, real: %v", env.EpochPeriod, actualEnv.EpochPeriod)
-	}
-	if !bytes.Equal(actualEnv.RewardRate.Bytes(), env.RewardRate.Bytes()) {
-		return fmt.Errorf("mismatching reward rate, expected: %v, real: %v", env.RewardRate, actualEnv.RewardRate)
-	}
-	if !bytes.Equal(actualEnv.CommissionRate.Bytes(), env.CommissionRate.Bytes()) {
-		return fmt.Errorf("mismatching commission rate, expected: %v, real: %v", env.CommissionRate, actualEnv.CommissionRate)
-	}
-	if !bytes.Equal(actualEnv.ValidatorThreshold.Bytes(), env.ValidatorThreshold.Bytes()) {
-		return fmt.Errorf("mismatching validator threshold, expected: %v, real: %v", env.ValidatorThreshold, actualEnv.ValidatorThreshold)
-	}
-	if !bytes.Equal(actualEnv.JailThreshold.Bytes(), env.JailThreshold.Bytes()) {
-		return fmt.Errorf("mismatching jail threshold, expected: %v, real: %v", env.JailThreshold, actualEnv.JailThreshold)
-	}
-	if !bytes.Equal(actualEnv.JailPeriod.Bytes(), env.JailPeriod.Bytes()) {
-		return fmt.Errorf("mismatching jail period, expected: %v, real: %v", env.JailPeriod, actualEnv.JailPeriod)
+	if err = actualEnv.Equal(env); err != nil {
+		return err
 	}
 
 	validators, err := getValidatorsFromHeader(header)

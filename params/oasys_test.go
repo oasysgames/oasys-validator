@@ -79,4 +79,11 @@ func TestEnvironmentValue(t *testing.T) {
 			t.Errorf("GetFirstBlock(%d): want=11520 got=%d", number, got)
 		}
 	}
+
+	// test `Equal` method
+	wantErr := "mismatching start block, expected: 0, real: 11520"
+	gotErr := newVal.Equal(env).Error()
+	if gotErr != wantErr {
+		t.Errorf("Equal(env): want=`%s` got=`%s`", wantErr, gotErr)
+	}
 }
