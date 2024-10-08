@@ -1113,6 +1113,14 @@ func _deployments11(genesisHash common.Hash, contracts wantContracts) {
 	}
 }
 
+func _deployments12(genesisHash common.Hash, contracts wantContracts) {
+	// StakeManager
+	contracts["0x0000000000000000000000000000000000001001"].codeHash = "f0b8fef7ea94ceb9ec2e102f52e4c06c"
+
+	// CandidateValidatorManager
+	contracts["0x520000000000000000000000000000000000002e"].codeHash = "6de4d098a3297020346dcb7b2ba4914c"
+}
+
 func TestDeploy(t *testing.T) {
 	type wantDeployments []struct {
 		block  uint64
@@ -1141,6 +1149,7 @@ func TestDeploy(t *testing.T) {
 				{1529980, []deployFn{_deployments9}},
 				{1892000, []deployFn{_deployments10}},
 				{4089588, []deployFn{_deployments11}},
+				{9999998, []deployFn{_deployments12}},
 			},
 		},
 		{
@@ -1160,6 +1169,7 @@ func TestDeploy(t *testing.T) {
 				{1519840, []deployFn{_deployments9}},
 				{1880660, []deployFn{_deployments10}},
 				{4017600, []deployFn{_deployments11}},
+				{4428900, []deployFn{_deployments12}},
 			},
 		},
 		{
@@ -1186,7 +1196,8 @@ func TestDeploy(t *testing.T) {
 					_deployments8,
 					_deployments9,
 					_deployments10,
-					_deployments11,
+					// _deployments11,
+					_deployments12,
 				}},
 			},
 		},
