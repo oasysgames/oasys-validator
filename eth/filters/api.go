@@ -27,6 +27,7 @@ import (
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/gopool"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
@@ -188,6 +189,68 @@ func (api *FilterAPI) NewPendingTransactions(ctx context.Context, fullTx *bool) 
 	return rpcSub, nil
 }
 
+// NewVotesFilter creates a filter that fetches votes that entered the vote pool.
+// It is part of the filter package since polling goes with eth_getFilterChanges.
+func (api *FilterAPI) NewVotesFilter() rpc.ID {
+	var (
+		votes   = make(chan *types.VoteEnvelope)
+		voteSub = api.events.SubscribeNewVotes(votes)
+	)
+	api.filtersMu.Lock()
+	api.filters[voteSub.ID] = &filter{typ: VotesSubscription, deadline: time.NewTimer(api.timeout), hashes: make([]common.Hash, 0), s: voteSub}
+	api.filtersMu.Unlock()
+
+	gopool.Submit(func() {
+		for {
+			select {
+			case vote := <-votes:
+				api.filtersMu.Lock()
+				if f, found := api.filters[voteSub.ID]; found {
+					f.hashes = append(f.hashes, vote.Hash())
+				}
+				api.filtersMu.Unlock()
+			case <-voteSub.Err():
+				api.filtersMu.Lock()
+				delete(api.filters, voteSub.ID)
+				api.filtersMu.Unlock()
+				return
+			}
+		}
+	})
+
+	return voteSub.ID
+}
+
+// NewVotes creates a subscription that is triggered each time a vote enters the vote pool.
+func (api *FilterAPI) NewVotes(ctx context.Context) (*rpc.Subscription, error) {
+	notifier, supported := rpc.NotifierFromContext(ctx)
+	if !supported {
+		return &rpc.Subscription{}, rpc.ErrNotificationsUnsupported
+	}
+
+	rpcSub := notifier.CreateSubscription()
+
+	gopool.Submit(func() {
+		votes := make(chan *types.VoteEnvelope, 128)
+		voteSub := api.events.SubscribeNewVotes(votes)
+
+		for {
+			select {
+			case vote := <-votes:
+				notifier.Notify(rpcSub.ID, vote)
+			case <-rpcSub.Err():
+				voteSub.Unsubscribe()
+				return
+			case <-notifier.Closed():
+				voteSub.Unsubscribe()
+				return
+			}
+		}
+	})
+
+	return rpcSub, nil
+}
+
 // NewBlockFilter creates a filter that fetches blocks that are imported into the chain.
 // It is part of the filter package since polling goes with eth_getFilterChanges.
 func (api *FilterAPI) NewBlockFilter() rpc.ID {
@@ -247,6 +310,68 @@ func (api *FilterAPI) NewHeads(ctx context.Context) (*rpc.Subscription, error) {
 			}
 		}
 	}()
+
+	return rpcSub, nil
+}
+
+// NewFinalizedHeaderFilter creates a filter that fetches finalized headers that are reached.
+func (api *FilterAPI) NewFinalizedHeaderFilter() rpc.ID {
+	var (
+		headers   = make(chan *types.Header)
+		headerSub = api.events.SubscribeNewFinalizedHeaders(headers)
+	)
+
+	api.filtersMu.Lock()
+	api.filters[headerSub.ID] = &filter{typ: FinalizedHeadersSubscription, deadline: time.NewTimer(api.timeout), hashes: make([]common.Hash, 0), s: headerSub}
+	api.filtersMu.Unlock()
+
+	gopool.Submit(func() {
+		for {
+			select {
+			case h := <-headers:
+				api.filtersMu.Lock()
+				if f, found := api.filters[headerSub.ID]; found {
+					f.hashes = append(f.hashes, h.Hash())
+				}
+				api.filtersMu.Unlock()
+			case <-headerSub.Err():
+				api.filtersMu.Lock()
+				delete(api.filters, headerSub.ID)
+				api.filtersMu.Unlock()
+				return
+			}
+		}
+	})
+
+	return headerSub.ID
+}
+
+// NewFinalizedHeaders send a notification each time a new finalized header is reached.
+func (api *FilterAPI) NewFinalizedHeaders(ctx context.Context) (*rpc.Subscription, error) {
+	notifier, supported := rpc.NotifierFromContext(ctx)
+	if !supported {
+		return &rpc.Subscription{}, rpc.ErrNotificationsUnsupported
+	}
+
+	rpcSub := notifier.CreateSubscription()
+
+	gopool.Submit(func() {
+		headers := make(chan *types.Header)
+		headersSub := api.events.SubscribeNewFinalizedHeaders(headers)
+
+		for {
+			select {
+			case h := <-headers:
+				notifier.Notify(rpcSub.ID, h)
+			case <-rpcSub.Err():
+				headersSub.Unsubscribe()
+				return
+			case <-notifier.Closed():
+				headersSub.Unsubscribe()
+				return
+			}
+		}
+	})
 
 	return rpcSub, nil
 }
@@ -441,7 +566,7 @@ func (api *FilterAPI) GetFilterChanges(id rpc.ID) (interface{}, error) {
 		f.deadline.Reset(api.timeout)
 
 		switch f.typ {
-		case BlocksSubscription:
+		case BlocksSubscription, FinalizedHeadersSubscription, VotesSubscription:
 			hashes := f.hashes
 			f.hashes = nil
 			return returnHashes(hashes), nil
