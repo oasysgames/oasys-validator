@@ -746,7 +746,7 @@ func assembleValidators(validators *nextValidators) []byte {
 	// add validator number
 	extra = append(extra, byte(len(validators.Operators)))
 	// sanity check
-	if 256 < len(validators.Operators) {
+	if 256 <= len(validators.Operators) {
 		// As the number of validators is stored in a single byte, it should be less than 256
 		// Though the logically max number of validators is 1000(10M*1000=supply),
 		// the practical max is around 100, as the average staking of a validator is 100M.
@@ -852,6 +852,11 @@ func (c *Oasys) assembleVoteAttestation(chain consensus.ChainHeaderReader, heade
 	for i, voteAddr := range validators.VoteAddresses {
 		if _, ok := voteAddrSet[voteAddr]; ok {
 			voterIndex := i + 1
+			// sanity check
+			if 64 <= voterIndex {
+				// As the bitset is uint64, it should be less than 64
+				return errors.New("too many validators")
+			}
 			attestation.VoteAddressSet |= 1 << voterIndex
 		}
 	}
