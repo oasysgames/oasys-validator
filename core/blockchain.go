@@ -1151,7 +1151,7 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 
 		// Rewind may have occurred, skip in that case.
 		if bc.CurrentHeader().Number.Cmp(head.Number()) >= 0 {
-			reorg, err := bc.forker.ReorgNeeded(bc.CurrentSnapBlock(), head.Header())
+			reorg, err := bc.forker.ReorgNeededWithFastFinality(bc.CurrentSnapBlock(), head.Header())
 			if err != nil {
 				log.Warn("Reorg failed", "err", err)
 				return false
@@ -1510,7 +1510,7 @@ func (bc *BlockChain) writeBlockAndSetHead(block *types.Block, receipts []*types
 		return NonStatTy, err
 	}
 	currentBlock := bc.CurrentBlock()
-	reorg, err := bc.forker.ReorgNeeded(currentBlock, block.Header())
+	reorg, err := bc.forker.ReorgNeededWithFastFinality(currentBlock, block.Header())
 	if err != nil {
 		return NonStatTy, err
 	}
@@ -1669,7 +1669,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, setHead bool) (int, error)
 			current = bc.CurrentBlock()
 		)
 		for block != nil && bc.skipBlock(err, it) {
-			reorg, err = bc.forker.ReorgNeeded(current, block.Header())
+			reorg, err = bc.forker.ReorgNeededWithFastFinality(current, block.Header())
 			if err != nil {
 				return it.index, err
 			}
@@ -2034,7 +2034,7 @@ func (bc *BlockChain) insertSideChain(block *types.Block, it *insertIterator) (i
 	//
 	// If the externTd was larger than our local TD, we now need to reimport the previous
 	// blocks to regenerate the required state
-	reorg, err := bc.forker.ReorgNeeded(current, lastBlock.Header())
+	reorg, err := bc.forker.ReorgNeededWithFastFinality(current, lastBlock.Header())
 	if err != nil {
 		return it.index, err
 	}
@@ -2265,6 +2265,12 @@ func (bc *BlockChain) reorg(oldHead *types.Header, newHead *types.Block) error {
 		// rewind the canonical chain to a lower point.
 		log.Error("Impossible reorg, please file an issue", "oldnum", oldBlock.Number(), "oldhash", oldBlock.Hash(), "oldblocks", len(oldChain), "newnum", newBlock.Number(), "newhash", newBlock.Hash(), "newblocks", len(newChain))
 	}
+	// Reset the tx lookup cache in case to clear stale txlookups.
+	// This is done before writing any new chain data to avoid the
+	// weird scenario that canonical chain is changed while the
+	// stale lookups are still cached.
+	bc.txLookupCache.Purge()
+
 	// Insert the new chain(except the head block(reverse order)),
 	// taking care of the proper incremental order.
 	for i := len(newChain) - 1; i >= 1; i-- {
@@ -2279,11 +2285,14 @@ func (bc *BlockChain) reorg(oldHead *types.Header, newHead *types.Block) error {
 
 	// Delete useless indexes right now which includes the non-canonical
 	// transaction indexes, canonical chain indexes which above the head.
-	indexesBatch := bc.db.NewBatch()
-	for _, tx := range types.HashDifference(deletedTxs, addedTxs) {
+	var (
+		indexesBatch = bc.db.NewBatch()
+		diffs        = types.HashDifference(deletedTxs, addedTxs)
+		blockBatch   = bc.db.NewBatch()
+	)
+	for _, tx := range diffs {
 		rawdb.DeleteTxLookupEntry(indexesBatch, tx)
 	}
-
 	// Delete all hash markers that are not part of the new canonical chain.
 	// Because the reorg function does not handle new chain head, all hash
 	// markers greater than or equal to new chain head should be deleted.
@@ -2296,10 +2305,13 @@ func (bc *BlockChain) reorg(oldHead *types.Header, newHead *types.Block) error {
 		if hash == (common.Hash{}) {
 			break
 		}
-		rawdb.DeleteCanonicalHash(indexesBatch, i)
+		rawdb.DeleteCanonicalHash(blockBatch, i)
 	}
 	if err := indexesBatch.Write(); err != nil {
 		log.Crit("Failed to delete useless indexes", "err", err)
+	}
+	if err := blockBatch.Write(); err != nil {
+		log.Crit("Failed to delete useless indexes use block batch", "err", err)
 	}
 
 	// Send out events for logs from the old canon chain, and 'reborn'
