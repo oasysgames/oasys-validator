@@ -60,7 +60,8 @@ func (bc *BlockChain) CurrentFinalBlock() *types.Header {
 		}
 		return p.GetFinalizedHeader(bc, currentHeader)
 	}
-	return bc.currentFinalBlock.Load()
+
+	return nil
 }
 
 // CurrentSafeBlock retrieves the current safe block of the canonical
@@ -76,7 +77,7 @@ func (bc *BlockChain) CurrentSafeBlock() *types.Header {
 			return bc.GetHeaderByHash(justifiedBlockHash)
 		}
 	}
-	return bc.currentSafeBlock.Load()
+	return nil
 }
 
 // HasHeader checks if a block header is present in the database or not, caching
