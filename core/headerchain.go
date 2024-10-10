@@ -306,7 +306,7 @@ func (hc *HeaderChain) writeHeadersAndSetHead(headers []*types.Header, forker *F
 		}
 	)
 	// Ask the fork choicer if the reorg is necessary
-	if reorg, err := forker.ReorgNeeded(hc.CurrentHeader(), lastHeader); err != nil {
+	if reorg, err := forker.ReorgNeededWithFastFinality(hc.CurrentHeader(), lastHeader); err != nil {
 		return nil, err
 	} else if !reorg {
 		if inserted != 0 {
