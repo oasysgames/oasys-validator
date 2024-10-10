@@ -57,9 +57,8 @@ var (
 	headBlockGauge          = metrics.NewRegisteredGauge("chain/head/block", nil)
 	headHeaderGauge         = metrics.NewRegisteredGauge("chain/head/header", nil)
 	headFastBlockGauge      = metrics.NewRegisteredGauge("chain/head/receipt", nil)
+	headJustifiedBlockGauge = metrics.NewRegisteredGauge("chain/head/justified", nil)
 	headFinalizedBlockGauge = metrics.NewRegisteredGauge("chain/head/finalized", nil)
-	headSafeBlockGauge      = metrics.NewRegisteredGauge("chain/head/safe", nil)
-	justifiedBlockGauge     = metrics.NewRegisteredGauge("chain/head/justified", nil)
 
 	chainInfoGauge = metrics.NewRegisteredGaugeInfo("chain/info", nil)
 
@@ -239,7 +238,6 @@ type BlockChain struct {
 	currentBlock      atomic.Pointer[types.Header] // Current head of the chain
 	currentSnapBlock  atomic.Pointer[types.Header] // Current head of snap-sync
 	currentFinalBlock atomic.Pointer[types.Header] // Latest (consensus) finalized block
-	currentSafeBlock  atomic.Pointer[types.Header] // Latest (consensus) safe block
 
 	bodyCache     *lru.Cache[common.Hash, *types.Body]
 	bodyRLPCache  *lru.Cache[common.Hash, rlp.RawValue]
@@ -325,8 +323,6 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, genesis *Genesis
 
 	bc.currentBlock.Store(nil)
 	bc.currentSnapBlock.Store(nil)
-	bc.currentFinalBlock.Store(nil)
-	bc.currentSafeBlock.Store(nil)
 
 	// Update chain info data metrics
 	chainInfoGauge.Update(metrics.GaugeInfoValue{"chain_id": bc.chainConfig.ChainID.String()})
@@ -515,6 +511,17 @@ func (bc *BlockChain) GetJustifiedNumber(header *types.Header) uint64 {
 	return 0
 }
 
+// getFinalizedNumber returns the highest finalized number before the specific block.
+func (bc *BlockChain) getFinalizedNumber(header *types.Header) uint64 {
+	if p, ok := bc.engine.(consensus.PoS); ok {
+		if finalizedHeader := p.GetFinalizedHeader(bc, header); finalizedHeader != nil {
+			return finalizedHeader.Number.Uint64()
+		}
+	}
+
+	return 0
+}
+
 // loadLastState loads the last known chain state from the database. This method
 // assumes that the chain manager mutex is held.
 func (bc *BlockChain) loadLastState() error {
@@ -535,6 +542,8 @@ func (bc *BlockChain) loadLastState() error {
 	// Everything seems to be fine, set as the head block
 	bc.currentBlock.Store(headBlock.Header())
 	headBlockGauge.Update(int64(headBlock.NumberU64()))
+	headJustifiedBlockGauge.Update(int64(bc.GetJustifiedNumber(headBlock.Header())))
+	headFinalizedBlockGauge.Update(int64(bc.getFinalizedNumber(headBlock.Header())))
 
 	// Restore the last known head header
 	headHeader := headBlock.Header()
@@ -556,36 +565,28 @@ func (bc *BlockChain) loadLastState() error {
 		}
 	}
 
-	// Restore the last known finalized block and safe block
-	// Note: the safe block is not stored on disk and it is set to the last
-	// known finalized block on startup
-	if head := rawdb.ReadFinalizedBlockHash(bc.db); head != (common.Hash{}) {
-		if block := bc.GetBlockByHash(head); block != nil {
-			bc.currentFinalBlock.Store(block.Header())
-			headFinalizedBlockGauge.Update(int64(block.NumberU64()))
-			bc.currentSafeBlock.Store(block.Header())
-			headSafeBlockGauge.Update(int64(block.NumberU64()))
-		}
-	}
 	// Issue a status log for the user
 	var (
-		currentSnapBlock  = bc.CurrentSnapBlock()
-		currentFinalBlock = bc.currentFinalBlock.Load() // load directly to prevent panic by acccesing ethapi before it set during startup
+		currentSnapBlock = bc.CurrentSnapBlock()
 
 		headerTd = bc.GetTd(headHeader.Hash(), headHeader.Number.Uint64())
 		blockTd  = bc.GetTd(headBlock.Hash(), headBlock.NumberU64())
 	)
 	if headHeader.Hash() != headBlock.Hash() {
-		log.Info("Loaded most recent local header", "number", headHeader.Number, "hash", headHeader.Hash(), "td", headerTd, "age", common.PrettyAge(time.Unix(int64(headHeader.Time), 0)))
+		log.Info("Loaded most recent local header", "number", headHeader.Number, "hash", headHeader.Hash(), "root", headHeader.Root, "td", headerTd, "age", common.PrettyAge(time.Unix(int64(headHeader.Time), 0)))
 	}
-	log.Info("Loaded most recent local block", "number", headBlock.Number(), "hash", headBlock.Hash(), "td", blockTd, "age", common.PrettyAge(time.Unix(int64(headBlock.Time()), 0)))
+	log.Info("Loaded most recent local block", "number", headBlock.Number(), "hash", headBlock.Hash(), "root", headBlock.Root(), "td", blockTd, "age", common.PrettyAge(time.Unix(int64(headBlock.Time()), 0)))
 	if headBlock.Hash() != currentSnapBlock.Hash() {
 		snapTd := bc.GetTd(currentSnapBlock.Hash(), currentSnapBlock.Number.Uint64())
-		log.Info("Loaded most recent local snap block", "number", currentSnapBlock.Number, "hash", currentSnapBlock.Hash(), "td", snapTd, "age", common.PrettyAge(time.Unix(int64(currentSnapBlock.Time), 0)))
+		log.Info("Loaded most recent local snap block", "number", currentSnapBlock.Number, "hash", currentSnapBlock.Hash(), "root", currentSnapBlock.Root, "td", snapTd, "age", common.PrettyAge(time.Unix(int64(currentSnapBlock.Time), 0)))
 	}
-	if currentFinalBlock != nil {
-		finalTd := bc.GetTd(currentFinalBlock.Hash(), currentFinalBlock.Number.Uint64())
-		log.Info("Loaded most recent local finalized block", "number", currentFinalBlock.Number, "hash", currentFinalBlock.Hash(), "td", finalTd, "age", common.PrettyAge(time.Unix(int64(currentFinalBlock.Time), 0)))
+	if posa, ok := bc.engine.(consensus.PoS); ok {
+		if currentFinalizedHeader := posa.GetFinalizedHeader(bc, headHeader); currentFinalizedHeader != nil {
+			if currentFinalizedBlock := bc.GetBlockByHash(currentFinalizedHeader.Hash()); currentFinalizedBlock != nil {
+				finalTd := bc.GetTd(currentFinalizedBlock.Hash(), currentFinalizedBlock.NumberU64())
+				log.Info("Loaded most recent local finalized block", "number", currentFinalizedBlock.Number(), "hash", currentFinalizedBlock.Hash(), "root", currentFinalizedBlock.Root(), "td", finalTd, "age", common.PrettyAge(time.Unix(int64(currentFinalizedBlock.Time()), 0)))
+			}
+		}
 	}
 	if pivot := rawdb.ReadLastPivotNumber(bc.db); pivot != nil {
 		log.Info("Loaded last snap-sync pivot marker", "number", *pivot)
@@ -645,16 +646,6 @@ func (bc *BlockChain) SetFinalized(header *types.Header) {
 	} else {
 		rawdb.WriteFinalizedBlockHash(bc.db, common.Hash{})
 		headFinalizedBlockGauge.Update(0)
-	}
-}
-
-// SetSafe sets the safe block.
-func (bc *BlockChain) SetSafe(header *types.Header) {
-	bc.currentSafeBlock.Store(header)
-	if header != nil {
-		headSafeBlockGauge.Update(int64(header.Number.Uint64()))
-	} else {
-		headSafeBlockGauge.Update(0)
 	}
 }
 
@@ -826,11 +817,7 @@ func (bc *BlockChain) setHeadBeyondRoot(head uint64, time uint64, root common.Ha
 	bc.txLookupCache.Purge()
 	bc.futureBlocks.Purge()
 
-	// Clear safe block, finalized block if needed
-	if safe := bc.CurrentSafeBlock(); safe != nil && head < safe.Number.Uint64() {
-		log.Warn("SetHead invalidated safe block")
-		bc.SetSafe(nil)
-	}
+	// Clear finalized block if needed
 	if finalized := bc.CurrentFinalBlock(); finalized != nil && head < finalized.Number.Uint64() {
 		log.Error("SetHead invalidated finalized block")
 		bc.SetFinalized(nil)
@@ -862,7 +849,8 @@ func (bc *BlockChain) SnapSyncCommitHead(hash common.Hash) error {
 	}
 	bc.currentBlock.Store(block.Header())
 	headBlockGauge.Update(int64(block.NumberU64()))
-	justifiedBlockGauge.Update(int64(bc.GetJustifiedNumber(block.Header())))
+	headJustifiedBlockGauge.Update(int64(bc.GetJustifiedNumber(block.Header())))
+	headFinalizedBlockGauge.Update(int64(bc.getFinalizedNumber(block.Header())))
 	bc.chainmu.Unlock()
 
 	// Destroy any existing state snapshot and regenerate it in the background,
@@ -904,7 +892,8 @@ func (bc *BlockChain) ResetWithGenesisBlock(genesis *types.Block) error {
 	bc.genesisBlock = genesis
 	bc.currentBlock.Store(bc.genesisBlock.Header())
 	headBlockGauge.Update(int64(bc.genesisBlock.NumberU64()))
-	justifiedBlockGauge.Update(int64(bc.genesisBlock.NumberU64()))
+	headJustifiedBlockGauge.Update(int64(bc.genesisBlock.NumberU64()))
+	headFinalizedBlockGauge.Update(int64(bc.genesisBlock.NumberU64()))
 	bc.hc.SetGenesis(bc.genesisBlock.Header())
 	bc.hc.SetCurrentHeader(bc.genesisBlock.Header())
 	bc.currentSnapBlock.Store(bc.genesisBlock.Header())
@@ -976,7 +965,8 @@ func (bc *BlockChain) writeHeadBlock(block *types.Block) {
 
 	bc.currentBlock.Store(block.Header())
 	headBlockGauge.Update(int64(block.NumberU64()))
-	justifiedBlockGauge.Update(int64(bc.GetJustifiedNumber(block.Header())))
+	headJustifiedBlockGauge.Update(int64(bc.GetJustifiedNumber(block.Header())))
+	headFinalizedBlockGauge.Update(int64(bc.getFinalizedNumber(block.Header())))
 }
 
 // stopWithoutSaving stops the blockchain service. If any imports are currently in progress
