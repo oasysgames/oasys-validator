@@ -104,14 +104,14 @@ func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, engine c
 	}
 	hc.currentHeaderHash = hc.CurrentHeader().Hash()
 	headHeaderGauge.Update(hc.CurrentHeader().Number.Int64())
-	headJustifiedBlockGauge.Update(int64(hc.getJustifiedNumber(hc.CurrentHeader())))
+	headJustifiedBlockGauge.Update(int64(hc.GetJustifiedNumber(hc.CurrentHeader())))
 	headFinalizedBlockGauge.Update(int64(hc.getFinalizedNumber(hc.CurrentHeader())))
 
 	return hc, nil
 }
 
 // getJustifiedNumber returns the highest justified blockNumber on the branch including and before `header`.
-func (hc *HeaderChain) getJustifiedNumber(header *types.Header) uint64 {
+func (hc *HeaderChain) GetJustifiedNumber(header *types.Header) uint64 {
 	if p, ok := hc.engine.(consensus.PoS); ok {
 		justifiedBlockNumber, _, err := p.GetJustifiedNumberAndHash(hc, []*types.Header{header})
 		if err == nil {
@@ -561,7 +561,7 @@ func (hc *HeaderChain) SetCurrentHeader(head *types.Header) {
 	hc.currentHeader.Store(head)
 	hc.currentHeaderHash = head.Hash()
 	headHeaderGauge.Update(head.Number.Int64())
-	headJustifiedBlockGauge.Update(int64(hc.getJustifiedNumber(head)))
+	headJustifiedBlockGauge.Update(int64(hc.GetJustifiedNumber(head)))
 	headFinalizedBlockGauge.Update(int64(hc.getFinalizedNumber(head)))
 }
 
@@ -649,7 +649,7 @@ func (hc *HeaderChain) setHead(headBlock uint64, headTime uint64, updateFn Updat
 		hc.currentHeader.Store(parent)
 		hc.currentHeaderHash = parentHash
 		headHeaderGauge.Update(parent.Number.Int64())
-		headJustifiedBlockGauge.Update(int64(hc.getJustifiedNumber(parent)))
+		headJustifiedBlockGauge.Update(int64(hc.GetJustifiedNumber(parent)))
 		headFinalizedBlockGauge.Update(int64(hc.getFinalizedNumber(parent)))
 
 		// If this is the first iteration, wipe any leftover data upwards too so
