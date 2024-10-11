@@ -104,8 +104,6 @@ func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, engine c
 	}
 	hc.currentHeaderHash = hc.CurrentHeader().Hash()
 	headHeaderGauge.Update(hc.CurrentHeader().Number.Int64())
-	headJustifiedBlockGauge.Update(int64(hc.GetJustifiedNumber(hc.CurrentHeader())))
-	headFinalizedBlockGauge.Update(int64(hc.getFinalizedNumber(hc.CurrentHeader())))
 
 	return hc, nil
 }
@@ -120,17 +118,6 @@ func (hc *HeaderChain) GetJustifiedNumber(header *types.Header) uint64 {
 	}
 	// return 0 when err!=nil
 	// so the input `header` will at a disadvantage during reorg
-	return 0
-}
-
-// getFinalizedNumber returns the highest finalized number before the specific block.
-func (hc *HeaderChain) getFinalizedNumber(header *types.Header) uint64 {
-	if p, ok := hc.engine.(consensus.PoS); ok {
-		if finalizedHeader := p.GetFinalizedHeader(hc, header); finalizedHeader != nil {
-			return finalizedHeader.Number.Uint64()
-		}
-	}
-
 	return 0
 }
 
@@ -561,8 +548,6 @@ func (hc *HeaderChain) SetCurrentHeader(head *types.Header) {
 	hc.currentHeader.Store(head)
 	hc.currentHeaderHash = head.Hash()
 	headHeaderGauge.Update(head.Number.Int64())
-	headJustifiedBlockGauge.Update(int64(hc.GetJustifiedNumber(head)))
-	headFinalizedBlockGauge.Update(int64(hc.getFinalizedNumber(head)))
 }
 
 type (
@@ -649,8 +634,6 @@ func (hc *HeaderChain) setHead(headBlock uint64, headTime uint64, updateFn Updat
 		hc.currentHeader.Store(parent)
 		hc.currentHeaderHash = parentHash
 		headHeaderGauge.Update(parent.Number.Int64())
-		headJustifiedBlockGauge.Update(int64(hc.GetJustifiedNumber(parent)))
-		headFinalizedBlockGauge.Update(int64(hc.getFinalizedNumber(parent)))
 
 		// If this is the first iteration, wipe any leftover data upwards too so
 		// we don't end up with dangling daps in the database
