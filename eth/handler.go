@@ -153,6 +153,7 @@ type handler struct {
 
 	// channels for fetcher, syncer, txsyncLoop
 	quitSync chan struct{}
+	stopCh   chan struct{}
 
 	chainSync *chainSyncer
 	wg        sync.WaitGroup
@@ -181,6 +182,7 @@ func newHandler(config *handlerConfig) (*handler, error) {
 		quitSync:       make(chan struct{}),
 		handlerDoneCh:  make(chan struct{}),
 		handlerStartCh: make(chan struct{}),
+		stopCh:         make(chan struct{}),
 	}
 	if config.Sync == downloader.FullSync {
 		// The database seems empty as the current block is the genesis. Yet the snap
@@ -620,7 +622,7 @@ func (h *handler) Stop() {
 			h.voteMonitorSub.Unsubscribe()
 		}
 	}
-
+	close(h.stopCh)
 	// Quit chainSync and txsync64.
 	// After this is done, no new peers will be accepted.
 	close(h.quitSync)
@@ -779,10 +781,18 @@ func (h *handler) BroadcastVote(vote *types.VoteEnvelope) {
 func (h *handler) minedBroadcastLoop() {
 	defer h.wg.Done()
 
-	for obj := range h.minedBlockSub.Chan() {
-		if ev, ok := obj.Data.(core.NewMinedBlockEvent); ok {
-			h.BroadcastBlock(ev.Block, true)  // First propagate block to peers
-			h.BroadcastBlock(ev.Block, false) // Only then announce to the rest
+	for {
+		select {
+		case obj := <-h.minedBlockSub.Chan():
+			if obj == nil {
+				continue
+			}
+			if ev, ok := obj.Data.(core.NewMinedBlockEvent); ok {
+				h.BroadcastBlock(ev.Block, true)  // First propagate block to peers
+				h.BroadcastBlock(ev.Block, false) // Only then announce to the rest
+			}
+		case <-h.stopCh:
+			return
 		}
 	}
 }
@@ -795,6 +805,8 @@ func (h *handler) txBroadcastLoop() {
 		case event := <-h.txsCh:
 			h.BroadcastTransactions(event.Txs)
 		case <-h.txsSub.Err():
+			return
+		case <-h.stopCh:
 			return
 		}
 	}
@@ -811,6 +823,8 @@ func (h *handler) voteBroadcastLoop() {
 			h.BroadcastVote(event.Vote)
 		case <-h.votesSub.Err():
 			return
+		case <-h.stopCh:
+			return
 		}
 	}
 }
@@ -825,6 +839,8 @@ func (h *handler) startMaliciousVoteMonitor() {
 			pendingBlockNumber := h.chain.CurrentHeader().Number.Uint64() + 1
 			h.maliciousVoteMonitor.ConflictDetect(event.Vote, pendingBlockNumber)
 		case <-h.voteMonitorSub.Err():
+			return
+		case <-h.stopCh:
 			return
 		}
 	}
