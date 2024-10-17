@@ -212,6 +212,9 @@ type Config struct {
 	// VoteJournalDir is the directory to store votes in the fast finality feature.
 	VoteJournalDir string `toml:",omitempty"`
 
+	// VoteKeyName is name of the BLS public key used for voting
+	VoteKeyName string `toml:",omitempty"`
+
 	// BatchRequestLimit is the maximum number of requests in a batch.
 	BatchRequestLimit int `toml:",omitempty"`
 
