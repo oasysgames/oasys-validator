@@ -290,8 +290,9 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 			conf := stack.Config()
 			blsPasswordPath := stack.ResolvePath(conf.BLSPasswordFile)
 			blsWalletPath := stack.ResolvePath(conf.BLSWalletDir)
+			blsAccountName := conf.VoteKeyName
 			voteJournalPath := stack.ResolvePath(conf.VoteJournalDir)
-			if _, err := vote.NewVoteManager(eth, eth.blockchain, votePool, voteJournalPath, blsPasswordPath, blsWalletPath, posa); err != nil {
+			if _, err := vote.NewVoteManager(eth, eth.blockchain, votePool, voteJournalPath, blsPasswordPath, blsWalletPath, blsAccountName, posa); err != nil {
 				log.Error("Failed to Initialize voteManager", "err", err)
 				return nil, err
 			}
