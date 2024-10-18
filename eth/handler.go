@@ -252,6 +252,13 @@ func newHandler(config *handlerConfig) (*handler, error) {
 	heighter := func() uint64 {
 		return h.chain.CurrentBlock().Number.Uint64()
 	}
+	finalizeHeighter := func() uint64 {
+		fblock := h.chain.CurrentFinalBlock()
+		if fblock == nil {
+			return 0
+		}
+		return fblock.Number.Uint64()
+	}
 	inserter := func(blocks types.Blocks) (int, error) {
 		// All the block fetcher activities should be disabled
 		// after the transition. Print the warning log.
@@ -301,7 +308,8 @@ func newHandler(config *handlerConfig) (*handler, error) {
 		}
 		return h.chain.InsertChain(blocks)
 	}
-	h.blockFetcher = fetcher.NewBlockFetcher(false, nil, h.chain.GetBlockByHash, validator, h.BroadcastBlock, heighter, nil, inserter, h.removePeer)
+	h.blockFetcher = fetcher.NewBlockFetcher(false, nil, h.chain.GetBlockByHash, validator, h.BroadcastBlock,
+		heighter, finalizeHeighter, nil, inserter, h.removePeer)
 
 	fetchTx := func(peer string, hashes []common.Hash) error {
 		p := h.peers.peer(peer)
@@ -620,7 +628,6 @@ func (h *handler) Stop() {
 			h.voteMonitorSub.Unsubscribe()
 		}
 	}
-
 	// Quit chainSync and txsync64.
 	// After this is done, no new peers will be accepted.
 	close(h.quitSync)
