@@ -1114,8 +1114,7 @@ func (w *worker) commitWork(interrupt *atomic.Int32, timestamp int64) {
 	}
 	// Submit the generated block for consensus sealing.
 	if err = w.commit(work.copy(), w.fullTaskHook, true, start); err != nil {
-		log.Error("Failed to commit work", "in", "commitWork", "err", err)
-		return
+		log.Warn("Failed to commit work", "in", "commitWork", "err", err)
 	}
 
 	// Swap out the old work with the new one, terminating any leftover
