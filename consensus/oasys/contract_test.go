@@ -601,11 +601,11 @@ func makeEnv(wallet accounts.Wallet, account accounts.Account) (*testEnv, error)
 	}
 
 	// Generate StateDB
-	_, _, statedb := tests.MakePreState(db, genspec.Alloc, false, rawdb.HashScheme)
+	stateTestState := tests.MakePreState(db, genspec.Alloc, false, rawdb.HashScheme)
 
 	// Replace artifact bytecode
 	environment.artifact.DeployedBytecode = fmt.Sprintf("0x%s", hex.EncodeToString(genspec.Alloc[_environmentAddress].Code))
 	stakeManager.artifact.DeployedBytecode = fmt.Sprintf("0x%s", hex.EncodeToString(genspec.Alloc[_stakeManagerAddress].Code))
 
-	return &testEnv{engine, chain, statedb}, nil
+	return &testEnv{engine, chain, stateTestState.StateDB}, nil
 }
