@@ -17,6 +17,7 @@
 package eth
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math/big"
@@ -25,8 +26,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // ethHandler implements the eth.Backend interface to handle the various network
@@ -138,5 +141,26 @@ func (h *ethHandler) handleBlockBroadcast(peer *eth.Peer, block *types.Block, td
 		peer.SetHead(trueHead, trueTD)
 		h.chainSync.handlePeerEvent()
 	}
+	// Update the peer's justfied head if better than the previous
+	if h.chain.Config().IsFastFinalityEnabled(block.Number()) {
+		if attestation, err := decodeVoteAttestation(block.Header()); err == nil && (peer.JustifiedNumber() == nil || attestation.Data.SourceNumber > peer.JustifiedNumber()) {
+			peer.SetJustified(attestation.Data.SourceNumber)
+		}
+	}
 	return nil
+}
+
+const (
+	extraVanity = 32                     // Fixed number of extra-data prefix bytes reserved for signer vanity
+	extraSeal   = crypto.SignatureLength // Fixed number of extra-data suffix bytes reserved for signer seal
+)
+
+func decodeVoteAttestation(header *types.Header) (*types.VoteAttestation, error) {
+	attestationBytes := header.Extra[extraVanity : len(header.Extra)-extraSeal]
+	var attestation types.VoteAttestation
+	// Decode attestation fail if no attestation info or epoch header
+	if err := rlp.Decode(bytes.NewReader(attestationBytes), &attestation); err != nil {
+		return nil, fmt.Errorf("failed to decode attestation: %v", err)
+	}
+	return &attestation, nil
 }
