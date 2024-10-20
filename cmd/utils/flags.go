@@ -944,6 +944,11 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 		Usage:    "Path for the voteJournal dir in fast finality feature (default = inside the datadir)",
 		Category: flags.FastFinalityCategory,
 	}
+	VoteKeyNameFlag = &cli.StringFlag{
+		Name:     "vote-key-name",
+		Usage:    "Name of the BLS public key used for voting (default = first found key)",
+		Category: flags.FastFinalityCategory,
+	}
 )
 
 var (
@@ -1450,6 +1455,9 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	if ctx.IsSet(BLSPasswordFileFlag.Name) {
 		cfg.BLSPasswordFile = ctx.String(BLSPasswordFileFlag.Name)
 	}
+	if ctx.IsSet(VoteKeyNameFlag.Name) {
+		cfg.VoteKeyName = ctx.String(VoteKeyNameFlag.Name)
+	}
 	if ctx.IsSet(DBEngineFlag.Name) {
 		dbEngine := ctx.String(DBEngineFlag.Name)
 		if dbEngine != "leveldb" && dbEngine != "pebble" {
@@ -1808,7 +1816,7 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		cfg.RPCTxFeeCap = ctx.Float64(RPCGlobalTxFeeCapFlag.Name)
 	}
 	if ctx.IsSet(NoDiscoverFlag.Name) {
-		cfg.EthDiscoveryURLs, cfg.SnapDiscoveryURLs, cfg.BscDiscoveryURLs = []string{}, []string{}, []string{}
+		cfg.EthDiscoveryURLs, cfg.SnapDiscoveryURLs = []string{}, []string{}
 	} else if ctx.IsSet(DNSDiscoveryFlag.Name) {
 		urls := ctx.String(DNSDiscoveryFlag.Name)
 		if urls == "" {
@@ -1943,7 +1951,6 @@ func SetDNSDiscoveryDefaults(cfg *ethconfig.Config, genesis common.Hash) {
 	if url := params.KnownDNSNetwork(genesis, protocol); url != "" {
 		cfg.EthDiscoveryURLs = []string{url}
 		cfg.SnapDiscoveryURLs = cfg.EthDiscoveryURLs
-		cfg.BscDiscoveryURLs = cfg.EthDiscoveryURLs
 	}
 }
 

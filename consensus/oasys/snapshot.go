@@ -297,7 +297,7 @@ func (s *Snapshot) ToNextValidators() *nextValidators {
 		copy(voteAddresses[i][:], info.VoteAddress[:])
 	}
 	return &nextValidators{
-		Owners:        make([]common.Address, len(operators)), // take care the owners are empty
+		Owners:        make([]common.Address, 0), // take care the owners are empty
 		Operators:     operators,
 		Stakes:        stakes,
 		VoteAddresses: voteAddresses,

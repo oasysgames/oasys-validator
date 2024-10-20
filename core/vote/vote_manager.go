@@ -44,7 +44,7 @@ type VoteManager struct {
 	engine consensus.PoS
 }
 
-func NewVoteManager(eth Backend, chain *core.BlockChain, pool *VotePool, journalPath, blsPasswordPath, blsWalletPath string, engine consensus.PoS) (*VoteManager, error) {
+func NewVoteManager(eth Backend, chain *core.BlockChain, pool *VotePool, journalPath, blsPasswordPath, blsWalletPath, blsAccountName string, engine consensus.PoS) (*VoteManager, error) {
 	voteManager := &VoteManager{
 		eth:         eth,
 		chain:       chain,
@@ -55,7 +55,7 @@ func NewVoteManager(eth Backend, chain *core.BlockChain, pool *VotePool, journal
 	}
 
 	// Create voteSigner.
-	voteSigner, err := NewVoteSigner(blsPasswordPath, blsWalletPath)
+	voteSigner, err := NewVoteSigner(blsPasswordPath, blsWalletPath, blsAccountName)
 	if err != nil {
 		return nil, err
 	}
