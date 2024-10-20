@@ -12,6 +12,7 @@ import (
 	"github.com/prysmaticlabs/prysm/v5/validator/accounts/iface"
 	"github.com/prysmaticlabs/prysm/v5/validator/accounts/wallet"
 	"github.com/prysmaticlabs/prysm/v5/validator/keymanager"
+	"github.com/prysmaticlabs/prysm/v5/validator/keymanager/local"
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
@@ -29,7 +30,7 @@ type VoteSigner struct {
 	PubKey [48]byte
 }
 
-func NewVoteSigner(blsPasswordPath, blsWalletPath string) (*VoteSigner, error) {
+func NewVoteSigner(blsPasswordPath, blsWalletPath, blsAccountName string) (*VoteSigner, error) {
 	dirExists, err := wallet.Exists(blsWalletPath)
 	if err != nil {
 		log.Error("Check BLS wallet exists", "err", err)
@@ -71,10 +72,39 @@ func NewVoteSigner(blsPasswordPath, blsWalletPath string) (*VoteSigner, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "could not fetch validating public keys")
 	}
+	if len(pubKeys) == 0 {
+		return nil, errors.New("no public keys in the BLS wallet")
+	}
+
+	// The default uses the first found key.
+	pubKey := pubKeys[0]
+
+	// If a key name is specified, find for it, but use the first key if not found.
+	if blsAccountName != "" {
+		ikm, ok := km.(*local.Keymanager)
+		if !ok {
+			return nil, errors.New("could not assert BLS keymanager interface to concrete type")
+		}
+		accountNames, err := ikm.ValidatingAccountNames()
+		if err != nil {
+			return nil, errors.Wrap(err, "could not fetch BLS account names")
+		}
+		var found bool
+		for i := 0; i < len(accountNames) && !found; i++ {
+			found = accountNames[i] == blsAccountName
+			if found {
+				pubKey = pubKeys[i]
+			}
+		}
+		if !found {
+			log.Warn("Configured voting BLS public key was not found, so the default key will be used",
+				"configured", blsAccountName, "default", accountNames[0])
+		}
+	}
 
 	return &VoteSigner{
 		km:     &km,
-		PubKey: pubKeys[0],
+		PubKey: pubKey,
 	}, nil
 }
 

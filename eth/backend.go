@@ -45,7 +45,6 @@ import (
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/ethereum/go-ethereum/eth/gasprice"
-	"github.com/ethereum/go-ethereum/eth/protocols/bsc"
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/eth/protocols/snap"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -78,7 +77,6 @@ type Ethereum struct {
 	handler            *handler
 	ethDialCandidates  enode.Iterator
 	snapDialCandidates enode.Iterator
-	bscDialCandidates  enode.Iterator
 	merger             *consensus.Merger
 
 	// DB interfaces
@@ -290,8 +288,9 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 			conf := stack.Config()
 			blsPasswordPath := stack.ResolvePath(conf.BLSPasswordFile)
 			blsWalletPath := stack.ResolvePath(conf.BLSWalletDir)
+			blsAccountName := conf.VoteKeyName
 			voteJournalPath := stack.ResolvePath(conf.VoteJournalDir)
-			if _, err := vote.NewVoteManager(eth, eth.blockchain, votePool, voteJournalPath, blsPasswordPath, blsWalletPath, posa); err != nil {
+			if _, err := vote.NewVoteManager(eth, eth.blockchain, votePool, voteJournalPath, blsPasswordPath, blsWalletPath, blsAccountName, posa); err != nil {
 				log.Error("Failed to Initialize voteManager", "err", err)
 				return nil, err
 			}
@@ -312,10 +311,6 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		return nil, err
 	}
 	eth.snapDialCandidates, err = dnsclient.NewIterator(eth.config.SnapDiscoveryURLs...)
-	if err != nil {
-		return nil, err
-	}
-	eth.bscDialCandidates, err = dnsclient.NewIterator(eth.config.BscDiscoveryURLs...)
 	if err != nil {
 		return nil, err
 	}
@@ -565,7 +560,6 @@ func (s *Ethereum) Protocols() []p2p.Protocol {
 	if s.config.SnapshotCache > 0 {
 		protos = append(protos, snap.MakeProtocols((*snapHandler)(s.handler), s.snapDialCandidates)...)
 	}
-	protos = append(protos, bsc.MakeProtocols((*bscHandler)(s.handler), s.bscDialCandidates)...)
 	return protos
 }
 
@@ -599,7 +593,6 @@ func (s *Ethereum) Stop() error {
 	// Stop all the peer-related stuff first.
 	s.ethDialCandidates.Close()
 	s.snapDialCandidates.Close()
-	s.bscDialCandidates.Close()
 	s.handler.Stop()
 
 	// Then stop everything else.

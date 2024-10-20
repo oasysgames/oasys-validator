@@ -150,6 +150,7 @@ var (
 		utils.BLSPasswordFileFlag,
 		utils.BLSWalletDirFlag,
 		utils.VoteJournalDirFlag,
+		utils.VoteKeyNameFlag,
 		utils.LogDebugFlag,
 		utils.LogBacktraceAtFlag,
 	}, utils.NetworkFlags, utils.DatabaseFlags)
