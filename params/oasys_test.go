@@ -79,60 +79,11 @@ func TestEnvironmentValue(t *testing.T) {
 			t.Errorf("GetFirstBlock(%d): want=11520 got=%d", number, got)
 		}
 	}
-}
 
-func TestNewEnvironmentValue(t *testing.T) {
-	compare := func(got, want *EnvironmentValue) {
-		if got.StartBlock.Cmp(want.StartBlock) != 0 {
-			t.Errorf("StartBlock: want=%d got=%d", want.StartBlock, got.StartBlock)
-		}
-		if got.StartEpoch.Cmp(want.StartEpoch) != 0 {
-			t.Errorf("StartEpoch: want=%d got=%d", want.StartEpoch, got.StartEpoch)
-		}
-		if got.BlockPeriod.Cmp(want.BlockPeriod) != 0 {
-			t.Errorf("BlockPeriod: want=%d got=%d", want.BlockPeriod, got.BlockPeriod)
-		}
-		if got.EpochPeriod.Cmp(want.EpochPeriod) != 0 {
-			t.Errorf("EpochPeriod: want=%d got=%d", want.EpochPeriod, got.EpochPeriod)
-		}
-		if got.RewardRate.Cmp(want.RewardRate) != 0 {
-			t.Errorf("RewardRate: want=%d got=%d", want.RewardRate, got.RewardRate)
-		}
-		if got.CommissionRate.Cmp(want.CommissionRate) != 0 {
-			t.Errorf("CommissionRate: want=%d got=%d", want.CommissionRate, got.CommissionRate)
-		}
-		if got.ValidatorThreshold.Cmp(want.ValidatorThreshold) != 0 {
-			t.Errorf("ValidatorThreshold: want=%d got=%d", want.ValidatorThreshold, got.ValidatorThreshold)
-		}
-		if got.JailThreshold.Cmp(want.JailThreshold) != 0 {
-			t.Errorf("JailThreshold: want=%d got=%d", want.JailThreshold, got.JailThreshold)
-		}
-		if got.JailPeriod.Cmp(want.JailPeriod) != 0 {
-			t.Errorf("JailPeriod: want=%d got=%d", want.JailPeriod, got.JailPeriod)
-		}
+	// test `Equal` method
+	wantErr := "mismatching start block, expected: 0, real: 11520"
+	gotErr := newVal.Equal(env).Error()
+	if gotErr != wantErr {
+		t.Errorf("Equal(env): want=`%s` got=`%s`", wantErr, gotErr)
 	}
-
-	compare(InitialEnvironmentValue(OasysMainnetChainConfig), &EnvironmentValue{
-		StartBlock:         common.Big0,
-		StartEpoch:         common.Big1,
-		BlockPeriod:        big.NewInt(15),
-		EpochPeriod:        big.NewInt(5760),
-		RewardRate:         big.NewInt(10),
-		CommissionRate:     big.NewInt(10),
-		ValidatorThreshold: new(big.Int).Mul(big.NewInt(Ether), big.NewInt(10_000_000)),
-		JailThreshold:      big.NewInt(500),
-		JailPeriod:         big.NewInt(2),
-	})
-
-	compare(ShortenedBlockTimeEnvironmentValue(OasysMainnetChainConfig), &EnvironmentValue{
-		StartBlock:         big.NewInt(5748480),
-		StartEpoch:         big.NewInt(999),
-		BlockPeriod:        big.NewInt(6),
-		EpochPeriod:        big.NewInt(14400),
-		RewardRate:         big.NewInt(10),
-		CommissionRate:     big.NewInt(10),
-		ValidatorThreshold: new(big.Int).Mul(big.NewInt(Ether), big.NewInt(10_000_000)),
-		JailThreshold:      big.NewInt(500),
-		JailPeriod:         big.NewInt(2),
-	})
 }

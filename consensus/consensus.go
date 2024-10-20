@@ -52,6 +52,10 @@ type ChainHeaderReader interface {
 	GetCanonicalHash(number uint64) common.Hash
 }
 
+type VotePool interface {
+	FetchVoteByBlockHash(blockHash common.Hash) []*types.VoteEnvelope
+}
+
 // ChainReader defines a small collection of methods needed to access the local
 // blockchain during header and/or uncle verification.
 type ChainReader interface {
@@ -135,4 +139,8 @@ type PoS interface {
 	Engine
 
 	IsSystemTransaction(tx *types.Transaction, header *types.Header) (bool, error)
+	GetJustifiedNumberAndHash(chain ChainHeaderReader, headers []*types.Header) (uint64, common.Hash, error)
+	GetFinalizedHeader(chain ChainHeaderReader, header *types.Header) *types.Header
+	VerifyVote(chain ChainHeaderReader, vote *types.VoteEnvelope) error
+	IsActiveValidatorAt(chain ChainHeaderReader, header *types.Header, checkVoteKeyFn func(bLSPublicKey *types.BLSPublicKey) bool) bool
 }

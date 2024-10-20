@@ -1,6 +1,7 @@
 package params
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -71,6 +72,40 @@ func (p *EnvironmentValue) Copy() *EnvironmentValue {
 		JailThreshold:      new(big.Int).Set(p.JailThreshold),
 		JailPeriod:         new(big.Int).Set(p.JailPeriod),
 	}
+}
+
+// Checks if the values of all fields are equal to `expect`.
+func (p *EnvironmentValue) Equal(expect *EnvironmentValue) error {
+	ne := func(a, b *big.Int) bool { return a.Cmp(b) != 0 }
+
+	if ne(p.StartBlock, expect.StartBlock) {
+		return fmt.Errorf("mismatching start block, expected: %v, real: %v", expect.StartBlock, p.StartBlock)
+	}
+	if ne(p.StartEpoch, expect.StartEpoch) {
+		return fmt.Errorf("mismatching start epoch, expected: %v, real: %v", expect.StartEpoch, p.StartEpoch)
+	}
+	if ne(p.BlockPeriod, expect.BlockPeriod) {
+		return fmt.Errorf("mismatching block period, expected: %v, real: %v", expect.BlockPeriod, p.BlockPeriod)
+	}
+	if ne(p.EpochPeriod, expect.EpochPeriod) {
+		return fmt.Errorf("mismatching epoch period, expected: %v, real: %v", expect.EpochPeriod, p.EpochPeriod)
+	}
+	if ne(p.RewardRate, expect.RewardRate) {
+		return fmt.Errorf("mismatching reward rate, expected: %v, real: %v", expect.RewardRate, p.RewardRate)
+	}
+	if ne(p.CommissionRate, expect.CommissionRate) {
+		return fmt.Errorf("mismatching commission rate, expected: %v, real: %v", expect.CommissionRate, p.CommissionRate)
+	}
+	if ne(p.ValidatorThreshold, expect.ValidatorThreshold) {
+		return fmt.Errorf("mismatching validator threshold, expected: %v, real: %v", expect.ValidatorThreshold, p.ValidatorThreshold)
+	}
+	if ne(p.JailThreshold, expect.JailThreshold) {
+		return fmt.Errorf("mismatching jail threshold, expected: %v, real: %v", expect.JailThreshold, p.JailThreshold)
+	}
+	if ne(p.JailPeriod, expect.JailPeriod) {
+		return fmt.Errorf("mismatching jail period, expected: %v, real: %v", expect.JailPeriod, p.JailPeriod)
+	}
+	return nil
 }
 
 // Returns the environment value in Genesis.
