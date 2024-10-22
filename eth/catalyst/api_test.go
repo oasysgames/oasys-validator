@@ -1548,11 +1548,13 @@ func TestBlockToPayloadWithBlobs(t *testing.T) {
 	}
 
 	txs = append(txs, types.NewTx(&inner))
-	sidecars := []*types.BlobTxSidecar{
+	sidecars := []*types.BlobSidecar{
 		{
-			Blobs:       make([]kzg4844.Blob, 1),
-			Commitments: make([]kzg4844.Commitment, 1),
-			Proofs:      make([]kzg4844.Proof, 1),
+			BlobTxSidecar: types.BlobTxSidecar{
+				Blobs:       make([]kzg4844.Blob, 1),
+				Commitments: make([]kzg4844.Commitment, 1),
+				Proofs:      make([]kzg4844.Proof, 1),
+			},
 		},
 	}
 
