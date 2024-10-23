@@ -45,6 +45,7 @@ import (
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/ethereum/go-ethereum/eth/gasprice"
+	"github.com/ethereum/go-ethereum/eth/protocols/bsc"
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/eth/protocols/snap"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -73,11 +74,12 @@ type Ethereum struct {
 	// Handlers
 	txPool *txpool.TxPool
 
-	blockchain         *core.BlockChain
-	handler            *handler
-	ethDialCandidates  enode.Iterator
-	snapDialCandidates enode.Iterator
-	merger             *consensus.Merger
+	blockchain          *core.BlockChain
+	handler             *handler
+	ethDialCandidates   enode.Iterator
+	snapDialCandidates  enode.Iterator
+	emptyDialCandidates enode.Iterator
+	merger              *consensus.Merger
 
 	// DB interfaces
 	chainDb ethdb.Database // Block chain database
@@ -318,6 +320,10 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		return nil, err
 	}
 	eth.snapDialCandidates, err = dnsclient.NewIterator(eth.config.SnapDiscoveryURLs...)
+	if err != nil {
+		return nil, err
+	}
+	eth.emptyDialCandidates, err = dnsclient.NewIterator()
 	if err != nil {
 		return nil, err
 	}
@@ -567,6 +573,7 @@ func (s *Ethereum) Protocols() []p2p.Protocol {
 	if s.config.SnapshotCache > 0 {
 		protos = append(protos, snap.MakeProtocols((*snapHandler)(s.handler), s.snapDialCandidates)...)
 	}
+	protos = append(protos, bsc.MakeProtocols((*bscHandler)(s.handler), s.emptyDialCandidates)...)
 	return protos
 }
 
