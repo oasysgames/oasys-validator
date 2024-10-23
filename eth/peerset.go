@@ -399,6 +399,26 @@ func (ps *peerSet) peerWithHighestTD() *eth.Peer {
 	return bestPeer
 }
 
+// peerWithHighestJustifiedBlockAndTD() returns the peer with the
+// highest justified block height. If multiple peers have the same
+// height, the one with the highest total difficulty is returned.
+func (ps *peerSet) peerWithHighestJustifiedBlockAndTD() (bestPeer *eth.Peer, bestJustified uint64, bestTd *big.Int) {
+	ps.lock.RLock()
+	defer ps.lock.RUnlock()
+
+	for _, p := range ps.peers {
+		justified := p.JustifiedBlock()
+		if justified == nil {
+			continue
+		}
+		_, td := p.Head()
+		if *justified > bestJustified || (*justified == bestJustified && td.Cmp(bestTd) > 0) {
+			bestPeer, bestJustified, bestTd = p.Peer, *justified, td
+		}
+	}
+	return
+}
+
 // close disconnects all peers.
 func (ps *peerSet) close() {
 	ps.lock.Lock()
