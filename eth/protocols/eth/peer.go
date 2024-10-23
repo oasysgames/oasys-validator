@@ -75,6 +75,8 @@ type Peer struct {
 	head common.Hash // Latest advertised head block hash
 	td   *big.Int    // Latest advertised head block total difficulty
 
+	justifiedBlock *uint64 // Latest advertised justified block
+
 	knownBlocks     *knownCache            // Set of block hashes known to be known by this peer
 	queuedBlocks    chan *blockPropagation // Queue of blocks to broadcast to the peer
 	queuedBlockAnns chan *types.Block      // Queue of blocks to announce to the peer
@@ -154,6 +156,22 @@ func (p *Peer) SetHead(hash common.Hash, td *big.Int) {
 
 	copy(p.head[:], hash[:])
 	p.td.Set(td)
+}
+
+// JustifiedBlock retrieves the latest advertised justified block of the peer.
+func (p *Peer) JustifiedBlock() *uint64 {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	return p.justifiedBlock
+}
+
+// SetJustifiedBlock updates the latest advertised justified block of the peer.
+func (p *Peer) SetJustifiedBlock(num uint64) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	p.justifiedBlock = &num
 }
 
 // KnownBlock returns whether peer is known to already have a block.

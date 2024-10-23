@@ -155,7 +155,7 @@ func (s *Snapshot) updateAttestation(header *types.Header, chainConfig *params.C
 	}
 
 	// The attestation should have been checked in verify header, update directly
-	attestation, _ := getVoteAttestationFromHeader(header, chainConfig, oasysConfig, s.Environment)
+	attestation, _ := getVoteAttestationFromHeader(header, chainConfig, oasysConfig, s.Environment.IsEpoch(header.Number.Uint64()))
 	if attestation == nil {
 		return
 	}

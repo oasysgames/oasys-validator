@@ -413,7 +413,7 @@ func (o *Oasys) getParent(chain consensus.ChainHeaderReader, header *types.Heade
 
 // verifyVoteAttestation checks whether the vote attestation in the header is valid.
 func (o *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header, env *params.EnvironmentValue) error {
-	attestation, err := getVoteAttestationFromHeader(header, o.chainConfig, o.config, env)
+	attestation, err := getVoteAttestationFromHeader(header, o.chainConfig, o.config, env.IsEpoch(header.Number.Uint64()))
 	if err != nil {
 		return err
 	}
@@ -574,7 +574,7 @@ func getEnvironmentFromHeader(header *types.Header) (*params.EnvironmentValue, e
 }
 
 // getVoteAttestationFromHeader returns the vote attestation extracted from the header's extra field if exists.
-func getVoteAttestationFromHeader(header *types.Header, chainConfig *params.ChainConfig, oasysConfig *params.OasysConfig, env *params.EnvironmentValue) (*types.VoteAttestation, error) {
+func getVoteAttestationFromHeader(header *types.Header, chainConfig *params.ChainConfig, oasysConfig *params.OasysConfig, isEpoch bool) (*types.VoteAttestation, error) {
 	if len(header.Extra) <= extraVanity+extraSeal {
 		return nil, nil
 	}
@@ -584,8 +584,13 @@ func getVoteAttestationFromHeader(header *types.Header, chainConfig *params.Chai
 	}
 
 	var attestationBytes []byte
-	if env.IsEpoch(header.Number.Uint64()) {
-		num := int(header.Extra[extraVanity+envValuesLen])
+	if isEpoch {
+		// Strictly check the length because it might be called from the
+		// `DecodeVoteAttestation(...)` even though it is not actually an epoch block.
+		var num int
+		if len(header.Extra) >= extraVanity+envValuesLen {
+			num = int(header.Extra[extraVanity+envValuesLen])
+		}
 		if len(header.Extra) <= extraVanity+extraSeal+validatorNumberSize+num*validatorInfoBytesLen {
 			return nil, nil
 		}
@@ -606,6 +611,18 @@ func getVoteAttestationFromHeader(header *types.Header, chainConfig *params.Chai
 		return nil, fmt.Errorf("block %d has vote attestation info, decode err: %s", header.Number.Uint64(), err)
 	}
 	return &attestation, nil
+}
+
+// Decode vote atestation from the block header. It is a wrapper method that allows
+// calls from outside the consensus engine. The provided block header may depend on
+// an unknown ancestor, so it must not access the Environment or Snapshot.
+func (o *Oasys) DecodeVoteAttestation(header *types.Header) *types.VoteAttestation {
+	attestation, _ := getVoteAttestationFromHeader(header, o.chainConfig, o.config, false)
+	if attestation == nil {
+		// Possible epoch block.
+		attestation, _ = getVoteAttestationFromHeader(header, o.chainConfig, o.config, true)
+	}
+	return attestation
 }
 
 // snapshot retrieves the authorization snapshot at a given point in time.
