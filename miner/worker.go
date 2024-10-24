@@ -1016,7 +1016,7 @@ func (w *worker) prepareWork(genParams *generateParams) (*environment, error) {
 		}
 		header.BlobGasUsed = new(uint64)
 		header.ExcessBlobGas = &excessBlobGas
-		header.ParentBeaconRoot = genParams.beaconRoot
+		header.ParentBeaconRoot = new(common.Hash)
 		if w.chainConfig.Oasys != nil {
 			header.WithdrawalsHash = &types.EmptyWithdrawalsHash
 		}

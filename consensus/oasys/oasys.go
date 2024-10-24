@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"math/big"
 	"sort"
@@ -1300,11 +1301,34 @@ func (c *Oasys) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, p
 	return scheduler.difficulty(number, c.signer, c.chainConfig.IsForkedOasysExtendDifficulty(parent.Number))
 }
 
+func encodeSigHeaderWithoutVoteAttestation(w io.Writer, header *types.Header) {
+	err := rlp.Encode(w, []interface{}{
+		header.ParentHash,
+		header.UncleHash,
+		header.Coinbase,
+		header.Root,
+		header.TxHash,
+		header.ReceiptHash,
+		header.Bloom,
+		header.Difficulty,
+		header.Number,
+		header.GasLimit,
+		header.GasUsed,
+		header.Time,
+		header.Extra[:extraVanity], // this will panic if extra is too short, should check before calling encodeSigHeaderWithoutVoteAttestation
+		header.MixDigest,
+		header.Nonce,
+	})
+	if err != nil {
+		panic("can't encode: " + err.Error())
+	}
+}
+
 // SealHash returns the hash of a block without vote attestation prior to it being sealed.
 // So it's not the real hash of a block, just used as unique id to distinguish task
 func (c *Oasys) SealHash(header *types.Header) (hash common.Hash) {
 	hasher := sha3.NewLegacyKeccak256()
-	types.EncodeSigHeaderWithoutVoteAttestation(hasher, header)
+	encodeSigHeaderWithoutVoteAttestation(hasher, header)
 	hasher.Sum(hash[:0])
 	return hash
 }
