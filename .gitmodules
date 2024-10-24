@@ -12,3 +12,6 @@
 [submodule "oasys-genesis-contract-6037082"]
 	path = consensus/oasys/oasys-genesis-contract-6037082
 	url = https://github.com/oasysgames/oasys-genesis-contract.git
+[submodule "consensus/oasys/oasys-genesis-contract-5675779"]
+	path = consensus/oasys/oasys-genesis-contract-5675779
+	url = https://github.com/oasysgames/oasys-genesis-contract.git

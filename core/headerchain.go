@@ -104,7 +104,21 @@ func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, engine c
 	}
 	hc.currentHeaderHash = hc.CurrentHeader().Hash()
 	headHeaderGauge.Update(hc.CurrentHeader().Number.Int64())
+
 	return hc, nil
+}
+
+// getJustifiedNumber returns the highest justified blockNumber on the branch including and before `header`.
+func (hc *HeaderChain) GetJustifiedNumber(header *types.Header) uint64 {
+	if p, ok := hc.engine.(consensus.PoS); ok {
+		justifiedBlockNumber, _, err := p.GetJustifiedNumberAndHash(hc, []*types.Header{header})
+		if err == nil {
+			return justifiedBlockNumber
+		}
+	}
+	// return 0 when err!=nil
+	// so the input `header` will at a disadvantage during reorg
+	return 0
 }
 
 // GetBlockNumber retrieves the block number belonging to the given hash
@@ -279,7 +293,7 @@ func (hc *HeaderChain) writeHeadersAndSetHead(headers []*types.Header, forker *F
 		}
 	)
 	// Ask the fork choicer if the reorg is necessary
-	if reorg, err := forker.ReorgNeeded(hc.CurrentHeader(), lastHeader); err != nil {
+	if reorg, err := forker.ReorgNeededWithFastFinality(hc.CurrentHeader(), lastHeader); err != nil {
 		return nil, err
 	} else if !reorg {
 		if inserted != 0 {

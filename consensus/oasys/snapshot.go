@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"sort"
 
@@ -23,11 +24,41 @@ type Snapshot struct {
 	sigcache *lru.ARCCache       // Cache of recent block signatures to speed up ecrecover
 	ethAPI   *ethapi.BlockChainAPI
 
-	Number     uint64                      `json:"number"`     // Block number where the snapshot was created
-	Hash       common.Hash                 `json:"hash"`       // Block hash where the snapshot was created
-	Validators map[common.Address]*big.Int `json:"validators"` // Set of authorized validators and stakes at this moment
+	Number      uint64                            `json:"number"`                // Block number where the snapshot was created
+	Hash        common.Hash                       `json:"hash"`                  // Block hash where the snapshot was created
+	Validators  map[common.Address]*ValidatorInfo `json:"validators"`            // Set of authorized validators and stakes at this moment
+	Attestation *types.VoteData                   `json:"attestation,omitempty"` // Attestation for fast finality, but `Source` used as `Finalized`
 
 	Environment *params.EnvironmentValue `json:"environment"`
+}
+
+type ValidatorInfo struct {
+	// The index is determined by the sorted order of the validator owner address
+	Stake       *big.Int           `json:"stake,omitempty"`        // The stake amount
+	Index       int                `json:"index,omitempty"`        // The index should offset by 1
+	VoteAddress types.BLSPublicKey `json:"vote_address,omitempty"` // The vote address
+}
+
+// Note: This code can be removed after each validators has been upgraded to v1.6.0.
+func (info *ValidatorInfo) UnmarshalJSON(b []byte) error {
+	// v1.5.0 or earlier
+	bigint := new(big.Int)
+	if err := json.Unmarshal(b, bigint); err == nil {
+		info.Stake = bigint
+		return nil
+	}
+
+	// v1.6.0 or later
+	type Alias ValidatorInfo
+	alias := new(Alias)
+	if err := json.Unmarshal(b, alias); err != nil {
+		return err
+	}
+
+	info.Stake = alias.Stake
+	info.Index = alias.Index
+	info.VoteAddress = alias.VoteAddress
+	return nil
 }
 
 // validatorsAscending implements the sort interface to allow sorting a list of addresses
@@ -48,11 +79,14 @@ func newSnapshot(config *params.ChainConfig, sigcache *lru.ARCCache, ethAPI *eth
 		ethAPI:      ethAPI,
 		Number:      number,
 		Hash:        hash,
-		Validators:  make(map[common.Address]*big.Int),
+		Validators:  make(map[common.Address]*ValidatorInfo),
 		Environment: environment.Copy(),
 	}
-	for _, address := range validators {
-		snap.Validators[address] = new(big.Int).Set(common.Big0)
+	for i, address := range validators {
+		snap.Validators[address] = &ValidatorInfo{
+			Index: i + 1,
+			Stake: new(big.Int).Set(common.Big0),
+		}
 	}
 	return snap
 }
@@ -92,18 +126,66 @@ func (s *Snapshot) copy() *Snapshot {
 		ethAPI:      s.ethAPI,
 		Number:      s.Number,
 		Hash:        s.Hash,
-		Validators:  make(map[common.Address]*big.Int),
+		Validators:  make(map[common.Address]*ValidatorInfo),
 		Environment: s.Environment.Copy(),
 	}
-	for address, stake := range s.Validators {
-		cpy.Validators[address] = new(big.Int).Set(stake)
+	for address, info := range s.Validators {
+		var voteAddress types.BLSPublicKey
+		copy(voteAddress[:], info.VoteAddress.Bytes())
+		cpy.Validators[address] = &ValidatorInfo{
+			Index:       info.Index,
+			Stake:       new(big.Int).Set(info.Stake),
+			VoteAddress: voteAddress,
+		}
+	}
+	if s.Attestation != nil {
+		cpy.Attestation = &types.VoteData{
+			SourceNumber: s.Attestation.SourceNumber,
+			SourceHash:   s.Attestation.SourceHash,
+			TargetNumber: s.Attestation.TargetNumber,
+			TargetHash:   s.Attestation.TargetHash,
+		}
 	}
 	return cpy
 }
 
+func (s *Snapshot) updateAttestation(header *types.Header, chainConfig *params.ChainConfig, oasysConfig *params.OasysConfig) {
+	if !chainConfig.IsFastFinalityEnabled(header.Number) {
+		return
+	}
+
+	// The attestation should have been checked in verify header, update directly
+	attestation, _ := getVoteAttestationFromHeader(header, chainConfig, oasysConfig, s.Environment.IsEpoch(header.Number.Uint64()))
+	if attestation == nil {
+		return
+	}
+
+	// Headers with bad attestation are accepted before Plato upgrade,
+	// but Attestation of snapshot is only updated when the target block is direct parent of the header
+	targetNumber := attestation.Data.TargetNumber
+	targetHash := attestation.Data.TargetHash
+	if targetHash != header.ParentHash || targetNumber+1 != header.Number.Uint64() {
+		log.Warn("updateAttestation failed", "error", fmt.Errorf("invalid attestation, target mismatch, expected block: %d, hash: %s; real block: %d, hash: %s",
+			header.Number.Uint64()-1, header.ParentHash, targetNumber, targetHash))
+		updateAttestationErrorCounter.Inc(1)
+		return
+	}
+
+	// Update attestation
+	// Two scenarios for s.Attestation being nil:
+	// 1) The first attestation is assembled.
+	// 2) The snapshot on disk is missing, prompting the creation of a new snapshot using `newSnapshot`.
+	if s.Attestation != nil && attestation.Data.SourceNumber+1 != attestation.Data.TargetNumber {
+		s.Attestation.TargetNumber = attestation.Data.TargetNumber
+		s.Attestation.TargetHash = attestation.Data.TargetHash
+	} else {
+		s.Attestation = attestation.Data
+	}
+}
+
 // apply creates a new authorization snapshot by applying the given headers to
 // the original one.
-func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderReader) (*Snapshot, error) {
+func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderReader, oasysConfig *params.OasysConfig) (*Snapshot, error) {
 	// Allow passing in no headers for cleaner code
 	if len(headers) == 0 {
 		return s, nil
@@ -130,21 +212,38 @@ func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderRea
 
 		var exists bool
 		if number > 0 && snap.Environment.IsEpoch(number) {
-			nextValidator, err := getNextValidators(s.config, s.ethAPI, header.ParentHash, snap.Environment.Epoch(number), number)
-			if err != nil {
-				log.Error("Failed to get validators", "in", "Snapshot.apply", "hash", header.ParentHash, "number", number, "err", err)
-				return nil, err
+			var nextValidator *nextValidators
+			if s.config.IsFastFinalityEnabled(header.Number) {
+				if nextValidator, err = getValidatorsFromHeader(header); err != nil {
+					log.Warn("failed to get validators from header", "in", "Snapshot.apply", "hash", header.Hash(), "number", number, "err", err)
+				}
 			}
-			nextEnv, err := getNextEnvironmentValue(s.ethAPI, header.ParentHash)
+			// If not fast finality or failed to get validators from header
+			if nextValidator == nil {
+				if nextValidator, err = getNextValidators(s.config, s.ethAPI, header.ParentHash, snap.Environment.Epoch(number), number); err != nil {
+					return nil, fmt.Errorf("failed to get validators, in Snapshot.apply, err: %w", err)
+				}
+			}
+			var nextEnv *params.EnvironmentValue
+			if s.config.IsFastFinalityEnabled(header.Number) {
+				nextEnv, err = getEnvironmentFromHeader(header)
+			} else {
+				nextEnv, err = getNextEnvironmentValue(s.ethAPI, header.ParentHash)
+			}
 			if err != nil {
 				log.Error("Failed to get environment value", "in", "Snapshot.apply", "hash", header.ParentHash, "number", number, "err", err)
 				return nil, err
 			}
 
 			snap.Environment = nextEnv.Copy()
-			snap.Validators = map[common.Address]*big.Int{}
+			snap.Validators = make(map[common.Address]*ValidatorInfo, len(nextValidator.Operators))
 			for i, address := range nextValidator.Operators {
-				snap.Validators[address] = nextValidator.Stakes[i]
+				voterIndex := i + 1
+				snap.Validators[address] = &ValidatorInfo{
+					Index:       voterIndex,
+					Stake:       nextValidator.Stakes[i],
+					VoteAddress: nextValidator.VoteAddresses[i],
+				}
 			}
 
 			exists = nextValidator.Exists(validator)
@@ -155,6 +254,8 @@ func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderRea
 		if !exists {
 			return nil, errUnauthorizedValidator
 		}
+
+		snap.updateAttestation(header, s.config, oasysConfig)
 	}
 	snap.Number += uint64(len(headers))
 	snap.Hash = headers[len(headers)-1].Hash()
@@ -177,16 +278,30 @@ func (s *Snapshot) exists(validator common.Address) bool {
 	return ok
 }
 
-func (s *Snapshot) validatorsToTuple() ([]common.Address, []*big.Int) {
+func (s *Snapshot) ToNextValidators() *nextValidators {
 	operators := make([]common.Address, len(s.Validators))
 	stakes := make([]*big.Int, len(s.Validators))
-	i := 0
-	for address, stake := range s.Validators {
+	voteAddresses := make([]types.BLSPublicKey, len(s.Validators))
+	var counter int
+	for address, info := range s.Validators {
+		// Basically, voterIndex is assured when creating snapshot
+		i := info.Index - 1
+		if info.Index == 0 {
+			// The is one scenario that the index is 0, which is the first run after the upgrade(v1.6.0).
+			// In this case, As the snapshot is loaded from disk, the format is old one.
+			i = counter
+			counter++
+		}
 		operators[i] = address
-		stakes[i] = new(big.Int).Set(stake)
-		i++
+		stakes[i] = new(big.Int).Set(info.Stake)
+		copy(voteAddresses[i][:], info.VoteAddress[:])
 	}
-	return operators, stakes
+	return &nextValidators{
+		Owners:        make([]common.Address, 0), // take care the owners are empty
+		Operators:     operators,
+		Stakes:        stakes,
+		VoteAddresses: voteAddresses,
+	}
 }
 
 func parseValidatorBytes(validatorBytes []byte) ([]common.Address, error) {

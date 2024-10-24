@@ -11,6 +11,8 @@ import (
 	"math"
 	"math/big"
 	"path/filepath"
+	"reflect"
+	"sort"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts"
@@ -40,6 +42,7 @@ var (
 	//go:embed oasys-genesis-contract-cfb3cd0/artifacts/contracts/Environment.sol/Environment.json
 	//go:embed oasys-genesis-contract-cfb3cd0/artifacts/contracts/StakeManager.sol/StakeManager.json
 	//go:embed oasys-genesis-contract-6037082/artifacts/contracts/CandidateValidatorManager.sol/CandidateValidatorManager.json
+	//go:embed oasys-genesis-contract-5675779/artifacts/contracts/CandidateValidatorManager.sol/CandidateValidatorManager.json
 	artifacts embed.FS
 
 	// Oasys genesis contracts
@@ -55,18 +58,26 @@ var (
 			path: filepath.FromSlash("oasys-genesis-contract-cfb3cd0/artifacts/contracts/StakeManager.sol/StakeManager.json"),
 		},
 	}
-	systemMethods = map[*genesisContract]map[string]int{
-		// Methods with the `onlyCoinbase` modifier are system methods.
-		// See: https://github.com/oasysgames/oasys-genesis-contract/search?q=onlyCoinbase
-		environment:  {"initialize": 0, "updateValue": 0},
-		stakeManager: {"initialize": 0, "slash": 0},
-	}
-
 	candidateManager = &builtinContract{
 		address: common.HexToAddress(candidateManagerAddress),
 		artifact: &artifact{
 			path: filepath.FromSlash("oasys-genesis-contract-6037082/artifacts/contracts/CandidateValidatorManager.sol/CandidateValidatorManager.json"),
 		},
+	}
+	// This contract corresponds to v1.6.0 of the genesis contract.
+	// `2` is not majar version of the genesis contract.
+	// Just increment the version number to avoid the conflict.
+	candidateManager2 = &builtinContract{
+		address: common.HexToAddress(candidateManagerAddress),
+		artifact: &artifact{
+			path: filepath.FromSlash("oasys-genesis-contract-5675779/artifacts/contracts/CandidateValidatorManager.sol/CandidateValidatorManager.json"),
+		},
+	}
+	systemMethods = map[*genesisContract]map[string]int{
+		// Methods with the `onlyCoinbase` modifier are system methods.
+		// See: https://github.com/oasysgames/oasys-genesis-contract/search?q=onlyCoinbase
+		environment:  {"initialize": 0, "updateValue": 0},
+		stakeManager: {"initialize": 0, "slash": 0},
 	}
 )
 
@@ -79,6 +90,9 @@ func init() {
 		panic(err)
 	}
 	if err := candidateManager.parseABI(); err != nil {
+		panic(err)
+	}
+	if err := candidateManager2.parseABI(); err != nil {
 		panic(err)
 	}
 
@@ -155,16 +169,20 @@ type nextValidators struct {
 	Owners    []common.Address
 	Operators []common.Address
 	Stakes    []*big.Int
+	// for finality, vote address is unique in validators
+	VoteAddresses []types.BLSPublicKey
 }
 
 func (p *nextValidators) Copy() *nextValidators {
 	cpy := nextValidators{
-		Owners:    make([]common.Address, len(p.Owners)),
-		Operators: make([]common.Address, len(p.Operators)),
-		Stakes:    make([]*big.Int, len(p.Stakes)),
+		Owners:        make([]common.Address, len(p.Owners)),
+		Operators:     make([]common.Address, len(p.Operators)),
+		Stakes:        make([]*big.Int, len(p.Stakes)),
+		VoteAddresses: make([]types.BLSPublicKey, len(p.VoteAddresses)),
 	}
 	copy(cpy.Owners, p.Owners)
 	copy(cpy.Operators, p.Operators)
+	copy(cpy.VoteAddresses, p.VoteAddresses)
 	for i, v := range p.Stakes {
 		cpy.Stakes[i] = new(big.Int).Set(v)
 	}
@@ -178,6 +196,39 @@ func (p *nextValidators) Exists(validator common.Address) bool {
 		}
 	}
 	return false
+}
+
+func (p *nextValidators) SortByOwner() {
+	// Create a slice of indices based on the length of the Owners slice
+	indices := make([]int, len(p.Owners))
+	for i := range indices {
+		indices[i] = i
+	}
+
+	// Sort the indices based on the Owners slice
+	sort.Slice(indices, func(i, j int) bool {
+		return bytes.Compare(p.Owners[indices[i]][:], p.Owners[indices[j]][:]) < 0
+	})
+
+	// Create new slices to hold the sorted data
+	sortedOwners := make([]common.Address, len(p.Owners))
+	sortedOperators := make([]common.Address, len(p.Owners))
+	sortedStakes := make([]*big.Int, len(p.Owners))
+	sortedVoteAddresses := make([]types.BLSPublicKey, len(p.Owners))
+
+	// Rearrange all slices according to the sorted indices
+	for i, idx := range indices {
+		sortedOwners[i] = p.Owners[idx]
+		sortedOperators[i] = p.Operators[idx]
+		sortedStakes[i] = p.Stakes[idx]
+		sortedVoteAddresses[i] = p.VoteAddresses[idx]
+	}
+
+	// Assign sorted slices back to the struct fields
+	p.Owners = sortedOwners
+	p.Operators = sortedOperators
+	p.Stakes = sortedStakes
+	p.VoteAddresses = sortedVoteAddresses
 }
 
 // callmsg
@@ -307,6 +358,14 @@ func getNextValidators(
 	epoch uint64,
 	block uint64,
 ) (*nextValidators, error) {
+	if config.IsFastFinalityEnabled(new(big.Int).SetUint64(block)) {
+		validators, err := callGetHighStakes2(ethAPI, hash, epoch)
+		if err != nil {
+			return nil, err
+		}
+		validators.SortByOwner() // sort by owner for fast finality
+		return validators, nil
+	}
 	if config.IsForkedOasysPublication(new(big.Int).SetUint64(block)) {
 		return callGetHighStakes(ethAPI, hash, epoch)
 	}
@@ -366,6 +425,8 @@ func callGetValidators(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*n
 				result.Owners = append(result.Owners, recv.Owners[i])
 				result.Operators = append(result.Operators, recv.Operators[i])
 				result.Stakes = append(result.Stakes, recv.Stakes[i])
+				// set empty key, as the older than v1.6.0 stake manager does not return bls pub key
+				result.VoteAddresses = append(result.VoteAddresses, types.BLSPublicKey{})
 			}
 		}
 	}
@@ -375,20 +436,86 @@ func callGetValidators(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*n
 
 // Call the `CandidateValidatorManager.getHighStakes` method.
 func callGetHighStakes(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*nextValidators, error) {
+	var (
+		recv struct {
+			Owners          []common.Address
+			Operators       []common.Address
+			Stakes          []*big.Int
+			Candidates      []bool
+			NewCursor       *big.Int
+			Actives, Jailed []bool // unused
+		}
+		result            nextValidators
+		processCallResult = func() {
+			for i := range recv.Owners {
+				if recv.Candidates[i] {
+					result.Owners = append(result.Owners, recv.Owners[i])
+					result.Operators = append(result.Operators, recv.Operators[i])
+					result.Stakes = append(result.Stakes, recv.Stakes[i])
+					// set empty key, as the older than v1.6.0 stake manager does not return bls pub key
+					result.VoteAddresses = append(result.VoteAddresses, types.BLSPublicKey{})
+				}
+			}
+		}
+	)
+	if err := callGetHighStakesCommon(ethAPI, hash, epoch, candidateManager, &recv, processCallResult); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// Call the `CandidateValidatorManager.getHighStakes` method.
+// This function is for the v1.6.0 contract.
+func callGetHighStakes2(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*nextValidators, error) {
+	var (
+		recv struct {
+			Owners          []common.Address
+			Operators       []common.Address
+			Stakes          []*big.Int
+			BlsPublicKeys   [][]byte
+			Candidates      []bool
+			NewCursor       *big.Int
+			Actives, Jailed []bool // unused
+		}
+		result            nextValidators
+		processCallResult = func() {
+			for i := range recv.Owners {
+				if recv.Candidates[i] {
+					result.Owners = append(result.Owners, recv.Owners[i])
+					result.Operators = append(result.Operators, recv.Operators[i])
+					result.Stakes = append(result.Stakes, recv.Stakes[i])
+					if len(recv.BlsPublicKeys[i]) == types.BLSPublicKeyLength {
+						result.VoteAddresses = append(result.VoteAddresses, types.BLSPublicKey(recv.BlsPublicKeys[i]))
+					} else {
+						// set empty key if bls pub key is not registered on contract
+						result.VoteAddresses = append(result.VoteAddresses, types.BLSPublicKey{})
+					}
+				}
+			}
+		}
+	)
+	if err := callGetHighStakesCommon(ethAPI, hash, epoch, candidateManager2, &recv, processCallResult); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+func callGetHighStakesCommon(ethAPI blockchainAPI, hash common.Hash, epoch uint64, manager *builtinContract, v interface{}, processCallResult func()) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	var (
 		method  = "getHighStakes"
-		result  nextValidators
 		bpoch   = new(big.Int).SetUint64(epoch)
 		cursor  = big.NewInt(0)
 		howMany = big.NewInt(100)
 	)
 	for {
-		data, err := candidateManager.abi.Pack(method, bpoch, cursor, howMany)
+		data, err := manager.abi.Pack(method, bpoch, cursor, howMany)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		hexData := (hexutil.Bytes)(data)
@@ -396,7 +523,7 @@ func callGetHighStakes(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*n
 		rbytes, err := ethAPI.Call(
 			ctx,
 			ethapi.TransactionArgs{
-				To:   &candidateManager.address,
+				To:   &manager.address,
 				Data: &hexData,
 			},
 			&blockNrOrHash,
@@ -404,36 +531,29 @@ func callGetHighStakes(ethAPI blockchainAPI, hash common.Hash, epoch uint64) (*n
 			nil,
 		)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
-		var recv struct {
-			Owners     []common.Address
-			Operators  []common.Address
-			Stakes     []*big.Int
-			Candidates []bool
-			NewCursor  *big.Int
-
-			// unused
-			Actives, Jailed []bool
+		if err := manager.abi.UnpackIntoInterface(v, method, rbytes); err != nil {
+			return err
 		}
-		if err := candidateManager.abi.UnpackIntoInterface(&recv, method, rbytes); err != nil {
-			return nil, err
-		} else if len(recv.Owners) == 0 {
+
+		// we assume that the `Owners` field and the `NewCursor` field are always present
+		vOwners := reflect.ValueOf(v).Elem().FieldByName("Owners")
+		vCursor := reflect.ValueOf(v).Elem().FieldByName("NewCursor")
+		if !vOwners.IsValid() || !vCursor.IsValid() {
+			panic("Owners or NewCursor field are not found. unexpected value is present as getHighStakes's output")
+		}
+
+		if vOwners.Len() == 0 {
 			break
 		}
 
-		cursor = recv.NewCursor
-		for i := range recv.Owners {
-			if recv.Candidates[i] {
-				result.Owners = append(result.Owners, recv.Owners[i])
-				result.Operators = append(result.Operators, recv.Operators[i])
-				result.Stakes = append(result.Stakes, recv.Stakes[i])
-			}
-		}
+		cursor, _ = vCursor.Interface().(*big.Int)
+		processCallResult() // callback to process the received data
 	}
 
-	return &result, nil
+	return nil
 }
 
 // Call the `StakeManager.getValidatorOwners` method.

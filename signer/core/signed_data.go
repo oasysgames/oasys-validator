@@ -258,7 +258,7 @@ func oasysHeaderHashAndRlp(header *types.Header) (hash, rlp []byte, err error) {
 		return
 	}
 	rlp = oasys.OasysRLP(header)
-	hash = oasys.SealHash(header).Bytes()
+	hash = types.SealHash(header).Bytes()
 	return hash, rlp, err
 }
 

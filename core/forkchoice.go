@@ -24,6 +24,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
@@ -35,6 +36,12 @@ import (
 type ChainReader interface {
 	// Config retrieves the header chain's chain configuration.
 	Config() *params.ChainConfig
+
+	// Engine retrieves the blockchain's consensus engine.
+	Engine() consensus.Engine
+
+	// GetJustifiedNumber returns the highest justified blockNumber on the branch including and before `header`
+	GetJustifiedNumber(header *types.Header) uint64
 
 	// GetTd returns the total difficulty of a local block.
 	GetTd(common.Hash, uint64) *big.Int
@@ -110,4 +117,29 @@ func (f *ForkChoice) ReorgNeeded(current *types.Header, extern *types.Header) (b
 		reorg = !currentPreserve && (externPreserve || f.rand.Float64() < 0.5)
 	}
 	return reorg, nil
+}
+
+// ReorgNeededWithFastFinality compares justified block numbers firstly, backoff to compare tds when equal
+func (f *ForkChoice) ReorgNeededWithFastFinality(current *types.Header, header *types.Header) (bool, error) {
+	_, ok := f.chain.Engine().(consensus.PoS)
+	if !ok {
+		return f.ReorgNeeded(current, header)
+	}
+
+	justifiedNumber, curJustifiedNumber := uint64(0), uint64(0)
+	if f.chain.Config().IsFastFinalityEnabled(header.Number) {
+		justifiedNumber = f.chain.GetJustifiedNumber(header)
+	}
+	if f.chain.Config().IsFastFinalityEnabled(current.Number) {
+		curJustifiedNumber = f.chain.GetJustifiedNumber(current)
+	}
+	if justifiedNumber == curJustifiedNumber {
+		return f.ReorgNeeded(current, header)
+	}
+
+	if justifiedNumber > curJustifiedNumber && header.Number.Cmp(current.Number) <= 0 {
+		log.Info("Chain find higher justifiedNumber", "fromHeight", current.Number, "fromHash", current.Hash(), "fromMiner", current.Coinbase, "fromJustified", curJustifiedNumber,
+			"toHeight", header.Number, "toHash", header.Hash(), "toMiner", header.Coinbase, "toJustified", justifiedNumber)
+	}
+	return justifiedNumber > curJustifiedNumber, nil
 }
