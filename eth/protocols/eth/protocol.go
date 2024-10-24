@@ -30,7 +30,6 @@ import (
 
 // Constants to match up protocol versions and messages
 const (
-	ETH66 = 66
 	ETH67 = 67
 	ETH68 = 68
 )
@@ -41,11 +40,11 @@ const ProtocolName = "eth"
 
 // ProtocolVersions are the supported versions of the `eth` protocol (first
 // is primary).
-var ProtocolVersions = []uint{ETH68, ETH67, ETH66}
+var ProtocolVersions = []uint{ETH68, ETH67}
 
 // protocolLengths are the number of implemented message corresponding to
 // different protocol versions.
-var protocolLengths = map[uint]uint64{ETH68: 17, ETH67: 17, ETH66: 17}
+var protocolLengths = map[uint]uint64{ETH68: 17, ETH67: 17}
 
 // maxMessageSize is the maximum cap on the size of a protocol message.
 const maxMessageSize = 10 * 1024 * 1024
@@ -62,8 +61,6 @@ const (
 	NewPooledTransactionHashesMsg = 0x08
 	GetPooledTransactionsMsg      = 0x09
 	PooledTransactionsMsg         = 0x0a
-	GetNodeDataMsg                = 0x0d
-	NodeDataMsg                   = 0x0e
 	GetReceiptsMsg                = 0x0f
 	ReceiptsMsg                   = 0x10
 )
@@ -258,24 +255,6 @@ func (p *BlockBodiesResponse) Unpack() ([][]*types.Transaction, [][]*types.Heade
 	return txset, uncleset, withdrawalset
 }
 
-// GetNodeDataPacket represents a trie node data query.
-type GetNodeDataPacket []common.Hash
-
-// GetNodeDataPacket represents a trie node data query over eth/66.
-type GetNodeDataPacket66 struct {
-	RequestId uint64
-	GetNodeDataPacket
-}
-
-// NodeDataPacket is the network packet for trie node data distribution.
-type NodeDataPacket [][]byte
-
-// NodeDataPacket is the network packet for trie node data distribution over eth/66.
-type NodeDataPacket66 struct {
-	RequestId uint64
-	NodeDataPacket
-}
-
 // GetReceiptsRequest represents a block receipts query.
 type GetReceiptsRequest []common.Hash
 
@@ -304,11 +283,8 @@ type ReceiptsRLPPacket struct {
 	ReceiptsRLPResponse
 }
 
-// NewPooledTransactionHashesPacket67 represents a transaction announcement packet on eth/67.
-type NewPooledTransactionHashesPacket67 []common.Hash
-
-// NewPooledTransactionHashesPacket68 represents a transaction announcement packet on eth/68 and newer.
-type NewPooledTransactionHashesPacket68 struct {
+// NewPooledTransactionHashesPacket represents a transaction announcement packet on eth/68 and newer.
+type NewPooledTransactionHashesPacket struct {
 	Types  []byte
 	Sizes  []uint32
 	Hashes []common.Hash
@@ -367,10 +343,8 @@ func (*BlockBodiesResponse) Kind() byte   { return BlockBodiesMsg }
 func (*NewBlockPacket) Name() string { return "NewBlock" }
 func (*NewBlockPacket) Kind() byte   { return NewBlockMsg }
 
-func (*NewPooledTransactionHashesPacket67) Name() string { return "NewPooledTransactionHashes" }
-func (*NewPooledTransactionHashesPacket67) Kind() byte   { return NewPooledTransactionHashesMsg }
-func (*NewPooledTransactionHashesPacket68) Name() string { return "NewPooledTransactionHashes" }
-func (*NewPooledTransactionHashesPacket68) Kind() byte   { return NewPooledTransactionHashesMsg }
+func (*NewPooledTransactionHashesPacket) Name() string { return "NewPooledTransactionHashes" }
+func (*NewPooledTransactionHashesPacket) Kind() byte   { return NewPooledTransactionHashesMsg }
 
 func (*GetPooledTransactionsRequest) Name() string { return "GetPooledTransactions" }
 func (*GetPooledTransactionsRequest) Kind() byte   { return GetPooledTransactionsMsg }
