@@ -35,6 +35,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/eth/catalyst"
+	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/internal/flags"
@@ -176,6 +177,16 @@ func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend) {
 	if ctx.IsSet(utils.OverrideVerkle.Name) {
 		v := ctx.Uint64(utils.OverrideVerkle.Name)
 		cfg.Eth.OverrideVerkle = &v
+	}
+	if ctx.IsSet(utils.OverrideFullImmutabilityThreshold.Name) {
+		params.FullImmutabilityThreshold = ctx.Uint64(utils.OverrideFullImmutabilityThreshold.Name)
+		downloader.FullMaxForkAncestry = ctx.Uint64(utils.OverrideFullImmutabilityThreshold.Name)
+	}
+	if ctx.IsSet(utils.OverrideMinBlocksForBlobRequests.Name) {
+		params.MinBlocksForBlobRequests = ctx.Uint64(utils.OverrideMinBlocksForBlobRequests.Name)
+	}
+	if ctx.IsSet(utils.OverrideDefaultExtraReserveForBlobRequests.Name) {
+		params.DefaultExtraReserveForBlobRequests = ctx.Uint64(utils.OverrideDefaultExtraReserveForBlobRequests.Name)
 	}
 	backend, eth := utils.RegisterEthService(stack, &cfg.Eth)
 

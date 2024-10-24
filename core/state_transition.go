@@ -457,6 +457,13 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		fee := new(uint256.Int).SetUint64(st.gasUsed())
 		fee.Mul(fee, effectiveTipU256)
 		st.state.AddBalance(st.evm.Context.Coinbase, fee)
+		if st.evm.ChainConfig().Oasys != nil && rules.IsCancun {
+			// add extra blob fee reward
+			blobFee := new(big.Int).SetUint64(st.blobGasUsed())
+			blobFee.Mul(blobFee, st.evm.Context.BlobBaseFee)
+			blobFeeU256, _ := uint256.FromBig(blobFee)
+			st.state.AddBalance(st.evm.Context.Coinbase, blobFeeU256)
+		}
 	}
 
 	return &ExecutionResult{

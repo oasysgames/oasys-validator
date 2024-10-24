@@ -170,7 +170,7 @@ func newTestBackend(t *testing.T, londonBlock *big.Int, pending bool) *testBacke
 	}
 	chain.InsertChain(blocks)
 	chain.SetFinalized(chain.GetBlockByNumber(25).Header())
-	chain.SetSafe(chain.GetBlockByNumber(25).Header())
+	// chain.SetSafe(chain.GetBlockByNumber(25).Header())
 	return &testBackend{chain: chain, pending: pending}
 }
 

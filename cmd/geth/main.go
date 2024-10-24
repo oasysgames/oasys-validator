@@ -67,6 +67,9 @@ var (
 		utils.SmartCardDaemonPathFlag,
 		utils.OverrideCancun,
 		utils.OverrideVerkle,
+		utils.OverrideFullImmutabilityThreshold,
+		utils.OverrideMinBlocksForBlobRequests,
+		utils.OverrideDefaultExtraReserveForBlobRequests,
 		utils.EnablePersonal,
 		utils.TxPoolLocalsFlag,
 		utils.TxPoolNoLocalsFlag,
@@ -153,6 +156,7 @@ var (
 		utils.VoteKeyNameFlag,
 		utils.LogDebugFlag,
 		utils.LogBacktraceAtFlag,
+		utils.BlobExtraReserveFlag,
 	}, utils.NetworkFlags, utils.DatabaseFlags)
 
 	rpcFlags = []cli.Flag{
