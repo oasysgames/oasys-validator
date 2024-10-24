@@ -554,8 +554,7 @@ func HeaderParentHashFromRLP(header []byte) common.Hash {
 }
 
 var (
-	extraVanity = 32 // Fixed number of extra-data prefix bytes reserved for signer vanity
-	extraSeal   = 65 // Fixed number of extra-data suffix bytes reserved for signer seal
+	extraSeal = 65 // Fixed number of extra-data suffix bytes reserved for signer seal
 )
 
 func SealHash(header *Header) (hash common.Hash) {
