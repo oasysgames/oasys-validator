@@ -1,23 +1,12 @@
-<<<<<<< HEAD
 ![logo1](https://user-images.githubusercontent.com/107421475/227834490-3a3a9834-21a8-4079-8166-f6fe571d6b8d.png)
 # Oasys Validator
 Validator client for Oasys. Forked from go ethereum.
-=======
-## Go Ethereum
-
-Golang execution layer implementation of the Ethereum protocol.
->>>>>>> c5ba367eb6232e3eddd7d6226bfd374449c63164
 
 [![API Reference](
 https://pkg.go.dev/badge/github.com/ethereum/go-ethereum
 )](https://pkg.go.dev/github.com/ethereum/go-ethereum?tab=doc)
 [![Go Report Card](https://goreportcard.com/badge/github.com/ethereum/go-ethereum)](https://goreportcard.com/report/github.com/ethereum/go-ethereum)
-<<<<<<< HEAD
 [![Discord](https://img.shields.io/badge/discord-join%20chat-blue.svg)](https://discord.gg/oasysgames)
-=======
-[![Travis](https://app.travis-ci.com/ethereum/go-ethereum.svg?branch=master)](https://app.travis-ci.com/github/ethereum/go-ethereum)
-[![Discord](https://img.shields.io/badge/discord-join%20chat-blue.svg)](https://discord.gg/nthXNEv)
->>>>>>> c5ba367eb6232e3eddd7d6226bfd374449c63164
 
 Automated builds are available for stable releases and the unstable master branch. Binary
 archives are published at https://github.com/oasysgames/oasys-validator/releases.
