@@ -1119,6 +1119,9 @@ func _deployments12(genesisHash common.Hash, contracts wantContracts) {
 
 	// CandidateValidatorManager
 	contracts["0x520000000000000000000000000000000000002e"].codeHash = "6de4d098a3297020346dcb7b2ba4914c"
+
+	// LOAS
+	contracts["0x5200000000000000000000000000000000000023"].codeHash = "044637c8af353e46615765c8755265d6"
 }
 
 func TestDeploy(t *testing.T) {
@@ -1169,7 +1172,7 @@ func TestDeploy(t *testing.T) {
 				{1519840, []deployFn{_deployments9}},
 				{1880660, []deployFn{_deployments10}},
 				{4017600, []deployFn{_deployments11}},
-				{4428900, []deployFn{_deployments12}},
+				{9999998, []deployFn{_deployments12}},
 			},
 		},
 		{
