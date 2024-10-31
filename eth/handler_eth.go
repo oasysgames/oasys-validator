@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
@@ -137,6 +138,14 @@ func (h *ethHandler) handleBlockBroadcast(peer *eth.Peer, block *types.Block, td
 	if _, td := peer.Head(); trueTD.Cmp(td) > 0 {
 		peer.SetHead(trueHead, trueTD)
 		h.chainSync.handlePeerEvent()
+	}
+	// Update the peer's justfied head if better than the previous
+	if pos, ok := h.chain.Engine().(consensus.PoS); ok {
+		if attestation := pos.DecodeVoteAttestation(block.Header()); attestation != nil {
+			if cur := peer.JustifiedBlock(); cur == nil || attestation.Data.SourceNumber > *cur {
+				peer.SetJustifiedBlock(attestation.Data.SourceNumber)
+			}
+		}
 	}
 	return nil
 }

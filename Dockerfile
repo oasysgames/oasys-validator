@@ -1,5 +1,5 @@
 # Build Geth in a stock Go builder container
-FROM golang:1.20.14-bookworm as builder
+FROM golang:1.21.13-bookworm as builder
 
 # Support setting various labels on the final image
 ARG COMMIT=""
