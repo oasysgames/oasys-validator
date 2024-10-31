@@ -1172,7 +1172,7 @@ func TestDeploy(t *testing.T) {
 				{1519840, []deployFn{_deployments9}},
 				{1880660, []deployFn{_deployments10}},
 				{4017600, []deployFn{_deployments11}},
-				{9999998, []deployFn{_deployments12}},
+				{4958700, []deployFn{_deployments12}},
 			},
 		},
 		{
