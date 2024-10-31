@@ -462,7 +462,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 		case <-timer.C:
 			// If sealing is running resubmit a new work cycle periodically to pull in
 			// higher priced transactions. Disable this overhead for pending blocks.
-			if w.isRunning() && ((w.chainConfig.Clique == nil || w.chainConfig.Clique.Period > 0) || w.chainConfig.Oasys == nil || w.chainConfig.Oasys.Period > 0) {
+			if w.isRunning() && ((w.chainConfig.Clique != nil && w.chainConfig.Clique.Period > 0) || (w.chainConfig.Oasys != nil && w.chainConfig.Oasys.Period > 0)) {
 				// Short circuit if no new transaction arrives.
 				if w.newTxs.Load() == 0 {
 					timer.Reset(recommit)
@@ -1073,6 +1073,7 @@ func (w *worker) commitWork(interrupt *atomic.Int32, timestamp int64) {
 		coinbase:  coinbase,
 	})
 	if err != nil {
+		log.Error("Failed to prepare work", "in", "commitWork", "err", err)
 		return
 	}
 	// Deploy oasys built-in contracts
@@ -1107,7 +1108,9 @@ func (w *worker) commitWork(interrupt *atomic.Int32, timestamp int64) {
 		return
 	}
 	// Submit the generated block for consensus sealing.
-	w.commit(work.copy(), w.fullTaskHook, true, start)
+	if err = w.commit(work.copy(), w.fullTaskHook, true, start); err != nil {
+		log.Warn("Failed to commit work", "in", "commitWork", "err", err)
+	}
 
 	// Swap out the old work with the new one, terminating any leftover
 	// prefetcher processes in the mean time and starting a new one.

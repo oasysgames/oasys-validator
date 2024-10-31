@@ -480,6 +480,9 @@ func (c *ChainConfig) Description() string {
 	if c.ShanghaiTime != nil {
 		banner += fmt.Sprintf(" - Shanghai:                    @%-10v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/shanghai.md)\n", *c.ShanghaiTime)
 	}
+	if c.OasysFastFinalityEnabledBlock() != nil {
+		banner += fmt.Sprintf(" - Oasys Fast Finality Enabled: #%-8v (https://github.com/oasysgames/oasys-validator/releases/tag/v1.6.0)\n", c.OasysFastFinalityEnabledBlock())
+	}
 	if c.CancunTime != nil {
 		banner += fmt.Sprintf(" - Cancun:                      @%-10v\n", *c.CancunTime)
 	}
@@ -614,6 +617,26 @@ func (c *ChainConfig) OasysShortenedBlockTimeStartEpoch() *big.Int {
 		return big.NewInt(SHORT_BLOCK_TIME_FORK_EPOCH_TESTNET)
 	}
 	return big.NewInt(SHORT_BLOCK_TIME_FORK_EPOCH_OTHERS)
+}
+
+// OasysFastFinalityEnabledBlock returns the hard fork of Oasys.
+// TODO: Set correct block number for mainnet and testnet.
+func (c *ChainConfig) OasysFastFinalityEnabledBlock() *big.Int {
+	if c.Oasys == nil {
+		return nil
+	}
+	if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
+		return big.NewInt(9999999)
+	}
+	if c.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0 {
+		return big.NewInt(9999999)
+	}
+	return big.NewInt(2)
+}
+
+// IsFastFinalityEnabled returns whether num is either equal to the first fast finality fork block or greater.
+func (c *ChainConfig) IsFastFinalityEnabled(num *big.Int) bool {
+	return isBlockForked(c.OasysFastFinalityEnabledBlock(), num)
 }
 
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.

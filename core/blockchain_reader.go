@@ -59,7 +59,17 @@ func (bc *BlockChain) CurrentFinalBlock() *types.Header {
 // CurrentSafeBlock retrieves the current safe block of the canonical
 // chain. The block is retrieved from the blockchain's internal cache.
 func (bc *BlockChain) CurrentSafeBlock() *types.Header {
-	return bc.currentSafeBlock.Load()
+	if p, ok := bc.engine.(consensus.PoS); ok {
+		currentHeader := bc.CurrentHeader()
+		if currentHeader == nil {
+			return nil
+		}
+		_, justifiedBlockHash, err := p.GetJustifiedNumberAndHash(bc, []*types.Header{currentHeader})
+		if err == nil {
+			return bc.GetHeaderByHash(justifiedBlockHash)
+		}
+	}
+	return nil
 }
 
 // HasHeader checks if a block header is present in the database or not, caching
@@ -416,4 +426,9 @@ func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscript
 // block processing has started while false means it has stopped.
 func (bc *BlockChain) SubscribeBlockProcessingEvent(ch chan<- bool) event.Subscription {
 	return bc.scope.Track(bc.blockProcFeed.Subscribe(ch))
+}
+
+// SubscribeFinalizedHeaderEvent registers a subscription of FinalizedHeaderEvent.
+func (bc *BlockChain) SubscribeFinalizedHeaderEvent(ch chan<- FinalizedHeaderEvent) event.Subscription {
+	return bc.scope.Track(bc.finalizedHeaderFeed.Subscribe(ch))
 }

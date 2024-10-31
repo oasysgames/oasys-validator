@@ -908,6 +908,47 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 		Value:    metrics.DefaultConfig.InfluxDBOrganization,
 		Category: flags.MetricsCategory,
 	}
+
+	VotingEnabledFlag = &cli.BoolFlag{
+		Name:     "vote",
+		Usage:    "Enable voting when mining",
+		Category: flags.FastFinalityCategory,
+	}
+
+	DisableVoteAttestationFlag = &cli.BoolFlag{
+		Name:     "disablevoteattestation",
+		Usage:    "Disable assembling vote attestation ",
+		Category: flags.FastFinalityCategory,
+	}
+
+	BLSPasswordFileFlag = &cli.StringFlag{
+		Name:     "blspassword",
+		Usage:    "Password file path for the BLS wallet, which contains the password to unlock BLS wallet for managing votes in fast_finality feature",
+		Category: flags.AccountCategory,
+	}
+
+	EnableMaliciousVoteMonitorFlag = &cli.BoolFlag{
+		Name:     "monitor.maliciousvote",
+		Usage:    "Enable malicious vote monitor to check whether any validator violates the voting rules of fast finality",
+		Category: flags.FastFinalityCategory,
+	}
+
+	BLSWalletDirFlag = &flags.DirectoryFlag{
+		Name:     "blswallet",
+		Usage:    "Path for the blsWallet dir in fast finality feature (default = inside the datadir)",
+		Category: flags.AccountCategory,
+	}
+
+	VoteJournalDirFlag = &flags.DirectoryFlag{
+		Name:     "vote-journal-path",
+		Usage:    "Path for the voteJournal dir in fast finality feature (default = inside the datadir)",
+		Category: flags.FastFinalityCategory,
+	}
+	VoteKeyNameFlag = &cli.StringFlag{
+		Name:     "vote-key-name",
+		Usage:    "Name of the BLS public key used for voting (default = first found key)",
+		Category: flags.FastFinalityCategory,
+	}
 )
 
 var (
@@ -1214,6 +1255,13 @@ func setLes(ctx *cli.Context, cfg *ethconfig.Config) {
 	}
 }
 
+// setMonitors enable monitors from the command line flags.
+func setMonitors(ctx *cli.Context, cfg *node.Config) {
+	if ctx.Bool(EnableMaliciousVoteMonitorFlag.Name) {
+		cfg.EnableMaliciousVoteMonitor = true
+	}
+}
+
 // MakeDatabaseHandles raises out the number of allowed file handles per process
 // for Geth and returns half of the allowance to assign to the database.
 func MakeDatabaseHandles(max int) int {
@@ -1301,6 +1349,22 @@ func MakePasswordList(ctx *cli.Context) []string {
 	return lines
 }
 
+func MakePasswordListFromPath(path string) []string {
+	if path == "" {
+		return nil
+	}
+	text, err := os.ReadFile(path)
+	if err != nil {
+		Fatalf("Failed to read password file: %v", err)
+	}
+	lines := strings.Split(string(text), "\n")
+	// Sanitise DOS line endings.
+	for i := range lines {
+		lines[i] = strings.TrimRight(lines[i], "\r")
+	}
+	return lines
+}
+
 func SetP2PConfig(ctx *cli.Context, cfg *p2p.Config) {
 	setNodeKey(ctx, cfg)
 	setNAT(ctx, cfg)
@@ -1354,6 +1418,9 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	setNodeUserIdent(ctx, cfg)
 	SetDataDir(ctx, cfg)
 	setSmartCard(ctx, cfg)
+	setMonitors(ctx, cfg)
+	setBLSWalletDir(ctx, cfg)
+	setVoteJournalDir(ctx, cfg)
 
 	if ctx.IsSet(JWTSecretFlag.Name) {
 		cfg.JWTSecret = ctx.String(JWTSecretFlag.Name)
@@ -1384,6 +1451,12 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	}
 	if ctx.IsSet(InsecureUnlockAllowedFlag.Name) {
 		cfg.InsecureUnlockAllowed = ctx.Bool(InsecureUnlockAllowedFlag.Name)
+	}
+	if ctx.IsSet(BLSPasswordFileFlag.Name) {
+		cfg.BLSPasswordFile = ctx.String(BLSPasswordFileFlag.Name)
+	}
+	if ctx.IsSet(VoteKeyNameFlag.Name) {
+		cfg.VoteKeyName = ctx.String(VoteKeyNameFlag.Name)
 	}
 	if ctx.IsSet(DBEngineFlag.Name) {
 		dbEngine := ctx.String(DBEngineFlag.Name)
@@ -1434,6 +1507,24 @@ func SetDataDir(ctx *cli.Context, cfg *node.Config) {
 		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "sepolia")
 	case ctx.Bool(HoleskyFlag.Name) && cfg.DataDir == node.DefaultDataDir():
 		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "holesky")
+	}
+}
+
+func setVoteJournalDir(ctx *cli.Context, cfg *node.Config) {
+	dataDir := cfg.DataDir
+	if ctx.IsSet(VoteJournalDirFlag.Name) {
+		cfg.VoteJournalDir = ctx.String(VoteJournalDirFlag.Name)
+	} else if cfg.VoteJournalDir == "" {
+		cfg.VoteJournalDir = filepath.Join(dataDir, "voteJournal")
+	}
+}
+
+func setBLSWalletDir(ctx *cli.Context, cfg *node.Config) {
+	dataDir := cfg.DataDir
+	if ctx.IsSet(BLSWalletDirFlag.Name) {
+		cfg.BLSWalletDir = ctx.String(BLSWalletDirFlag.Name)
+	} else if cfg.BLSWalletDir == "" {
+		cfg.BLSWalletDir = filepath.Join(dataDir, "bls/wallet")
 	}
 }
 
@@ -1510,6 +1601,12 @@ func setMiner(ctx *cli.Context, cfg *miner.Config) {
 	}
 	if ctx.IsSet(MinerNewPayloadTimeout.Name) {
 		cfg.NewPayloadTimeout = ctx.Duration(MinerNewPayloadTimeout.Name)
+	}
+	if ctx.Bool(VotingEnabledFlag.Name) {
+		cfg.VoteEnable = true
+	}
+	if ctx.Bool(DisableVoteAttestationFlag.Name) {
+		cfg.DisableVoteAttestation = true
 	}
 }
 
