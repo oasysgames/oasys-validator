@@ -182,8 +182,8 @@ func (cs *chainSyncer) nextSyncOp() *chainSyncOp {
 			if peerJustified < *ourJustified {
 				return nil
 			}
-			// Ignored because justified block height is the same but TD is lower.
-			if peerJustified == *ourJustified && peerTD.Cmp(ourTD) < 0 {
+			// Ignored because justified block height is the same but TD is the same or lower.
+			if peerJustified == *ourJustified && peerTD.Cmp(ourTD) <= 0 {
 				return nil
 			}
 		}
