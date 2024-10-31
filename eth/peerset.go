@@ -21,8 +21,10 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/eth/protocols/bsc"
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/eth/protocols/snap"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -37,6 +39,9 @@ var (
 	// to the peer set, but one with the same id already exists.
 	errPeerAlreadyRegistered = errors.New("peer already registered")
 
+	// errPeerWaitTimeout is returned if a peer waits extension for too long
+	errPeerWaitTimeout = errors.New("peer wait timeout")
+
 	// errPeerNotRegistered is returned if a peer is attempted to be removed from
 	// a peer set, but no peer with the given id exists.
 	errPeerNotRegistered = errors.New("peer not registered")
@@ -44,6 +49,17 @@ var (
 	// errSnapWithoutEth is returned if a peer attempts to connect only on the
 	// snap protocol without advertising the eth main protocol.
 	errSnapWithoutEth = errors.New("peer connected on snap without compatible eth support")
+
+	// errBscWithoutEth is returned if a peer attempts to connect only on the
+	// bsc protocol without advertising the eth main protocol.
+	errBscWithoutEth = errors.New("peer connected on bsc without compatible eth support")
+)
+
+const (
+	// extensionWaitTimeout is the maximum allowed time for the extension wait to
+	// complete before dropping the connection as malicious.
+	extensionWaitTimeout = 10 * time.Second
+	tryWaitTimeout       = 100 * time.Millisecond
 )
 
 // peerSet represents the collection of active peers currently participating in
@@ -55,8 +71,12 @@ type peerSet struct {
 	snapWait map[string]chan *snap.Peer // Peers connected on `eth` waiting for their snap extension
 	snapPend map[string]*snap.Peer      // Peers connected on the `snap` protocol, but not yet on `eth`
 
+	bscWait map[string]chan *bsc.Peer // Peers connected on `eth` waiting for their bsc extension
+	bscPend map[string]*bsc.Peer      // Peers connected on the `bsc` protocol, but not yet on `eth`
+
 	lock   sync.RWMutex
 	closed bool
+	quitCh chan struct{} // Quit channel to signal termination
 }
 
 // newPeerSet creates a new peer set to track the active participants.
@@ -65,6 +85,9 @@ func newPeerSet() *peerSet {
 		peers:    make(map[string]*ethPeer),
 		snapWait: make(map[string]chan *snap.Peer),
 		snapPend: make(map[string]*snap.Peer),
+		bscWait:  make(map[string]chan *bsc.Peer),
+		bscPend:  make(map[string]*bsc.Peer),
+		quitCh:   make(chan struct{}),
 	}
 }
 
@@ -95,6 +118,36 @@ func (ps *peerSet) registerSnapExtension(peer *snap.Peer) error {
 		return nil
 	}
 	ps.snapPend[id] = peer
+	return nil
+}
+
+// registerBscExtension unblocks an already connected `eth` peer waiting for its
+// `bsc` extension, or if no such peer exists, tracks the extension for the time
+// being until the `eth` main protocol starts looking for it.
+func (ps *peerSet) registerBscExtension(peer *bsc.Peer) error {
+	// Reject the peer if it advertises `bsc` without `eth` as `bsc` is only a
+	// satellite protocol meaningful with the chain selection of `eth`
+	if !peer.RunningCap(eth.ProtocolName, eth.ProtocolVersions) {
+		return errBscWithoutEth
+	}
+	// Ensure nobody can double connect
+	ps.lock.Lock()
+	defer ps.lock.Unlock()
+
+	id := peer.ID()
+	if _, ok := ps.peers[id]; ok {
+		return errPeerAlreadyRegistered // avoid connections with the same id as existing ones
+	}
+	if _, ok := ps.bscPend[id]; ok {
+		return errPeerAlreadyRegistered // avoid connections with the same id as pending ones
+	}
+	// Inject the peer into an `eth` counterpart is available, otherwise save for later
+	if wait, ok := ps.bscWait[id]; ok {
+		delete(ps.bscWait, id)
+		wait <- peer
+		return nil
+	}
+	ps.bscPend[id] = peer
 	return nil
 }
 
@@ -129,12 +182,92 @@ func (ps *peerSet) waitSnapExtension(peer *eth.Peer) (*snap.Peer, error) {
 	ps.snapWait[id] = wait
 	ps.lock.Unlock()
 
-	return <-wait, nil
+	select {
+	case peer := <-wait:
+		return peer, nil
+
+	case <-time.After(extensionWaitTimeout):
+		ps.lock.Lock()
+		delete(ps.snapWait, id)
+		ps.lock.Unlock()
+		return nil, errPeerWaitTimeout
+
+	case <-ps.quitCh:
+		ps.lock.Lock()
+		delete(ps.snapWait, id)
+		ps.lock.Unlock()
+		return nil, errPeerSetClosed
+	}
+}
+
+// waitBscExtension blocks until all satellite protocols are connected and tracked
+// by the peerset.
+func (ps *peerSet) waitBscExtension(peer *eth.Peer) (*bsc.Peer, error) {
+	// If the peer does not support a compatible `bsc`, don't wait
+	if !peer.RunningCap(bsc.ProtocolName, bsc.ProtocolVersions) {
+		return nil, nil
+	}
+	// Ensure nobody can double connect
+	ps.lock.Lock()
+
+	id := peer.ID()
+	if _, ok := ps.peers[id]; ok {
+		ps.lock.Unlock()
+		return nil, errPeerAlreadyRegistered // avoid connections with the same id as existing ones
+	}
+	if _, ok := ps.bscWait[id]; ok {
+		ps.lock.Unlock()
+		return nil, errPeerAlreadyRegistered // avoid connections with the same id as pending ones
+	}
+	// If `bsc` already connected, retrieve the peer from the pending set
+	if bsc, ok := ps.bscPend[id]; ok {
+		delete(ps.bscPend, id)
+
+		ps.lock.Unlock()
+		return bsc, nil
+	}
+	// Otherwise wait for `bsc` to connect concurrently
+	wait := make(chan *bsc.Peer)
+	ps.bscWait[id] = wait
+	ps.lock.Unlock()
+
+	select {
+	case peer := <-wait:
+		return peer, nil
+
+	case <-time.After(extensionWaitTimeout):
+		// could be deadlock, so we use TryLock to avoid it.
+		if ps.lock.TryLock() {
+			delete(ps.bscWait, id)
+			ps.lock.Unlock()
+			return nil, errPeerWaitTimeout
+		}
+		// if TryLock failed, we wait for a while and try again.
+		for {
+			select {
+			case <-wait:
+				// discard the peer, even though the peer arrived.
+				return nil, errPeerWaitTimeout
+			case <-time.After(tryWaitTimeout):
+				if ps.lock.TryLock() {
+					delete(ps.bscWait, id)
+					ps.lock.Unlock()
+					return nil, errPeerWaitTimeout
+				}
+			}
+		}
+
+	case <-ps.quitCh:
+		ps.lock.Lock()
+		delete(ps.bscWait, id)
+		ps.lock.Unlock()
+		return nil, errPeerSetClosed
+	}
 }
 
 // registerPeer injects a new `eth` peer into the working set, or returns an error
 // if the peer is already known.
-func (ps *peerSet) registerPeer(peer *eth.Peer, ext *snap.Peer) error {
+func (ps *peerSet) registerPeer(peer *eth.Peer, ext *snap.Peer, bscExt *bsc.Peer) error {
 	// Start tracking the new peer
 	ps.lock.Lock()
 	defer ps.lock.Unlock()
@@ -152,6 +285,9 @@ func (ps *peerSet) registerPeer(peer *eth.Peer, ext *snap.Peer) error {
 	if ext != nil {
 		eth.snapExt = &snapPeer{ext}
 		ps.snapPeers++
+	}
+	if bscExt != nil {
+		eth.bscExt = &bscPeer{bscExt}
 	}
 	ps.peers[id] = eth
 	return nil
@@ -212,6 +348,21 @@ func (ps *peerSet) peersWithoutTransaction(hash common.Hash) []*ethPeer {
 	return list
 }
 
+// peersWithoutVote retrieves a list of peers that do not have a given
+// vote in their set of known hashes.
+func (ps *peerSet) peersWithoutVote(hash common.Hash) []*ethPeer {
+	ps.lock.RLock()
+	defer ps.lock.RUnlock()
+
+	list := make([]*ethPeer, 0, len(ps.peers))
+	for _, p := range ps.peers {
+		if p.bscExt != nil && !p.bscExt.KnownVote(hash) {
+			list = append(list, p)
+		}
+	}
+	return list
+}
+
 // len returns if the current number of `eth` peers in the set. Since the `snap`
 // peers are tied to the existence of an `eth` connection, that will always be a
 // subset of `eth`.
@@ -248,6 +399,26 @@ func (ps *peerSet) peerWithHighestTD() *eth.Peer {
 	return bestPeer
 }
 
+// peerWithHighestJustifiedBlockAndTD() returns the peer with the
+// highest justified block height. If multiple peers have the same
+// height, the one with the highest total difficulty is returned.
+func (ps *peerSet) peerWithHighestJustifiedBlockAndTD() (bestPeer *eth.Peer, bestJustified uint64, bestTd *big.Int) {
+	ps.lock.RLock()
+	defer ps.lock.RUnlock()
+
+	for _, p := range ps.peers {
+		justified := p.JustifiedBlock()
+		if justified == nil {
+			continue
+		}
+		_, td := p.Head()
+		if *justified > bestJustified || (*justified == bestJustified && td.Cmp(bestTd) > 0) {
+			bestPeer, bestJustified, bestTd = p.Peer, *justified, td
+		}
+	}
+	return
+}
+
 // close disconnects all peers.
 func (ps *peerSet) close() {
 	ps.lock.Lock()
@@ -255,6 +426,9 @@ func (ps *peerSet) close() {
 
 	for _, p := range ps.peers {
 		p.Disconnect(p2p.DiscQuitting)
+	}
+	if !ps.closed {
+		close(ps.quitCh)
 	}
 	ps.closed = true
 }
