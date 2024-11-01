@@ -1413,6 +1413,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	// if cancun is enabled, here need to write sidecars too
 	if bc.chainConfig.IsCancun(block.Number(), block.Time()) {
 		rawdb.WriteBlobSidecars(blockBatch, block.Hash(), block.NumberU64(), block.Sidecars())
+		bc.sidecarsCache.Add(block.Hash(), block.Sidecars())
 	}
 	if err := blockBatch.Write(); err != nil {
 		log.Crit("Failed to write block into disk", "err", err)
