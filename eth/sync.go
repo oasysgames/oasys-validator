@@ -22,7 +22,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/log"
@@ -45,6 +47,15 @@ func (h *handler) syncTransactions(p *eth.Peer) {
 		return
 	}
 	p.AsyncSendPooledTransactionHashes(hashes)
+}
+
+// syncVotes starts sending all currently pending votes to the given peer.
+func (h *handler) syncVotes(p *bscPeer) {
+	votes := h.votepool.GetVotes()
+	if len(votes) == 0 {
+		return
+	}
+	p.AsyncSendVotes(votes)
 }
 
 // chainSyncer coordinates blockchain sync components.
@@ -162,6 +173,23 @@ func (cs *chainSyncer) nextSyncOp() *chainSyncOp {
 	if cs.handler.peers.len() < minPeers {
 		return nil
 	}
+
+	// Find the peer with the highest justified block height.
+	mode, ourTD := cs.modeAndLocalHead()
+	if peer, peerJustified, peerTD := cs.handler.peers.peerWithHighestJustifiedBlockAndTD(); peer != nil {
+		if ourJustified := cs.getJustifiedBlockNumber(); ourJustified != nil {
+			// Ignored because justified block height is lower.
+			if peerJustified < *ourJustified {
+				return nil
+			}
+			// Ignored because justified block height is the same but TD is the same or lower.
+			if peerJustified == *ourJustified && peerTD.Cmp(ourTD) <= 0 {
+				return nil
+			}
+		}
+		return peerToSyncOp(mode, peer)
+	}
+
 	// We have enough peers, pick the one with the highest TD, but avoid going
 	// over the terminal total difficulty. Above that we expect the consensus
 	// clients to direct the chain head to sync to.
@@ -169,7 +197,7 @@ func (cs *chainSyncer) nextSyncOp() *chainSyncOp {
 	if peer == nil {
 		return nil
 	}
-	mode, ourTD := cs.modeAndLocalHead()
+
 	op := peerToSyncOp(mode, peer)
 	if op.td.Cmp(ourTD) <= 0 {
 		// We seem to be in sync according to the legacy rules. In the merge
@@ -182,6 +210,25 @@ func (cs *chainSyncer) nextSyncOp() *chainSyncOp {
 		return nil // We're in sync
 	}
 	return op
+}
+
+// Retrieve the justified block number of the canonical chain from the consensus engine.
+func (cs *chainSyncer) getJustifiedBlockNumber() *uint64 {
+	head := cs.handler.chain.CurrentHeader()
+	if !cs.handler.chain.Config().IsFastFinalityEnabled(head.Number) {
+		return nil
+	}
+	pos, ok := cs.handler.chain.Engine().(consensus.PoS)
+	if !ok {
+		return nil
+	}
+	// Note: Do not use methods like `(*core.BlockChain).CurrentSafeBlock()`, as they may
+	// fall back to the latest block if the justified block cannot be retrieved.
+	justified, _, err := pos.GetJustifiedNumberAndHash(cs.handler.chain, []*types.Header{head})
+	if err != nil {
+		return nil
+	}
+	return &justified
 }
 
 func peerToSyncOp(mode downloader.SyncMode, p *eth.Peer) *chainSyncOp {

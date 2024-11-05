@@ -29,11 +29,13 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/beacon"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/forkid"
+	"github.com/ethereum/go-ethereum/core/monitor"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/fetcher"
+	"github.com/ethereum/go-ethereum/eth/protocols/bsc"
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/eth/protocols/snap"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -48,6 +50,12 @@ const (
 	// txChanSize is the size of channel listening to NewTxsEvent.
 	// The number is referenced from the size of tx pool.
 	txChanSize = 4096
+
+	// voteChanSize is the size of channel listening to NewVotesEvent.
+	voteChanSize = 256
+
+	// deltaTdThreshold is the threshold of TD difference for peers to broadcast votes.
+	deltaTdThreshold = 20
 
 	// txMaxBroadcastSize is the max size of a transaction that will be broadcasted.
 	// All transactions with a higher size will be announced and need to be fetched
@@ -81,6 +89,17 @@ type txPool interface {
 	SubscribeTransactions(ch chan<- core.NewTxsEvent, reorgs bool) event.Subscription
 }
 
+// votePool defines the methods needed from a votes pool implementation to
+// support all the operations needed by the Ethereum chain protocols.
+type votePool interface {
+	PutVote(vote *types.VoteEnvelope)
+	GetVotes() []*types.VoteEnvelope
+
+	// SubscribeNewVoteEvent should return an event subscription of
+	// NewVotesEvent and send events to the given channel.
+	SubscribeNewVoteEvent(ch chan<- core.NewVoteEvent) event.Subscription
+}
+
 // handlerConfig is the collection of initialization parameters to create a full
 // node network handler.
 type handlerConfig struct {
@@ -93,6 +112,8 @@ type handlerConfig struct {
 	BloomCache     uint64                 // Megabytes to alloc for snap sync bloom
 	EventMux       *event.TypeMux         // Legacy event mux, deprecate for `feed`
 	RequiredBlocks map[uint64]common.Hash // Hard coded map of required block hashes for sync challenges
+	// for finality
+	VotePool votePool
 }
 
 type handler struct {
@@ -104,6 +125,7 @@ type handler struct {
 
 	database ethdb.Database
 	txpool   txPool
+	votepool votePool
 	chain    *core.BlockChain
 	maxPeers int
 
@@ -117,6 +139,15 @@ type handler struct {
 	txsCh         chan core.NewTxsEvent
 	txsSub        event.Subscription
 	minedBlockSub *event.TypeMuxSubscription
+	voteCh        chan core.NewVoteEvent
+	votesSub      event.Subscription
+
+	voteMonitorSub       event.Subscription
+	maliciousVoteMonitor *monitor.MaliciousVoteMonitor
+
+	// Used for calcurate average difficulty per block
+	firstTDInBroadcastVote     *big.Int
+	firstHeightInBroadcastVote uint64
 
 	requiredBlocks map[uint64]common.Hash
 
@@ -142,6 +173,7 @@ func newHandler(config *handlerConfig) (*handler, error) {
 		eventMux:       config.EventMux,
 		database:       config.Database,
 		txpool:         config.TxPool,
+		votepool:       config.VotePool,
 		chain:          config.Chain,
 		peers:          newPeerSet(),
 		merger:         config.Merger,
@@ -220,6 +252,13 @@ func newHandler(config *handlerConfig) (*handler, error) {
 	heighter := func() uint64 {
 		return h.chain.CurrentBlock().Number.Uint64()
 	}
+	finalizeHeighter := func() uint64 {
+		fblock := h.chain.CurrentFinalBlock()
+		if fblock == nil {
+			return 0
+		}
+		return fblock.Number.Uint64()
+	}
 	inserter := func(blocks types.Blocks) (int, error) {
 		// All the block fetcher activities should be disabled
 		// after the transition. Print the warning log.
@@ -269,7 +308,8 @@ func newHandler(config *handlerConfig) (*handler, error) {
 		}
 		return h.chain.InsertChain(blocks)
 	}
-	h.blockFetcher = fetcher.NewBlockFetcher(false, nil, h.chain.GetBlockByHash, validator, h.BroadcastBlock, heighter, nil, inserter, h.removePeer)
+	h.blockFetcher = fetcher.NewBlockFetcher(false, nil, h.chain.GetBlockByHash, validator, h.BroadcastBlock,
+		heighter, finalizeHeighter, nil, inserter, h.removePeer)
 
 	fetchTx := func(peer string, hashes []common.Hash) error {
 		p := h.peers.peer(peer)
@@ -337,6 +377,11 @@ func (h *handler) runEthPeer(peer *eth.Peer, handler eth.Handler) error {
 		peer.Log().Error("Snapshot extension barrier failed", "err", err)
 		return err
 	}
+	bsc, err := h.peers.waitBscExtension(peer)
+	if err != nil {
+		peer.Log().Error("Bsc extension barrier failed", "err", err)
+		return err
+	}
 
 	// Execute the Ethereum handshake
 	var (
@@ -371,7 +416,7 @@ func (h *handler) runEthPeer(peer *eth.Peer, handler eth.Handler) error {
 	peer.Log().Debug("Ethereum peer connected", "name", peer.Name())
 
 	// Register the peer locally
-	if err := h.peers.registerPeer(peer, snap); err != nil {
+	if err := h.peers.registerPeer(peer, snap, bsc); err != nil {
 		peer.Log().Error("Ethereum peer registration failed", "err", err)
 		return err
 	}
@@ -394,9 +439,12 @@ func (h *handler) runEthPeer(peer *eth.Peer, handler eth.Handler) error {
 	}
 	h.chainSync.handlePeerEvent()
 
-	// Propagate existing transactions. new transactions appearing
+	// Propagate existing transactions and votes. new transactions and votes appearing
 	// after this will be sent via broadcasts.
 	h.syncTransactions(peer)
+	if h.votepool != nil && p.bscExt != nil {
+		h.syncVotes(p.bscExt)
+	}
 
 	// Create a notification channel for pending requests if the peer goes down
 	dead := make(chan struct{})
@@ -472,6 +520,30 @@ func (h *handler) runSnapExtension(peer *snap.Peer, handler snap.Handler) error 
 	return handler(peer)
 }
 
+// runBscExtension registers a `bsc` peer into the joint eth/bsc peerset and
+// starts handling inbound messages. As `bsc` is only a satellite protocol to
+// `eth`, all subsystem registrations and lifecycle management will be done by
+// the main `eth` handler to prevent strange races.
+func (h *handler) runBscExtension(peer *bsc.Peer, handler bsc.Handler) error {
+	if !h.incHandlers() {
+		return p2p.DiscQuitting
+	}
+	defer h.decHandlers()
+
+	if err := h.peers.registerBscExtension(peer); err != nil {
+		if metrics.Enabled {
+			if peer.Inbound() {
+				bsc.IngressRegistrationErrorMeter.Mark(1)
+			} else {
+				bsc.EgressRegistrationErrorMeter.Mark(1)
+			}
+		}
+		peer.Log().Error("Bsc extension registration failed", "err", err)
+		return err
+	}
+	return handler(peer)
+}
+
 // removePeer requests disconnection of a peer.
 func (h *handler) removePeer(id string) {
 	peer := h.peers.peer(id)
@@ -520,6 +592,19 @@ func (h *handler) Start(maxPeers int) {
 	h.txsSub = h.txpool.SubscribeTransactions(h.txsCh, false)
 	go h.txBroadcastLoop()
 
+	// broadcast votes
+	if h.votepool != nil {
+		h.wg.Add(1)
+		h.voteCh = make(chan core.NewVoteEvent, voteChanSize)
+		h.votesSub = h.votepool.SubscribeNewVoteEvent(h.voteCh)
+		go h.voteBroadcastLoop()
+
+		if h.maliciousVoteMonitor != nil {
+			h.wg.Add(1)
+			go h.startMaliciousVoteMonitor()
+		}
+	}
+
 	// broadcast mined blocks
 	h.wg.Add(1)
 	h.minedBlockSub = h.eventMux.Subscribe(core.NewMinedBlockEvent{})
@@ -537,7 +622,12 @@ func (h *handler) Start(maxPeers int) {
 func (h *handler) Stop() {
 	h.txsSub.Unsubscribe()        // quits txBroadcastLoop
 	h.minedBlockSub.Unsubscribe() // quits blockBroadcastLoop
-
+	if h.votepool != nil {
+		h.votesSub.Unsubscribe() // quits voteBroadcastLoop
+		if h.maliciousVoteMonitor != nil {
+			h.voteMonitorSub.Unsubscribe()
+		}
+	}
 	// Quit chainSync and txsync64.
 	// After this is done, no new peers will be accepted.
 	close(h.quitSync)
@@ -649,6 +739,49 @@ func (h *handler) BroadcastTransactions(txs types.Transactions) {
 		"bcastpeers", directPeers, "bcastcount", directCount, "annpeers", annPeers, "anncount", annCount)
 }
 
+// BroadcastVote will propagate a batch of votes to all peers
+// which are not known to already have the given vote.
+func (h *handler) BroadcastVote(vote *types.VoteEnvelope) {
+	var (
+		directCount int // Count of announcements made
+		directPeers int
+
+		voteMap = make(map[*ethPeer]*types.VoteEnvelope) // Set peer->hash to transfer directly
+	)
+
+	// Broadcast vote to a batch of peers not knowing about it
+	peers := h.peers.peersWithoutVote(vote.Hash())
+	headBlock := h.chain.CurrentBlock()
+	currentTD := h.chain.GetTd(headBlock.Hash(), headBlock.Number.Uint64())
+	var averageDifficulty *big.Int
+	if h.firstTDInBroadcastVote == nil || h.firstHeightInBroadcastVote == 0 {
+		h.firstTDInBroadcastVote = currentTD
+		h.firstHeightInBroadcastVote = headBlock.Number.Uint64()
+	} else if headBlock.Number.Uint64() > h.firstHeightInBroadcastVote {
+		averageDifficulty = new(big.Int).Div(new(big.Int).Sub(currentTD, h.firstTDInBroadcastVote), big.NewInt(int64(headBlock.Number.Uint64()-h.firstHeightInBroadcastVote)))
+	}
+	for _, peer := range peers {
+		_, peerTD := peer.Head()
+		deltaTD := new(big.Int).Abs(new(big.Int).Sub(currentTD, peerTD))
+		// broadcast if
+		// - bscExt is set
+		// - the first time (averageDifficulty is not set)
+		// - The total difficulty of peer is within the [+|-] range of average difficulty per block * deltaTdThreshold (blocks)
+		broadCasts := peer.bscExt != nil && (averageDifficulty == nil || deltaTD.Cmp(new(big.Int).Mul(big.NewInt(deltaTdThreshold), averageDifficulty)) < 1)
+		if broadCasts {
+			voteMap[peer] = vote
+		}
+	}
+
+	for peer, _vote := range voteMap {
+		directPeers++
+		directCount += 1
+		votes := []*types.VoteEnvelope{_vote}
+		peer.bscExt.AsyncSendVotes(votes)
+	}
+	log.Debug("Vote broadcast", "vote packs", directPeers, "broadcast vote", directCount, "source", vote.Data.SourceNumber, "target", vote.Data.TargetNumber)
+}
+
 // minedBroadcastLoop sends mined blocks to connected peers.
 func (h *handler) minedBroadcastLoop() {
 	defer h.wg.Done()
@@ -669,6 +802,36 @@ func (h *handler) txBroadcastLoop() {
 		case event := <-h.txsCh:
 			h.BroadcastTransactions(event.Txs)
 		case <-h.txsSub.Err():
+			return
+		}
+	}
+}
+
+// voteBroadcastLoop announces new vote to connected peers.
+func (h *handler) voteBroadcastLoop() {
+	defer h.wg.Done()
+	for {
+		select {
+		case event := <-h.voteCh:
+			// The timeliness of votes is very important,
+			// so one vote will be sent instantly without waiting for other votes for batch sending by design.
+			h.BroadcastVote(event.Vote)
+		case <-h.votesSub.Err():
+			return
+		}
+	}
+}
+
+func (h *handler) startMaliciousVoteMonitor() {
+	defer h.wg.Done()
+	voteCh := make(chan core.NewVoteEvent, voteChanSize)
+	h.voteMonitorSub = h.votepool.SubscribeNewVoteEvent(voteCh)
+	for {
+		select {
+		case event := <-voteCh:
+			pendingBlockNumber := h.chain.CurrentHeader().Number.Uint64() + 1
+			h.maliciousVoteMonitor.ConflictDetect(event.Vote, pendingBlockNumber)
+		case <-h.voteMonitorSub.Err():
 			return
 		}
 	}
