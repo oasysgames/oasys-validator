@@ -2071,7 +2071,10 @@ func (bc *BlockChain) insertSideChain(block *types.Block, it *insertIterator) (i
 	for i := len(hashes) - 1; i >= 0; i-- {
 		// Append the next block to our batch
 		block := bc.GetBlock(hashes[i], numbers[i])
-		if block != nil && bc.chainConfig.IsCancun(block.Number(), block.Time()) {
+		if block == nil {
+			log.Crit("Importing heavy sidechain block is nil", "hash", hashes[i], "number", numbers[i])
+		}
+		if bc.chainConfig.IsCancun(block.Number(), block.Time()) {
 			block = block.WithSidecars(bc.GetSidecarsByHash(hashes[i]))
 		}
 
