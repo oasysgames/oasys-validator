@@ -1413,6 +1413,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	// if cancun is enabled, here need to write sidecars too
 	if bc.chainConfig.IsCancun(block.Number(), block.Time()) {
 		rawdb.WriteBlobSidecars(blockBatch, block.Hash(), block.NumberU64(), block.Sidecars())
+		bc.sidecarsCache.Add(block.Hash(), block.Sidecars())
 	}
 	if err := blockBatch.Write(); err != nil {
 		log.Crit("Failed to write block into disk", "err", err)
@@ -2071,7 +2072,10 @@ func (bc *BlockChain) insertSideChain(block *types.Block, it *insertIterator) (i
 	for i := len(hashes) - 1; i >= 0; i-- {
 		// Append the next block to our batch
 		block := bc.GetBlock(hashes[i], numbers[i])
-		if block != nil && bc.chainConfig.IsCancun(block.Number(), block.Time()) {
+		if block == nil {
+			log.Crit("Importing heavy sidechain block is nil", "hash", hashes[i], "number", numbers[i])
+		}
+		if bc.chainConfig.IsCancun(block.Number(), block.Time()) {
 			block = block.WithSidecars(bc.GetSidecarsByHash(hashes[i]))
 		}
 
