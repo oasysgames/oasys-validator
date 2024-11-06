@@ -22,13 +22,11 @@ all:
 test: all
 	$(GORUN) build/ci.go test
 
-<<<<<<< HEAD
+#? test-oasys: Run Oasys consensus tests
 test-oasys:
 	go test -v ./consensus/oasys/...
 
-=======
 #? lint: Run certain pre-selected linters
->>>>>>> c5ba367eb6232e3eddd7d6226bfd374449c63164
 lint: ## Run linters.
 	$(GORUN) build/ci.go lint
 

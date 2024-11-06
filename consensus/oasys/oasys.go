@@ -28,6 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/trie"
 	lru "github.com/hashicorp/golang-lru"
+	"github.com/holiman/uint256"
 	"github.com/prysmaticlabs/prysm/v5/crypto/bls"
 	"github.com/willf/bitset"
 	"golang.org/x/crypto/sha3"
@@ -1494,7 +1495,7 @@ func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash,
 		return nil
 	}
 
-	state.AddBalance(stakeManager.address, rewards)
+	state.AddBalance(stakeManager.address, uint256.MustFromBig(rewards))
 	log.Info("Balance added to stake manager", "hash", hash, "amount", rewards.String())
 	return nil
 }
