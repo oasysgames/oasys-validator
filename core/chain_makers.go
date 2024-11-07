@@ -610,6 +610,10 @@ func (cm *chainMaker) GetCanonicalHash(number uint64) common.Hash {
 	return common.Hash{}
 }
 
+func (cm *chainMaker) GetVerifiedBlockByHash(hash common.Hash) *types.Header {
+	return cm.GetHeaderByHash(hash)
+}
+
 func (cm *chainMaker) ChasingHead() *types.Header {
 	panic("not supported")
 }
