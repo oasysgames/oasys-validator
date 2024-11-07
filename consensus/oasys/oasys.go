@@ -222,6 +222,10 @@ func New(chainConfig *params.ChainConfig, config *params.OasysConfig, db ethdb.D
 	}
 }
 
+func (c *Oasys) Period() uint64 {
+	return c.config.Period
+}
+
 // Author implements consensus.Engine, returning the Ethereum address recovered
 // from the signature in the header's extra-data section.
 func (c *Oasys) Author(header *types.Header) (common.Address, error) {
