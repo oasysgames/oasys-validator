@@ -1363,7 +1363,7 @@ func (c *Oasys) GetJustifiedNumberAndHash(chain consensus.ChainHeaderReader, hea
 	if !chain.Config().IsFastFinalityEnabled(head.Number) {
 		return 0, chain.GetHeaderByNumber(0).Hash(), nil
 	}
-	snap, err := c.snapshot(chain, head.Number.Uint64(), head.Hash(), nil)
+	snap, err := c.snapshot(chain, head.Number.Uint64(), head.Hash(), headers)
 	if err != nil {
 		return 0, common.Hash{}, fmt.Errorf("unexpected error when getting snapshot in GetJustifiedNumberAndHash, blockNumber: %d, blockHash: %s, error: %v", head.Number.Uint64(), head.Hash(), err)
 	}
