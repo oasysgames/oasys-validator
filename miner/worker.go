@@ -1205,6 +1205,16 @@ func (w *worker) commit(env *environment, interval func(), update bool, start ti
 		if interval != nil {
 			interval()
 		}
+		// Withdrawals are set to nil here, because this is only called in PoW.
+		block, receipts, err := w.engine.FinalizeAndAssemble(w.chain, types.CopyHeader(env.header), env.state, env.txs, nil, env.receipts, nil)
+		if err != nil {
+			return err
+		}
+
+		if block.Header().EmptyWithdrawalsHash() {
+			block = block.WithWithdrawals(make([]*types.Withdrawal, 0))
+		}
+
 		// If Cancun enabled, sidecars can't be nil then.
 		if w.chainConfig.IsCancun(env.header.Number, env.header.Time) && env.sidecars == nil {
 			env.sidecars = make(types.BlobSidecars, 0)
@@ -1212,11 +1222,6 @@ func (w *worker) commit(env *environment, interval func(), update bool, start ti
 		// Create a local environment copy, avoid the data race with snapshot state.
 		// https://github.com/ethereum/go-ethereum/issues/24299
 		env := env.copy()
-		// Withdrawals are set to nil here, because this is only called in PoW.
-		block, receipts, err := w.engine.FinalizeAndAssemble(w.chain, types.CopyHeader(env.header), env.state, env.txs, nil, env.receipts, nil)
-		if err != nil {
-			return err
-		}
 
 		block = block.WithSidecars(env.sidecars)
 
