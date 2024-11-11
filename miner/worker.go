@@ -1016,9 +1016,13 @@ func (w *worker) prepareWork(genParams *generateParams) (*environment, error) {
 		}
 		header.BlobGasUsed = new(uint64)
 		header.ExcessBlobGas = &excessBlobGas
-		header.ParentBeaconRoot = genParams.beaconRoot
 		if w.chainConfig.Oasys != nil {
 			header.WithdrawalsHash = &types.EmptyWithdrawalsHash
+		}
+		if w.chainConfig.Oasys == nil {
+			header.ParentBeaconRoot = genParams.beaconRoot
+		} else {
+			header.ParentBeaconRoot = new(common.Hash)
 		}
 	}
 	// Could potentially happen if starting to mine in an odd state.
