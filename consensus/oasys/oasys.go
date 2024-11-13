@@ -410,6 +410,16 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 		}
 	}
 
+	// Verify vote attestation for fast finality.
+	if err := c.verifyVoteAttestation(chain, header, parents, env); err != nil {
+		log.Warn("Verify vote attestation failed", "error", err, "hash", header.Hash(), "number", header.Number,
+			"parent", header.ParentHash, "coinbase", header.Coinbase, "extra", common.Bytes2Hex(header.Extra))
+		verifyVoteAttestationErrorCounter.Inc(1)
+		if chain.Config().IsFastFinalityEnabled(header.Number) {
+			return err
+		}
+	}
+
 	// All basic checks passed, verify the seal and return
 	return c.verifySeal(chain, header, parents, scheduler)
 }

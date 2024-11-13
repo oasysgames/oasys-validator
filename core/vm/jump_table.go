@@ -91,13 +91,14 @@ func newCancunInstructionSet() JumpTable {
 }
 
 func newShanghaiInstructionSet() JumpTable {
-	instructionSet := newMergeInstructionSet()
+	instructionSet := newLondonInstructionSet()
 	enable3855(&instructionSet) // PUSH0 instruction
 	enable3860(&instructionSet) // Limit and meter initcode
 
 	return validate(instructionSet)
 }
 
+// Skip the Merge instruction set, as Oasys does not support RANDAO
 func newMergeInstructionSet() JumpTable {
 	instructionSet := newLondonInstructionSet()
 	instructionSet[PREVRANDAO] = &operation{
