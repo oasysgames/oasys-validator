@@ -412,7 +412,7 @@ func (ps *peerSet) peerWithHighestJustifiedBlockAndTD() (bestPeer *eth.Peer, bes
 			continue
 		}
 		_, td := p.Head()
-		if *justified > bestJustified || (*justified == bestJustified && td.Cmp(bestTd) > 0) {
+		if bestPeer == nil || *justified > bestJustified || (*justified == bestJustified && td.Cmp(bestTd) > 0) {
 			bestPeer, bestJustified, bestTd = p.Peer, *justified, td
 		}
 	}
