@@ -234,6 +234,7 @@ var (
 		BerlinBlock:         big.NewInt(0),
 		LondonBlock:         big.NewInt(0),
 		ShanghaiTime:        newUint64(1721910600), // Thu Jul 25 2024 21:30:00 GMT+0900
+		CancunTime:          newUint64(9999999999),
 
 		Oasys: &OasysConfig{
 			Period: 15,
@@ -255,6 +256,7 @@ var (
 		BerlinBlock:         big.NewInt(0),
 		LondonBlock:         big.NewInt(0),
 		ShanghaiTime:        newUint64(1718600000), // Mon Jun 17 2024 13:53:20 GMT+0900
+		CancunTime:          newUint64(9999999999),
 
 		Oasys: &OasysConfig{
 			Period: 15,
@@ -695,7 +697,13 @@ func (c *ChainConfig) IsShanghai(num *big.Int, time uint64) bool {
 
 // IsCancun returns whether num is either equal to the Cancun fork time or greater.
 func (c *ChainConfig) IsCancun(num *big.Int, time uint64) bool {
-	return c.IsLondon(num) && isTimestampForked(c.CancunTime, time)
+	cancunTime := c.CancunTime
+	if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
+		cancunTime = OasysMainnetChainConfig.CancunTime
+	} else if c.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0 {
+		cancunTime = OasysTestnetChainConfig.CancunTime
+	}
+	return c.IsLondon(num) && isTimestampForked(cancunTime, time)
 }
 
 // IsPrague returns whether num is either equal to the Prague fork time or greater.
@@ -760,7 +768,7 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "grayGlacierBlock", block: c.GrayGlacierBlock, optional: true},
 		{name: "mergeNetsplitBlock", block: c.MergeNetsplitBlock, optional: true},
 		{name: "shanghaiTime", timestamp: c.ShanghaiTime},
-		{name: "cancunTime", timestamp: c.CancunTime, optional: true},
+		{name: "cancunTime", timestamp: c.CancunTime},
 		{name: "pragueTime", timestamp: c.PragueTime, optional: true},
 		{name: "verkleTime", timestamp: c.VerkleTime, optional: true},
 	} {
@@ -1055,9 +1063,9 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 		IsBerlin:         c.IsBerlin(num),
 		IsLondon:         c.IsLondon(num),
 		IsMerge:          isMerge,
-		IsShanghai:       isMerge && c.IsShanghai(num, timestamp),
-		IsCancun:         isMerge && c.IsCancun(num, timestamp),
-		IsPrague:         isMerge && c.IsPrague(num, timestamp),
-		IsVerkle:         isMerge && c.IsVerkle(num, timestamp),
+		IsShanghai:       c.IsShanghai(num, timestamp),
+		IsCancun:         c.IsCancun(num, timestamp),
+		IsPrague:         c.IsPrague(num, timestamp),
+		IsVerkle:         c.IsVerkle(num, timestamp),
 	}
 }
