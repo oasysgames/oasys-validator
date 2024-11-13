@@ -347,7 +347,7 @@ func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 		case !header.EmptyWithdrawalsHash():
 			return errors.New("header has wrong WithdrawalsHash")
 		}
-		if header.ParentBeaconRoot == nil {
+		if header.ParentBeaconRoot == nil || *header.ParentBeaconRoot != (common.Hash{}) {
 			return errors.New("header is missing beaconRoot")
 		}
 		if err := eip4844.VerifyEIP4844Header(parent, header); err != nil {
