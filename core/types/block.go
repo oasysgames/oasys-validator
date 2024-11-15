@@ -566,7 +566,8 @@ func SealHash(header *Header) (hash common.Hash) {
 
 func EncodeSigHeader(w io.Writer, header *Header) {
 	var enc []interface{}
-	if header.ParentBeaconRoot != nil && *header.ParentBeaconRoot == (common.Hash{}) {
+	cancun := header.ParentBeaconRoot != nil && *header.ParentBeaconRoot == (common.Hash{})
+	if cancun {
 		enc = []interface{}{
 			header.ParentHash,
 			header.UncleHash,
@@ -607,6 +608,9 @@ func EncodeSigHeader(w io.Writer, header *Header) {
 			header.MixDigest,
 			header.Nonce,
 		}
+		if header.BaseFee != nil {
+			enc = append(enc, header.BaseFee)
+		}
 		if header.WithdrawalsHash != nil {
 			panic("unexpected withdrawal hash value in oasys")
 		}
@@ -619,9 +623,6 @@ func EncodeSigHeader(w io.Writer, header *Header) {
 		if header.ParentBeaconRoot != nil {
 			panic("unexpected parent beacon root value in oasys")
 		}
-	}
-	if header.BaseFee != nil {
-		enc = append(enc, header.BaseFee)
 	}
 	if err := rlp.Encode(w, enc); err != nil {
 		panic("can't encode: " + err.Error())
