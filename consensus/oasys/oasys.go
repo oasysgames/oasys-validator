@@ -222,10 +222,6 @@ func New(chainConfig *params.ChainConfig, config *params.OasysConfig, db ethdb.D
 	}
 }
 
-func (c *Oasys) Period() uint64 {
-	return c.config.Period
-}
-
 // Author implements consensus.Engine, returning the Ethereum address recovered
 // from the signature in the header's extra-data section.
 func (c *Oasys) Author(header *types.Header) (common.Address, error) {
@@ -1148,6 +1144,22 @@ func (c *Oasys) IsActiveValidatorAt(chain consensus.ChainHeaderReader, header *t
 		}
 	}
 	return false
+}
+
+// Period returns the period of corresponding epoch. In case of any error, it returns the value in the config.
+func (c *Oasys) Period(chain consensus.ChainHeaderReader, header *types.Header) uint64 {
+	number := header.Number.Uint64()
+	snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
+	if err != nil {
+		log.Warn("failed to get snapshot", "in", "Period", "parentHash", header.ParentHash, "number", number, "err", err)
+		return c.config.Period
+	}
+	env, err := c.environment(chain, header, snap, true)
+	if err != nil {
+		log.Warn("failed to get environment value", "in", "Period", "parentHash", header.ParentHash, "number", number, "err", err)
+		return c.config.Period
+	}
+	return env.EpochPeriod.Uint64()
 }
 
 // VerifyVote will verify: 1. If the vote comes from valid validators 2. If the vote's sourceNumber and sourceHash are correct

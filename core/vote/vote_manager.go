@@ -140,7 +140,7 @@ func (voteManager *VoteManager) loop() {
 
 			curHead := cHead.Header
 			if o, ok := voteManager.engine.(*oasys.Oasys); ok {
-				nextBlockMinedTime := time.Unix(int64((curHead.Time + o.Period())), 0)
+				nextBlockMinedTime := time.Unix(int64((curHead.Time + o.Period(voteManager.chain, curHead))), 0)
 				timeForBroadcast := 50 * time.Millisecond // enough to broadcast a vote
 				if time.Now().Add(timeForBroadcast).After(nextBlockMinedTime) {
 					log.Warn("too late to vote", "Head.Time(Second)", curHead.Time, "Now(Millisecond)", time.Now().UnixMilli())

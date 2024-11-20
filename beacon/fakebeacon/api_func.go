@@ -3,6 +3,7 @@ package fakebeacon
 import (
 	"context"
 	"sort"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
@@ -11,9 +12,10 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
+// spec: https://ethereum.github.io/beacon-APIs/#/Beacon/getBlobSidecars
 type BlobSidecar struct {
 	Blob          kzg4844.Blob       `json:"blob"`
-	Index         int                `json:"index"`
+	Index         Uint64String       `json:"index"`
 	KZGCommitment kzg4844.Commitment `json:"kzg_commitment"`
 	KZGProof      kzg4844.Proof      `json:"kzg_proof"`
 }
@@ -37,6 +39,23 @@ type ReducedConfigData struct {
 type IndexedBlobHash struct {
 	Index int         // absolute index in the block, a.k.a. position in sidecar blobs array
 	Hash  common.Hash // hash of the blob, used for consistency checks
+}
+
+// Uint64String is a decimal string representation of an uint64, for usage in the Beacon API JSON encoding
+type Uint64String uint64
+
+func (v Uint64String) MarshalText() (out []byte, err error) {
+	out = strconv.AppendUint(out, uint64(v), 10)
+	return
+}
+
+func (v *Uint64String) UnmarshalText(b []byte) error {
+	n, err := strconv.ParseUint(string(b), 0, 64)
+	if err != nil {
+		return err
+	}
+	*v = Uint64String(n)
+	return nil
 }
 
 func configSpec() ReducedConfigData {
@@ -72,7 +91,7 @@ func beaconBlobSidecars(ctx context.Context, backend ethapi.Backend, slot uint64
 			}
 			if fullBlob || idx == indices[curIdx] {
 				res.Data = append(res.Data, &BlobSidecar{
-					Index:         idx,
+					Index:         Uint64String(idx),
 					Blob:          sideCar.Blobs[i],
 					KZGCommitment: sideCar.Commitments[i],
 					KZGProof:      sideCar.Proofs[i],
