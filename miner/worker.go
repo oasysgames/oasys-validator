@@ -758,11 +758,6 @@ func (w *worker) updateSnapshot(env *environment) {
 }
 
 func (w *worker) commitTransaction(env *environment, tx *types.Transaction) ([]*types.Log, error) {
-	// Oasys transaction verification
-	if err := core.VerifyTx(tx); err != nil {
-		return nil, err
-	}
-
 	if tx.Type() == types.BlobTxType {
 		return w.commitBlobTransaction(env, tx)
 	}
@@ -908,11 +903,6 @@ func (w *worker) commitTransactions(env *environment, plainTxs, blobTxs *transac
 			coalescedLogs = append(coalescedLogs, logs...)
 			env.tcount++
 			txs.Shift()
-
-		case errors.Is(err, core.ErrUnauthorizedDeployment):
-			// Pop the deployment transaction
-			log.Trace("Skipping deployment transaction", "sender", from)
-			txs.Pop()
 
 		default:
 			// Transaction is regarded as invalid, drop all consecutive transactions from
