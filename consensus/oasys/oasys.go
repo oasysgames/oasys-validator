@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"math/big"
 	"sort"
@@ -398,16 +399,6 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 	// Verify that the gasUsed is <= gasLimit
 	if header.GasUsed > header.GasLimit {
 		return fmt.Errorf("invalid gasUsed: have %d, gasLimit %d", header.GasUsed, header.GasLimit)
-	}
-
-	// Verify vote attestation for fast finality.
-	if err := c.verifyVoteAttestation(chain, header, parents, env); err != nil {
-		log.Warn("Verify vote attestation failed", "error", err, "hash", header.Hash(), "number", header.Number,
-			"parent", header.ParentHash, "coinbase", header.Coinbase, "extra", common.Bytes2Hex(header.Extra))
-		verifyVoteAttestationErrorCounter.Inc(1)
-		if chain.Config().IsFastFinalityEnabled(header.Number) {
-			return err
-		}
 	}
 
 	// Verify vote attestation for fast finality.
@@ -1155,11 +1146,27 @@ func (c *Oasys) IsActiveValidatorAt(chain consensus.ChainHeaderReader, header *t
 	return false
 }
 
+// Period returns the period of corresponding epoch. In case of any error, it returns the value in the config.
+func (c *Oasys) Period(chain consensus.ChainHeaderReader, header *types.Header) uint64 {
+	number := header.Number.Uint64()
+	snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
+	if err != nil {
+		log.Warn("failed to get snapshot", "in", "Period", "parentHash", header.ParentHash, "number", number, "err", err)
+		return c.config.Period
+	}
+	env, err := c.environment(chain, header, snap, true)
+	if err != nil {
+		log.Warn("failed to get environment value", "in", "Period", "parentHash", header.ParentHash, "number", number, "err", err)
+		return c.config.Period
+	}
+	return env.EpochPeriod.Uint64()
+}
+
 // VerifyVote will verify: 1. If the vote comes from valid validators 2. If the vote's sourceNumber and sourceHash are correct
 func (c *Oasys) VerifyVote(chain consensus.ChainHeaderReader, vote *types.VoteEnvelope) error {
 	targetNumber := vote.Data.TargetNumber
 	targetHash := vote.Data.TargetHash
-	header := chain.GetHeaderByHash(targetHash)
+	header := chain.GetVerifiedBlockByHash(targetHash)
 	if header == nil {
 		log.Warn("BlockHeader at current voteBlockNumber is nil", "targetNumber", targetNumber, "targetHash", targetHash)
 		return errors.New("BlockHeader at current voteBlockNumber is nil")
@@ -1310,11 +1317,34 @@ func (c *Oasys) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, p
 	return scheduler.difficulty(number, c.signer, c.chainConfig.IsForkedOasysExtendDifficulty(parent.Number))
 }
 
+func encodeSigHeaderWithoutVoteAttestation(w io.Writer, header *types.Header) {
+	err := rlp.Encode(w, []interface{}{
+		header.ParentHash,
+		header.UncleHash,
+		header.Coinbase,
+		header.Root,
+		header.TxHash,
+		header.ReceiptHash,
+		header.Bloom,
+		header.Difficulty,
+		header.Number,
+		header.GasLimit,
+		header.GasUsed,
+		header.Time,
+		header.Extra[:extraVanity], // this will panic if extra is too short, should check before calling encodeSigHeaderWithoutVoteAttestation
+		header.MixDigest,
+		header.Nonce,
+	})
+	if err != nil {
+		panic("can't encode: " + err.Error())
+	}
+}
+
 // SealHash returns the hash of a block without vote attestation prior to it being sealed.
 // So it's not the real hash of a block, just used as unique id to distinguish task
 func (c *Oasys) SealHash(header *types.Header) (hash common.Hash) {
 	hasher := sha3.NewLegacyKeccak256()
-	types.EncodeSigHeaderWithoutVoteAttestation(hasher, header)
+	encodeSigHeaderWithoutVoteAttestation(hasher, header)
 	hasher.Sum(hash[:0])
 	return hash
 }
@@ -1345,7 +1375,7 @@ func (c *Oasys) GetJustifiedNumberAndHash(chain consensus.ChainHeaderReader, hea
 	if !chain.Config().IsFastFinalityEnabled(head.Number) {
 		return 0, chain.GetHeaderByNumber(0).Hash(), nil
 	}
-	snap, err := c.snapshot(chain, head.Number.Uint64(), head.Hash(), nil)
+	snap, err := c.snapshot(chain, head.Number.Uint64(), head.Hash(), headers)
 	if err != nil {
 		return 0, common.Hash{}, fmt.Errorf("unexpected error when getting snapshot in GetJustifiedNumberAndHash, blockNumber: %d, blockHash: %s, error: %v", head.Number.Uint64(), head.Hash(), err)
 	}

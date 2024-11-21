@@ -527,7 +527,7 @@ func makeEnv(wallet accounts.Wallet, account accounts.Account) (*testEnv, error)
 			Config:    chainConfig,
 			ExtraData: make([]byte, extraVanity+common.AddressLength+extraSeal),
 			BaseFee:   big.NewInt(params.InitialBaseFee),
-			Alloc: map[common.Address]core.GenesisAccount{
+			Alloc: map[common.Address]types.Account{
 				account.Address: {
 					Balance: big.NewInt(params.Ether),
 				},

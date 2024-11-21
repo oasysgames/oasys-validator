@@ -392,6 +392,10 @@ func (hc *HeaderChain) InsertHeaderChain(chain []*types.Header, start time.Time,
 	return res.status, err
 }
 
+func (hc *HeaderChain) GetVerifiedBlockByHash(hash common.Hash) *types.Header {
+	return hc.GetHeaderByHash(hash)
+}
+
 func (hc *HeaderChain) ChasingHead() *types.Header {
 	return nil
 }

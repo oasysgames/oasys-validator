@@ -554,8 +554,7 @@ func HeaderParentHashFromRLP(header []byte) common.Hash {
 }
 
 var (
-	extraVanity = 32 // Fixed number of extra-data prefix bytes reserved for signer vanity
-	extraSeal   = 65 // Fixed number of extra-data suffix bytes reserved for signer seal
+	extraSeal = 65 // Fixed number of extra-data suffix bytes reserved for signer seal
 )
 
 func SealHash(header *Header) (hash common.Hash) {
@@ -566,62 +565,66 @@ func SealHash(header *Header) (hash common.Hash) {
 }
 
 func EncodeSigHeader(w io.Writer, header *Header) {
-	enc := []interface{}{
-		header.ParentHash,
-		header.UncleHash,
-		header.Coinbase,
-		header.Root,
-		header.TxHash,
-		header.ReceiptHash,
-		header.Bloom,
-		header.Difficulty,
-		header.Number,
-		header.GasLimit,
-		header.GasUsed,
-		header.Time,
-		header.Extra[:len(header.Extra)-extraSeal], // this will panic if extra is too short, should check before calling encodeSigHeader
-		header.MixDigest,
-		header.Nonce,
-	}
-	if header.BaseFee != nil {
-		enc = append(enc, header.BaseFee)
-	}
-	if header.WithdrawalsHash != nil {
-		panic("unexpected withdrawal hash value in oasys")
-	}
-	if header.ExcessBlobGas != nil {
-		panic("unexpected excess blob gas value in oasys")
-	}
-	if header.BlobGasUsed != nil {
-		panic("unexpected blob gas used value in oasys")
-	}
-	if header.ParentBeaconRoot != nil {
-		panic("unexpected parent beacon root value in oasys")
+	var enc []interface{}
+	cancun := header.ParentBeaconRoot != nil && *header.ParentBeaconRoot == (common.Hash{})
+	if cancun {
+		enc = []interface{}{
+			header.ParentHash,
+			header.UncleHash,
+			header.Coinbase,
+			header.Root,
+			header.TxHash,
+			header.ReceiptHash,
+			header.Bloom,
+			header.Difficulty,
+			header.Number,
+			header.GasLimit,
+			header.GasUsed,
+			header.Time,
+			header.Extra[:len(header.Extra)-extraSeal], // this will panic if extra is too short, should check before calling encodeSigHeader
+			header.MixDigest,
+			header.Nonce,
+			header.BaseFee,
+			header.WithdrawalsHash,
+			header.BlobGasUsed,
+			header.ExcessBlobGas,
+			header.ParentBeaconRoot,
+		}
+	} else {
+		enc = []interface{}{
+			header.ParentHash,
+			header.UncleHash,
+			header.Coinbase,
+			header.Root,
+			header.TxHash,
+			header.ReceiptHash,
+			header.Bloom,
+			header.Difficulty,
+			header.Number,
+			header.GasLimit,
+			header.GasUsed,
+			header.Time,
+			header.Extra[:len(header.Extra)-extraSeal], // this will panic if extra is too short, should check before calling encodeSigHeader
+			header.MixDigest,
+			header.Nonce,
+		}
+		if header.BaseFee != nil {
+			enc = append(enc, header.BaseFee)
+		}
+		if header.WithdrawalsHash != nil {
+			panic("unexpected withdrawal hash value in oasys")
+		}
+		if header.ExcessBlobGas != nil {
+			panic("unexpected excess blob gas value in oasys")
+		}
+		if header.BlobGasUsed != nil {
+			panic("unexpected blob gas used value in oasys")
+		}
+		if header.ParentBeaconRoot != nil {
+			panic("unexpected parent beacon root value in oasys")
+		}
 	}
 	if err := rlp.Encode(w, enc); err != nil {
-		panic("can't encode: " + err.Error())
-	}
-}
-
-func EncodeSigHeaderWithoutVoteAttestation(w io.Writer, header *Header) {
-	err := rlp.Encode(w, []interface{}{
-		header.ParentHash,
-		header.UncleHash,
-		header.Coinbase,
-		header.Root,
-		header.TxHash,
-		header.ReceiptHash,
-		header.Bloom,
-		header.Difficulty,
-		header.Number,
-		header.GasLimit,
-		header.GasUsed,
-		header.Time,
-		header.Extra[:extraVanity], // this will panic if extra is too short, should check before calling encodeSigHeaderWithoutVoteAttestation
-		header.MixDigest,
-		header.Nonce,
-	})
-	if err != nil {
 		panic("can't encode: " + err.Error())
 	}
 }
