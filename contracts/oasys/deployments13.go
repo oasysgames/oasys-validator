@@ -71,6 +71,20 @@ var deployments13 = []*deployment{
 					},
 				},
 			},
+			// mapping(address => address) private _createAllowedList;
+			"0x01": &mapping{
+				keyFn: addressKeyFn,
+				values: map[string]interface{}{
+					"0x0000000000000000000000000000000000000001": "0x0000000000000000000000000000000000000001",
+				},
+			},
+			// mapping(address => address) private _callDeniedList;
+			"0x02": &mapping{
+				keyFn: addressKeyFn,
+				values: map[string]interface{}{
+					"0x0000000000000000000000000000000000000001": "0x0000000000000000000000000000000000000001",
+				},
+			},
 		},
 	},
 }
