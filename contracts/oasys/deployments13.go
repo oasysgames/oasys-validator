@@ -37,12 +37,12 @@ var deployments13 = []*deployment{
 								},
 							},
 							// For local development
-							GenesisHash: &mapping{
-								keyFn: addressKeyFn,
-								values: map[string]interface{}{
-									"0x75fBB5Bd6FDf076Dcaf55243e9E3f3c76F8b5640": "0x1",
-								},
-							},
+							// GenesisHash: &mapping{
+							// 	keyFn: addressKeyFn,
+							// 	values: map[string]interface{}{
+							// 		"0x75fBB5Bd6FDf076Dcaf55243e9E3f3c76F8b5640": "0x1",
+							// 	},
+							// },
 						},
 					},
 					"MANAGER_ROLE": structvalue{
@@ -61,12 +61,12 @@ var deployments13 = []*deployment{
 								},
 							},
 							// For local development
-							GenesisHash: &mapping{
-								keyFn: addressKeyFn,
-								values: map[string]interface{}{
-									"0x75fBB5Bd6FDf076Dcaf55243e9E3f3c76F8b5640": "0x1",
-								},
-							},
+							// GenesisHash: &mapping{
+							// 	keyFn: addressKeyFn,
+							// 	values: map[string]interface{}{
+							// 		"0x75fBB5Bd6FDf076Dcaf55243e9E3f3c76F8b5640": "0x1",
+							// 	},
+							// },
 						},
 					},
 				},
