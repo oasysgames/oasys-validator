@@ -176,8 +176,16 @@ const (
 )
 
 var (
-	MinBlocksForBlobRequests           uint64 = 524288              // it keeps blob data available for ~18.2 days in local, ref: https://github.com/bnb-chain/BEPs/blob/master/BEPs/BEP-336.md#51-parameters.
-	DefaultExtraReserveForBlobRequests uint64 = 1 * (24 * 3600) / 3 // it adds more time for expired blobs for some request cases, like expiry blob when remote peer is syncing, default 1 day.
+	// The factor to adjust blob reserve period for Oasys.
+	// Oasys blocktime(6s) / BSC blocktime(3s) = 2
+	divisionFactorForOasys uint64 = 2
+
+	// it keeps blob data available for ~18.2 days in local, ref: https://github.com/bnb-chain/BEPs/blob/master/BEPs/BEP-336.md#51-parameters.
+	// Same as the default blob reserve period in Ethereum (4096 epochs).
+	MinBlocksForBlobRequests uint64 = 524288 / divisionFactorForOasys
+
+	// it adds more time for expired blobs for some request cases, like expiry blob when remote peer is syncing, default 1 day.
+	DefaultExtraReserveForBlobRequests uint64 = 1 * (24 * 3600) / 3 / divisionFactorForOasys
 )
 
 // Gas discount table for BLS12-381 G1 and G2 multi exponentiation operations

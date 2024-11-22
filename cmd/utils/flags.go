@@ -972,7 +972,7 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 	// Blob setting
 	BlobExtraReserveFlag = &cli.Uint64Flag{
 		Name:     "blob.extra-reserve",
-		Usage:    "Extra reserve threshold for blob, blob never expires when 0 is set, default 28800",
+		Usage:    "Extra reserve threshold for blob, blob never expires when 0 is set, default 14400",
 		Value:    params.DefaultExtraReserveForBlobRequests,
 		Category: flags.MiscCategory,
 	}
