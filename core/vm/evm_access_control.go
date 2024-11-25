@@ -7,7 +7,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/contracts/oasys"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
 )
 
 var (
@@ -21,20 +20,17 @@ var (
 	emptyHash        common.Hash
 )
 
-// Check the `_createAllowedList`  mappings in the `EVMAccessControl` contract
-func (evm *EVM) isAllowedToCreate(address common.Address) bool {
-	if evm.chainConfig.ChainID.Cmp(params.OasysTestnetChainConfig.ChainID) == 0 {
-		return true // Allow all contract creation on testnet
-	}
-	hash := computeAddressMapStorageKey(address, 1)
-	val := evm.StateDB.GetState(evmAccessControl, hash)
+// Check the `_createAllowedList` mappings in the `EVMAccessControl` contract
+func IsAllowedToCreate(state StateDB, from common.Address) bool {
+	hash := computeAddressMapStorageKey(from, 1)
+	val := state.GetState(evmAccessControl, hash)
 	return val.Cmp(emptyHash) != 0
 }
 
 // Check the `_callAllowedList` mappings in the `EVMAccessControl` contract
-func (evm *EVM) isDeniedToCall(address common.Address) bool {
-	hash := computeAddressMapStorageKey(address, 2)
-	val := evm.StateDB.GetState(evmAccessControl, hash)
+func IsDeniedToCall(state StateDB, to common.Address) bool {
+	hash := computeAddressMapStorageKey(to, 2)
+	val := state.GetState(evmAccessControl, hash)
 	return val.Cmp(emptyHash) != 0
 }
 
