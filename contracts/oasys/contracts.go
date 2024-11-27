@@ -28,8 +28,8 @@ var (
 		name:    "PermissionedContractFactory",
 		address: "0x520000000000000000000000000000000000002F",
 	}
-	evmAccessControl = &contract{
-		name:    "EVMAccessControl",
+	transactionFilter = &contract{
+		name:    "TransactionFilter",
 		address: "0x520000000000000000000000000000000000003F",
 	}
 

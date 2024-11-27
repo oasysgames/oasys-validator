@@ -38,6 +38,12 @@ var (
 	ErrInvalidCode              = errors.New("invalid code: must not begin with 0xef")
 	ErrNonceUintOverflow        = errors.New("nonce uint64 overflow")
 
+	// ErrUnauthorizedCreate is returned if an unauthorized address creates a contract
+	ErrUnauthorizedCreate = errors.New("unauthorized create")
+
+	// ErrUnauthorizedCall is returned if an unauthorized address calls the contract
+	ErrUnauthorizedCall = errors.New("unauthorized call")
+
 	// errStopToken is an internal token indicating interpreter loop termination,
 	// never returned to outside callers.
 	errStopToken = errors.New("stop token")

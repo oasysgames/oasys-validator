@@ -24,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/txfilter"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/ethereum/go-ethereum/log"
@@ -243,6 +244,18 @@ func ValidateTransactionWithState(tx *types.Transaction, signer types.Signer, op
 		// (i.e. max cancellable via out-of-bound transaction).
 		if used, left := opts.UsedAndLeftSlots(from); left <= 0 {
 			return fmt.Errorf("%w: pooled %d txs", ErrAccountLimitExceeded, used)
+		}
+	}
+	// Validate the contract creator or destination contract.
+	if to := tx.To(); to == nil {
+		// Fail if the caller is not allowed to create
+		if !txfilter.IsAllowedToCreate(opts.State, from) {
+			return fmt.Errorf("the deployer address is not allowed. please submit application form. from: %s", from)
+		}
+	} else {
+		// Fail if the address is not allowed to call
+		if txfilter.IsDeniedToCall(opts.State, *to) {
+			return fmt.Errorf("the calling contract is in denlylist. to: %s", to)
 		}
 	}
 	return nil
