@@ -1844,9 +1844,6 @@ func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 		// Ensure only eip155 signed transactions are submitted if EIP155Required is set.
 		return common.Hash{}, errors.New("only replay-protected (EIP-155) transactions allowed over RPC")
 	}
-	if err := b.SendTx(ctx, tx); err != nil {
-		return common.Hash{}, err
-	}
 	// Print a log with full tx details for manual investigations and interventions
 	head := b.CurrentBlock()
 	signer := types.MakeSigner(b.ChainConfig(), head.Number, head.Time)
@@ -1855,7 +1852,28 @@ func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 		return common.Hash{}, err
 	}
 
-	if tx.To() == nil {
+	// Validate the contract creator or destination contract.
+	to := tx.To()
+	state, _, err := b.StateAndHeaderByNumber(ctx, rpc.BlockNumber(head.Number.Int64()))
+	if err != nil {
+		return common.Hash{}, err
+	}
+	if state == nil {
+		return common.Hash{}, errors.New("state not found")
+	}
+	// Fail if the caller is not allowed to create
+	if to == nil && !vm.IsAllowedToCreate(state, from) {
+		return common.Hash{}, fmt.Errorf("the deployer address is not allowed. please submit application form. from: %s", from)
+	}
+	// Fail if the address is not allowed to call
+	if to != nil && vm.IsDeniedToCall(state, *to) {
+		return common.Hash{}, fmt.Errorf("the calling contract is in denlylist. to: %s", to)
+	}
+
+	if err := b.SendTx(ctx, tx); err != nil {
+		return common.Hash{}, err
+	}
+	if to == nil {
 		addr := crypto.CreateAddress(from, tx.Nonce())
 		log.Info("Submitted contract creation", "hash", tx.Hash().Hex(), "from", from, "nonce", tx.Nonce(), "contract", addr.Hex(), "value", tx.Value())
 	} else {
