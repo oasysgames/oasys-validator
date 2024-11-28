@@ -341,13 +341,9 @@ func (f *chainFreezer) freezeRangeWithBlobs(nfdb *nofreezedb, number, limit uint
 	}
 
 	// freeze pre cancun
-	if cancunNumber == 0 {
-		// case of development
-	} else {
-		preHashes, err = f.freezeRange(nfdb, number, cancunNumber-1)
-		if err != nil {
-			return preHashes, err
-		}
+	preHashes, err = f.freezeRange(nfdb, number, cancunNumber-1)
+	if err != nil {
+		return preHashes, err
 	}
 
 	if err = ResetEmptyBlobAncientTable(f, cancunNumber); err != nil {
@@ -360,6 +356,7 @@ func (f *chainFreezer) freezeRangeWithBlobs(nfdb *nofreezedb, number, limit uint
 }
 
 func (f *chainFreezer) freezeRange(nfdb *nofreezedb, number, limit uint64) (hashes []common.Hash, err error) {
+	log.Debug("freezeRange is called", "number", number, "to", limit)
 	if number > limit {
 		return nil, nil
 	}
@@ -368,6 +365,7 @@ func (f *chainFreezer) freezeRange(nfdb *nofreezedb, number, limit uint64) (hash
 	hashes = make([]common.Hash, 0, limit-number)
 	_, err = f.ModifyAncients(func(op ethdb.AncientWriteOp) error {
 		for ; number <= limit; number++ {
+			log.Debug("freezeRange: loop", "number", number)
 			// Retrieve all the components of the canonical block.
 			hash := ReadCanonicalHash(nfdb, number)
 			if hash == (common.Hash{}) {
@@ -391,8 +389,9 @@ func (f *chainFreezer) freezeRange(nfdb *nofreezedb, number, limit uint64) (hash
 			}
 			// blobs is nil before cancun fork
 			var sidecars rlp.RawValue
-			if isCancun(env, h.Number, h.Time) && number != 0 { // except genesis block in case of development
+			if isCancun(env, h.Number, h.Time) {
 				sidecars = ReadBlobSidecarsRLP(nfdb, hash, number)
+				log.Debug("freezeRange: isCancun", "number", number, "sidecars", sidecars)
 				if len(sidecars) == 0 {
 					return fmt.Errorf("block blobs missing, can't freeze block %d", number)
 				}
@@ -414,7 +413,8 @@ func (f *chainFreezer) freezeRange(nfdb *nofreezedb, number, limit uint64) (hash
 			if err := op.AppendRaw(ChainFreezerDifficultyTable, number, td); err != nil {
 				return fmt.Errorf("can't write td to Freezer: %v", err)
 			}
-			if isCancun(env, h.Number, h.Time) && number != 0 { // except genesis block in case of development
+			if isCancun(env, h.Number, h.Time) {
+				log.Debug("freezeRange: isCancun 2", "number", number, "sidecars", sidecars)
 				if err := op.AppendRaw(ChainFreezerBlobSidecarTable, number, sidecars); err != nil {
 					return fmt.Errorf("can't write blobs to Freezer: %v", err)
 				}
