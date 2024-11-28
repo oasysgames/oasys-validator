@@ -1079,10 +1079,6 @@ func (p *BlobPool) SetGasTip(tip *big.Int) {
 // validateTx checks whether a transaction is valid according to the consensus
 // rules and adheres to some heuristic limits of the local node (price and size).
 func (p *BlobPool) validateTx(tx *types.Transaction) error {
-	// Oasys transaction verification
-	if err := core.VerifyTx(tx); err != nil {
-		return err
-	}
 	// Ensure the transaction adheres to basic pool filters (type, size, tip) and
 	// consensus rules
 	baseOpts := &txpool.ValidationOptions{

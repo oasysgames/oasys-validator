@@ -625,10 +625,6 @@ func (pool *LegacyPool) validateTxBasics(tx *types.Transaction, local bool) erro
 // validateTx checks whether a transaction is valid according to the consensus
 // rules and adheres to some heuristic limits of the local node (price and size).
 func (pool *LegacyPool) validateTx(tx *types.Transaction, local bool) error {
-	// Oasys transaction verification
-	if err := core.VerifyTx(tx); err != nil {
-		return err
-	}
 	opts := &txpool.ValidationOptionsWithState{
 		State: pool.currentState,
 

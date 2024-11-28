@@ -17,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -989,10 +988,6 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 		return errors.New("oasys does not support withdrawals")
 	}
 
-	if err := verifyTx(header, *txs); err != nil {
-		return err
-	}
-
 	hash := header.Hash()
 	number := header.Number.Uint64()
 
@@ -1068,9 +1063,6 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 
 	if len(withdrawals) > 0 {
 		return nil, receipts, errors.New("oasys does not support withdrawals")
-	}
-	if err := verifyTx(header, txs); err != nil {
-		return nil, nil, err
 	}
 
 	hash := header.Hash()
@@ -1627,14 +1619,4 @@ func (c *Oasys) scheduler(chain consensus.ChainHeaderReader, header *types.Heade
 		newWeightedChooser(validators, stakes, seed))
 	schedulerCache.Add(seedHash, created)
 	return created, nil
-}
-
-// Oasys transaction verification
-func verifyTx(header *types.Header, txs []*types.Transaction) error {
-	for _, tx := range txs {
-		if err := core.VerifyTx(tx); err != nil {
-			return err
-		}
-	}
-	return nil
 }
