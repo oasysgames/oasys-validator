@@ -521,7 +521,7 @@ func (s *Ethereum) StartMining() error {
 			if !s.config.Miner.VoteEnable {
 				err := errors.New("vote is not enabled, please enable vote")
 				techDocRef := "https://docs.oasys.games/docs/hub-validator/operate-validator/build-validator-node#enabling-fast-finality"
-				return fmt.Errorf("temporarily force validators to enable voting. Please proceed with registering your voting key. For more details, refer to the technical documentation: %s, err: %v", techDocRef, err)
+				return fmt.Errorf("temporarily force validators to enable voting. Please proceed with registering your BLS key. For more details, refer to the technical documentation: %s, err: %v", techDocRef, err)
 			}
 		}
 		// If mining is started, we can disable the transaction rejection mechanism
