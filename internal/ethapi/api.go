@@ -1863,11 +1863,11 @@ func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 	}
 	// Fail if the caller is not allowed to create
 	if to == nil && !vm.IsAllowedToCreate(state, from) {
-		return common.Hash{}, vm.ErrUnauthorizedCreate
+		return common.Hash{}, fmt.Errorf("the deployer address is not allowed. please submit application form. from: %s", from)
 	}
 	// Fail if the address is not allowed to call
 	if to != nil && vm.IsDeniedToCall(state, *to) {
-		return common.Hash{}, vm.ErrUnauthorizedCall
+		return common.Hash{}, fmt.Errorf("the calling contract is in denlylist. to: %s", to)
 	}
 
 	if err := b.SendTx(ctx, tx); err != nil {
