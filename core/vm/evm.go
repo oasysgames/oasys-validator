@@ -439,7 +439,7 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	evm.StateDB.SetNonce(caller.Address(), nonce+1)
 	// Fail if the caller is not allowed to create
 	// Need to check after nonce increment to evict failed tx from the pool
-	if !evm.isAllowedToCreate(caller.Address()) {
+	if !IsAllowedToCreate(evm.StateDB, caller.Address()) {
 		return nil, common.Address{}, 0, ErrUnauthorizedCreate
 	}
 	// We add this to the access list _before_ taking a snapshot. Even if the creation fails,
