@@ -43,7 +43,7 @@ type BlobTx struct {
 	BlobHashes []common.Hash
 
 	// A blob transaction can optionally contain blobs. This field must be set when BlobTx
-	// is used to create a transaction for sigining.
+	// is used to create a transaction for signing.
 	Sidecar *BlobTxSidecar `rlp:"-"`
 
 	// Signature values
@@ -54,16 +54,17 @@ type BlobTx struct {
 
 // BlobTxSidecar contains the blobs of a blob transaction.
 type BlobTxSidecar struct {
-	Blobs       []kzg4844.Blob       // Blobs needed by the blob pool
-	Commitments []kzg4844.Commitment // Commitments needed by the blob pool
-	Proofs      []kzg4844.Proof      // Proofs needed by the blob pool
+	Blobs       []kzg4844.Blob       `json:"blobs"`       // Blobs needed by the blob pool
+	Commitments []kzg4844.Commitment `json:"commitments"` // Commitments needed by the blob pool
+	Proofs      []kzg4844.Proof      `json:"proofs"`      // Proofs needed by the blob pool
 }
 
 // BlobHashes computes the blob hashes of the given blobs.
 func (sc *BlobTxSidecar) BlobHashes() []common.Hash {
+	hasher := sha256.New()
 	h := make([]common.Hash, len(sc.Commitments))
 	for i := range sc.Blobs {
-		h[i] = blobHash(&sc.Commitments[i])
+		h[i] = kzg4844.CalcBlobHashV1(hasher, &sc.Commitments[i])
 	}
 	return h
 }
@@ -234,13 +235,4 @@ func (tx *BlobTx) decode(input []byte) error {
 		Proofs:      inner.Proofs,
 	}
 	return nil
-}
-
-func blobHash(commit *kzg4844.Commitment) common.Hash {
-	hasher := sha256.New()
-	hasher.Write(commit[:])
-	var vhash common.Hash
-	hasher.Sum(vhash[:0])
-	vhash[0] = params.BlobTxHashVersion
-	return vhash
 }

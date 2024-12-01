@@ -1124,6 +1124,37 @@ func _deployments12(genesisHash common.Hash, contracts wantContracts) {
 	contracts["0x5200000000000000000000000000000000000023"].codeHash = "044637c8af353e46615765c8755265d6"
 }
 
+func _deployments13(genesisHash common.Hash, contracts wantContracts) {
+	appends := wantContracts{
+		"0x520000000000000000000000000000000000003F": {
+			name:     "EVMAccessControl",
+			codeHash: "3327a2dbf42b66e805e7878e737ec30b",
+		},
+	}
+
+	switch genesisHash {
+	case params.OasysMainnetGenesisHash:
+		appends["0x520000000000000000000000000000000000003F"].storage = map[string]string{
+			"0x0bce92cc78449169524412e83bbfd32ee216dec5bba171ae073372f5ed4cecef": "0x0000000000000000000000000000000000000000000000000000000000000001",
+			"0x9d45e49a732f60a178c294b56c93b9ad5c903d62acc0d9d7d7efc850a5d71054": "0x0000000000000000000000000000000000000000000000000000000000000001",
+		}
+	case params.OasysTestnetGenesisHash:
+		appends["0x520000000000000000000000000000000000003F"].storage = map[string]string{
+			"0x8544f4d9501cd2ef57e66ff394f96f2a0b39125d6cdb5f1740571be3740295b6": "0x0000000000000000000000000000000000000000000000000000000000000001",
+			"0x9deaf035b302af9e8d3ffb94ff3cf77718c97fca1cafc9835e08481dd6411eb5": "0x0000000000000000000000000000000000000000000000000000000000000001",
+		}
+	default:
+		appends["0x520000000000000000000000000000000000003F"].storage = map[string]string{}
+	}
+
+	appends["0x520000000000000000000000000000000000003F"].storage["0xcc69885fda6bcc1a4ace058b4a62bf5e179ea78fd58a1ccd71c22cc9b688792f"] = "0x0000000000000000000000000000000000000000000000000000000000000001"
+	appends["0x520000000000000000000000000000000000003F"].storage["0xe90b7bceb6e7df5418fb78d8ee546e97c83a08bbccc01a0644d599ccd2a7c2e0"] = "0x0000000000000000000000000000000000000000000000000000000000000001"
+
+	for k, v := range appends {
+		contracts[k] = v
+	}
+}
+
 func TestDeploy(t *testing.T) {
 	type wantDeployments []struct {
 		block  uint64
@@ -1153,6 +1184,7 @@ func TestDeploy(t *testing.T) {
 				{1892000, []deployFn{_deployments10}},
 				{4089588, []deployFn{_deployments11}},
 				{5095900, []deployFn{_deployments12}},
+				{9999999, []deployFn{_deployments13}},
 			},
 		},
 		{
@@ -1173,6 +1205,7 @@ func TestDeploy(t *testing.T) {
 				{1880660, []deployFn{_deployments10}},
 				{4017600, []deployFn{_deployments11}},
 				{4958700, []deployFn{_deployments12}},
+				{9999999, []deployFn{_deployments13}},
 			},
 		},
 		{
@@ -1201,6 +1234,7 @@ func TestDeploy(t *testing.T) {
 					_deployments10,
 					// _deployments11,
 					_deployments12,
+					_deployments13,
 				}},
 			},
 		},
