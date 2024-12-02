@@ -217,7 +217,7 @@ func New(chainConfig *params.ChainConfig, config *params.OasysConfig, db ethdb.D
 		signatures:  signatures,
 		proposals:   make(map[common.Address]bool),
 		ethAPI:      ethAPI,
-		txSigner:    types.MakeSigner(chainConfig, common.Big0, 0),
+		txSigner:    types.LatestSigner(chainConfig),
 	}
 }
 

@@ -253,7 +253,7 @@ func (c *Oasys) IsSystemTransaction(tx *types.Transaction, header *types.Header)
 	}
 
 	if sender, err := types.Sender(c.txSigner, tx); err != nil {
-		return false, errors.New("unauthorized transaction")
+		return false, fmt.Errorf("unauthorized transaction: %w", err)
 	} else if sender != header.Coinbase {
 		// not created by validator
 		return false, nil
