@@ -166,6 +166,11 @@ func (h *Header) EmptyReceipts() bool {
 	return h.ReceiptHash == EmptyReceiptsHash
 }
 
+// EmptyWithdrawalsHash returns true if the WithdrawalsHash is EmptyWithdrawalsHash.
+func (h *Header) EmptyWithdrawalsHash() bool {
+	return h.WithdrawalsHash != nil && *h.WithdrawalsHash == EmptyWithdrawalsHash
+}
+
 // Body is a simple (mutable, non-safe) data container for storing and moving
 // a block's data contents (transactions and uncles) together.
 type Body struct {
@@ -205,6 +210,9 @@ type Block struct {
 	// inter-peer block relay.
 	ReceivedAt   time.Time
 	ReceivedFrom interface{}
+
+	// sidecars provides DA check
+	sidecars BlobSidecars
 }
 
 // "external" block encoding. used for eth protocol, etc.
@@ -422,6 +430,14 @@ func (b *Block) SanityCheck() error {
 	return b.header.SanityCheck()
 }
 
+func (b *Block) Sidecars() BlobSidecars {
+	return b.sidecars
+}
+
+func (b *Block) CleanSidecars() {
+	b.sidecars = make(BlobSidecars, 0)
+}
+
 type writeCounter uint64
 
 func (c *writeCounter) Write(b []byte) (int, error) {
@@ -446,11 +462,17 @@ func NewBlockWithHeader(header *Header) *Block {
 // WithSeal returns a new block with the data from b but the header replaced with
 // the sealed one.
 func (b *Block) WithSeal(header *Header) *Block {
+	// fill sidecars metadata
+	for _, sidecar := range b.sidecars {
+		sidecar.BlockNumber = header.Number
+		sidecar.BlockHash = header.Hash()
+	}
 	return &Block{
 		header:       CopyHeader(header),
 		transactions: b.transactions,
 		uncles:       b.uncles,
 		withdrawals:  b.withdrawals,
+		sidecars:     b.sidecars,
 	}
 }
 
@@ -461,6 +483,7 @@ func (b *Block) WithBody(transactions []*Transaction, uncles []*Header) *Block {
 		transactions: make([]*Transaction, len(transactions)),
 		uncles:       make([]*Header, len(uncles)),
 		withdrawals:  b.withdrawals,
+		sidecars:     b.sidecars,
 	}
 	copy(block.transactions, transactions)
 	for i := range uncles {
@@ -475,10 +498,26 @@ func (b *Block) WithWithdrawals(withdrawals []*Withdrawal) *Block {
 		header:       b.header,
 		transactions: b.transactions,
 		uncles:       b.uncles,
+		sidecars:     b.sidecars,
 	}
 	if withdrawals != nil {
 		block.withdrawals = make([]*Withdrawal, len(withdrawals))
 		copy(block.withdrawals, withdrawals)
+	}
+	return block
+}
+
+// WithSidecars returns a block containing the given blobs.
+func (b *Block) WithSidecars(sidecars BlobSidecars) *Block {
+	block := &Block{
+		header:       b.header,
+		transactions: b.transactions,
+		uncles:       b.uncles,
+		withdrawals:  b.withdrawals,
+	}
+	if sidecars != nil {
+		block.sidecars = make(BlobSidecars, len(sidecars))
+		copy(block.sidecars, sidecars)
 	}
 	return block
 }
@@ -515,8 +554,7 @@ func HeaderParentHashFromRLP(header []byte) common.Hash {
 }
 
 var (
-	extraVanity = 32 // Fixed number of extra-data prefix bytes reserved for signer vanity
-	extraSeal   = 65 // Fixed number of extra-data suffix bytes reserved for signer seal
+	extraSeal = 65 // Fixed number of extra-data suffix bytes reserved for signer seal
 )
 
 func SealHash(header *Header) (hash common.Hash) {
@@ -527,62 +565,66 @@ func SealHash(header *Header) (hash common.Hash) {
 }
 
 func EncodeSigHeader(w io.Writer, header *Header) {
-	enc := []interface{}{
-		header.ParentHash,
-		header.UncleHash,
-		header.Coinbase,
-		header.Root,
-		header.TxHash,
-		header.ReceiptHash,
-		header.Bloom,
-		header.Difficulty,
-		header.Number,
-		header.GasLimit,
-		header.GasUsed,
-		header.Time,
-		header.Extra[:len(header.Extra)-extraSeal], // this will panic if extra is too short, should check before calling encodeSigHeader
-		header.MixDigest,
-		header.Nonce,
-	}
-	if header.BaseFee != nil {
-		enc = append(enc, header.BaseFee)
-	}
-	if header.WithdrawalsHash != nil {
-		panic("unexpected withdrawal hash value in oasys")
-	}
-	if header.ExcessBlobGas != nil {
-		panic("unexpected excess blob gas value in oasys")
-	}
-	if header.BlobGasUsed != nil {
-		panic("unexpected blob gas used value in oasys")
-	}
-	if header.ParentBeaconRoot != nil {
-		panic("unexpected parent beacon root value in oasys")
+	var enc []interface{}
+	cancun := header.ParentBeaconRoot != nil && *header.ParentBeaconRoot == (common.Hash{})
+	if cancun {
+		enc = []interface{}{
+			header.ParentHash,
+			header.UncleHash,
+			header.Coinbase,
+			header.Root,
+			header.TxHash,
+			header.ReceiptHash,
+			header.Bloom,
+			header.Difficulty,
+			header.Number,
+			header.GasLimit,
+			header.GasUsed,
+			header.Time,
+			header.Extra[:len(header.Extra)-extraSeal], // this will panic if extra is too short, should check before calling encodeSigHeader
+			header.MixDigest,
+			header.Nonce,
+			header.BaseFee,
+			header.WithdrawalsHash,
+			header.BlobGasUsed,
+			header.ExcessBlobGas,
+			header.ParentBeaconRoot,
+		}
+	} else {
+		enc = []interface{}{
+			header.ParentHash,
+			header.UncleHash,
+			header.Coinbase,
+			header.Root,
+			header.TxHash,
+			header.ReceiptHash,
+			header.Bloom,
+			header.Difficulty,
+			header.Number,
+			header.GasLimit,
+			header.GasUsed,
+			header.Time,
+			header.Extra[:len(header.Extra)-extraSeal], // this will panic if extra is too short, should check before calling encodeSigHeader
+			header.MixDigest,
+			header.Nonce,
+		}
+		if header.BaseFee != nil {
+			enc = append(enc, header.BaseFee)
+		}
+		if header.WithdrawalsHash != nil {
+			panic("unexpected withdrawal hash value in oasys")
+		}
+		if header.ExcessBlobGas != nil {
+			panic("unexpected excess blob gas value in oasys")
+		}
+		if header.BlobGasUsed != nil {
+			panic("unexpected blob gas used value in oasys")
+		}
+		if header.ParentBeaconRoot != nil {
+			panic("unexpected parent beacon root value in oasys")
+		}
 	}
 	if err := rlp.Encode(w, enc); err != nil {
-		panic("can't encode: " + err.Error())
-	}
-}
-
-func EncodeSigHeaderWithoutVoteAttestation(w io.Writer, header *Header) {
-	err := rlp.Encode(w, []interface{}{
-		header.ParentHash,
-		header.UncleHash,
-		header.Coinbase,
-		header.Root,
-		header.TxHash,
-		header.ReceiptHash,
-		header.Bloom,
-		header.Difficulty,
-		header.Number,
-		header.GasLimit,
-		header.GasUsed,
-		header.Time,
-		header.Extra[:extraVanity], // this will panic if extra is too short, should check before calling encodeSigHeaderWithoutVoteAttestation
-		header.MixDigest,
-		header.Nonce,
-	})
-	if err != nil {
 		panic("can't encode: " + err.Error())
 	}
 }

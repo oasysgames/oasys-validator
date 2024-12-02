@@ -43,7 +43,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/trie/triedb/pathdb"
+	"github.com/ethereum/go-ethereum/triedb/pathdb"
 )
 
 const (
@@ -81,7 +81,7 @@ type txPool interface {
 
 	// Pending should return pending transactions.
 	// The slice should be modifiable by the caller.
-	Pending(enforceTips bool) map[common.Address][]*txpool.LazyTransaction
+	Pending(filter txpool.PendingFilter) map[common.Address][]*txpool.LazyTransaction
 
 	// SubscribeTransactions subscribes to new transaction events. The subscriber
 	// can decide whether to receive notifications only for newly seen transactions
@@ -308,7 +308,18 @@ func newHandler(config *handlerConfig) (*handler, error) {
 		}
 		return h.chain.InsertChain(blocks)
 	}
-	h.blockFetcher = fetcher.NewBlockFetcher(false, nil, h.chain.GetBlockByHash, validator, h.BroadcastBlock,
+
+	broadcastBlockWithCheck := func(block *types.Block, propagate bool) {
+		if propagate {
+			if err := core.IsDataAvailable(h.chain, block); err != nil {
+				log.Error("Propagating block with invalid sidecars", "number", block.Number(), "hash", block.Hash(), "err", err)
+				return
+			}
+		}
+		h.BroadcastBlock(block, propagate)
+	}
+
+	h.blockFetcher = fetcher.NewBlockFetcher(false, nil, h.chain.GetBlockByHash, validator, broadcastBlockWithCheck,
 		heighter, finalizeHeighter, nil, inserter, h.removePeer)
 
 	fetchTx := func(peer string, hashes []common.Hash) error {

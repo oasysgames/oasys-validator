@@ -50,6 +50,12 @@ type ChainHeaderReader interface {
 
 	// GetCanonicalHash returns the canonical hash for a given block number
 	GetCanonicalHash(number uint64) common.Hash
+
+	// GetVerifiedBlockByHash retrieves the highest verified block.
+	GetVerifiedBlockByHash(hash common.Hash) *types.Header
+
+	// ChasingHead return the best chain head of peers.
+	ChasingHead() *types.Header
 }
 
 type VotePool interface {

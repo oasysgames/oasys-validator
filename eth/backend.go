@@ -155,6 +155,24 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Override the chain config with provided settings.
+	var overrides core.ChainOverrides
+	if config.OverrideCancun != nil {
+		chainConfig.CancunTime = config.OverrideCancun
+		overrides.OverrideCancun = config.OverrideCancun
+	}
+	if config.OverrideVerkle != nil {
+		chainConfig.VerkleTime = config.OverrideVerkle
+		overrides.OverrideVerkle = config.OverrideVerkle
+	}
+
+	// startup ancient freeze
+	if err = chainDb.SetupFreezerEnv(&ethdb.FreezerEnv{
+		ChainCfg:         chainConfig,
+		BlobExtraReserve: config.BlobExtraReserve,
+	}); err != nil {
+		return nil, err
+	}
 	networkID := config.NetworkId
 	if networkID == 0 {
 		networkID = chainConfig.ChainID.Uint64()
@@ -218,14 +236,6 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 			StateScheme:         scheme,
 		}
 	)
-	// Override the chain config with provided settings.
-	var overrides core.ChainOverrides
-	if config.OverrideCancun != nil {
-		overrides.OverrideCancun = config.OverrideCancun
-	}
-	if config.OverrideVerkle != nil {
-		overrides.OverrideVerkle = config.OverrideVerkle
-	}
 	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, config.Genesis, &overrides, eth.engine, vmConfig, eth.shouldPreserve, &config.TransactionHistory)
 	if err != nil {
 		return nil, err
@@ -243,7 +253,7 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	}
 	legacyPool := legacypool.New(config.TxPool, eth.blockchain)
 
-	eth.txPool, err = txpool.New(new(big.Int).SetUint64(config.TxPool.PriceLimit), eth.blockchain, []txpool.SubPool{legacyPool, blobPool})
+	eth.txPool, err = txpool.New(config.TxPool.PriceLimit, eth.blockchain, []txpool.SubPool{legacyPool, blobPool})
 	if err != nil {
 		return nil, err
 	}
@@ -300,11 +310,7 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		}
 	}
 
-	gpoParams := config.GPO
-	if gpoParams.Default == nil {
-		gpoParams.Default = config.Miner.GasPrice
-	}
-	eth.APIBackend.gpo = gasprice.NewOracle(eth.APIBackend, gpoParams)
+	eth.APIBackend.gpo = gasprice.NewOracle(eth.APIBackend, config.GPO, config.Miner.GasPrice)
 
 	// Setup DNS discovery iterators.
 	dnsclient := dnsdisc.NewClient(dnsdisc.Config{})
@@ -370,7 +376,7 @@ func (s *Ethereum) APIs() []rpc.API {
 			Service:   NewMinerAPI(s),
 		}, {
 			Namespace: "eth",
-			Service:   downloader.NewDownloaderAPI(s.handler.downloader, s.eventMux),
+			Service:   downloader.NewDownloaderAPI(s.handler.downloader, s.blockchain, s.eventMux),
 		}, {
 			Namespace: "admin",
 			Service:   NewAdminAPI(s),
@@ -513,6 +519,13 @@ func (s *Ethereum) StartMining() error {
 				return fmt.Errorf("signer missing: %v", err)
 			}
 			oas.Authorize(eb, wallet.SignData, wallet.SignTx)
+
+			// Temporarily force miners to enable voting to prompt validators to encourage validators to register voting keys
+			if !s.config.Miner.VoteEnable {
+				err := errors.New("vote is not enabled, please enable vote")
+				techDocRef := "https://docs.oasys.games/docs/hub-validator/operate-validator/build-validator-node#enabling-fast-finality"
+				return fmt.Errorf("temporarily force validators to enable voting. Please proceed with registering your BLS key. For more details, refer to the technical documentation: %s, err: %v", techDocRef, err)
+			}
 		}
 		// If mining is started, we can disable the transaction rejection mechanism
 		// introduced to speed sync times.

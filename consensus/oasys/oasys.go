@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"math/big"
 	"sort"
@@ -15,7 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
-	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -28,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/trie"
 	lru "github.com/hashicorp/golang-lru"
+	"github.com/holiman/uint256"
 	"github.com/prysmaticlabs/prysm/v5/crypto/bls"
 	"github.com/willf/bitset"
 	"golang.org/x/crypto/sha3"
@@ -215,7 +217,7 @@ func New(chainConfig *params.ChainConfig, config *params.OasysConfig, db ethdb.D
 		signatures:  signatures,
 		proposals:   make(map[common.Address]bool),
 		ethAPI:      ethAPI,
-		txSigner:    types.MakeSigner(chainConfig, common.Big0, 0),
+		txSigner:    types.LatestSigner(chainConfig),
 	}
 }
 
@@ -308,22 +310,51 @@ func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 	if header.GasLimit > params.MaxGasLimit {
 		return fmt.Errorf("invalid gasLimit: have %v, max %v", header.GasLimit, params.MaxGasLimit)
 	}
-	// Verify the non-existence of withdrawalsHash.
-	if header.WithdrawalsHash != nil {
-		return fmt.Errorf("invalid withdrawalsHash: have %x, expected nil", header.WithdrawalsHash)
+
+	parent, err := c.getParent(chain, header, parents)
+	if err != nil {
+		return err
 	}
-	if chain.Config().IsCancun(header.Number, header.Time) {
-		return errors.New("oasys does not support cancun fork")
+
+	// Verify the block's gas usage and (if applicable) verify the base fee.
+	if !chain.Config().IsLondon(header.Number) {
+		// Verify BaseFee not present before EIP-1559 fork.
+		if header.BaseFee != nil {
+			return fmt.Errorf("invalid baseFee before fork: have %d, want <nil>", header.BaseFee)
+		}
+		if err := misc.VerifyGaslimit(parent.GasLimit, header.GasLimit); err != nil {
+			return err
+		}
+	} else if err := eip1559.VerifyEIP1559Header(chain.Config(), parent, header); err != nil {
+		// Verify the header's EIP-1559 attributes.
+		return err
 	}
-	// Verify the non-existence of cancun-specific header fields
-	switch {
-	case header.ExcessBlobGas != nil:
-		return fmt.Errorf("invalid excessBlobGas: have %d, expected nil", header.ExcessBlobGas)
-	case header.BlobGasUsed != nil:
-		return fmt.Errorf("invalid blobGasUsed: have %d, expected nil", header.BlobGasUsed)
-	case header.ParentBeaconRoot != nil:
-		return fmt.Errorf("invalid parentBeaconRoot, have %#x, expected nil", header.ParentBeaconRoot)
+	// Verify the existence / non-existence of cancun-specific header fields
+	cancun := chain.Config().IsCancun(header.Number, header.Time)
+	if !cancun {
+		switch {
+		case header.ExcessBlobGas != nil:
+			return fmt.Errorf("invalid excessBlobGas: have %d, expected nil", header.ExcessBlobGas)
+		case header.BlobGasUsed != nil:
+			return fmt.Errorf("invalid blobGasUsed: have %d, expected nil", header.BlobGasUsed)
+		case header.ParentBeaconRoot != nil:
+			return fmt.Errorf("invalid parentBeaconRoot, have %#x, expected nil", header.ParentBeaconRoot)
+		case header.WithdrawalsHash != nil:
+			return fmt.Errorf("invalid WithdrawalsHash, have %#x, expected nil", header.WithdrawalsHash)
+		}
+	} else {
+		switch {
+		case !header.EmptyWithdrawalsHash():
+			return errors.New("header has wrong WithdrawalsHash")
+		}
+		if header.ParentBeaconRoot == nil || *header.ParentBeaconRoot != (common.Hash{}) {
+			return errors.New("header is missing beaconRoot")
+		}
+		if err := eip4844.VerifyEIP4844Header(parent, header); err != nil {
+			return err
+		}
 	}
+
 	// All basic checks passed, verify cascading fields
 	return c.verifyCascadingFields(chain, header, parents, snap, env)
 }
@@ -367,18 +398,6 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 	// Verify that the gasUsed is <= gasLimit
 	if header.GasUsed > header.GasLimit {
 		return fmt.Errorf("invalid gasUsed: have %d, gasLimit %d", header.GasUsed, header.GasLimit)
-	}
-	if !chain.Config().IsLondon(header.Number) {
-		// Verify BaseFee not present before EIP-1559 fork.
-		if header.BaseFee != nil {
-			return fmt.Errorf("invalid baseFee before fork: have %d, want <nil>", header.BaseFee)
-		}
-		if err := misc.VerifyGaslimit(parent.GasLimit, header.GasLimit); err != nil {
-			return err
-		}
-	} else if err := eip1559.VerifyEIP1559Header(chain.Config(), parent, header); err != nil {
-		// Verify the header's EIP-1559 attributes.
-		return err
 	}
 
 	// Verify vote attestation for fast finality.
@@ -969,10 +988,6 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 		return errors.New("oasys does not support withdrawals")
 	}
 
-	if err := verifyTx(header, *txs); err != nil {
-		return err
-	}
-
 	hash := header.Hash()
 	number := header.Number.Uint64()
 
@@ -1049,9 +1064,6 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 	if len(withdrawals) > 0 {
 		return nil, receipts, errors.New("oasys does not support withdrawals")
 	}
-	if err := verifyTx(header, txs); err != nil {
-		return nil, nil, err
-	}
 
 	hash := header.Hash()
 	number := header.Number.Uint64()
@@ -1126,11 +1138,27 @@ func (c *Oasys) IsActiveValidatorAt(chain consensus.ChainHeaderReader, header *t
 	return false
 }
 
+// Period returns the period of corresponding epoch. In case of any error, it returns the value in the config.
+func (c *Oasys) Period(chain consensus.ChainHeaderReader, header *types.Header) uint64 {
+	number := header.Number.Uint64()
+	snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
+	if err != nil {
+		log.Warn("failed to get snapshot", "in", "Period", "parentHash", header.ParentHash, "number", number, "err", err)
+		return c.config.Period
+	}
+	env, err := c.environment(chain, header, snap, true)
+	if err != nil {
+		log.Warn("failed to get environment value", "in", "Period", "parentHash", header.ParentHash, "number", number, "err", err)
+		return c.config.Period
+	}
+	return env.EpochPeriod.Uint64()
+}
+
 // VerifyVote will verify: 1. If the vote comes from valid validators 2. If the vote's sourceNumber and sourceHash are correct
 func (c *Oasys) VerifyVote(chain consensus.ChainHeaderReader, vote *types.VoteEnvelope) error {
 	targetNumber := vote.Data.TargetNumber
 	targetHash := vote.Data.TargetHash
-	header := chain.GetHeaderByHash(targetHash)
+	header := chain.GetVerifiedBlockByHash(targetHash)
 	if header == nil {
 		log.Warn("BlockHeader at current voteBlockNumber is nil", "targetNumber", targetNumber, "targetHash", targetHash)
 		return errors.New("BlockHeader at current voteBlockNumber is nil")
@@ -1281,11 +1309,34 @@ func (c *Oasys) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, p
 	return scheduler.difficulty(number, c.signer, c.chainConfig.IsForkedOasysExtendDifficulty(parent.Number))
 }
 
+func encodeSigHeaderWithoutVoteAttestation(w io.Writer, header *types.Header) {
+	err := rlp.Encode(w, []interface{}{
+		header.ParentHash,
+		header.UncleHash,
+		header.Coinbase,
+		header.Root,
+		header.TxHash,
+		header.ReceiptHash,
+		header.Bloom,
+		header.Difficulty,
+		header.Number,
+		header.GasLimit,
+		header.GasUsed,
+		header.Time,
+		header.Extra[:extraVanity], // this will panic if extra is too short, should check before calling encodeSigHeaderWithoutVoteAttestation
+		header.MixDigest,
+		header.Nonce,
+	})
+	if err != nil {
+		panic("can't encode: " + err.Error())
+	}
+}
+
 // SealHash returns the hash of a block without vote attestation prior to it being sealed.
 // So it's not the real hash of a block, just used as unique id to distinguish task
 func (c *Oasys) SealHash(header *types.Header) (hash common.Hash) {
 	hasher := sha3.NewLegacyKeccak256()
-	types.EncodeSigHeaderWithoutVoteAttestation(hasher, header)
+	encodeSigHeaderWithoutVoteAttestation(hasher, header)
 	hasher.Sum(hash[:0])
 	return hash
 }
@@ -1316,7 +1367,7 @@ func (c *Oasys) GetJustifiedNumberAndHash(chain consensus.ChainHeaderReader, hea
 	if !chain.Config().IsFastFinalityEnabled(head.Number) {
 		return 0, chain.GetHeaderByNumber(0).Hash(), nil
 	}
-	snap, err := c.snapshot(chain, head.Number.Uint64(), head.Hash(), nil)
+	snap, err := c.snapshot(chain, head.Number.Uint64(), head.Hash(), headers)
 	if err != nil {
 		return 0, common.Hash{}, fmt.Errorf("unexpected error when getting snapshot in GetJustifiedNumberAndHash, blockNumber: %d, blockHash: %s, error: %v", head.Number.Uint64(), head.Hash(), err)
 	}
@@ -1494,7 +1545,7 @@ func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash,
 		return nil
 	}
 
-	state.AddBalance(stakeManager.address, rewards)
+	state.AddBalance(stakeManager.address, uint256.MustFromBig(rewards))
 	log.Info("Balance added to stake manager", "hash", hash, "amount", rewards.String())
 	return nil
 }
@@ -1568,14 +1619,4 @@ func (c *Oasys) scheduler(chain consensus.ChainHeaderReader, header *types.Heade
 		newWeightedChooser(validators, stakes, seed))
 	schedulerCache.Add(seedHash, created)
 	return created, nil
-}
-
-// Oasys transaction verification
-func verifyTx(header *types.Header, txs []*types.Transaction) error {
-	for _, tx := range txs {
-		if err := core.VerifyTx(tx); err != nil {
-			return err
-		}
-	}
-	return nil
 }

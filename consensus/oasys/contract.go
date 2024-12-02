@@ -28,6 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/holiman/uint256"
 )
 
 const (
@@ -252,7 +253,7 @@ func (c *Oasys) IsSystemTransaction(tx *types.Transaction, header *types.Header)
 	}
 
 	if sender, err := types.Sender(c.txSigner, tx); err != nil {
-		return false, errors.New("unauthorized transaction")
+		return false, fmt.Errorf("unauthorized transaction: %w", err)
 	} else if sender != header.Coinbase {
 		// not created by validator
 		return false, nil
@@ -796,7 +797,7 @@ func applyMessage(
 		*msg.To(),
 		msg.Data(),
 		msg.Gas(),
-		msg.Value(),
+		uint256.MustFromBig(msg.Value()),
 	)
 	if err != nil {
 		log.Error("failed apply message", "msg", string(ret), "err", err)

@@ -31,10 +31,12 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/accounts/scwallet"
 	"github.com/ethereum/go-ethereum/accounts/usbwallet"
+	"github.com/ethereum/go-ethereum/beacon/fakebeacon"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/eth/catalyst"
+	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/internal/flags"
@@ -91,10 +93,11 @@ type ethstatsConfig struct {
 }
 
 type gethConfig struct {
-	Eth      ethconfig.Config
-	Node     node.Config
-	Ethstats ethstatsConfig
-	Metrics  metrics.Config
+	Eth        ethconfig.Config
+	Node       node.Config
+	Ethstats   ethstatsConfig
+	Metrics    metrics.Config
+	FakeBeacon fakebeacon.Config
 }
 
 func loadConfig(file string, cfg *gethConfig) error {
@@ -177,6 +180,16 @@ func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend) {
 		v := ctx.Uint64(utils.OverrideVerkle.Name)
 		cfg.Eth.OverrideVerkle = &v
 	}
+	if ctx.IsSet(utils.OverrideFullImmutabilityThreshold.Name) {
+		params.FullImmutabilityThreshold = ctx.Uint64(utils.OverrideFullImmutabilityThreshold.Name)
+		downloader.FullMaxForkAncestry = ctx.Uint64(utils.OverrideFullImmutabilityThreshold.Name)
+	}
+	if ctx.IsSet(utils.OverrideMinBlocksForBlobRequests.Name) {
+		params.MinBlocksForBlobRequests = ctx.Uint64(utils.OverrideMinBlocksForBlobRequests.Name)
+	}
+	if ctx.IsSet(utils.OverrideDefaultExtraReserveForBlobRequests.Name) {
+		params.DefaultExtraReserveForBlobRequests = ctx.Uint64(utils.OverrideDefaultExtraReserveForBlobRequests.Name)
+	}
 	backend, eth := utils.RegisterEthService(stack, &cfg.Eth)
 
 	// Create gauge with geth system and build information
@@ -204,6 +217,17 @@ func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend) {
 	if cfg.Ethstats.URL != "" {
 		utils.RegisterEthStatsService(stack, backend, cfg.Ethstats.URL)
 	}
+
+	if ctx.IsSet(utils.FakeBeaconAddrFlag.Name) {
+		cfg.FakeBeacon.Addr = ctx.String(utils.FakeBeaconAddrFlag.Name)
+	}
+	if ctx.IsSet(utils.FakeBeaconPortFlag.Name) {
+		cfg.FakeBeacon.Port = ctx.Int(utils.FakeBeaconPortFlag.Name)
+	}
+	if cfg.FakeBeacon.Enable || ctx.IsSet(utils.FakeBeaconEnabledFlag.Name) {
+		go fakebeacon.NewService(&cfg.FakeBeacon, backend).Run()
+	}
+
 	// Configure full-sync tester service if requested
 	if ctx.IsSet(utils.SyncTargetFlag.Name) {
 		hex := hexutil.MustDecode(ctx.String(utils.SyncTargetFlag.Name))
