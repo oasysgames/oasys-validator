@@ -14,9 +14,6 @@ const (
 	// Address of initial wallet in genesis.
 	mainnetGenesisWalletAddress = "0xdF3548cD5e355202AE92e766c7361eA4F6687A61"
 	testnetGenesisWalletAddress = "0xbf9Ec8a822519C00128f0c7C13f13cafF0501Aea"
-
-	// Address of contracts in `oasys-governance-contract`.
-	EVMAccessControl = "0x520000000000000000000000000000000000003F"
 )
 
 var (

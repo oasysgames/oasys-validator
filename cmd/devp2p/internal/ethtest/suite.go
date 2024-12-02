@@ -64,23 +64,23 @@ func NewSuite(dest *enode.Node, chainDir, engineURL, jwt string) (*Suite, error)
 func (s *Suite) EthTests() []utesting.Test {
 	return []utesting.Test{
 		// status
-		{Name: "Status", Fn: s.TestStatus},
+		{Name: "TestStatus", Fn: s.TestStatus},
 		// get block headers
-		{Name: "GetBlockHeaders", Fn: s.TestGetBlockHeaders},
-		{Name: "SimultaneousRequests", Fn: s.TestSimultaneousRequests},
-		{Name: "SameRequestID", Fn: s.TestSameRequestID},
-		{Name: "ZeroRequestID", Fn: s.TestZeroRequestID},
+		{Name: "TestGetBlockHeaders", Fn: s.TestGetBlockHeaders},
+		{Name: "TestSimultaneousRequests", Fn: s.TestSimultaneousRequests},
+		{Name: "TestSameRequestID", Fn: s.TestSameRequestID},
+		{Name: "TestZeroRequestID", Fn: s.TestZeroRequestID},
 		// get block bodies
-		{Name: "GetBlockBodies", Fn: s.TestGetBlockBodies},
+		{Name: "TestGetBlockBodies", Fn: s.TestGetBlockBodies},
 		// // malicious handshakes + status
-		{Name: "MaliciousHandshake", Fn: s.TestMaliciousHandshake},
-		{Name: "MaliciousStatus", Fn: s.TestMaliciousStatus},
+		{Name: "TestMaliciousHandshake", Fn: s.TestMaliciousHandshake},
+		{Name: "TestMaliciousStatus", Fn: s.TestMaliciousStatus},
 		// test transactions
-		{Name: "LargeTxRequest", Fn: s.TestLargeTxRequest, Slow: true},
-		{Name: "Transaction", Fn: s.TestTransaction},
-		{Name: "InvalidTxs", Fn: s.TestInvalidTxs},
-		{Name: "NewPooledTxs", Fn: s.TestNewPooledTxs},
-		{Name: "BlobViolations", Fn: s.TestBlobViolations},
+		{Name: "TestTransaction", Fn: s.TestTransaction},
+		{Name: "TestInvalidTxs", Fn: s.TestInvalidTxs},
+		{Name: "TestLargeTxRequest", Fn: s.TestLargeTxRequest},
+		{Name: "TestNewPooledTxs", Fn: s.TestNewPooledTxs},
+		{Name: "TestBlobViolations", Fn: s.TestBlobViolations},
 	}
 }
 
@@ -94,9 +94,9 @@ func (s *Suite) SnapTests() []utesting.Test {
 	}
 }
 
+// TestStatus attempts to connect to the given node and exchange a status
+// message with it on the eth protocol.
 func (s *Suite) TestStatus(t *utesting.T) {
-	t.Log(`This test is just a sanity check. It performs an eth protocol handshake.`)
-
 	conn, err := s.dial()
 	if err != nil {
 		t.Fatalf("dial failed: %v", err)
@@ -112,9 +112,9 @@ func headersMatch(expected []*types.Header, headers []*types.Header) bool {
 	return reflect.DeepEqual(expected, headers)
 }
 
+// TestGetBlockHeaders tests whether the given node can respond to an eth
+// `GetBlockHeaders` request and that the response is accurate.
 func (s *Suite) TestGetBlockHeaders(t *utesting.T) {
-	t.Log(`This test requests block headers from the node.`)
-
 	conn, err := s.dial()
 	if err != nil {
 		t.Fatalf("dial failed: %v", err)
@@ -154,10 +154,10 @@ func (s *Suite) TestGetBlockHeaders(t *utesting.T) {
 	}
 }
 
+// TestSimultaneousRequests sends two simultaneous `GetBlockHeader` requests
+// from the same connection with different request IDs and checks to make sure
+// the node responds with the correct headers per request.
 func (s *Suite) TestSimultaneousRequests(t *utesting.T) {
-	t.Log(`This test requests blocks headers from the node, performing two requests
-concurrently, with different request IDs.`)
-
 	conn, err := s.dial()
 	if err != nil {
 		t.Fatalf("dial failed: %v", err)
@@ -228,10 +228,9 @@ concurrently, with different request IDs.`)
 	}
 }
 
+// TestSameRequestID sends two requests with the same request ID to a single
+// node.
 func (s *Suite) TestSameRequestID(t *utesting.T) {
-	t.Log(`This test requests block headers, performing two concurrent requests with the
-same request ID. The node should handle the request by responding to both requests.`)
-
 	conn, err := s.dial()
 	if err != nil {
 		t.Fatalf("dial failed: %v", err)
@@ -299,10 +298,9 @@ same request ID. The node should handle the request by responding to both reques
 	}
 }
 
+// TestZeroRequestID checks that a message with a request ID of zero is still handled
+// by the node.
 func (s *Suite) TestZeroRequestID(t *utesting.T) {
-	t.Log(`This test sends a GetBlockHeaders message with a request-id of zero,
-and expects a response.`)
-
 	conn, err := s.dial()
 	if err != nil {
 		t.Fatalf("dial failed: %v", err)
@@ -335,9 +333,9 @@ and expects a response.`)
 	}
 }
 
+// TestGetBlockBodies tests whether the given node can respond to a
+// `GetBlockBodies` request and that the response is accurate.
 func (s *Suite) TestGetBlockBodies(t *utesting.T) {
-	t.Log(`This test sends GetBlockBodies requests to the node for known blocks in the test chain.`)
-
 	conn, err := s.dial()
 	if err != nil {
 		t.Fatalf("dial failed: %v", err)
@@ -378,12 +376,12 @@ func randBuf(size int) []byte {
 	return buf
 }
 
+// TestMaliciousHandshake tries to send malicious data during the handshake.
 func (s *Suite) TestMaliciousHandshake(t *utesting.T) {
-	t.Log(`This test tries to send malicious data during the devp2p handshake, in various ways.`)
+	key, _ := crypto.GenerateKey()
 
 	// Write hello to client.
 	var (
-		key, _  = crypto.GenerateKey()
 		pub0    = crypto.FromECDSAPub(&key.PublicKey)[1:]
 		version = eth.ProtocolVersions[0]
 	)
@@ -453,9 +451,8 @@ func (s *Suite) TestMaliciousHandshake(t *utesting.T) {
 	}
 }
 
+// TestMaliciousStatus sends a status package with a large total difficulty.
 func (s *Suite) TestMaliciousStatus(t *utesting.T) {
-	t.Log(`This test sends a malicious eth Status message to the node and expects a disconnect.`)
-
 	conn, err := s.dial()
 	if err != nil {
 		t.Fatalf("dial failed: %v", err)
@@ -489,10 +486,9 @@ func (s *Suite) TestMaliciousStatus(t *utesting.T) {
 	}
 }
 
+// TestTransaction sends a valid transaction to the node and checks if the
+// transaction gets propagated.
 func (s *Suite) TestTransaction(t *utesting.T) {
-	t.Log(`This test sends a valid transaction to the node and checks if the
-transaction gets propagated.`)
-
 	// Nudge client out of syncing mode to accept pending txs.
 	if err := s.engine.sendForkchoiceUpdated(); err != nil {
 		t.Fatalf("failed to send next block: %v", err)
@@ -511,16 +507,15 @@ transaction gets propagated.`)
 	if err != nil {
 		t.Fatalf("failed to sign tx: %v", err)
 	}
-	if err := s.sendTxs(t, []*types.Transaction{tx}); err != nil {
+	if err := s.sendTxs([]*types.Transaction{tx}); err != nil {
 		t.Fatal(err)
 	}
 	s.chain.IncNonce(from, 1)
 }
 
+// TestInvalidTxs sends several invalid transactions and tests whether
+// the node will propagate them.
 func (s *Suite) TestInvalidTxs(t *utesting.T) {
-	t.Log(`This test sends several kinds of invalid transactions and checks that the node
-does not propagate them.`)
-
 	// Nudge client out of syncing mode to accept pending txs.
 	if err := s.engine.sendForkchoiceUpdated(); err != nil {
 		t.Fatalf("failed to send next block: %v", err)
@@ -539,7 +534,7 @@ does not propagate them.`)
 	if err != nil {
 		t.Fatalf("failed to sign tx: %v", err)
 	}
-	if err := s.sendTxs(t, []*types.Transaction{tx}); err != nil {
+	if err := s.sendTxs([]*types.Transaction{tx}); err != nil {
 		t.Fatalf("failed to send txs: %v", err)
 	}
 	s.chain.IncNonce(from, 1)
@@ -595,15 +590,14 @@ does not propagate them.`)
 		}
 		txs = append(txs, tx)
 	}
-	if err := s.sendInvalidTxs(t, txs); err != nil {
+	if err := s.sendInvalidTxs(txs); err != nil {
 		t.Fatalf("failed to send invalid txs: %v", err)
 	}
 }
 
+// TestLargeTxRequest tests whether a node can fulfill a large GetPooledTransactions
+// request.
 func (s *Suite) TestLargeTxRequest(t *utesting.T) {
-	t.Log(`This test first send ~2000 transactions to the node, then requests them
-on another peer connection using GetPooledTransactions.`)
-
 	// Nudge client out of syncing mode to accept pending txs.
 	if err := s.engine.sendForkchoiceUpdated(); err != nil {
 		t.Fatalf("failed to send next block: %v", err)
@@ -636,7 +630,7 @@ on another peer connection using GetPooledTransactions.`)
 	s.chain.IncNonce(from, uint64(count))
 
 	// Send txs.
-	if err := s.sendTxs(t, txs); err != nil {
+	if err := s.sendTxs(txs); err != nil {
 		t.Fatalf("failed to send txs: %v", err)
 	}
 
@@ -673,15 +667,13 @@ on another peer connection using GetPooledTransactions.`)
 	}
 }
 
+// TestNewPooledTxs tests whether a node will do a GetPooledTransactions request
+// upon receiving a NewPooledTransactionHashes announcement.
 func (s *Suite) TestNewPooledTxs(t *utesting.T) {
-	t.Log(`This test announces transaction hashes to the node and expects it to fetch
-the transactions using a GetPooledTransactions request.`)
-
 	// Nudge client out of syncing mode to accept pending txs.
 	if err := s.engine.sendForkchoiceUpdated(); err != nil {
 		t.Fatalf("failed to send next block: %v", err)
 	}
-
 	var (
 		count       = 50
 		from, nonce = s.chain.GetSender(1)
@@ -718,7 +710,7 @@ the transactions using a GetPooledTransactions request.`)
 	}
 
 	// Send announcement.
-	ann := eth.NewPooledTransactionHashesPacket{Types: txTypes, Sizes: sizes, Hashes: hashes}
+	ann := eth.NewPooledTransactionHashesPacket68{Types: txTypes, Sizes: sizes, Hashes: hashes}
 	err = conn.Write(ethProto, eth.NewPooledTransactionHashesMsg, ann)
 	if err != nil {
 		t.Fatalf("failed to write to connection: %v", err)
@@ -736,7 +728,7 @@ the transactions using a GetPooledTransactions request.`)
 				t.Fatalf("unexpected number of txs requested: wanted %d, got %d", len(hashes), len(msg.GetPooledTransactionsRequest))
 			}
 			return
-		case *eth.NewPooledTransactionHashesPacket:
+		case *eth.NewPooledTransactionHashesPacket68:
 			continue
 		case *eth.TransactionsPacket:
 			continue
@@ -770,7 +762,7 @@ func (s *Suite) makeBlobTxs(count, blobs int, discriminator byte) (txs types.Tra
 	from, nonce := s.chain.GetSender(5)
 	for i := 0; i < count; i++ {
 		// Make blob data, max of 2 blobs per tx.
-		blobdata := make([]byte, blobs%3)
+		blobdata := make([]byte, blobs%2)
 		for i := range blobdata {
 			blobdata[i] = discriminator
 			blobs -= 1
@@ -795,23 +787,21 @@ func (s *Suite) makeBlobTxs(count, blobs int, discriminator byte) (txs types.Tra
 }
 
 func (s *Suite) TestBlobViolations(t *utesting.T) {
-	t.Log(`This test sends some invalid blob tx announcements and expects the node to disconnect.`)
-
 	if err := s.engine.sendForkchoiceUpdated(); err != nil {
 		t.Fatalf("send fcu failed: %v", err)
 	}
-	// Create blob txs for each tests with unique tx hashes.
+	// Create blob txs for each tests with unqiue tx hashes.
 	var (
 		t1 = s.makeBlobTxs(2, 3, 0x1)
 		t2 = s.makeBlobTxs(2, 3, 0x2)
 	)
 	for _, test := range []struct {
-		ann  eth.NewPooledTransactionHashesPacket
+		ann  eth.NewPooledTransactionHashesPacket68
 		resp eth.PooledTransactionsResponse
 	}{
 		// Invalid tx size.
 		{
-			ann: eth.NewPooledTransactionHashesPacket{
+			ann: eth.NewPooledTransactionHashesPacket68{
 				Types:  []byte{types.BlobTxType, types.BlobTxType},
 				Sizes:  []uint32{uint32(t1[0].Size()), uint32(t1[1].Size() + 10)},
 				Hashes: []common.Hash{t1[0].Hash(), t1[1].Hash()},
@@ -820,7 +810,7 @@ func (s *Suite) TestBlobViolations(t *utesting.T) {
 		},
 		// Wrong tx type.
 		{
-			ann: eth.NewPooledTransactionHashesPacket{
+			ann: eth.NewPooledTransactionHashesPacket68{
 				Types:  []byte{types.DynamicFeeTxType, types.BlobTxType},
 				Sizes:  []uint32{uint32(t2[0].Size()), uint32(t2[1].Size())},
 				Hashes: []common.Hash{t2[0].Hash(), t2[1].Hash()},

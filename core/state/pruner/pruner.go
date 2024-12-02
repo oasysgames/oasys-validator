@@ -35,7 +35,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
-	"github.com/ethereum/go-ethereum/triedb"
 )
 
 const (
@@ -87,7 +86,7 @@ func NewPruner(db ethdb.Database, config Config) (*Pruner, error) {
 		return nil, errors.New("failed to load head block")
 	}
 	// Offline pruning is only supported in legacy hash based scheme.
-	triedb := triedb.NewDatabase(db, triedb.HashDefaults)
+	triedb := trie.NewDatabase(db, trie.HashDefaults)
 
 	snapconfig := snapshot.Config{
 		CacheSize:  256,
@@ -122,7 +121,7 @@ func prune(snaptree *snapshot.Tree, root common.Hash, maindb ethdb.Database, sta
 	// the trie nodes(and codes) belong to the active state will be filtered
 	// out. A very small part of stale tries will also be filtered because of
 	// the false-positive rate of bloom filter. But the assumption is held here
-	// that the false-positive is low enough(~0.05%). The probability of the
+	// that the false-positive is low enough(~0.05%). The probablity of the
 	// dangling node is the state root is super low. So the dangling nodes in
 	// theory will never ever be visited again.
 	var (
@@ -367,7 +366,7 @@ func RecoverPruning(datadir string, db ethdb.Database) error {
 		AsyncBuild: false,
 	}
 	// Offline pruning is only supported in legacy hash based scheme.
-	triedb := triedb.NewDatabase(db, triedb.HashDefaults)
+	triedb := trie.NewDatabase(db, trie.HashDefaults)
 	snaptree, err := snapshot.New(snapconfig, db, triedb, headBlock.Root())
 	if err != nil {
 		return err // The relevant snapshot(s) might not exist
@@ -410,7 +409,7 @@ func extractGenesis(db ethdb.Database, stateBloom *stateBloom) error {
 	if genesis == nil {
 		return errors.New("missing genesis block")
 	}
-	t, err := trie.NewStateTrie(trie.StateTrieID(genesis.Root()), triedb.NewDatabase(db, triedb.HashDefaults))
+	t, err := trie.NewStateTrie(trie.StateTrieID(genesis.Root()), trie.NewDatabase(db, trie.HashDefaults))
 	if err != nil {
 		return err
 	}
@@ -434,7 +433,7 @@ func extractGenesis(db ethdb.Database, stateBloom *stateBloom) error {
 			}
 			if acc.Root != types.EmptyRootHash {
 				id := trie.StorageTrieID(genesis.Root(), common.BytesToHash(accIter.LeafKey()), acc.Root)
-				storageTrie, err := trie.NewStateTrie(id, triedb.NewDatabase(db, triedb.HashDefaults))
+				storageTrie, err := trie.NewStateTrie(id, trie.NewDatabase(db, trie.HashDefaults))
 				if err != nil {
 					return err
 				}

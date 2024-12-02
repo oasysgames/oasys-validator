@@ -17,7 +17,6 @@
 package core
 
 import (
-	"errors"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -30,7 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/triedb"
+	"github.com/ethereum/go-ethereum/trie"
 )
 
 // CurrentHeader retrieves the current head header of the canonical chain. The
@@ -88,15 +87,6 @@ func (bc *BlockChain) GetHeader(hash common.Hash, number uint64) *types.Header {
 // GetHeaderByHash retrieves a block header from the database by hash, caching it if
 // found.
 func (bc *BlockChain) GetHeaderByHash(hash common.Hash) *types.Header {
-	return bc.hc.GetHeaderByHash(hash)
-}
-
-// GetVerifiedBlockByHash retrieves the header of a verified block, it may be only in memory.
-func (bc *BlockChain) GetVerifiedBlockByHash(hash common.Hash) *types.Header {
-	highestVerifiedBlock := bc.highestVerifiedBlock.Load()
-	if highestVerifiedBlock != nil && highestVerifiedBlock.Hash() == hash {
-		return highestVerifiedBlock
-	}
 	return bc.hc.GetHeaderByHash(hash)
 }
 
@@ -249,23 +239,6 @@ func (bc *BlockChain) GetReceiptsByHash(hash common.Hash) types.Receipts {
 	return receipts
 }
 
-// GetSidecarsByHash retrieves the sidecars for all transactions in a given block.
-func (bc *BlockChain) GetSidecarsByHash(hash common.Hash) types.BlobSidecars {
-	if sidecars, ok := bc.sidecarsCache.Get(hash); ok {
-		return sidecars
-	}
-	number := rawdb.ReadHeaderNumber(bc.db, hash)
-	if number == nil {
-		return nil
-	}
-	sidecars := rawdb.ReadBlobSidecars(bc.db, hash, *number)
-	if sidecars == nil {
-		return nil
-	}
-	bc.sidecarsCache.Add(hash, sidecars)
-	return sidecars
-}
-
 // GetUnclesInChain retrieves all the uncles from a given block backwards until
 // a specific distance is reached.
 func (bc *BlockChain) GetUnclesInChain(block *types.Block, length int) []*types.Header {
@@ -291,46 +264,20 @@ func (bc *BlockChain) GetAncestor(hash common.Hash, number, ancestor uint64, max
 	return bc.hc.GetAncestor(hash, number, ancestor, maxNonCanonical)
 }
 
-// GetTransactionLookup retrieves the lookup along with the transaction
-// itself associate with the given transaction hash.
-//
-// An error will be returned if the transaction is not found, and background
-// indexing for transactions is still in progress. The transaction might be
-// reachable shortly once it's indexed.
-//
-// A null will be returned in the transaction is not found and background
-// transaction indexing is already finished. The transaction is not existent
-// from the node's perspective.
-func (bc *BlockChain) GetTransactionLookup(hash common.Hash) (*rawdb.LegacyTxLookupEntry, *types.Transaction, error) {
+// GetTransactionLookup retrieves the lookup associate with the given transaction
+// hash from the cache or database.
+func (bc *BlockChain) GetTransactionLookup(hash common.Hash) *rawdb.LegacyTxLookupEntry {
 	// Short circuit if the txlookup already in the cache, retrieve otherwise
-	if item, exist := bc.txLookupCache.Get(hash); exist {
-		return item.lookup, item.transaction, nil
+	if lookup, exist := bc.txLookupCache.Get(hash); exist {
+		return lookup
 	}
 	tx, blockHash, blockNumber, txIndex := rawdb.ReadTransaction(bc.db, hash)
 	if tx == nil {
-		progress, err := bc.TxIndexProgress()
-		if err != nil {
-			return nil, nil, nil
-		}
-		// The transaction indexing is not finished yet, returning an
-		// error to explicitly indicate it.
-		if !progress.Done() {
-			return nil, nil, errors.New("transaction indexing still in progress")
-		}
-		// The transaction is already indexed, the transaction is either
-		// not existent or not in the range of index, returning null.
-		return nil, nil, nil
+		return nil
 	}
-	lookup := &rawdb.LegacyTxLookupEntry{
-		BlockHash:  blockHash,
-		BlockIndex: blockNumber,
-		Index:      txIndex,
-	}
-	bc.txLookupCache.Add(hash, txLookup{
-		lookup:      lookup,
-		transaction: tx,
-	})
-	return lookup, tx, nil
+	lookup := &rawdb.LegacyTxLookupEntry{BlockHash: blockHash, BlockIndex: blockNumber, Index: txIndex}
+	bc.txLookupCache.Add(hash, lookup)
+	return lookup
 }
 
 // GetTd retrieves a block's total difficulty in the canonical chain from the
@@ -433,22 +380,21 @@ func (bc *BlockChain) GetVMConfig() *vm.Config {
 	return &bc.vmConfig
 }
 
-// TxIndexProgress returns the transaction indexing progress.
-func (bc *BlockChain) TxIndexProgress() (TxIndexProgress, error) {
-	if bc.txIndexer == nil {
-		return TxIndexProgress{}, errors.New("tx indexer is not enabled")
-	}
-	return bc.txIndexer.txIndexProgress()
+// SetTxLookupLimit is responsible for updating the txlookup limit to the
+// original one stored in db if the new mismatches with the old one.
+func (bc *BlockChain) SetTxLookupLimit(limit uint64) {
+	bc.txLookupLimit = limit
+}
+
+// TxLookupLimit retrieves the txlookup limit used by blockchain to prune
+// stale transaction indices.
+func (bc *BlockChain) TxLookupLimit() uint64 {
+	return bc.txLookupLimit
 }
 
 // TrieDB retrieves the low level trie database used for data storage.
-func (bc *BlockChain) TrieDB() *triedb.Database {
+func (bc *BlockChain) TrieDB() *trie.Database {
 	return bc.triedb
-}
-
-// HeaderChain returns the underlying header chain.
-func (bc *BlockChain) HeaderChain() *HeaderChain {
-	return bc.hc
 }
 
 // SubscribeRemovedLogsEvent registers a subscription of RemovedLogsEvent.
@@ -464,11 +410,6 @@ func (bc *BlockChain) SubscribeChainEvent(ch chan<- ChainEvent) event.Subscripti
 // SubscribeChainHeadEvent registers a subscription of ChainHeadEvent.
 func (bc *BlockChain) SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) event.Subscription {
 	return bc.scope.Track(bc.chainHeadFeed.Subscribe(ch))
-}
-
-// SubscribeHighestVerifiedBlockEvent registers a subscription of HighestVerifiedBlockEvent.
-func (bc *BlockChain) SubscribeHighestVerifiedHeaderEvent(ch chan<- HighestVerifiedBlockEvent) event.Subscription {
-	return bc.scope.Track(bc.highestVerifiedBlockFeed.Subscribe(ch))
 }
 
 // SubscribeChainSideEvent registers a subscription of ChainSideEvent.

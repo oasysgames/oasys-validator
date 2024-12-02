@@ -65,12 +65,6 @@ var (
 )
 
 func createEmptyBlobTx(key *ecdsa.PrivateKey, withSidecar bool) *Transaction {
-	blobtx := createEmptyBlobTxInner(withSidecar)
-	signer := NewCancunSigner(blobtx.ChainID.ToBig())
-	return MustSignNewTx(key, signer, blobtx)
-}
-
-func createEmptyBlobTxInner(withSidecar bool) *BlobTx {
 	sidecar := &BlobTxSidecar{
 		Blobs:       []kzg4844.Blob{emptyBlob},
 		Commitments: []kzg4844.Commitment{emptyBlobCommit},
@@ -91,5 +85,6 @@ func createEmptyBlobTxInner(withSidecar bool) *BlobTx {
 	if withSidecar {
 		blobtx.Sidecar = sidecar
 	}
-	return blobtx
+	signer := NewCancunSigner(blobtx.ChainID.ToBig())
+	return MustSignNewTx(key, signer, blobtx)
 }

@@ -28,10 +28,6 @@ var (
 		name:    "PermissionedContractFactory",
 		address: "0x520000000000000000000000000000000000002F",
 	}
-	evmAccessControl = &contract{
-		name:    "EVMAccessControl",
-		address: "0x520000000000000000000000000000000000003F",
-	}
 
 	// ERC20 Tokens
 	wrappedOAS = &contract{

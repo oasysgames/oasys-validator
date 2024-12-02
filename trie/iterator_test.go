@@ -30,7 +30,7 @@ import (
 )
 
 func TestEmptyIterator(t *testing.T) {
-	trie := NewEmpty(newTestDatabase(rawdb.NewMemoryDatabase(), rawdb.HashScheme))
+	trie := NewEmpty(NewDatabase(rawdb.NewMemoryDatabase(), nil))
 	iter := trie.MustNodeIterator(nil)
 
 	seen := make(map[string]struct{})
@@ -43,7 +43,7 @@ func TestEmptyIterator(t *testing.T) {
 }
 
 func TestIterator(t *testing.T) {
-	db := newTestDatabase(rawdb.NewMemoryDatabase(), rawdb.HashScheme)
+	db := NewDatabase(rawdb.NewMemoryDatabase(), nil)
 	trie := NewEmpty(db)
 	vals := []struct{ k, v string }{
 		{"do", "verb"},
@@ -60,7 +60,7 @@ func TestIterator(t *testing.T) {
 		trie.MustUpdate([]byte(val.k), []byte(val.v))
 	}
 	root, nodes, _ := trie.Commit(false)
-	db.Update(root, types.EmptyRootHash, trienode.NewWithNodeSet(nodes))
+	db.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil)
 
 	trie, _ = New(TrieID(root), db)
 	found := make(map[string]string)
@@ -86,7 +86,7 @@ func (k *kv) cmp(other *kv) int {
 }
 
 func TestIteratorLargeData(t *testing.T) {
-	trie := NewEmpty(newTestDatabase(rawdb.NewMemoryDatabase(), rawdb.HashScheme))
+	trie := NewEmpty(NewDatabase(rawdb.NewMemoryDatabase(), nil))
 	vals := make(map[string]*kv)
 
 	for i := byte(0); i < 255; i++ {
@@ -205,7 +205,7 @@ var testdata2 = []kvs{
 }
 
 func TestIteratorSeek(t *testing.T) {
-	trie := NewEmpty(newTestDatabase(rawdb.NewMemoryDatabase(), rawdb.HashScheme))
+	trie := NewEmpty(NewDatabase(rawdb.NewMemoryDatabase(), nil))
 	for _, val := range testdata1 {
 		trie.MustUpdate([]byte(val.k), []byte(val.v))
 	}
@@ -246,22 +246,22 @@ func checkIteratorOrder(want []kvs, it *Iterator) error {
 }
 
 func TestDifferenceIterator(t *testing.T) {
-	dba := newTestDatabase(rawdb.NewMemoryDatabase(), rawdb.HashScheme)
+	dba := NewDatabase(rawdb.NewMemoryDatabase(), nil)
 	triea := NewEmpty(dba)
 	for _, val := range testdata1 {
 		triea.MustUpdate([]byte(val.k), []byte(val.v))
 	}
 	rootA, nodesA, _ := triea.Commit(false)
-	dba.Update(rootA, types.EmptyRootHash, trienode.NewWithNodeSet(nodesA))
+	dba.Update(rootA, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodesA), nil)
 	triea, _ = New(TrieID(rootA), dba)
 
-	dbb := newTestDatabase(rawdb.NewMemoryDatabase(), rawdb.HashScheme)
+	dbb := NewDatabase(rawdb.NewMemoryDatabase(), nil)
 	trieb := NewEmpty(dbb)
 	for _, val := range testdata2 {
 		trieb.MustUpdate([]byte(val.k), []byte(val.v))
 	}
 	rootB, nodesB, _ := trieb.Commit(false)
-	dbb.Update(rootB, types.EmptyRootHash, trienode.NewWithNodeSet(nodesB))
+	dbb.Update(rootB, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodesB), nil)
 	trieb, _ = New(TrieID(rootB), dbb)
 
 	found := make(map[string]string)
@@ -288,22 +288,22 @@ func TestDifferenceIterator(t *testing.T) {
 }
 
 func TestUnionIterator(t *testing.T) {
-	dba := newTestDatabase(rawdb.NewMemoryDatabase(), rawdb.HashScheme)
+	dba := NewDatabase(rawdb.NewMemoryDatabase(), nil)
 	triea := NewEmpty(dba)
 	for _, val := range testdata1 {
 		triea.MustUpdate([]byte(val.k), []byte(val.v))
 	}
 	rootA, nodesA, _ := triea.Commit(false)
-	dba.Update(rootA, types.EmptyRootHash, trienode.NewWithNodeSet(nodesA))
+	dba.Update(rootA, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodesA), nil)
 	triea, _ = New(TrieID(rootA), dba)
 
-	dbb := newTestDatabase(rawdb.NewMemoryDatabase(), rawdb.HashScheme)
+	dbb := NewDatabase(rawdb.NewMemoryDatabase(), nil)
 	trieb := NewEmpty(dbb)
 	for _, val := range testdata2 {
 		trieb.MustUpdate([]byte(val.k), []byte(val.v))
 	}
 	rootB, nodesB, _ := trieb.Commit(false)
-	dbb.Update(rootB, types.EmptyRootHash, trienode.NewWithNodeSet(nodesB))
+	dbb.Update(rootB, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodesB), nil)
 	trieb, _ = New(TrieID(rootB), dbb)
 
 	di, _ := NewUnionIterator([]NodeIterator{triea.MustNodeIterator(nil), trieb.MustNodeIterator(nil)})
@@ -341,8 +341,7 @@ func TestUnionIterator(t *testing.T) {
 }
 
 func TestIteratorNoDups(t *testing.T) {
-	db := newTestDatabase(rawdb.NewMemoryDatabase(), rawdb.HashScheme)
-	tr := NewEmpty(db)
+	tr := NewEmpty(NewDatabase(rawdb.NewMemoryDatabase(), nil))
 	for _, val := range testdata1 {
 		tr.MustUpdate([]byte(val.k), []byte(val.v))
 	}
@@ -366,9 +365,9 @@ func testIteratorContinueAfterError(t *testing.T, memonly bool, scheme string) {
 		tr.MustUpdate([]byte(val.k), []byte(val.v))
 	}
 	root, nodes, _ := tr.Commit(false)
-	tdb.Update(root, types.EmptyRootHash, trienode.NewWithNodeSet(nodes))
+	tdb.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil)
 	if !memonly {
-		tdb.Commit(root)
+		tdb.Commit(root, false)
 	}
 	tr, _ = New(TrieID(root), tdb)
 	wantNodeCount := checkIteratorNoDups(t, tr.MustNodeIterator(nil), nil)
@@ -482,9 +481,9 @@ func testIteratorContinueAfterSeekError(t *testing.T, memonly bool, scheme strin
 			break
 		}
 	}
-	triedb.Update(root, types.EmptyRootHash, trienode.NewWithNodeSet(nodes))
+	triedb.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil)
 	if !memonly {
-		triedb.Commit(root)
+		triedb.Commit(root, false)
 	}
 	var (
 		barNodeBlob []byte
@@ -556,8 +555,8 @@ func testIteratorNodeBlob(t *testing.T, scheme string) {
 		trie.MustUpdate([]byte(val.k), []byte(val.v))
 	}
 	root, nodes, _ := trie.Commit(false)
-	triedb.Update(root, types.EmptyRootHash, trienode.NewWithNodeSet(nodes))
-	triedb.Commit(root)
+	triedb.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil)
+	triedb.Commit(root, false)
 
 	var found = make(map[common.Hash][]byte)
 	trie, _ = New(TrieID(root), triedb)

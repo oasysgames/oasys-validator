@@ -527,7 +527,7 @@ func makeEnv(wallet accounts.Wallet, account accounts.Account) (*testEnv, error)
 			Config:    chainConfig,
 			ExtraData: make([]byte, extraVanity+common.AddressLength+extraSeal),
 			BaseFee:   big.NewInt(params.InitialBaseFee),
-			Alloc: map[common.Address]types.Account{
+			Alloc: map[common.Address]core.GenesisAccount{
 				account.Address: {
 					Balance: big.NewInt(params.Ether),
 				},
@@ -601,11 +601,11 @@ func makeEnv(wallet accounts.Wallet, account accounts.Account) (*testEnv, error)
 	}
 
 	// Generate StateDB
-	stateTestState := tests.MakePreState(db, genspec.Alloc, false, rawdb.HashScheme)
+	_, _, statedb := tests.MakePreState(db, genspec.Alloc, false, rawdb.HashScheme)
 
 	// Replace artifact bytecode
 	environment.artifact.DeployedBytecode = fmt.Sprintf("0x%s", hex.EncodeToString(genspec.Alloc[_environmentAddress].Code))
 	stakeManager.artifact.DeployedBytecode = fmt.Sprintf("0x%s", hex.EncodeToString(genspec.Alloc[_stakeManagerAddress].Code))
 
-	return &testEnv{engine, chain, stateTestState.StateDB}, nil
+	return &testEnv{engine, chain, statedb}, nil
 }
