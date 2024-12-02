@@ -37,7 +37,7 @@ var deploymentSets = map[common.Hash]map[uint64]deploymentSet{
 		1880660: deploymentSet{deployments10},
 		4017600: deploymentSet{deployments11},
 		4958700: deploymentSet{deployments12},
-		9999999: deploymentSet{deployments13}, // TODO:
+		5420336: deploymentSet{deployments13}, // TODO:
 	},
 	defaultGenesisHash: {
 		2: deploymentSet{
