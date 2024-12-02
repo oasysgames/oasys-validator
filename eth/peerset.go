@@ -183,8 +183,8 @@ func (ps *peerSet) waitSnapExtension(peer *eth.Peer) (*snap.Peer, error) {
 	ps.lock.Unlock()
 
 	select {
-	case p := <-wait:
-		return p, nil
+	case peer := <-wait:
+		return peer, nil
 
 	case <-time.After(extensionWaitTimeout):
 		ps.lock.Lock()

@@ -30,6 +30,8 @@ import (
 
 // Constants to match up protocol versions and messages
 const (
+	ETH66 = 66
+	ETH67 = 67
 	ETH68 = 68
 )
 
@@ -39,11 +41,11 @@ const ProtocolName = "eth"
 
 // ProtocolVersions are the supported versions of the `eth` protocol (first
 // is primary).
-var ProtocolVersions = []uint{ETH68}
+var ProtocolVersions = []uint{ETH68, ETH67, ETH66}
 
 // protocolLengths are the number of implemented message corresponding to
 // different protocol versions.
-var protocolLengths = map[uint]uint64{ETH68: 17}
+var protocolLengths = map[uint]uint64{ETH68: 17, ETH67: 17, ETH66: 17}
 
 // maxMessageSize is the maximum cap on the size of a protocol message.
 const maxMessageSize = 10 * 1024 * 1024
@@ -60,6 +62,8 @@ const (
 	NewPooledTransactionHashesMsg = 0x08
 	GetPooledTransactionsMsg      = 0x09
 	PooledTransactionsMsg         = 0x0a
+	GetNodeDataMsg                = 0x0d
+	NodeDataMsg                   = 0x0e
 	GetReceiptsMsg                = 0x0f
 	ReceiptsMsg                   = 0x10
 )
@@ -185,9 +189,8 @@ type BlockHeadersRLPPacket struct {
 
 // NewBlockPacket is the network packet for the block propagation message.
 type NewBlockPacket struct {
-	Block    *types.Block
-	TD       *big.Int
-	Sidecars types.BlobSidecars `rlp:"optional"`
+	Block *types.Block
+	TD    *big.Int
 }
 
 // sanityCheck verifies that the values are reasonable, as a DoS protection
@@ -200,15 +203,6 @@ func (request *NewBlockPacket) sanityCheck() error {
 	if tdlen := request.TD.BitLen(); tdlen > 100 {
 		return fmt.Errorf("too large block TD: bitlen %d", tdlen)
 	}
-
-	if len(request.Sidecars) > 0 {
-		for _, sidecar := range request.Sidecars {
-			if err := sidecar.SanityCheck(request.Block.Number(), request.Block.Hash()); err != nil {
-				return err
-			}
-		}
-	}
-
 	return nil
 }
 
@@ -247,23 +241,39 @@ type BlockBody struct {
 	Transactions []*types.Transaction // Transactions contained within a block
 	Uncles       []*types.Header      // Uncles contained within a block
 	Withdrawals  []*types.Withdrawal  `rlp:"optional"` // Withdrawals contained within a block
-	Sidecars     types.BlobSidecars   `rlp:"optional"` // Sidecars contained within a block
 }
 
 // Unpack retrieves the transactions and uncles from the range packet and returns
 // them in a split flat format that's more consistent with the internal data structures.
-func (p *BlockBodiesResponse) Unpack() ([][]*types.Transaction, [][]*types.Header, [][]*types.Withdrawal, []types.BlobSidecars) {
+func (p *BlockBodiesResponse) Unpack() ([][]*types.Transaction, [][]*types.Header, [][]*types.Withdrawal) {
 	// TODO(matt): add support for withdrawals to fetchers
 	var (
 		txset         = make([][]*types.Transaction, len(*p))
 		uncleset      = make([][]*types.Header, len(*p))
 		withdrawalset = make([][]*types.Withdrawal, len(*p))
-		sidecarset    = make([]types.BlobSidecars, len(*p))
 	)
 	for i, body := range *p {
-		txset[i], uncleset[i], withdrawalset[i], sidecarset[i] = body.Transactions, body.Uncles, body.Withdrawals, body.Sidecars
+		txset[i], uncleset[i], withdrawalset[i] = body.Transactions, body.Uncles, body.Withdrawals
 	}
-	return txset, uncleset, withdrawalset, sidecarset
+	return txset, uncleset, withdrawalset
+}
+
+// GetNodeDataPacket represents a trie node data query.
+type GetNodeDataPacket []common.Hash
+
+// GetNodeDataPacket represents a trie node data query over eth/66.
+type GetNodeDataPacket66 struct {
+	RequestId uint64
+	GetNodeDataPacket
+}
+
+// NodeDataPacket is the network packet for trie node data distribution.
+type NodeDataPacket [][]byte
+
+// NodeDataPacket is the network packet for trie node data distribution over eth/66.
+type NodeDataPacket66 struct {
+	RequestId uint64
+	NodeDataPacket
 }
 
 // GetReceiptsRequest represents a block receipts query.
@@ -294,8 +304,11 @@ type ReceiptsRLPPacket struct {
 	ReceiptsRLPResponse
 }
 
-// NewPooledTransactionHashesPacket represents a transaction announcement packet on eth/68 and newer.
-type NewPooledTransactionHashesPacket struct {
+// NewPooledTransactionHashesPacket67 represents a transaction announcement packet on eth/67.
+type NewPooledTransactionHashesPacket67 []common.Hash
+
+// NewPooledTransactionHashesPacket68 represents a transaction announcement packet on eth/68 and newer.
+type NewPooledTransactionHashesPacket68 struct {
 	Types  []byte
 	Sizes  []uint32
 	Hashes []common.Hash
@@ -354,8 +367,10 @@ func (*BlockBodiesResponse) Kind() byte   { return BlockBodiesMsg }
 func (*NewBlockPacket) Name() string { return "NewBlock" }
 func (*NewBlockPacket) Kind() byte   { return NewBlockMsg }
 
-func (*NewPooledTransactionHashesPacket) Name() string { return "NewPooledTransactionHashes" }
-func (*NewPooledTransactionHashesPacket) Kind() byte   { return NewPooledTransactionHashesMsg }
+func (*NewPooledTransactionHashesPacket67) Name() string { return "NewPooledTransactionHashes" }
+func (*NewPooledTransactionHashesPacket67) Kind() byte   { return NewPooledTransactionHashesMsg }
+func (*NewPooledTransactionHashesPacket68) Name() string { return "NewPooledTransactionHashes" }
+func (*NewPooledTransactionHashesPacket68) Kind() byte   { return NewPooledTransactionHashesMsg }
 
 func (*GetPooledTransactionsRequest) Name() string { return "GetPooledTransactions" }
 func (*GetPooledTransactionsRequest) Kind() byte   { return GetPooledTransactionsMsg }

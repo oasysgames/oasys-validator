@@ -622,16 +622,6 @@ web3._extend({
 			call: 'eth_getBlockReceipts',
 			params: 1,
 		}),
-		new web3._extend.Method({
-			name: 'getBlobSidecars',
-			call: 'eth_getBlobSidecars',
-			params: 2,
-		}),
-		new web3._extend.Method({
-			name: 'getBlobSidecarByTxHash',
-			call: 'eth_getBlobSidecarByTxHash',
-			params: 2,
-		}),
 	],
 	properties: [
 		new web3._extend.Property({

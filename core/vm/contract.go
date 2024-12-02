@@ -17,6 +17,8 @@
 package vm
 
 import (
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/holiman/uint256"
 )
@@ -57,11 +59,11 @@ type Contract struct {
 	Input    []byte
 
 	Gas   uint64
-	value *uint256.Int
+	value *big.Int
 }
 
 // NewContract returns a new contract environment for the execution of EVM.
-func NewContract(caller ContractRef, object ContractRef, value *uint256.Int, gas uint64) *Contract {
+func NewContract(caller ContractRef, object ContractRef, value *big.Int, gas uint64) *Contract {
 	c := &Contract{CallerAddress: caller.Address(), caller: caller, self: object}
 
 	if parent, ok := caller.(*Contract); ok {
@@ -171,7 +173,7 @@ func (c *Contract) Address() common.Address {
 }
 
 // Value returns the contract's value (sent to it from it's caller)
-func (c *Contract) Value() *uint256.Int {
+func (c *Contract) Value() *big.Int {
 	return c.value
 }
 

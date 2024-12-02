@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/state/snapshot"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth/tracers/logger"
 	"github.com/ethereum/go-ethereum/tests"
@@ -89,27 +90,26 @@ func runStateTest(fname string, cfg vm.Config, jsonOut, dump bool) error {
 	if err != nil {
 		return err
 	}
-	var testsByName map[string]tests.StateTest
-	if err := json.Unmarshal(src, &testsByName); err != nil {
+	var tests map[string]tests.StateTest
+	if err := json.Unmarshal(src, &tests); err != nil {
 		return err
 	}
-
 	// Iterate over all the tests, run them and aggregate the results
-	results := make([]StatetestResult, 0, len(testsByName))
-	for key, test := range testsByName {
+	results := make([]StatetestResult, 0, len(tests))
+	for key, test := range tests {
 		for _, st := range test.Subtests() {
 			// Run the test and aggregate the result
 			result := &StatetestResult{Name: key, Fork: st.Fork, Pass: true}
-			test.Run(st, cfg, false, rawdb.HashScheme, func(err error, tstate *tests.StateTestState) {
+			test.Run(st, cfg, false, rawdb.HashScheme, func(err error, snaps *snapshot.Tree, statedb *state.StateDB) {
 				var root common.Hash
-				if tstate.StateDB != nil {
-					root = tstate.StateDB.IntermediateRoot(false)
+				if statedb != nil {
+					root = statedb.IntermediateRoot(false)
 					result.Root = &root
 					if jsonOut {
 						fmt.Fprintf(os.Stderr, "{\"stateRoot\": \"%#x\"}\n", root)
 					}
 					if dump { // Dump any state to aid debugging
-						cpy, _ := state.New(root, tstate.StateDB.Database(), nil)
+						cpy, _ := state.New(root, statedb.Database(), nil)
 						dump := cpy.RawDump(nil)
 						result.State = &dump
 					}

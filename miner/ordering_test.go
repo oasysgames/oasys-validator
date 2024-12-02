@@ -27,7 +27,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/holiman/uint256"
 )
 
 func TestTransactionPriceNonceSortLegacy(t *testing.T) {
@@ -93,8 +92,8 @@ func testTransactionPriceNonceSort(t *testing.T, baseFee *big.Int) {
 				Hash:      tx.Hash(),
 				Tx:        tx,
 				Time:      tx.Time(),
-				GasFeeCap: uint256.MustFromBig(tx.GasFeeCap()),
-				GasTipCap: uint256.MustFromBig(tx.GasTipCap()),
+				GasFeeCap: tx.GasFeeCap(),
+				GasTipCap: tx.GasTipCap(),
 				Gas:       tx.Gas(),
 				BlobGas:   tx.BlobGas(),
 			})
@@ -105,7 +104,7 @@ func testTransactionPriceNonceSort(t *testing.T, baseFee *big.Int) {
 	txset := newTransactionsByPriceAndNonce(signer, groups, baseFee)
 
 	txs := types.Transactions{}
-	for tx, _ := txset.Peek(); tx != nil; tx, _ = txset.Peek() {
+	for tx := txset.Peek(); tx != nil; tx = txset.Peek() {
 		txs = append(txs, tx.Tx)
 		txset.Shift()
 	}
@@ -161,8 +160,8 @@ func TestTransactionTimeSort(t *testing.T) {
 			Hash:      tx.Hash(),
 			Tx:        tx,
 			Time:      tx.Time(),
-			GasFeeCap: uint256.MustFromBig(tx.GasFeeCap()),
-			GasTipCap: uint256.MustFromBig(tx.GasTipCap()),
+			GasFeeCap: tx.GasFeeCap(),
+			GasTipCap: tx.GasTipCap(),
 			Gas:       tx.Gas(),
 			BlobGas:   tx.BlobGas(),
 		})
@@ -171,7 +170,7 @@ func TestTransactionTimeSort(t *testing.T) {
 	txset := newTransactionsByPriceAndNonce(signer, groups, nil)
 
 	txs := types.Transactions{}
-	for tx, _ := txset.Peek(); tx != nil; tx, _ = txset.Peek() {
+	for tx := txset.Peek(); tx != nil; tx = txset.Peek() {
 		txs = append(txs, tx.Tx)
 		txset.Shift()
 	}

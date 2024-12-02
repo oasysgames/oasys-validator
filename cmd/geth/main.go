@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
 
-// geth is a command-line client for Ethereum.
+// geth is the official command-line client for Ethereum.
 package main
 
 import (
@@ -67,9 +67,6 @@ var (
 		utils.SmartCardDaemonPathFlag,
 		utils.OverrideCancun,
 		utils.OverrideVerkle,
-		utils.OverrideFullImmutabilityThreshold,
-		utils.OverrideMinBlocksForBlobRequests,
-		utils.OverrideDefaultExtraReserveForBlobRequests,
 		utils.EnablePersonal,
 		utils.TxPoolLocalsFlag,
 		utils.TxPoolNoLocalsFlag,
@@ -156,7 +153,6 @@ var (
 		utils.VoteKeyNameFlag,
 		utils.LogDebugFlag,
 		utils.LogBacktraceAtFlag,
-		utils.BlobExtraReserveFlag,
 	}, utils.NetworkFlags, utils.DatabaseFlags)
 
 	rpcFlags = []cli.Flag{
@@ -207,12 +203,6 @@ var (
 		utils.MetricsInfluxDBBucketFlag,
 		utils.MetricsInfluxDBOrganizationFlag,
 	}
-
-	fakeBeaconFlags = []cli.Flag{
-		utils.FakeBeaconEnabledFlag,
-		utils.FakeBeaconAddrFlag,
-		utils.FakeBeaconPortFlag,
-	}
 )
 
 var app = flags.NewApp("the go-ethereum command line interface")
@@ -220,13 +210,13 @@ var app = flags.NewApp("the go-ethereum command line interface")
 func init() {
 	// Initialize the CLI app and start Geth
 	app.Action = geth
+	app.HideVersion = true // we have a command to print the version
+	app.Copyright = "Copyright 2022-2024 Oasys | Blockchain for The Games All Rights Reserved."
 	app.Commands = []*cli.Command{
 		// See chaincmd.go:
 		initCommand,
 		importCommand,
 		exportCommand,
-		importHistoryCommand,
-		exportHistoryCommand,
 		importPreimagesCommand,
 		removedbCommand,
 		dumpCommand,
@@ -265,7 +255,6 @@ func init() {
 		consoleFlags,
 		debug.Flags,
 		metricsFlags,
-		fakeBeaconFlags,
 	)
 	flags.AutoEnvVars(app.Flags, "GETH")
 

@@ -36,7 +36,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/beacon/fakebeacon"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/fdlimit"
 	"github.com/ethereum/go-ethereum/core"
@@ -70,9 +69,9 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/netutil"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/ethereum/go-ethereum/triedb"
-	"github.com/ethereum/go-ethereum/triedb/hashdb"
-	"github.com/ethereum/go-ethereum/triedb/pathdb"
+	"github.com/ethereum/go-ethereum/trie"
+	"github.com/ethereum/go-ethereum/trie/triedb/hashdb"
+	"github.com/ethereum/go-ethereum/trie/triedb/pathdb"
 	pcsclite "github.com/gballet/go-libpcsclite"
 	gopsutil "github.com/shirou/gopsutil/mem"
 	"github.com/urfave/cli/v2"
@@ -251,24 +250,6 @@ var (
 	OverrideVerkle = &cli.Uint64Flag{
 		Name:     "override.verkle",
 		Usage:    "Manually specify the Verkle fork timestamp, overriding the bundled setting",
-		Category: flags.EthCategory,
-	}
-	OverrideFullImmutabilityThreshold = &cli.Uint64Flag{
-		Name:     "override.immutabilitythreshold",
-		Usage:    "It is the number of blocks after which a chain segment is considered immutable, only for testing purpose",
-		Value:    params.FullImmutabilityThreshold,
-		Category: flags.EthCategory,
-	}
-	OverrideMinBlocksForBlobRequests = &cli.Uint64Flag{
-		Name:     "override.minforblobrequest",
-		Usage:    "It keeps blob data available for min blocks in local, only for testing purpose",
-		Value:    params.MinBlocksForBlobRequests,
-		Category: flags.EthCategory,
-	}
-	OverrideDefaultExtraReserveForBlobRequests = &cli.Uint64Flag{
-		Name:     "override.defaultextrareserve",
-		Usage:    "It adds more extra time for expired blobs for some request cases, only for testing purpose",
-		Value:    params.DefaultExtraReserveForBlobRequests,
 		Category: flags.EthCategory,
 	}
 	SyncModeFlag = &flags.TextMarshalerFlag{
@@ -967,33 +948,6 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 		Name:     "vote-key-name",
 		Usage:    "Name of the BLS public key used for voting (default = first found key)",
 		Category: flags.FastFinalityCategory,
-	}
-
-	// Blob setting
-	BlobExtraReserveFlag = &cli.Uint64Flag{
-		Name:     "blob.extra-reserve",
-		Usage:    "Extra reserve threshold for blob, blob never expires when 0 is set, default 14400",
-		Value:    params.DefaultExtraReserveForBlobRequests,
-		Category: flags.MiscCategory,
-	}
-
-	// Fake beacon
-	FakeBeaconEnabledFlag = &cli.BoolFlag{
-		Name:     "fake-beacon",
-		Usage:    "Enable the HTTP-RPC server of fake-beacon",
-		Category: flags.APICategory,
-	}
-	FakeBeaconAddrFlag = &cli.StringFlag{
-		Name:     "fake-beacon.addr",
-		Usage:    "HTTP-RPC server listening addr of fake-beacon",
-		Value:    fakebeacon.DefaultAddr,
-		Category: flags.APICategory,
-	}
-	FakeBeaconPortFlag = &cli.IntFlag{
-		Name:     "fake-beacon.port",
-		Usage:    "HTTP-RPC server listening port of fake-beacon",
-		Value:    fakebeacon.DefaultPort,
-		Category: flags.APICategory,
 	}
 )
 
@@ -1985,18 +1939,6 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	if err := kzg4844.UseCKZG(ctx.String(CryptoKZGFlag.Name) == "ckzg"); err != nil {
 		Fatalf("Failed to set KZG library implementation to %s: %v", ctx.String(CryptoKZGFlag.Name), err)
 	}
-
-	// blob setting
-	if ctx.IsSet(OverrideDefaultExtraReserveForBlobRequests.Name) {
-		cfg.BlobExtraReserve = ctx.Uint64(OverrideDefaultExtraReserveForBlobRequests.Name)
-	}
-	if ctx.IsSet(BlobExtraReserveFlag.Name) {
-		extraReserve := ctx.Uint64(BlobExtraReserveFlag.Name)
-		if extraReserve > 0 && extraReserve < params.DefaultExtraReserveForBlobRequests {
-			extraReserve = params.DefaultExtraReserveForBlobRequests
-		}
-		cfg.BlobExtraReserve = extraReserve
-	}
 }
 
 // SetDNSDiscoveryDefaults configures DNS discovery with the given URL if
@@ -2301,8 +2243,8 @@ func MakeConsolePreloads(ctx *cli.Context) []string {
 }
 
 // MakeTrieDatabase constructs a trie database based on the configured scheme.
-func MakeTrieDatabase(ctx *cli.Context, disk ethdb.Database, preimage bool, readOnly bool, isVerkle bool) *triedb.Database {
-	config := &triedb.Config{
+func MakeTrieDatabase(ctx *cli.Context, disk ethdb.Database, preimage bool, readOnly bool, isVerkle bool) *trie.Database {
+	config := &trie.Config{
 		Preimages: preimage,
 		IsVerkle:  isVerkle,
 	}
@@ -2315,12 +2257,12 @@ func MakeTrieDatabase(ctx *cli.Context, disk ethdb.Database, preimage bool, read
 		// ignore the parameter silently. TODO(rjl493456442)
 		// please config it if read mode is implemented.
 		config.HashDB = hashdb.Defaults
-		return triedb.NewDatabase(disk, config)
+		return trie.NewDatabase(disk, config)
 	}
 	if readOnly {
 		config.PathDB = pathdb.ReadOnly
 	} else {
 		config.PathDB = pathdb.Defaults
 	}
-	return triedb.NewDatabase(disk, config)
+	return trie.NewDatabase(disk, config)
 }

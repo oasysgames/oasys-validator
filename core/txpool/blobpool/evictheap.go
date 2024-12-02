@@ -30,7 +30,7 @@ import (
 // transaction from each account to determine which account to evict from.
 //
 // The heap internally tracks a slice of cheapest transactions from each account
-// and a mapping from addresses to indices for direct removals/updates.
+// and a mapping from addresses to indices for direct removals/udates.
 //
 // The goal of the heap is to decide which account has the worst bottleneck to
 // evict transactions from.

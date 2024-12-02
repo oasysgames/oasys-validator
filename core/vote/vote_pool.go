@@ -24,7 +24,7 @@ const (
 	lowerLimitOfVoteBlockNumber = 256
 	upperLimitOfVoteBlockNumber = 11 // refer to fetcher.maxUncleDist
 
-	highestVerifiedBlockChanSize = 10 // highestVerifiedBlockChanSize is the size of channel listening to HighestVerifiedBlockEvent.
+	chainHeadChanSize = 10 // chainHeadChanSize is the size of channel listening to ChainHeadEvent.
 )
 
 var (
@@ -57,8 +57,8 @@ type VotePool struct {
 	curVotesPq    *votesPriorityQueue
 	futureVotesPq *votesPriorityQueue
 
-	highestVerifiedBlockCh  chan core.HighestVerifiedBlockEvent
-	highestVerifiedBlockSub event.Subscription
+	chainHeadCh  chan core.ChainHeadEvent
+	chainHeadSub event.Subscription
 
 	votesCh chan *types.VoteEnvelope
 
@@ -69,19 +69,19 @@ type votesPriorityQueue []*types.VoteData
 
 func NewVotePool(chain *core.BlockChain, engine consensus.PoS) *VotePool {
 	votePool := &VotePool{
-		chain:                  chain,
-		receivedVotes:          mapset.NewSet[common.Hash](),
-		curVotes:               make(map[common.Hash]*VoteBox),
-		futureVotes:            make(map[common.Hash]*VoteBox),
-		curVotesPq:             &votesPriorityQueue{},
-		futureVotesPq:          &votesPriorityQueue{},
-		highestVerifiedBlockCh: make(chan core.HighestVerifiedBlockEvent, highestVerifiedBlockChanSize),
-		votesCh:                make(chan *types.VoteEnvelope, voteBufferForPut),
-		engine:                 engine,
+		chain:         chain,
+		receivedVotes: mapset.NewSet[common.Hash](),
+		curVotes:      make(map[common.Hash]*VoteBox),
+		futureVotes:   make(map[common.Hash]*VoteBox),
+		curVotesPq:    &votesPriorityQueue{},
+		futureVotesPq: &votesPriorityQueue{},
+		chainHeadCh:   make(chan core.ChainHeadEvent, chainHeadChanSize),
+		votesCh:       make(chan *types.VoteEnvelope, voteBufferForPut),
+		engine:        engine,
 	}
 
 	// Subscribe events from blockchain and start the main event loop.
-	votePool.highestVerifiedBlockSub = votePool.chain.SubscribeHighestVerifiedHeaderEvent(votePool.highestVerifiedBlockCh)
+	votePool.chainHeadSub = votePool.chain.SubscribeChainHeadEvent(votePool.chainHeadCh)
 
 	go votePool.loop()
 	return votePool
@@ -89,18 +89,18 @@ func NewVotePool(chain *core.BlockChain, engine consensus.PoS) *VotePool {
 
 // loop is the vote pool's main even loop, waiting for and reacting to outside blockchain events and votes channel event.
 func (pool *VotePool) loop() {
-	defer pool.highestVerifiedBlockSub.Unsubscribe()
+	defer pool.chainHeadSub.Unsubscribe()
 
 	for {
 		select {
 		// Handle ChainHeadEvent.
-		case ev := <-pool.highestVerifiedBlockCh:
-			if ev.Header != nil {
-				latestBlockNumber := ev.Header.Number.Uint64()
+		case ev := <-pool.chainHeadCh:
+			if ev.Block != nil {
+				latestBlockNumber := ev.Block.NumberU64()
 				pool.prune(latestBlockNumber)
-				pool.transferVotesFromFutureToCur(ev.Header)
+				pool.transferVotesFromFutureToCur(ev.Block.Header())
 			}
-		case <-pool.highestVerifiedBlockSub.Err():
+		case <-pool.chainHeadSub.Err():
 			return
 
 		// Handle votes channel and put the vote into vote pool.
@@ -135,7 +135,7 @@ func (pool *VotePool) putIntoVotePool(vote *types.VoteEnvelope) bool {
 	var votesPq *votesPriorityQueue
 	isFutureVote := false
 
-	voteBlock := pool.chain.GetVerifiedBlockByHash(targetHash)
+	voteBlock := pool.chain.GetHeaderByHash(targetHash)
 	if voteBlock == nil {
 		votes = pool.futureVotes
 		votesPq = pool.futureVotesPq
@@ -225,7 +225,7 @@ func (pool *VotePool) transferVotesFromFutureToCur(latestBlockHeader *types.Head
 	futurePqBuffer := make([]*types.VoteData, 0)
 	for futurePq.Len() > 0 && futurePq.Peek().TargetNumber <= latestBlockNumber {
 		blockHash := futurePq.Peek().TargetHash
-		header := pool.chain.GetVerifiedBlockByHash(blockHash)
+		header := pool.chain.GetHeaderByHash(blockHash)
 		if header == nil {
 			// Put into pq buffer used for later put again into futurePq
 			futurePqBuffer = append(futurePqBuffer, heap.Pop(futurePq).(*types.VoteData))
