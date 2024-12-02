@@ -6,6 +6,10 @@ import (
 )
 
 const (
+	// Built-in contract prefixes.
+	BuiltInContractPrefix1 = "0x0000000000000000" // 8 bytes
+	BuiltInContractPrefix2 = "0x5200000000000000" // 8 bytes
+
 	// Address of contracts in genesis.
 	EnvironmentAddress  = "0x0000000000000000000000000000000000001000"
 	StakeManagerAddress = "0x0000000000000000000000000000000000001001"
