@@ -118,6 +118,26 @@ func (ec *Client) BlockReceipts(ctx context.Context, blockNrOrHash rpc.BlockNumb
 	return r, err
 }
 
+// BlobSidecars return the Sidecars of a given block number or hash.
+func (ec *Client) BlobSidecars(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) ([]*types.BlobSidecar, error) {
+	var r []*types.BlobSidecar
+	err := ec.c.CallContext(ctx, &r, "eth_getBlobSidecars", blockNrOrHash.String())
+	if err == nil && r == nil {
+		return nil, ethereum.NotFound
+	}
+	return r, err
+}
+
+// BlobSidecarByTxHash return a sidecar of a given blob transaction
+func (ec *Client) BlobSidecarByTxHash(ctx context.Context, hash common.Hash) (*types.BlobSidecar, error) {
+	var r *types.BlobSidecar
+	err := ec.c.CallContext(ctx, &r, "eth_getBlobSidecarByTxHash", hash)
+	if err == nil && r == nil {
+		return nil, ethereum.NotFound
+	}
+	return r, err
+}
+
 type rpcBlock struct {
 	Hash         common.Hash         `json:"hash"`
 	Transactions []rpcTransaction    `json:"transactions"`
@@ -307,10 +327,8 @@ func (ec *Client) TransactionInBlock(ctx context.Context, blockHash common.Hash,
 func (ec *Client) TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
 	var r *types.Receipt
 	err := ec.c.CallContext(ctx, &r, "eth_getTransactionReceipt", txHash)
-	if err == nil {
-		if r == nil {
-			return nil, ethereum.NotFound
-		}
+	if err == nil && r == nil {
+		return nil, ethereum.NotFound
 	}
 	return r, err
 }
@@ -675,6 +693,15 @@ func toCallArg(msg ethereum.CallMsg) interface{} {
 	if msg.GasTipCap != nil {
 		arg["maxPriorityFeePerGas"] = (*hexutil.Big)(msg.GasTipCap)
 	}
+	if msg.AccessList != nil {
+		arg["accessList"] = msg.AccessList
+	}
+	if msg.BlobGasFeeCap != nil {
+		arg["maxFeePerBlobGas"] = (*hexutil.Big)(msg.BlobGasFeeCap)
+	}
+	if msg.BlobHashes != nil {
+		arg["blobVersionedHashes"] = msg.BlobHashes
+	}
 	return arg
 }
 
@@ -687,18 +714,20 @@ type rpcProgress struct {
 	PulledStates hexutil.Uint64
 	KnownStates  hexutil.Uint64
 
-	SyncedAccounts      hexutil.Uint64
-	SyncedAccountBytes  hexutil.Uint64
-	SyncedBytecodes     hexutil.Uint64
-	SyncedBytecodeBytes hexutil.Uint64
-	SyncedStorage       hexutil.Uint64
-	SyncedStorageBytes  hexutil.Uint64
-	HealedTrienodes     hexutil.Uint64
-	HealedTrienodeBytes hexutil.Uint64
-	HealedBytecodes     hexutil.Uint64
-	HealedBytecodeBytes hexutil.Uint64
-	HealingTrienodes    hexutil.Uint64
-	HealingBytecode     hexutil.Uint64
+	SyncedAccounts         hexutil.Uint64
+	SyncedAccountBytes     hexutil.Uint64
+	SyncedBytecodes        hexutil.Uint64
+	SyncedBytecodeBytes    hexutil.Uint64
+	SyncedStorage          hexutil.Uint64
+	SyncedStorageBytes     hexutil.Uint64
+	HealedTrienodes        hexutil.Uint64
+	HealedTrienodeBytes    hexutil.Uint64
+	HealedBytecodes        hexutil.Uint64
+	HealedBytecodeBytes    hexutil.Uint64
+	HealingTrienodes       hexutil.Uint64
+	HealingBytecode        hexutil.Uint64
+	TxIndexFinishedBlocks  hexutil.Uint64
+	TxIndexRemainingBlocks hexutil.Uint64
 }
 
 func (p *rpcProgress) toSyncProgress() *ethereum.SyncProgress {
@@ -706,22 +735,24 @@ func (p *rpcProgress) toSyncProgress() *ethereum.SyncProgress {
 		return nil
 	}
 	return &ethereum.SyncProgress{
-		StartingBlock:       uint64(p.StartingBlock),
-		CurrentBlock:        uint64(p.CurrentBlock),
-		HighestBlock:        uint64(p.HighestBlock),
-		PulledStates:        uint64(p.PulledStates),
-		KnownStates:         uint64(p.KnownStates),
-		SyncedAccounts:      uint64(p.SyncedAccounts),
-		SyncedAccountBytes:  uint64(p.SyncedAccountBytes),
-		SyncedBytecodes:     uint64(p.SyncedBytecodes),
-		SyncedBytecodeBytes: uint64(p.SyncedBytecodeBytes),
-		SyncedStorage:       uint64(p.SyncedStorage),
-		SyncedStorageBytes:  uint64(p.SyncedStorageBytes),
-		HealedTrienodes:     uint64(p.HealedTrienodes),
-		HealedTrienodeBytes: uint64(p.HealedTrienodeBytes),
-		HealedBytecodes:     uint64(p.HealedBytecodes),
-		HealedBytecodeBytes: uint64(p.HealedBytecodeBytes),
-		HealingTrienodes:    uint64(p.HealingTrienodes),
-		HealingBytecode:     uint64(p.HealingBytecode),
+		StartingBlock:          uint64(p.StartingBlock),
+		CurrentBlock:           uint64(p.CurrentBlock),
+		HighestBlock:           uint64(p.HighestBlock),
+		PulledStates:           uint64(p.PulledStates),
+		KnownStates:            uint64(p.KnownStates),
+		SyncedAccounts:         uint64(p.SyncedAccounts),
+		SyncedAccountBytes:     uint64(p.SyncedAccountBytes),
+		SyncedBytecodes:        uint64(p.SyncedBytecodes),
+		SyncedBytecodeBytes:    uint64(p.SyncedBytecodeBytes),
+		SyncedStorage:          uint64(p.SyncedStorage),
+		SyncedStorageBytes:     uint64(p.SyncedStorageBytes),
+		HealedTrienodes:        uint64(p.HealedTrienodes),
+		HealedTrienodeBytes:    uint64(p.HealedTrienodeBytes),
+		HealedBytecodes:        uint64(p.HealedBytecodes),
+		HealedBytecodeBytes:    uint64(p.HealedBytecodeBytes),
+		HealingTrienodes:       uint64(p.HealingTrienodes),
+		HealingBytecode:        uint64(p.HealingBytecode),
+		TxIndexFinishedBlocks:  uint64(p.TxIndexFinishedBlocks),
+		TxIndexRemainingBlocks: uint64(p.TxIndexRemainingBlocks),
 	}
 }

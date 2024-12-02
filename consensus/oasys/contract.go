@@ -28,6 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/holiman/uint256"
 )
 
 const (
@@ -796,7 +797,7 @@ func applyMessage(
 		*msg.To(),
 		msg.Data(),
 		msg.Gas(),
-		msg.Value(),
+		uint256.MustFromBig(msg.Value()),
 	)
 	if err != nil {
 		log.Error("failed apply message", "msg", string(ret), "err", err)
