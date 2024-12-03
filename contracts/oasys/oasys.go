@@ -6,17 +6,21 @@ import (
 )
 
 const (
+	// Built-in contract prefixes.
+	BuiltInContractPrefix1 = "0x0000000000000000" // 8 bytes
+	BuiltInContractPrefix2 = "0x5200000000000000" // 8 bytes
+
 	// Address of contracts in genesis.
-	EnvironmentAddress  = "0x0000000000000000000000000000000000001000"
-	StakeManagerAddress = "0x0000000000000000000000000000000000001001"
-	AllowListAddress    = "0x0000000000000000000000000000000000001002"
+	EnvironmentAddress  = BuiltInContractPrefix1 + "000000000000000000001000"
+	StakeManagerAddress = BuiltInContractPrefix1 + "000000000000000000001001"
+	AllowListAddress    = BuiltInContractPrefix1 + "000000000000000000001002"
 
 	// Address of initial wallet in genesis.
 	mainnetGenesisWalletAddress = "0xdF3548cD5e355202AE92e766c7361eA4F6687A61"
 	testnetGenesisWalletAddress = "0xbf9Ec8a822519C00128f0c7C13f13cafF0501Aea"
 
 	// Address of contracts in `oasys-governance-contract`.
-	EVMAccessControl = "0x520000000000000000000000000000000000003F"
+	EVMAccessControl = BuiltInContractPrefix2 + "00000000000000000000003F"
 )
 
 var (
