@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"bytes"
 	"errors"
 	"math/big"
 
@@ -18,6 +19,8 @@ var (
 
 	evmAccessControl = common.HexToAddress(oasys.EVMAccessControl)
 	emptyHash        common.Hash
+	buildInPrefix1   = common.FromHex(oasys.BuiltInContractPrefix1)
+	buildInPrefix2   = common.FromHex(oasys.BuiltInContractPrefix2)
 )
 
 // Check the `_createAllowedList` mappings in the `EVMAccessControl` contract
@@ -29,6 +32,10 @@ func IsAllowedToCreate(state StateDB, from common.Address) bool {
 
 // Check the `_callAllowedList` mappings in the `EVMAccessControl` contract
 func IsDeniedToCall(state StateDB, to common.Address) bool {
+	// Don't deny calls to built-in contracts
+	if bytes.HasPrefix(to.Bytes(), buildInPrefix1) || bytes.HasPrefix(to.Bytes(), buildInPrefix2) {
+		return false
+	}
 	hash := computeAddressMapStorageKey(to, 2)
 	val := state.GetState(evmAccessControl, hash)
 	return val.Cmp(emptyHash) != 0
