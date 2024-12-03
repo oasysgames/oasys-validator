@@ -25,9 +25,8 @@ var (
 
 // Check the `_createAllowedList` mappings in the `EVMAccessControl` contract
 func IsAllowedToCreate(state StateDB, from common.Address) bool {
-	hash := computeAddressMapStorageKey(from, 1)
-	val := state.GetState(evmAccessControl, hash)
-	return val.Cmp(emptyHash) != 0
+	// Always allow in testnet, as anybody freely create contracts
+	return true
 }
 
 // Check the `_callAllowedList` mappings in the `EVMAccessControl` contract
