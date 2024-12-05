@@ -437,11 +437,6 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 		return nil, common.Address{}, gas, ErrNonceUintOverflow
 	}
 	evm.StateDB.SetNonce(caller.Address(), nonce+1)
-	// Fail if the caller is not allowed to create
-	// Need to check after nonce increment to evict failed tx from the pool
-	if !IsAllowedToCreate(evm.StateDB, caller.Address()) {
-		return nil, common.Address{}, 0, ErrUnauthorizedCreate
-	}
 	// We add this to the access list _before_ taking a snapshot. Even if the creation fails,
 	// the access-list change should not be rolled back
 	if evm.chainRules.IsBerlin {
@@ -520,6 +515,16 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 
 // Create creates a new contract using code as deployment code.
 func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *uint256.Int) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error) {
+	// Fail if the caller is not allowed to create
+	if !IsAllowedToCreate(evm.StateDB, caller.Address()) {
+		nonce := evm.StateDB.GetNonce(caller.Address())
+		if nonce+1 < nonce {
+			return nil, common.Address{}, gas, ErrNonceUintOverflow
+		}
+		// Need to increment nonce to evict failed tx from the pool
+		evm.StateDB.SetNonce(caller.Address(), nonce+1)
+		return nil, common.Address{}, 0, ErrUnauthorizedCreate
+	}
 	contractAddr = crypto.CreateAddress(caller.Address(), evm.StateDB.GetNonce(caller.Address()))
 	return evm.create(caller, &codeAndHash{code: code}, gas, value, contractAddr, CREATE)
 }
