@@ -1256,7 +1256,7 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 	// Fail if the address is not allowed to call
 	to := args.To
 	if to != nil && vm.IsDeniedToCall(state, *to) {
-		return 0, fmt.Errorf("the calling contract is in denlylist. to: %s", to)
+		return 0, fmt.Errorf("the calling contract is in denlylist. to: %s", to.Hex())
 	}
 	estimate, revert, err := gasestimator.Estimate(ctx, call, opts, gasCap)
 	if err != nil {
@@ -1872,7 +1872,7 @@ func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 	}
 	// Fail if the address is not allowed to call
 	if to != nil && vm.IsDeniedToCall(state, *to) {
-		return common.Hash{}, fmt.Errorf("the calling contract is in denlylist. to: %s", to)
+		return common.Hash{}, fmt.Errorf("the calling contract is in denlylist. to: %s", to.Hex())
 	}
 
 	if err := b.SendTx(ctx, tx); err != nil {
