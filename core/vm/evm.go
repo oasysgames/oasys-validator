@@ -441,7 +441,7 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	// because this check targets raw transactions from EOA, and `CREATE2`
 	// within internal transactions is excluded.
 	// Need to check after nonce increment to evict failed tx from the pool.
-	if typ == CREATE && !IsAllowedToCreate(evm.StateDB, caller.Address()) {
+	if evm.depth == 0 && typ == CREATE && !IsAllowedToCreate(evm.StateDB, caller.Address()) {
 		return nil, common.Address{}, 0, ErrUnauthorizedCreate
 	}
 	// We add this to the access list _before_ taking a snapshot. Even if the creation fails,
