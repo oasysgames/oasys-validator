@@ -1253,6 +1253,11 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 	if err != nil {
 		return 0, err
 	}
+	// Fail if the address is not allowed to call
+	to := args.To
+	if to != nil && vm.IsDeniedToCall(state, *to) {
+		return 0, fmt.Errorf("the calling contract is in denlylist. to: %s", to)
+	}
 	estimate, revert, err := gasestimator.Estimate(ctx, call, opts, gasCap)
 	if err != nil {
 		if len(revert) > 0 {
