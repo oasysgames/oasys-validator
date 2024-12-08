@@ -178,7 +178,9 @@ func (evm *EVM) Interpreter() *EVMInterpreter {
 // execution error or failed value transfer.
 func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas uint64, value *uint256.Int) (ret []byte, leftOverGas uint64, err error) {
 	// Fail if the address is not allowed to call
-	if IsDeniedToCall(evm.StateDB, addr) {
+	// Skip the check if this call is readonly (eth_call)
+	readOnly := evm.Config.NoBaseFee
+	if !readOnly && IsDeniedToCall(evm.StateDB, addr) {
 		return nil, 0, ErrUnauthorizedCall
 	}
 	// Fail if we're trying to execute above the call depth limit
