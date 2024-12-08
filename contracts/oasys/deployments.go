@@ -22,7 +22,7 @@ var deploymentSets = map[common.Hash]map[uint64]deploymentSet{
 		1892000: deploymentSet{deployments10},
 		4089588: deploymentSet{deployments11},
 		5095900: deploymentSet{deployments12},
-		5498661: deploymentSet{deployments13},
+		5527429: deploymentSet{deployments13},
 	},
 	params.OasysTestnetGenesisHash: {
 		1:       deploymentSet{deployments0},
