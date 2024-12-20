@@ -338,6 +338,10 @@ func LoadChainConfig(db ethdb.Database, genesis *Genesis) (*params.ChainConfig, 
 	// chain config corresponds to the canonical chain.
 	stored := rawdb.ReadCanonicalHash(db, 0)
 	if stored != (common.Hash{}) {
+		builtInConf := params.GetBuiltInChainConfig(stored)
+		if builtInConf != nil {
+			return builtInConf, nil
+		}
 		storedcfg := rawdb.ReadChainConfig(db, stored)
 		if storedcfg != nil {
 			return storedcfg, nil
@@ -364,24 +368,14 @@ func LoadChainConfig(db ethdb.Database, genesis *Genesis) (*params.ChainConfig, 
 }
 
 func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
-	switch {
-	case g != nil:
-		return g.Config
-	case ghash == params.MainnetGenesisHash:
-		return params.MainnetChainConfig
-	case ghash == params.HoleskyGenesisHash:
-		return params.HoleskyChainConfig
-	case ghash == params.SepoliaGenesisHash:
-		return params.SepoliaChainConfig
-	case ghash == params.GoerliGenesisHash:
-		return params.GoerliChainConfig
-	case ghash == params.OasysMainnetGenesisHash:
-		return params.OasysMainnetChainConfig
-	case ghash == params.OasysTestnetGenesisHash:
-		return params.OasysTestnetChainConfig
-	default:
-		return params.AllEthashProtocolChanges
+	conf := params.GetBuiltInChainConfig(ghash)
+	if conf != nil {
+		return conf
 	}
+	if g != nil {
+		return g.Config // it could be a custom config for QA test, just return
+	}
+	return params.AllEthashProtocolChanges
 }
 
 // IsVerkle indicates whether the state is already stored in a verkle
