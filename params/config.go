@@ -356,6 +356,25 @@ var (
 	TestRules = TestChainConfig.Rules(new(big.Int), false, 0)
 )
 
+func GetBuiltInChainConfig(ghash common.Hash) *ChainConfig {
+	switch ghash {
+	case MainnetGenesisHash:
+		return MainnetChainConfig
+	case HoleskyGenesisHash:
+		return HoleskyChainConfig
+	case SepoliaGenesisHash:
+		return SepoliaChainConfig
+	case GoerliGenesisHash:
+		return GoerliChainConfig
+	case OasysMainnetGenesisHash:
+		return OasysMainnetChainConfig
+	case OasysTestnetGenesisHash:
+		return OasysTestnetChainConfig
+	default:
+		return nil
+	}
+}
+
 // NetworkNames are user friendly names to use in the chain spec banner.
 var NetworkNames = map[string]string{
 	MainnetChainConfig.ChainID.String(): "mainnet",
