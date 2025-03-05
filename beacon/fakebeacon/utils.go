@@ -21,9 +21,8 @@ func fetchBlockNumberByTime(ctx context.Context, ts int64, backend ethapi.Backen
 		return nil, errors.New("time too large")
 	}
 	blockPeriod := getBlockPeriod(backend.ChainConfig())
-	adjustedBlockPeriod := getBlockPeriod(backend.ChainConfig())*2 - 1
 	blockNum := currentHeader.Number.Uint64()
-	estimateEndNumber := int64(blockNum) - (blockTime-ts)/adjustedBlockPeriod
+	estimateEndNumber := int64(blockNum) - (blockTime-ts)/blockPeriod
 	// find the end number
 	for {
 		header, err := backend.HeaderByNumber(ctx, rpc.BlockNumber(estimateEndNumber))
@@ -42,10 +41,10 @@ func fetchBlockNumberByTime(ctx context.Context, ts int64, backend ethapi.Backen
 		}
 
 		// let the estimateEndNumber a little bigger than real value
-		if headerTime > ts+(blockPeriod*4) {
-			estimateEndNumber -= (headerTime - ts) / adjustedBlockPeriod
+		if headerTime > ts+(blockPeriod*3-1) {
+			estimateEndNumber -= (headerTime - ts) / blockPeriod
 		} else if headerTime < ts {
-			estimateEndNumber += (ts-headerTime)/adjustedBlockPeriod + 1
+			estimateEndNumber += (ts-headerTime)/blockPeriod + 1
 		} else {
 			// search one by one
 			for headerTime >= ts {
