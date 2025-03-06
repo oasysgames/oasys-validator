@@ -25,11 +25,13 @@ func fetchBlockNumberByTime(ctx context.Context, ts int64, backend ethapi.Backen
 	var (
 		blockPeriod = getBlockPeriod(backend.ChainConfig())
 		// highEdge and lowEdge represent the current known range of block headers.
-		highEdge = currentHeader
-		lowEdge  *types.Header
+		highEdge = currentHeader // higher bound block header
+		lowEdge  *types.Header   // lower bound block header
 		// Start the search from the current header.
 		cursor = currentHeader
 		// isBackward toggles the search direction to help narrow the range.
+		// - true: search past blocks
+		// - false: search future blocks
 		isBackward = true
 	)
 
