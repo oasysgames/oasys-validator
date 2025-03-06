@@ -2,10 +2,7 @@ package fakebeacon
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"math/rand"
-	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
@@ -14,56 +11,65 @@ import (
 )
 
 func fetchBlockNumberByTime(ctx context.Context, ts int64, backend ethapi.Backend) (*types.Header, error) {
-	// calc the block number of the ts.
 	currentHeader := backend.CurrentHeader()
-	blockTime := int64(currentHeader.Time)
-	if ts > blockTime {
-		return nil, errors.New("time too large")
+	if ts == int64(currentHeader.Time) {
+		// Found the block.
+		return currentHeader, nil
+	} else if ts > int64(currentHeader.Time) {
+		// Future time so return an error.
+		return nil, fmt.Errorf("future time %d, current time %d", ts, currentHeader.Time)
 	}
-	blockPeriod := getBlockPeriod(backend.ChainConfig())
-	adjustedBlockPeriod := getBlockPeriod(backend.ChainConfig())*2 - 1
-	blockNum := currentHeader.Number.Uint64()
-	estimateEndNumber := int64(blockNum) - (blockTime-ts)/adjustedBlockPeriod
-	// find the end number
+
+	// Performs a range search to locate the block whose timestamp matches ts.
+	// Gradually narrows down the search range.
+	var (
+		blockPeriod = getBlockPeriod(backend.ChainConfig())
+		// highEdge and lowEdge represent the current known range of block headers.
+		highEdge = currentHeader
+		lowEdge  *types.Header
+		// Start the search from the current header.
+		cursor = currentHeader
+		// isBackward toggles the search direction to help narrow the range.
+		isBackward = true
+	)
+
 	for {
-		header, err := backend.HeaderByNumber(ctx, rpc.BlockNumber(estimateEndNumber))
-		if err != nil {
-			time.Sleep(time.Duration(rand.Int()%180) * time.Millisecond)
-			continue
-		}
-		if header == nil {
-			estimateEndNumber -= 1
-			time.Sleep(time.Duration(rand.Int()%180) * time.Millisecond)
-			continue
-		}
-		headerTime := int64(header.Time)
-		if headerTime == ts {
-			return header, nil
+		estimated := estimateBlockNumber(blockPeriod, int64(cursor.Time), int64(cursor.Number.Uint64()), ts)
+
+		// Make sure the estimate number is within the range.
+		// If exceed the range, narrow the range by `1`.
+		if int64(highEdge.Number.Uint64()) < estimated {
+			estimated = int64(highEdge.Number.Uint64()) - 1
+		} else if lowEdge != nil && int64(lowEdge.Number.Uint64()) > estimated {
+			estimated = int64(lowEdge.Number.Uint64()) + 1
 		}
 
-		// let the estimateEndNumber a little bigger than real value
-		if headerTime > ts+(blockPeriod*4) {
-			estimateEndNumber -= (headerTime - ts) / adjustedBlockPeriod
-		} else if headerTime < ts {
-			estimateEndNumber += (ts-headerTime)/adjustedBlockPeriod + 1
-		} else {
-			// search one by one
-			for headerTime >= ts {
-				header, err = backend.HeaderByNumber(ctx, rpc.BlockNumber(estimateEndNumber-1))
-				if err != nil {
-					time.Sleep(time.Duration(rand.Int()%180) * time.Millisecond)
-					continue
-				}
-				headerTime = int64(header.Time)
-				if headerTime == ts {
-					return header, nil
-				}
-				estimateEndNumber -= 1
-				if headerTime < ts { //found the real endNumber
-					return nil, fmt.Errorf("block not found by time %d", ts)
-				}
-			}
+		var err error
+		if cursor, err = backend.HeaderByNumber(ctx, rpc.BlockNumber(estimated)); err != nil {
+			return nil, fmt.Errorf("failed to fetch block by number %d: %v", estimated, err)
 		}
+
+		// Succeed! Found the block.
+		if int64(cursor.Time) == ts {
+			return cursor, nil
+		}
+
+		// in case, lowEdge have not yet been found
+		// If lowEdge hasn't been set yet, adjust highEdge when target is earlier.
+		if lowEdge == nil && ts < int64(cursor.Time) {
+			highEdge = cursor
+			continue
+		}
+
+		// Alternate updating the boundaries to narrow the search range.
+		if isBackward {
+			lowEdge = cursor
+		} else {
+			highEdge = cursor
+		}
+
+		// Toggle the search direction.
+		isBackward = !isBackward
 	}
 }
 
@@ -78,4 +84,32 @@ func getBlockPeriod(cfg *params.ChainConfig) int64 {
 	default:
 		return 1
 	}
+}
+
+func estimateBlockNumber(blockPeriod, sourceTime, sourceNumber, targetTime int64) int64 {
+	diff := targetTime - sourceTime
+
+	// Determine how many blocks to shift.
+	var shift int64
+	if abs(diff) < blockPeriod {
+		shift = 1
+	} else {
+		shift = abs(diff) / blockPeriod
+	}
+
+	if diff < 0 {
+		// Target time is in the past.
+		return sourceNumber - shift
+	}
+	// Target time is in the future.
+	return sourceNumber + shift
+}
+
+// abs returns the absolute value of an int64.
+// Define as the starndard library does not have an abs for int64.
+func abs(x int64) int64 {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
