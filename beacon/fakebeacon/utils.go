@@ -38,10 +38,10 @@ func fetchBlockNumberByTime(ctx context.Context, ts int64, backend ethapi.Backen
 	)
 
 	for {
-		var (
-			estimated = estimateBlockNumber(averageBlockTime, int64(cursor.Time), int64(cursor.Number.Uint64()), ts)
-			err       error
-		)
+		estimated, err := estimateBlockNumber(averageBlockTime, int64(cursor.Time), int64(cursor.Number.Uint64()), ts)
+		if err != nil {
+			return nil, err
+		}
 		if cursor, err = backend.HeaderByNumber(ctx, rpc.BlockNumber(estimated)); err != nil {
 			return nil, fmt.Errorf("failed to fetch block by timestamp %d: %v", ts, err)
 		}
@@ -96,7 +96,7 @@ func getBlockPeriod(cfg *params.ChainConfig) int64 {
 	}
 }
 
-func estimateBlockNumber(blockPeriod, sourceTime, sourceNumber, targetTime int64) int64 {
+func estimateBlockNumber(blockPeriod, sourceTime, sourceNumber, targetTime int64) (int64, error) {
 	diff := targetTime - sourceTime
 
 	// Determine how many blocks to shift.
@@ -108,11 +108,18 @@ func estimateBlockNumber(blockPeriod, sourceTime, sourceNumber, targetTime int64
 	}
 
 	if diff < 0 {
-		// Target time is in the past.
-		return sourceNumber - shift
+		// Target time is in the past from source time.
+		estimated := sourceNumber - shift
+		if estimated < 0 {
+			// Smaller than genesis block.
+			return estimated, fmt.Errorf("estimated block is negative: %d, sourceTime: %d, sourceNumber: %d, targetTime: %d", estimated, sourceTime, sourceNumber, targetTime)
+		}
+		return estimated, nil
 	}
-	// Target time is in the future.
-	return sourceNumber + shift
+
+	// Target time is in the future from source time.
+	return sourceNumber + shift, nil
+
 }
 
 // abs returns the absolute value of an int64.
