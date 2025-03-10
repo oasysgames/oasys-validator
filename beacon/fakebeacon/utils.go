@@ -42,6 +42,7 @@ func fetchBlockNumberByTime(ctx context.Context, ts int64, backend ethapi.Backen
 			estimated = estimateBlockNumber(averageBlockTime, int64(cursor.Time), int64(cursor.Number.Uint64()), ts)
 			err       error
 		)
+		fmt.Printf("estimated: %d\n", estimated)
 		if cursor, err = backend.HeaderByNumber(ctx, rpc.BlockNumber(estimated)); err != nil {
 			return nil, fmt.Errorf("failed to fetch block by timestamp %d: %v", ts, err)
 		}

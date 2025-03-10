@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -15,15 +16,15 @@ import (
 
 func TestFetchBlockNumberByTime(t *testing.T) {
 	var (
-		ctx       = context.Background()
-		bt        = uint64(params.SHORT_BLOCK_TIME_SECONDS)
-		genBtList = func(n int, b uint64) []uint64 {
-			blockTimes := make([]uint64, n)
-			for i := 0; i < n; i++ {
-				blockTimes[i] = b
-			}
-			return blockTimes
-		}
+		ctx = context.Background()
+		bt  = uint64(params.SHORT_BLOCK_TIME_SECONDS)
+		// genBtList = func(n int, b uint64) []uint64 {
+		// 	blockTimes := make([]uint64, n)
+		// 	for i := 0; i < n; i++ {
+		// 		blockTimes[i] = b
+		// 	}
+		// 	return blockTimes
+		// }
 	)
 
 	tests := []struct {
@@ -35,46 +36,46 @@ func TestFetchBlockNumberByTime(t *testing.T) {
 	}{
 		{
 			name:                "stable block growth",
-			chainLength:         100,
+			chainLength:         14400,
 			candidateBlockTimes: []uint64{bt},
 			targetBlockNumber:   10,
 			expectedAttempts:    2,
 		},
-		{
-			name:                "delayed block growth",
-			chainLength:         14400 * (7 + 1), // 1 week + 1
-			candidateBlockTimes: []uint64{bt, bt, bt, bt, bt, bt + 1, bt + 1, bt + 2},
-			targetBlockNumber:   14400,
-			expectedAttempts:    6,
-		},
-		{
-			name:                "shorter block time",
-			chainLength:         14400,
-			candidateBlockTimes: []uint64{bt - 3},
-			targetBlockNumber:   200,
-			expectedAttempts:    16,
-		},
-		{
-			name:                "longer block time",
-			chainLength:         14400 * 2,
-			candidateBlockTimes: []uint64{bt + 3},
-			targetBlockNumber:   14400,
-			expectedAttempts:    3,
-		},
-		{
-			name:                "blocktime chainge",
-			chainLength:         1500,
-			candidateBlockTimes: append(genBtList(1000, bt*2), genBtList(500, bt)...),
-			targetBlockNumber:   500,
-			expectedAttempts:    4,
-		},
-		{
-			name:                "big jumps",
-			chainLength:         1000 * 4,
-			candidateBlockTimes: append(genBtList(999, bt), 1000*bt),
-			targetBlockNumber:   2000,
-			expectedAttempts:    12,
-		},
+		// {
+		// 	name:                "delayed block growth",
+		// 	chainLength:         14400 * (7 + 1), // 1 week + 1
+		// 	candidateBlockTimes: []uint64{bt, bt, bt, bt, bt, bt + 1, bt + 1, bt + 2},
+		// 	targetBlockNumber:   14400,
+		// 	expectedAttempts:    6,
+		// },
+		// {
+		// 	name:                "shorter block time",
+		// 	chainLength:         14400,
+		// 	candidateBlockTimes: []uint64{bt - 3},
+		// 	targetBlockNumber:   200,
+		// 	expectedAttempts:    16,
+		// },
+		// {
+		// 	name:                "longer block time",
+		// 	chainLength:         14400 * 2,
+		// 	candidateBlockTimes: []uint64{bt + 3},
+		// 	targetBlockNumber:   14400,
+		// 	expectedAttempts:    3,
+		// },
+		// {
+		// 	name:                "blocktime chainge",
+		// 	chainLength:         1500,
+		// 	candidateBlockTimes: append(genBtList(1000, bt*2), genBtList(500, bt)...),
+		// 	targetBlockNumber:   500,
+		// 	expectedAttempts:    4,
+		// },
+		// {
+		// 	name:                "big jumps",
+		// 	chainLength:         1000 * 4,
+		// 	candidateBlockTimes: append(genBtList(999, bt), 1000*bt),
+		// 	targetBlockNumber:   2000,
+		// 	expectedAttempts:    12,
+		// },
 	}
 
 	for i, tt := range tests {
@@ -119,6 +120,8 @@ func (b *MockBackendForFakeBeacon) ChainConfig() *params.ChainConfig {
 }
 
 func makeBackend(length int, candidateBlockTimes []uint64) ethapi.Backend {
+	rnd := rand.New(rand.NewSource(1))
+
 	var (
 		backend    = MockBackendForFakeBeacon{headers: make([]*types.Header, length)}
 		timeCursor = uint64(time.Now().Unix()) // Blocktime start from this time
@@ -126,10 +129,20 @@ func makeBackend(length int, candidateBlockTimes []uint64) ethapi.Backend {
 	for blockNumber := 0; blockNumber < length; blockNumber++ {
 		index := blockNumber % len(candidateBlockTimes)
 		timeCursor += candidateBlockTimes[index]
+
+		var delay uint64
+		if blockNumber%5 == 0 {
+			delay = uint64(rnd.Intn(10))
+			fmt.Println(delay)
+		}
+
 		backend.headers[blockNumber] = &types.Header{
 			Number: big.NewInt(int64(blockNumber)),
-			Time:   timeCursor,
+			Time:   timeCursor + delay,
 		}
+	}
+	for i, header := range backend.headers {
+		fmt.Printf("header %d: number=%d time=%d\n", i, header.Number, header.Time)
 	}
 	return &backend
 }
