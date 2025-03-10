@@ -38,17 +38,10 @@ func fetchBlockNumberByTime(ctx context.Context, ts int64, backend ethapi.Backen
 	)
 
 	for {
-		estimated := estimateBlockNumber(averageBlockTime, int64(cursor.Time), int64(cursor.Number.Uint64()), ts)
-
-		// Make sure the estimate number is within the range.
-		// If exceed the range, narrow the range by `1`.
-		if int64(highEdge.Number.Uint64()) < estimated {
-			estimated = int64(highEdge.Number.Uint64()) - 1
-		} else if lowEdge != nil && int64(lowEdge.Number.Uint64()) > estimated {
-			estimated = int64(lowEdge.Number.Uint64()) + 1
-		}
-
-		var err error
+		var (
+			estimated = estimateBlockNumber(averageBlockTime, int64(cursor.Time), int64(cursor.Number.Uint64()), ts)
+			err       error
+		)
 		if cursor, err = backend.HeaderByNumber(ctx, rpc.BlockNumber(estimated)); err != nil {
 			return nil, fmt.Errorf("failed to fetch block by timestamp %d: %v", ts, err)
 		}
