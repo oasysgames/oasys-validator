@@ -23,20 +23,22 @@ func fetchBlockNumberByTime(ctx context.Context, ts int64, backend ethapi.Backen
 	// Performs a range search to locate the block whose timestamp matches ts.
 	// Gradually narrows down the search range.
 	var (
-		blockPeriod = getBlockPeriod(backend.ChainConfig())
 		// highEdge and lowEdge represent the current known range of block headers.
 		highEdge = currentHeader // higher bound block header
 		lowEdge  *types.Header   // lower bound block header
 		// Start the search from the current header.
 		cursor = currentHeader
 		// isBackward toggles the search direction to help narrow the range.
-		// - true: search past blocks
-		// - false: search future blocks
+		// - true: search past blocks from cursor
+		// - false: search future blocks from cursor
 		isBackward = true
+		// The average block time is used to estimate the block number.
+		// The initial value is from the chain configuration.
+		averageBlockTime = getBlockPeriod(backend.ChainConfig())
 	)
 
 	for {
-		estimated := estimateBlockNumber(blockPeriod, int64(cursor.Time), int64(cursor.Number.Uint64()), ts)
+		estimated := estimateBlockNumber(averageBlockTime, int64(cursor.Time), int64(cursor.Number.Uint64()), ts)
 
 		// Make sure the estimate number is within the range.
 		// If exceed the range, narrow the range by `1`.
@@ -48,7 +50,7 @@ func fetchBlockNumberByTime(ctx context.Context, ts int64, backend ethapi.Backen
 
 		var err error
 		if cursor, err = backend.HeaderByNumber(ctx, rpc.BlockNumber(estimated)); err != nil {
-			return nil, fmt.Errorf("failed to fetch block by number %d: %v", estimated, err)
+			return nil, fmt.Errorf("failed to fetch block by timestamp %d: %v", ts, err)
 		}
 
 		// Succeed! Found the block.
@@ -56,22 +58,35 @@ func fetchBlockNumberByTime(ctx context.Context, ts int64, backend ethapi.Backen
 			return cursor, nil
 		}
 
-		// in case, lowEdge have not yet been found
-		// If lowEdge hasn't been set yet, adjust highEdge when target is earlier.
-		if lowEdge == nil && ts < int64(cursor.Time) {
-			highEdge = cursor
+		// Alternate updating the boundaries to narrow the search range.
+		if isBackward {
+			if ts > int64(cursor.Time) {
+				lowEdge = cursor
+				isBackward = !isBackward // Toggle the search direction.
+			} else {
+				highEdge = cursor
+			}
+		} else {
+			if ts < int64(cursor.Time) {
+				highEdge = cursor
+				isBackward = !isBackward // Toggle the search direction.
+			} else {
+				lowEdge = cursor
+			}
+		}
+
+		// Low edge yet to be reached.
+		if lowEdge == nil {
 			continue
 		}
 
-		// Alternate updating the boundaries to narrow the search range.
-		if isBackward {
-			lowEdge = cursor
-		} else {
-			highEdge = cursor
+		// Sanity check
+		if highEdge.Number.Cmp(lowEdge.Number) <= 0 {
+			return nil, fmt.Errorf("failed to fetch block by timestamp %d: highEdge %d <= lowEdge %d", ts, highEdge.Number, lowEdge.Number)
 		}
 
-		// Toggle the search direction.
-		isBackward = !isBackward
+		// Update average block time.
+		averageBlockTime = int64((highEdge.Time - lowEdge.Time) / (highEdge.Number.Uint64() - lowEdge.Number.Uint64()))
 	}
 }
 
