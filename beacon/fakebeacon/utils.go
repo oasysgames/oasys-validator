@@ -38,10 +38,9 @@ func fetchBlockNumberByTime(ctx context.Context, ts int64, backend ethapi.Backen
 	)
 
 	for {
-		estimated, err := estimateBlockNumber(averageBlockTime, int64(cursor.Time), int64(cursor.Number.Uint64()), ts)
-		if err != nil {
-			return nil, err
-		}
+		estimated := estimateBlockNumber(averageBlockTime, int64(cursor.Time), int64(cursor.Number.Uint64()), ts)
+
+		var err error
 		if cursor, err = backend.HeaderByNumber(ctx, rpc.BlockNumber(estimated)); err != nil {
 			return nil, fmt.Errorf("failed to fetch block by timestamp %d: %v", ts, err)
 		}
@@ -58,6 +57,11 @@ func fetchBlockNumberByTime(ctx context.Context, ts int64, backend ethapi.Backen
 				isBackward = !isBackward // Toggle the search direction.
 			} else {
 				highEdge = cursor
+				if highEdge.Number.Uint64() == 0 {
+					// higher bound reached genesis block.
+					// Occurs when the target time is earlier than the genesis block
+					return nil, fmt.Errorf("failed to fetch block by timestamp %d: earlier than genesis %d", ts, highEdge.Time)
+				}
 			}
 		} else {
 			if ts < int64(cursor.Time) {
@@ -96,7 +100,7 @@ func getBlockPeriod(cfg *params.ChainConfig) int64 {
 	}
 }
 
-func estimateBlockNumber(blockPeriod, sourceTime, sourceNumber, targetTime int64) (int64, error) {
+func estimateBlockNumber(blockPeriod, sourceTime, sourceNumber, targetTime int64) int64 {
 	diff := targetTime - sourceTime
 
 	// Determine how many blocks to shift.
@@ -112,14 +116,13 @@ func estimateBlockNumber(blockPeriod, sourceTime, sourceNumber, targetTime int64
 		estimated := sourceNumber - shift
 		if estimated < 0 {
 			// Smaller than genesis block.
-			return estimated, fmt.Errorf("estimated block is negative: %d, sourceTime: %d, sourceNumber: %d, targetTime: %d", estimated, sourceTime, sourceNumber, targetTime)
+			return 0
 		}
-		return estimated, nil
+		return estimated
 	}
 
 	// Target time is in the future from source time.
-	return sourceNumber + shift, nil
-
+	return sourceNumber + shift
 }
 
 // abs returns the absolute value of an int64.
