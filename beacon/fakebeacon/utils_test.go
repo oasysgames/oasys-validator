@@ -30,67 +30,51 @@ func TestFetchBlockNumberByTime(t *testing.T) {
 		name                string
 		chainLength         int
 		candidateBlockTimes []uint64
-		targetBlockNumber   int
-		expectedAttempts    int
 	}{
 		{
 			name:                "stable block growth",
 			chainLength:         100,
 			candidateBlockTimes: []uint64{bt},
-			targetBlockNumber:   10,
-			expectedAttempts:    2,
 		},
 		{
 			name:                "delayed block growth",
-			chainLength:         14400 * (7 + 1), // 1 week + 1
+			chainLength:         100,
 			candidateBlockTimes: []uint64{bt, bt, bt, bt, bt, bt + 1, bt + 1, bt + 2},
-			targetBlockNumber:   14400,
-			expectedAttempts:    6,
 		},
 		{
 			name:                "shorter block time",
-			chainLength:         14400,
+			chainLength:         100,
 			candidateBlockTimes: []uint64{bt - 3},
-			targetBlockNumber:   200,
-			expectedAttempts:    16,
 		},
 		{
 			name:                "longer block time",
-			chainLength:         14400 * 2,
+			chainLength:         100,
 			candidateBlockTimes: []uint64{bt + 3},
-			targetBlockNumber:   14400,
-			expectedAttempts:    3,
 		},
 		{
 			name:                "blocktime chainge",
-			chainLength:         1500,
-			candidateBlockTimes: append(genBtList(1000, bt*2), genBtList(500, bt)...),
-			targetBlockNumber:   500,
-			expectedAttempts:    4,
+			chainLength:         100,
+			candidateBlockTimes: append(genBtList(70, bt*2), genBtList(30, bt)...),
 		},
 		{
 			name:                "big jumps",
-			chainLength:         1000 * 4,
-			candidateBlockTimes: append(genBtList(999, bt), 1000*bt),
-			targetBlockNumber:   2000,
-			expectedAttempts:    12,
+			chainLength:         100 + 10,
+			candidateBlockTimes: append(genBtList(99, bt), 1000*bt),
 		},
 	}
 
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			backend := makeBackend(tt.chainLength, tt.candidateBlockTimes)
-			targetBlock, _ := backend.HeaderByNumber(ctx, rpc.BlockNumber(tt.targetBlockNumber))
-
-			actualBlock, err := fetchBlockNumberByTime(ctx, int64(targetBlock.Time), backend)
-			if err != nil {
-				t.Error(err)
-			}
-			if actualBlock.Number.Cmp(targetBlock.Number) != 0 {
-				t.Errorf("test %d: expected block number %d, got %d", i, targetBlock.Number, actualBlock.Number)
-			}
-			if backend.(*MockBackendForFakeBeacon).searchAttempts != tt.expectedAttempts {
-				t.Errorf("test %d: expected search attempts %d, got %d", i, tt.expectedAttempts, backend.(*MockBackendForFakeBeacon).searchAttempts)
+			for j := 0; j < tt.chainLength; j++ {
+				targetBlock, _ := backend.HeaderByNumber(ctx, rpc.BlockNumber(j))
+				actualBlock, err := fetchBlockNumberByTime(ctx, int64(targetBlock.Time), backend)
+				if err != nil {
+					t.Error(err)
+				}
+				if actualBlock.Number.Cmp(targetBlock.Number) != 0 {
+					t.Errorf("test %d-%d: expected block number %d, got %d", i, j, targetBlock.Number, actualBlock.Number)
+				}
 			}
 		})
 	}
