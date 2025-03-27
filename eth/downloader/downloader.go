@@ -48,18 +48,10 @@ var (
 	MaxReceiptFetch = 256 // Number of transaction receipts to allow fetching per request
 	MaxStateFetch   = 384 // Number of node state values to allow fetching per request
 
-<<<<<<< HEAD
-	maxQueuedHeaders            = 32 * 1024                         // [eth/62] Maximum number of headers to queue for import (DOS protection)
-	maxHeadersProcess           = 2048                              // Number of header download results to import at once into the chain
-	maxResultsProcess           = 2048                              // Number of content download results to import at once into the chain
-	FullMaxForkAncestry  uint64 = params.FullImmutabilityThreshold  // Maximum chain reorganisation (locally redeclared so tests can reduce it)
-	lightMaxForkAncestry uint64 = params.LightImmutabilityThreshold // Maximum chain reorganisation (locally redeclared so tests can reduce it)
-=======
 	maxQueuedHeaders           = 32 * 1024                        // [eth/62] Maximum number of headers to queue for import (DOS protection)
 	maxHeadersProcess          = 2048                             // Number of header download results to import at once into the chain
 	maxResultsProcess          = 2048                             // Number of content download results to import at once into the chain
 	FullMaxForkAncestry uint64 = params.FullImmutabilityThreshold // Maximum chain reorganisation (locally redeclared so tests can reduce it)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	reorgProtThreshold   = 48 // Threshold number of recent blocks to disable mini reorg protection
 	reorgProtHeaderDelay = 2  // Number of headers to delay delivering to cover mini reorgs
@@ -222,12 +214,9 @@ type BlockChain interface {
 
 	// UpdateChasingHead update remote best chain head, used by DA check now.
 	UpdateChasingHead(head *types.Header)
-<<<<<<< HEAD
-=======
 
 	// AncientTail retrieves the tail the ancients blocks
 	AncientTail() (uint64, error)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 type DownloadOption func(downloader *Downloader) *Downloader
@@ -565,29 +554,6 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td, ttd *
 		// the ancientLimit through that. Otherwise calculate the ancient limit through
 		// the advertised height of the remote peer. This most is mostly a fallback for
 		// legacy networks, but should eventually be dropped. TODO(karalabe).
-<<<<<<< HEAD
-		if beaconMode {
-			// Beacon sync, use the latest finalized block as the ancient limit
-			// or a reasonable height if no finalized block is yet announced.
-			if final != nil {
-				d.ancientLimit = final.Number.Uint64()
-			} else if height > FullMaxForkAncestry+1 {
-				d.ancientLimit = height - FullMaxForkAncestry - 1
-			} else {
-				d.ancientLimit = 0
-			}
-		} else {
-			// Legacy sync, use the best announcement we have from the remote peer.
-			// TODO(karalabe): Drop this pathway.
-			if height > FullMaxForkAncestry+1 {
-				d.ancientLimit = height - FullMaxForkAncestry - 1
-			} else {
-				d.ancientLimit = 0
-			}
-		}
-		frozen, _ := d.stateDB.Ancients() // Ignore the error here since light client can also hit here.
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 		// Legacy sync, use the best announcement we have from the remote peer.
 		// TODO(karalabe): Drop this pathway.
@@ -636,11 +602,7 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td, ttd *
 		fetchers = append(fetchers, func() error { return d.processFullSyncContent(ttd, beaconMode) })
 	}
 	// update the chasing head
-<<<<<<< HEAD
-	d.blockchain.UpdateChasingHead(latest)
-=======
 	d.blockchain.UpdateChasingHead(remoteHeader)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	return d.spawnSync(fetchers)
 }
 
@@ -834,12 +796,6 @@ func (d *Downloader) findAncestor(p *peerConnection, localHeight uint64, remoteH
 
 	// Recap floor value for binary search
 	maxForkAncestry := FullMaxForkAncestry
-<<<<<<< HEAD
-	if d.getMode() == LightSync {
-		maxForkAncestry = lightMaxForkAncestry
-	}
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	if localHeight >= maxForkAncestry {
 		// We're above the max reorg threshold, find the earliest fork point
 		floor = int64(localHeight - maxForkAncestry)
@@ -1416,11 +1372,7 @@ func (d *Downloader) importBlockResults(results []*fetchResult) error {
 	)
 	blocks := make([]*types.Block, len(results))
 	for i, result := range results {
-<<<<<<< HEAD
-		blocks[i] = types.NewBlockWithHeader(result.Header).WithBody(result.Transactions, result.Uncles).WithWithdrawals(result.Withdrawals).WithSidecars(result.Sidecars)
-=======
 		blocks[i] = types.NewBlockWithHeader(result.Header).WithBody(result.body()).WithSidecars(result.Sidecars)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	}
 	// Downloaded blocks are always regarded as trusted after the
 	// transition. Because the downloaded chain is guided by the
@@ -1635,11 +1587,7 @@ func (d *Downloader) commitSnapSyncData(results []*fetchResult, stateSync *state
 	blocks := make([]*types.Block, len(results))
 	receipts := make([]types.Receipts, len(results))
 	for i, result := range results {
-<<<<<<< HEAD
-		blocks[i] = types.NewBlockWithHeader(result.Header).WithBody(result.Transactions, result.Uncles).WithWithdrawals(result.Withdrawals).WithSidecars(result.Sidecars)
-=======
 		blocks[i] = types.NewBlockWithHeader(result.Header).WithBody(result.body()).WithSidecars(result.Sidecars)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		receipts[i] = result.Receipts
 	}
 	if index, err := d.blockchain.InsertReceiptChain(blocks, receipts, d.ancientLimit); err != nil {
@@ -1650,11 +1598,7 @@ func (d *Downloader) commitSnapSyncData(results []*fetchResult, stateSync *state
 }
 
 func (d *Downloader) commitPivotBlock(result *fetchResult) error {
-<<<<<<< HEAD
-	block := types.NewBlockWithHeader(result.Header).WithBody(result.Transactions, result.Uncles).WithWithdrawals(result.Withdrawals).WithSidecars(result.Sidecars)
-=======
 	block := types.NewBlockWithHeader(result.Header).WithBody(result.body()).WithSidecars(result.Sidecars)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	log.Debug("Committing snap sync pivot as new head", "number", block.Number(), "hash", block.Hash())
 
 	// Commit the pivot block as the new head, will require full sync from here on
