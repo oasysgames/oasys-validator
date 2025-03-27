@@ -142,17 +142,6 @@ func NewOracle(backend OracleBackend, params Config, startPrice *big.Int) *Oracl
 	}
 
 	return &Oracle{
-<<<<<<< HEAD
-		backend:          backend,
-		lastPrice:        startPrice,
-		maxPrice:         maxPrice,
-		ignorePrice:      ignorePrice,
-		checkBlocks:      blocks,
-		percentile:       percent,
-		maxHeaderHistory: maxHeaderHistory,
-		maxBlockHistory:  maxBlockHistory,
-		historyCache:     cache,
-=======
 		backend:           backend,
 		lastPrice:         startPrice,
 		maxPrice:          maxPrice,
@@ -164,7 +153,6 @@ func NewOracle(backend OracleBackend, params Config, startPrice *big.Int) *Oracl
 		historyCache:      cache,
 		sampleTxThreshold: params.OracleThreshold,
 		defaultPrice:      startPrice,
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	}
 }
 

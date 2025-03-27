@@ -19,27 +19,17 @@ package gasprice
 import (
 	"context"
 	"crypto/sha256"
-<<<<<<< HEAD
-=======
 	"errors"
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	"fmt"
 	"math"
 	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-<<<<<<< HEAD
-	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/consensus/beacon"
-	"github.com/ethereum/go-ethereum/consensus/ethash"
-	"github.com/ethereum/go-ethereum/core"
-=======
 	"github.com/ethereum/go-ethereum/consensus/beacon"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -163,34 +153,23 @@ func newTestBackend(t *testing.T, londonBlock *big.Int, cancunBlock *big.Int, pe
 
 		// Compute empty blob hash.
 		emptyBlob          = kzg4844.Blob{}
-<<<<<<< HEAD
-		emptyBlobCommit, _ = kzg4844.BlobToCommitment(emptyBlob)
-=======
 		emptyBlobCommit, _ = kzg4844.BlobToCommitment(&emptyBlob)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		emptyBlobVHash     = kzg4844.CalcBlobHashV1(sha256.New(), &emptyBlobCommit)
 	)
 	config.LondonBlock = londonBlock
 	config.ArrowGlacierBlock = londonBlock
 	config.GrayGlacierBlock = londonBlock
-<<<<<<< HEAD
-	var engine consensus.Engine = beacon.New(ethash.NewFaker())
-=======
 
 	engine := beacon.New(ethash.NewFaker())
 	engine.TestingTTDBlock(testHead + 1)
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	td := params.GenesisDifficulty.Uint64()
 
 	if cancunBlock != nil {
 		ts := gspec.Timestamp + cancunBlock.Uint64()*10 // fixed 10 sec block time in blockgen
 		config.ShanghaiTime = &ts
 		config.CancunTime = &ts
-<<<<<<< HEAD
-=======
 		config.BlobScheduleConfig = params.DefaultBlobSchedule
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		signer = types.LatestSigner(gspec.Config)
 	}
 
