@@ -724,30 +724,18 @@ func (api *BlockChainAPI) GetBlockReceipts(ctx context.Context, blockNrOrHash rp
 	return result, nil
 }
 
-<<<<<<< HEAD
-func (s *BlockChainAPI) GetBlobSidecars(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, fullBlob *bool) ([]map[string]interface{}, error) {
-=======
 func (api *BlockChainAPI) GetBlobSidecars(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, fullBlob *bool) ([]map[string]interface{}, error) {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	showBlob := true
 	if fullBlob != nil {
 		showBlob = *fullBlob
 	}
-<<<<<<< HEAD
-	header, err := s.b.HeaderByNumberOrHash(ctx, blockNrOrHash)
-=======
 	header, err := api.b.HeaderByNumberOrHash(ctx, blockNrOrHash)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	if header == nil || err != nil {
 		// When the block doesn't exist, the RPC method should return JSON null
 		// as per specification.
 		return nil, nil
 	}
-<<<<<<< HEAD
-	blobSidecars, err := s.b.GetBlobSidecars(ctx, header.Hash())
-=======
 	blobSidecars, err := api.b.GetBlobSidecars(ctx, header.Hash())
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	if err != nil || blobSidecars == nil {
 		return nil, nil
 	}
@@ -758,38 +746,22 @@ func (api *BlockChainAPI) GetBlobSidecars(ctx context.Context, blockNrOrHash rpc
 	return result, nil
 }
 
-<<<<<<< HEAD
-func (s *BlockChainAPI) GetBlobSidecarByTxHash(ctx context.Context, hash common.Hash, fullBlob *bool) (map[string]interface{}, error) {
-=======
 func (api *BlockChainAPI) GetBlobSidecarByTxHash(ctx context.Context, hash common.Hash, fullBlob *bool) (map[string]interface{}, error) {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	showBlob := true
 	if fullBlob != nil {
 		showBlob = *fullBlob
 	}
-<<<<<<< HEAD
-	txTarget, blockHash, _, Index := rawdb.ReadTransaction(s.b.ChainDb(), hash)
-	if txTarget == nil {
-		return nil, nil
-	}
-	block, err := s.b.BlockByHash(ctx, blockHash)
-=======
 	txTarget, blockHash, _, Index := rawdb.ReadTransaction(api.b.ChainDb(), hash)
 	if txTarget == nil {
 		return nil, nil
 	}
 	block, err := api.b.BlockByHash(ctx, blockHash)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	if block == nil || err != nil {
 		// When the block doesn't exist, the RPC method should return JSON null
 		// as per specification.
 		return nil, nil
 	}
-<<<<<<< HEAD
-	blobSidecars, err := s.b.GetBlobSidecars(ctx, blockHash)
-=======
 	blobSidecars, err := api.b.GetBlobSidecars(ctx, blockHash)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	if err != nil || blobSidecars == nil || len(blobSidecars) == 0 {
 		return nil, nil
 	}
@@ -1184,17 +1156,14 @@ func DoEstimateGas(ctx context.Context, b Backend, args TransactionArgs, blockNr
 	if err := args.CallDefaults(gasCap, header.BaseFee, b.ChainConfig().ChainID); err != nil {
 		return 0, err
 	}
-<<<<<<< HEAD
 	// Fail if the address is not allowed to call
 	to := args.To
 	if to != nil && vm.IsDeniedToCall(state, *to) {
 		return 0, fmt.Errorf("the calling contract is in denlylist. to: %s", to.Hex())
 	}
-=======
 	call := args.ToMessage(header.BaseFee, true, true)
 
 	// Run the gas estimation and wrap any revertals into a custom return
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	estimate, revert, err := gasestimator.Estimate(ctx, call, opts, gasCap)
 	if err != nil {
 		if len(revert) > 0 {
