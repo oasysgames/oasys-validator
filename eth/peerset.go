@@ -24,10 +24,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-<<<<<<< HEAD
-=======
 	"github.com/ethereum/go-ethereum/core"
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	"github.com/ethereum/go-ethereum/eth/protocols/bsc"
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/eth/protocols/snap"
@@ -55,13 +52,10 @@ var (
 	// snap protocol without advertising the eth main protocol.
 	errSnapWithoutEth = errors.New("peer connected on snap without compatible eth support")
 
-<<<<<<< HEAD
-=======
 	// errTrustWithoutEth is returned if a peer attempts to connect only on the
 	// trust protocol without advertising the eth main protocol.
 	errTrustWithoutEth = errors.New("peer connected on trust without compatible eth support")
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	// errBscWithoutEth is returned if a peer attempts to connect only on the
 	// bsc protocol without advertising the eth main protocol.
 	errBscWithoutEth = errors.New("peer connected on bsc without compatible eth support")
@@ -83,12 +77,9 @@ type peerSet struct {
 	snapWait map[string]chan *snap.Peer // Peers connected on `eth` waiting for their snap extension
 	snapPend map[string]*snap.Peer      // Peers connected on the `snap` protocol, but not yet on `eth`
 
-<<<<<<< HEAD
-=======
 	trustWait map[string]chan *trust.Peer // Peers connected on `eth` waiting for their trust extension
 	trustPend map[string]*trust.Peer      // Peers connected on the `trust` protocol, but not yet on `eth`
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	bscWait map[string]chan *bsc.Peer // Peers connected on `eth` waiting for their bsc extension
 	bscPend map[string]*bsc.Peer      // Peers connected on the `bsc` protocol, but not yet on `eth`
 
@@ -100,14 +91,6 @@ type peerSet struct {
 // newPeerSet creates a new peer set to track the active participants.
 func newPeerSet() *peerSet {
 	return &peerSet{
-<<<<<<< HEAD
-		peers:    make(map[string]*ethPeer),
-		snapWait: make(map[string]chan *snap.Peer),
-		snapPend: make(map[string]*snap.Peer),
-		bscWait:  make(map[string]chan *bsc.Peer),
-		bscPend:  make(map[string]*bsc.Peer),
-		quitCh:   make(chan struct{}),
-=======
 		peers:     make(map[string]*ethPeer),
 		snapWait:  make(map[string]chan *snap.Peer),
 		snapPend:  make(map[string]*snap.Peer),
@@ -116,7 +99,6 @@ func newPeerSet() *peerSet {
 		bscWait:   make(map[string]chan *bsc.Peer),
 		bscPend:   make(map[string]*bsc.Peer),
 		quitCh:    make(chan struct{}),
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	}
 }
 
@@ -150,8 +132,6 @@ func (ps *peerSet) registerSnapExtension(peer *snap.Peer) error {
 	return nil
 }
 
-<<<<<<< HEAD
-=======
 // registerTrustExtension unblocks an already connected `eth` peer waiting for its
 // `trust` extension, or if no such peer exists, tracks the extension for the time
 // being until the `eth` main protocol starts looking for it.
@@ -186,7 +166,6 @@ func (ps *peerSet) registerTrustExtension(peer *trust.Peer) error {
 	return nil
 }
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 // registerBscExtension unblocks an already connected `eth` peer waiting for its
 // `bsc` extension, or if no such peer exists, tracks the extension for the time
 // being until the `eth` main protocol starts looking for it.
@@ -217,11 +196,7 @@ func (ps *peerSet) registerBscExtension(peer *bsc.Peer) error {
 	return nil
 }
 
-<<<<<<< HEAD
-// waitExtensions blocks until all satellite protocols are connected and tracked
-=======
 // waitSnapExtension blocks until all satellite protocols are connected and tracked
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 // by the peerset.
 func (ps *peerSet) waitSnapExtension(peer *eth.Peer) (*snap.Peer, error) {
 	// If the peer does not support a compatible `snap`, don't wait
@@ -253,13 +228,8 @@ func (ps *peerSet) waitSnapExtension(peer *eth.Peer) (*snap.Peer, error) {
 	ps.lock.Unlock()
 
 	select {
-<<<<<<< HEAD
-	case p := <-wait:
-		return p, nil
-=======
 	case peer := <-wait:
 		return peer, nil
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	case <-time.After(extensionWaitTimeout):
 		ps.lock.Lock()
@@ -275,8 +245,6 @@ func (ps *peerSet) waitSnapExtension(peer *eth.Peer) (*snap.Peer, error) {
 	}
 }
 
-<<<<<<< HEAD
-=======
 // waitTrustExtension blocks until all satellite protocols are connected and tracked
 // by the peerset.
 func (ps *peerSet) waitTrustExtension(peer *eth.Peer) (*trust.Peer, error) {
@@ -330,7 +298,6 @@ func (ps *peerSet) waitTrustExtension(peer *eth.Peer) (*trust.Peer, error) {
 	}
 }
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 // waitBscExtension blocks until all satellite protocols are connected and tracked
 // by the peerset.
 func (ps *peerSet) waitBscExtension(peer *eth.Peer) (*bsc.Peer, error) {
@@ -396,11 +363,6 @@ func (ps *peerSet) waitBscExtension(peer *eth.Peer) (*bsc.Peer, error) {
 	}
 }
 
-<<<<<<< HEAD
-// registerPeer injects a new `eth` peer into the working set, or returns an error
-// if the peer is already known.
-func (ps *peerSet) registerPeer(peer *eth.Peer, ext *snap.Peer, bscExt *bsc.Peer) error {
-=======
 // GetVerifyPeers returns an array of verify nodes.
 func (ps *peerSet) GetVerifyPeers() []core.VerifyPeer {
 	ps.lock.RLock()
@@ -418,7 +380,6 @@ func (ps *peerSet) GetVerifyPeers() []core.VerifyPeer {
 // registerPeer injects a new `eth` peer into the working set, or returns an error
 // if the peer is already known.
 func (ps *peerSet) registerPeer(peer *eth.Peer, ext *snap.Peer, trustExt *trust.Peer, bscExt *bsc.Peer) error {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	// Start tracking the new peer
 	ps.lock.Lock()
 	defer ps.lock.Unlock()
@@ -437,12 +398,9 @@ func (ps *peerSet) registerPeer(peer *eth.Peer, ext *snap.Peer, trustExt *trust.
 		eth.snapExt = &snapPeer{ext}
 		ps.snapPeers++
 	}
-<<<<<<< HEAD
-=======
 	if trustExt != nil {
 		eth.trustExt = &trustPeer{trustExt}
 	}
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	if bscExt != nil {
 		eth.bscExt = &bscPeer{bscExt}
 	}
