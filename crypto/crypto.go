@@ -208,11 +208,7 @@ func FromECDSA(priv *ecdsa.PrivateKey) []byte {
 
 // UnmarshalPubkey converts bytes to a secp256k1 public key.
 func UnmarshalPubkey(pub []byte) (*ecdsa.PublicKey, error) {
-<<<<<<< HEAD
-	x, y := elliptic.Unmarshal(S256(), pub) //nolint:all //TODO
-=======
 	x, y := S256().Unmarshal(pub)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	if x == nil {
 		return nil, errInvalidPubkey
 	}
@@ -226,11 +222,7 @@ func FromECDSAPub(pub *ecdsa.PublicKey) []byte {
 	if pub == nil || pub.X == nil || pub.Y == nil {
 		return nil
 	}
-<<<<<<< HEAD
-	return elliptic.Marshal(S256(), pub.X, pub.Y) //nolint:all //TODO
-=======
 	return S256().Marshal(pub.X, pub.Y)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 // HexToECDSA parses a secp256k1 private key.
