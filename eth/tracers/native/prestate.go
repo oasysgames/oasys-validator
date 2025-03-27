@@ -100,62 +100,8 @@ func newPrestateTracer(ctx *tracers.Context, cfg json.RawMessage, chainConfig *p
 	}, nil
 }
 
-<<<<<<< HEAD
-// CaptureStart implements the EVMLogger interface to initialize the tracing operation.
-func (t *prestateTracer) CaptureStart(env *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
-	t.env = env
-	t.create = create
-	t.to = to
-
-	t.lookupAccount(from)
-	t.lookupAccount(to)
-	t.lookupAccount(env.Context.Coinbase)
-
-	// The recipient balance includes the value transferred.
-	toBal := new(big.Int).Sub(t.pre[to].Balance, value)
-	t.pre[to].Balance = toBal
-
-	// The sender balance is after reducing: value and gasLimit.
-	// We need to re-add them to get the pre-tx balance.
-	fromBal := new(big.Int).Set(t.pre[from].Balance)
-	gasPrice := env.TxContext.GasPrice
-	consumedGas := new(big.Int).Mul(gasPrice, new(big.Int).SetUint64(t.gasLimit))
-	fromBal.Add(fromBal, new(big.Int).Add(value, consumedGas))
-
-	// Add blob fee to the sender's balance.
-	if env.Context.BlobBaseFee != nil && len(env.TxContext.BlobHashes) > 0 {
-		blobGas := uint64(params.BlobTxBlobGasPerBlob * len(env.TxContext.BlobHashes))
-		fromBal.Add(fromBal, new(big.Int).Mul(env.Context.BlobBaseFee, new(big.Int).SetUint64(blobGas)))
-	}
-	t.pre[from].Balance = fromBal
-	t.pre[from].Nonce--
-
-	if create && t.config.DiffMode {
-		t.created[to] = true
-	}
-}
-
-// CaptureEnd is called after the call finishes to finalize the tracing.
-func (t *prestateTracer) CaptureEnd(output []byte, gasUsed uint64, err error) {
-	if t.config.DiffMode {
-		return
-	}
-
-	if t.create {
-		// Keep existing account prior to contract creation at that address
-		if s := t.pre[t.to]; s != nil && !s.exists() {
-			// Exclude newly created contract.
-			delete(t.pre, t.to)
-		}
-	}
-}
-
-// CaptureState implements the EVMLogger interface to trace a single step of VM execution.
-func (t *prestateTracer) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
-=======
 // OnOpcode implements the EVMLogger interface to trace a single step of VM execution.
 func (t *prestateTracer) OnOpcode(pc uint64, opcode byte, gas, cost uint64, scope tracing.OpContext, rData []byte, depth int, err error) {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	if err != nil {
 		return
 	}
