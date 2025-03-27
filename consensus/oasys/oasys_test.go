@@ -6,8 +6,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/internal/testrand"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/trie/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,8 +26,8 @@ func TestAssembleEnvAndValidators(t *testing.T) {
 	)
 
 	for i := 0; i < size; i++ {
-		validators.Owners[i] = testutil.RandomAddress()
-		validators.Operators[i] = testutil.RandomAddress()
+		validators.Owners[i] = testrand.Address()
+		validators.Operators[i] = testrand.Address()
 		validators.Stakes[i] = newEth(int64(i))
 		validators.VoteAddresses[i] = randomBLSPublicKey()
 	}
@@ -109,5 +109,5 @@ func newEth(n int64) *big.Int {
 }
 
 func randomBLSPublicKey() types.BLSPublicKey {
-	return types.BLSPublicKey(testutil.RandBytes(types.BLSPublicKeyLength))
+	return types.BLSPublicKey(testrand.Bytes(types.BLSPublicKeyLength))
 }
