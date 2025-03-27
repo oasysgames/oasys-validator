@@ -37,13 +37,7 @@ import (
 	"github.com/ethereum/go-ethereum/beacon/fakebeacon"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
-<<<<<<< HEAD
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/eth/catalyst"
-	"github.com/ethereum/go-ethereum/eth/downloader"
-=======
 	"github.com/ethereum/go-ethereum/core/rawdb"
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/internal/flags"
@@ -237,8 +231,6 @@ func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend) {
 	if ctx.IsSet(utils.OverrideDefaultExtraReserveForBlobRequests.Name) {
 		params.DefaultExtraReserveForBlobRequests = ctx.Uint64(utils.OverrideDefaultExtraReserveForBlobRequests.Name)
 	}
-<<<<<<< HEAD
-=======
 	if ctx.IsSet(utils.OverrideBreatheBlockInterval.Name) {
 		params.BreatheBlockInterval = ctx.Uint64(utils.OverrideBreatheBlockInterval.Name)
 	}
@@ -246,7 +238,6 @@ func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend) {
 		params.FixedTurnLength = ctx.Uint64(utils.OverrideFixedTurnLength.Name)
 	}
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	backend, eth := utils.RegisterEthService(stack, &cfg.Eth)
 
 	// Create gauge with geth system and build information
@@ -277,41 +268,6 @@ func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend) {
 
 	if ctx.IsSet(utils.FakeBeaconAddrFlag.Name) {
 		cfg.FakeBeacon.Addr = ctx.String(utils.FakeBeaconAddrFlag.Name)
-<<<<<<< HEAD
-	}
-	if ctx.IsSet(utils.FakeBeaconPortFlag.Name) {
-		cfg.FakeBeacon.Port = ctx.Int(utils.FakeBeaconPortFlag.Name)
-	}
-	if cfg.FakeBeacon.Enable || ctx.IsSet(utils.FakeBeaconEnabledFlag.Name) {
-		go fakebeacon.NewService(&cfg.FakeBeacon, backend).Run()
-	}
-
-	// Configure full-sync tester service if requested
-	if ctx.IsSet(utils.SyncTargetFlag.Name) {
-		hex := hexutil.MustDecode(ctx.String(utils.SyncTargetFlag.Name))
-		if len(hex) != common.HashLength {
-			utils.Fatalf("invalid sync target length: have %d, want %d", len(hex), common.HashLength)
-		}
-		utils.RegisterFullSyncTester(stack, eth, common.BytesToHash(hex))
-	}
-	// Start the dev mode if requested, or launch the engine API for
-	// interacting with external consensus client.
-	if ctx.IsSet(utils.DeveloperFlag.Name) {
-		simBeacon, err := catalyst.NewSimulatedBeacon(ctx.Uint64(utils.DeveloperPeriodFlag.Name), eth)
-		if err != nil {
-			utils.Fatalf("failed to register dev mode catalyst service: %v", err)
-		}
-		catalyst.RegisterSimulatedBeaconAPIs(stack, simBeacon)
-		stack.RegisterLifecycle(simBeacon)
-	}
-	// Don't enable Engine API, ideally only when the consensus engine is Oasys
-	// else {
-	// 	err := catalyst.Register(stack, eth)
-	// 	if err != nil {
-	// 		utils.Fatalf("failed to register catalyst service: %v", err)
-	// 	}
-	// }
-=======
 	}
 	if ctx.IsSet(utils.FakeBeaconPortFlag.Name) {
 		cfg.FakeBeacon.Port = ctx.Int(utils.FakeBeaconPortFlag.Name)
@@ -327,7 +283,6 @@ func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend) {
 		utils.EnableNodeInfo(&cfg.Eth.TxPool, stack.Server().NodeInfo()),
 		utils.EnableNodeTrack(ctx, &cfg.Eth, stack),
 	)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	return stack, backend
 }
 

@@ -81,13 +81,9 @@ var (
 		utils.OverrideFullImmutabilityThreshold,
 		utils.OverrideMinBlocksForBlobRequests,
 		utils.OverrideDefaultExtraReserveForBlobRequests,
-<<<<<<< HEAD
-		utils.EnablePersonal,
-=======
 		utils.OverrideBreatheBlockInterval,
 		utils.OverrideFixedTurnLength,
 		utils.EnablePersonal, // deprecated
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		utils.TxPoolLocalsFlag,
 		utils.TxPoolNoLocalsFlag,
 		utils.TxPoolJournalFlag,
@@ -181,24 +177,16 @@ var (
 		utils.GpoMaxGasPriceFlag,
 		utils.GpoIgnoreGasPriceFlag,
 		configFileFlag,
-<<<<<<< HEAD
-=======
 		utils.BlockAmountReserved,
 		utils.CheckSnapshotWithMPT,
 		utils.EnableDoubleSignMonitorFlag,
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		utils.VotingEnabledFlag,
 		utils.DisableVoteAttestationFlag,
 		utils.EnableMaliciousVoteMonitorFlag,
 		utils.BLSPasswordFileFlag,
 		utils.BLSWalletDirFlag,
 		utils.VoteJournalDirFlag,
-<<<<<<< HEAD
 		utils.VoteKeyNameFlag,
-		utils.LogDebugFlag,
-		utils.LogBacktraceAtFlag,
-		utils.BlobExtraReserveFlag,
-=======
 		utils.LogDebugFlag,
 		utils.LogBacktraceAtFlag,
 		utils.BlobExtraReserveFlag,
@@ -210,7 +198,6 @@ var (
 		// utils.BeaconGenesisRootFlag,
 		// utils.BeaconGenesisTimeFlag,
 		// utils.BeaconCheckpointFlag,
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	}, utils.NetworkFlags, utils.DatabaseFlags)
 
 	rpcFlags = []cli.Flag{
