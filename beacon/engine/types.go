@@ -299,11 +299,7 @@ func ExecutableDataToBlockNoHash(data ExecutableData, versionedHashes []common.H
 
 // BlockToExecutableData constructs the ExecutableData structure by filling the
 // fields from the given block. It assumes the given block is post-merge block.
-<<<<<<< HEAD
-func BlockToExecutableData(block *types.Block, fees *big.Int, sidecars types.BlobSidecars) *ExecutionPayloadEnvelope {
-=======
 func BlockToExecutableData(block *types.Block, fees *big.Int, sidecars []*types.BlobTxSidecar, requests [][]byte) *ExecutionPayloadEnvelope {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	data := &ExecutableData{
 		BlockHash:        block.Hash(),
 		ParentHash:       block.ParentHash(),
