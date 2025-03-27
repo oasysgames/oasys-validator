@@ -135,19 +135,11 @@ func (b *testBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subsc
 }
 
 func (b *testBackend) SubscribeFinalizedHeaderEvent(ch chan<- core.FinalizedHeaderEvent) event.Subscription {
-<<<<<<< HEAD
-	return nil
-}
-
-func (b *testBackend) SubscribeNewVoteEvent(ch chan<- core.NewVoteEvent) event.Subscription {
-	return nil
-=======
 	return b.finalizedHeaderFeed.Subscribe(ch)
 }
 
 func (b *testBackend) SubscribeNewVoteEvent(ch chan<- core.NewVoteEvent) event.Subscription {
 	return b.voteFeed.Subscribe(ch)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 func (b *testBackend) BloomStatus() (uint64, uint64) {
