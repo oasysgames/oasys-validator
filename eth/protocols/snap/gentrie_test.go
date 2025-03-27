@@ -551,8 +551,6 @@ func TestTinyPartialTree(t *testing.T) {
 		}
 	}
 }
-<<<<<<< HEAD
-=======
 
 func TestTrieDelete(t *testing.T) {
 	var entries []*kv
@@ -695,4 +693,3 @@ func TestTrieDelete(t *testing.T) {
 		check(c.index)
 	}
 }
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
