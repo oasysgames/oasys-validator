@@ -32,22 +32,6 @@ const (
 	StableStateThreshold uint64 = 128
 )
 
-<<<<<<< HEAD
-	// LightImmutabilityThreshold is the number of blocks after which a header chain
-	// segment is considered immutable for light client(i.e. soft finality). It is used by
-	// the downloader as a hard limit against deep ancestors, by the blockchain against deep
-	// reorgs, by the light pruner as the pruning validity guarantee.
-	LightImmutabilityThreshold = 30000
-=======
-var (
-	// FullImmutabilityThreshold is the number of blocks after which a chain segment is
-	// considered immutable (i.e. soft finality). It is used by the downloader as a
-	// hard limit against deep ancestors, by the blockchain against deep reorgs, by
-	// the freezer as the cutoff threshold and by clique as the snapshot trust limit.
-	FullImmutabilityThreshold uint64 = 90000
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
-)
-
 var (
 	// FullImmutabilityThreshold is the number of blocks after which a chain segment is
 	// considered immutable (i.e. soft finality). It is used by the downloader as a
