@@ -26,23 +26,15 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/beacon"
 	"github.com/ethereum/go-ethereum/consensus/clique"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
-<<<<<<< HEAD
 	"github.com/ethereum/go-ethereum/consensus/oasys"
-=======
-	"github.com/ethereum/go-ethereum/consensus/parlia"
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/txpool/blobpool"
 	"github.com/ethereum/go-ethereum/core/txpool/legacypool"
 	"github.com/ethereum/go-ethereum/eth/gasprice"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
-<<<<<<< HEAD
-	"github.com/ethereum/go-ethereum/miner"
-=======
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/miner/minerconfig"
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -78,11 +70,7 @@ var Defaults = Config{
 	RPCEVMTimeout:      5 * time.Second,
 	GPO:                FullNodeGPO,
 	RPCTxFeeCap:        1,                                         // 1 ether
-<<<<<<< HEAD
 	BlobExtraReserve:   params.DefaultExtraReserveForBlobRequests, // Extra reserve threshold for blob, blob never expires when -1 is set, default 14400
-=======
-	BlobExtraReserve:   params.DefaultExtraReserveForBlobRequests, // Extra reserve threshold for blob, blob never expires when -1 is set, default 28800
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 //go:generate go run github.com/fjl/gencodec -type Config -formats toml -out gen_config.go
@@ -216,25 +204,9 @@ type Config struct {
 // CreateConsensusEngine creates a consensus engine for the given chain config.
 // Clique is allowed for now to live standalone, but ethash is forbidden and can
 // only exist on already merged networks.
-<<<<<<< HEAD
-func CreateConsensusEngine(config *params.ChainConfig, db ethdb.Database, ethAPI *ethapi.BlockChainAPI) (consensus.Engine, error) {
-	// If proof-of-authority is requested, set it up
-	if config.Clique != nil {
-		return beacon.New(clique.New(config.Clique, db)), nil
-	}
-	// If proof-of-stake is requested, set it up
+func CreateConsensusEngine(config *params.ChainConfig, db ethdb.Database, ee *ethapi.BlockChainAPI, genesisHash common.Hash) (consensus.Engine, error) {
 	if config.Oasys != nil {
 		return oasys.New(config, config.Oasys, db, ethAPI), nil
-	}
-	// If defaulting to proof-of-work, enforce an already merged network since
-	// we cannot run PoW algorithms anymore, so we cannot even follow a chain
-	// not coordinated by a beacon node.
-	if !config.TerminalTotalDifficultyPassed {
-		return nil, errors.New("ethash is only supported as a historical component of already merged networks")
-=======
-func CreateConsensusEngine(config *params.ChainConfig, db ethdb.Database, ee *ethapi.BlockChainAPI, genesisHash common.Hash) (consensus.Engine, error) {
-	if config.Parlia != nil {
-		return parlia.New(config, db, ee, genesisHash), nil
 	}
 	if config.TerminalTotalDifficulty == nil {
 		log.Error("Geth only supports PoS networks. Please transition legacy networks using Geth v1.13.x.")
@@ -242,8 +214,7 @@ func CreateConsensusEngine(config *params.ChainConfig, db ethdb.Database, ee *et
 	}
 	// If proof-of-authority is requested, set it up
 	if config.Clique != nil {
-		return clique.New(config.Clique, db), nil
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
+		return beacon.New(clique.New(config.Clique, db)), nil
 	}
 	return beacon.New(ethash.NewFaker()), nil
 }
