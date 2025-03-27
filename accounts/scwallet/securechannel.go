@@ -75,11 +75,7 @@ func NewSecureChannelSession(card *pcsc.Card, keyData []byte) (*SecureChannelSes
 	return &SecureChannelSession{
 		card:      card,
 		secret:    secret.Bytes(),
-<<<<<<< HEAD
-		publicKey: elliptic.Marshal(crypto.S256(), key.PublicKey.X, key.PublicKey.Y), //nolint:all //TODO
-=======
 		publicKey: crypto.FromECDSAPub(&key.PublicKey),
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	}, nil
 }
 
