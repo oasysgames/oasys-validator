@@ -165,18 +165,6 @@ func (db *Database) TruncateTail(n uint64) (uint64, error) {
 // TruncateTableTail will truncate certain table to new tail
 func (db *Database) TruncateTableTail(kind string, tail uint64) (uint64, error) {
 	panic("not supported")
-<<<<<<< HEAD
-}
-
-// ResetTable will reset certain table with new start point
-func (db *Database) ResetTable(kind string, startAt uint64, onlyEmpty bool) error {
-	panic("not supported")
-}
-
-func (db *Database) Sync() error {
-	return nil
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 // ResetTable will reset certain table with new start point
