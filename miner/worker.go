@@ -32,11 +32,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
-<<<<<<< HEAD
-	contracts "github.com/ethereum/go-ethereum/contracts/oasys"
-=======
 	"github.com/ethereum/go-ethereum/consensus/parlia"
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/stateless"
@@ -182,17 +178,12 @@ type newWorkReq struct {
 type newPayloadResult struct {
 	err      error
 	block    *types.Block
-<<<<<<< HEAD
-	fees     *big.Int           // total block fees
-	sidecars types.BlobSidecars // collected blobs of blob transactions
-=======
 	fees     *big.Int               // total block fees
 	sidecars []*types.BlobTxSidecar // collected blobs of blob transactions
 	stateDB  *state.StateDB         // StateDB after executing the transactions
 	receipts []*types.Receipt       // Receipts collected during construction
 	requests [][]byte               // Consensus layer requests collected during block construction
 	witness  *stateless.Witness     // Witness is an optional stateless proof
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 // getWorkReq represents a request for getting a new sealing work with provided parameters.
@@ -485,12 +476,8 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 		case <-timer.C:
 			// If sealing is running resubmit a new work cycle periodically to pull in
 			// higher priced transactions. Disable this overhead for pending blocks.
-<<<<<<< HEAD
-			if w.isRunning() && ((w.chainConfig.Clique != nil && w.chainConfig.Clique.Period > 0) || (w.chainConfig.Oasys != nil && w.chainConfig.Oasys.Period > 0)) {
-=======
 			if w.isRunning() && ((w.chainConfig.Clique != nil &&
-				w.chainConfig.Clique.Period > 0) || (w.chainConfig.Parlia != nil && w.chainConfig.Parlia.Period > 0)) {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
+				w.chainConfig.Clique.Period > 0) || (w.chainConfig.Oasys != nil && w.chainConfig.Oasys.Period > 0)) {
 				// Short circuit if no new transaction arrives.
 				commit(commitInterruptResubmit)
 			}
@@ -532,57 +519,7 @@ func (w *worker) mainLoop() {
 			w.commitWork(req.interruptCh, req.timestamp)
 
 		case req := <-w.getWorkCh:
-<<<<<<< HEAD
-			req.result <- w.generateWork(req.params)
-
-		case ev := <-w.txsCh:
-			// Apply transactions to the pending state if we're not sealing
-			//
-			// Note all transactions received may not be continuous with transactions
-			// already included in the current sealing block. These transactions will
-			// be automatically eliminated.
-			if !w.isRunning() && w.current != nil {
-				// If block is already full, abort
-				if gp := w.current.gasPool; gp != nil && gp.Gas() < params.TxGas {
-					continue
-				}
-				txs := make(map[common.Address][]*txpool.LazyTransaction, len(ev.Txs))
-				for _, tx := range ev.Txs {
-					acc, _ := types.Sender(w.current.signer, tx)
-					txs[acc] = append(txs[acc], &txpool.LazyTransaction{
-						Pool:      w.eth.TxPool(), // We don't know where this came from, yolo resolve from everywhere
-						Hash:      tx.Hash(),
-						Tx:        nil, // Do *not* set this! We need to resolve it later to pull blobs in
-						Time:      tx.Time(),
-						GasFeeCap: uint256.MustFromBig(tx.GasFeeCap()),
-						GasTipCap: uint256.MustFromBig(tx.GasTipCap()),
-						Gas:       tx.Gas(),
-						BlobGas:   tx.BlobGas(),
-					})
-				}
-				plainTxs := newTransactionsByPriceAndNonce(w.current.signer, txs, w.current.header.BaseFee) // Mixed bag of everrything, yolo
-				blobTxs := newTransactionsByPriceAndNonce(w.current.signer, nil, w.current.header.BaseFee)  // Empty bag, don't bother optimising
-
-				tcount := w.current.tcount
-				w.commitTransactions(w.current, plainTxs, blobTxs, nil)
-
-				// Only update the snapshot if any new transactions were added
-				// to the pending block
-				if tcount != w.current.tcount {
-					w.updateSnapshot(w.current)
-				}
-			} else {
-				// Special case, if the consensus engine is 0 period clique(dev mode),
-				// submit sealing work here since all empty submission will be rejected
-				// by clique. Of course the advance sealing(empty submission) is disabled.
-				if (w.chainConfig.Clique != nil && w.chainConfig.Clique.Period == 0) || (w.chainConfig.Oasys != nil && w.chainConfig.Oasys.Period == 0) {
-					w.commitWork(nil, time.Now().Unix())
-				}
-			}
-			w.newTxs.Add(int32(len(ev.Txs)))
-=======
 			req.result <- w.generateWork(req.params, false)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 		// System stopped
 		case <-w.exitCh:
@@ -805,11 +742,7 @@ func (w *worker) commitTransaction(env *environment, tx *types.Transaction, rece
 		return w.commitBlobTransaction(env, tx, receiptProcessors...)
 	}
 
-<<<<<<< HEAD
-	receipt, err := w.applyTransaction(env, tx)
-=======
 	receipt, err := w.applyTransaction(env, tx, receiptProcessors...)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	if err != nil {
 		return nil, err
 	}
@@ -818,11 +751,7 @@ func (w *worker) commitTransaction(env *environment, tx *types.Transaction, rece
 	return receipt.Logs, nil
 }
 
-<<<<<<< HEAD
-func (w *worker) commitBlobTransaction(env *environment, tx *types.Transaction) ([]*types.Log, error) {
-=======
 func (w *worker) commitBlobTransaction(env *environment, tx *types.Transaction, receiptProcessors ...core.ReceiptProcessor) ([]*types.Log, error) {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	sc := types.NewBlobSidecarFromTx(tx)
 	if sc == nil {
 		panic("blob transaction without blobs in miner")
@@ -1125,26 +1054,14 @@ func (w *worker) prepareWork(genParams *generateParams, witness bool) (*environm
 		}
 		header.BlobGasUsed = new(uint64)
 		header.ExcessBlobGas = &excessBlobGas
-<<<<<<< HEAD
-		if w.chainConfig.Oasys != nil {
-			header.WithdrawalsHash = &types.EmptyWithdrawalsHash
-		}
 		if w.chainConfig.Oasys == nil {
 			header.ParentBeaconRoot = genParams.beaconRoot
 		} else {
-			header.ParentBeaconRoot = new(common.Hash)
-=======
-		if w.chainConfig.Parlia == nil {
-			header.ParentBeaconRoot = genParams.beaconRoot
-		} else {
 			header.WithdrawalsHash = &types.EmptyWithdrawalsHash
-			if w.chainConfig.IsBohr(header.Number, header.Time) {
-				header.ParentBeaconRoot = new(common.Hash)
-			}
+			header.ParentBeaconRoot = new(common.Hash)
 			if w.chainConfig.IsPrague(header.Number, header.Time) {
 				header.RequestsHash = &types.EmptyRequestsHash
 			}
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		}
 	}
 	// Could potentially happen if starting to mine in an odd state.
@@ -1273,9 +1190,6 @@ func (w *worker) generateWork(params *generateParams, witness bool) *newPayloadR
 			log.Warn("Block building is interrupted", "allowance", common.PrettyDuration(w.recommit))
 		}
 	}
-<<<<<<< HEAD
-	block, receipts, err := w.engine.FinalizeAndAssemble(w.chain, work.header, work.state, work.txs, nil, work.receipts, params.withdrawals)
-=======
 	body := types.Body{Transactions: work.txs, Withdrawals: params.withdrawals}
 	allLogs := make([]*types.Log, 0)
 	for _, r := range work.receipts {
@@ -1301,24 +1215,18 @@ func (w *worker) generateWork(params *generateParams, witness bool) *newPayloadR
 
 	fees := work.state.GetBalance(consensus.SystemAddress)
 	block, receipts, err := w.engine.FinalizeAndAssemble(w.chain, work.header, work.state, &body, work.receipts, nil)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	if err != nil {
 		return &newPayloadResult{err: err}
 	}
 
 	return &newPayloadResult{
 		block:    block,
-<<<<<<< HEAD
-		fees:     totalFees(block, receipts),
-		sidecars: work.sidecars,
-=======
 		fees:     fees.ToBig(),
 		sidecars: work.sidecars.BlobTxSidecarList(),
 		stateDB:  work.state,
 		receipts: receipts,
 		requests: requests,
 		witness:  work.witness,
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	}
 }
 
@@ -1340,26 +1248,6 @@ func (w *worker) commitWork(interruptCh chan int32, timestamp int64) {
 			return
 		}
 	}
-<<<<<<< HEAD
-	work, err := w.prepareWork(&generateParams{
-		timestamp: uint64(timestamp),
-		coinbase:  coinbase,
-	})
-	if err != nil {
-		log.Error("Failed to prepare work", "in", "commitWork", "err", err)
-		return
-	}
-	// Deploy oasys built-in contracts
-	contracts.Deploy(w.chainConfig, work.state, work.header.Number.Uint64())
-	// Fill pending transactions from the txpool into the block.
-	err = w.fillTransactions(interrupt, work)
-	switch {
-	case err == nil:
-		// The entire block is filled, decrease resubmit interval in case
-		// of current interval is larger than the user-specified one.
-		w.adjustResubmitInterval(&intervalAdjust{inc: false})
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	stopTimer := time.NewTimer(0)
 	defer stopTimer.Stop()
@@ -1497,12 +1385,6 @@ LOOP:
 			sub.Unsubscribe()
 		}
 	}
-<<<<<<< HEAD
-	// Submit the generated block for consensus sealing.
-	if err = w.commit(work.copy(), w.fullTaskHook, true, start); err != nil {
-		log.Warn("Failed to commit work", "in", "commitWork", "err", err)
-	}
-=======
 	// get the most profitable work
 	bestWork := workList[0]
 	bestReward := new(uint256.Int)
@@ -1580,7 +1462,6 @@ LOOP:
 	metrics.GetOrRegisterCounter(fmt.Sprintf("block/from/%v", from), nil).Inc(1)
 
 	w.commit(bestWork, w.fullTaskHook, true, start)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	// Swap out the old work with the new one, terminating any leftover
 	// prefetcher processes in the mean time and starting a new one.
@@ -1605,36 +1486,6 @@ func (w *worker) commit(env *environment, interval func(), update bool, start ti
 		if interval != nil {
 			interval()
 		}
-<<<<<<< HEAD
-		// Withdrawals are set to nil here, because this is only called in PoW.
-		block, receipts, err := w.engine.FinalizeAndAssemble(w.chain, types.CopyHeader(env.header), env.state, env.txs, nil, env.receipts, nil)
-		if err != nil {
-			return err
-		}
-
-		if block.Header().EmptyWithdrawalsHash() {
-			block = block.WithWithdrawals(make([]*types.Withdrawal, 0))
-		}
-
-		// If Cancun enabled, sidecars can't be nil then.
-		if w.chainConfig.IsCancun(env.header.Number, env.header.Time) && env.sidecars == nil {
-			env.sidecars = make(types.BlobSidecars, 0)
-		}
-		// Create a local environment copy, avoid the data race with snapshot state.
-		// https://github.com/ethereum/go-ethereum/issues/24299
-		env := env.copy()
-
-		block = block.WithSidecars(env.sidecars)
-
-		// If we're post merge, just ignore
-		if !w.isTTDReached(block.Header()) {
-			select {
-			case w.taskCh <- &task{receipts: receipts, state: env.state, block: block, createdAt: time.Now()}:
-				fees := totalFees(block, receipts)
-				feesInEther := new(big.Float).Quo(new(big.Float).SetInt(fees), big.NewFloat(params.Ether))
-				log.Info("Commit new sealing work", "number", block.Number(), "sealhash", w.engine.SealHash(block.Header()),
-					"txs", env.tcount, "blobs", env.blobs, "gas", block.GasUsed(), "fees", feesInEther, "elapsed", common.PrettyDuration(time.Since(start)))
-=======
 		fees := env.state.GetBalance(consensus.SystemAddress).ToBig()
 		feesInEther := new(big.Float).Quo(new(big.Float).SetInt(fees), big.NewFloat(params.Ether))
 		// Withdrawals are set to nil here, because this is only called in PoW.
@@ -1650,7 +1501,6 @@ func (w *worker) commit(env *environment, interval func(), update bool, start ti
 		env.txs = body.Transactions
 		env.receipts = receipts
 		finalizeBlockTimer.UpdateSince(finalizeStart)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 		// If Cancun enabled, sidecars can't be nil then.
 		if w.chainConfig.IsCancun(env.header.Number, env.header.Time) && env.sidecars == nil {

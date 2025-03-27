@@ -69,16 +69,6 @@ func (args *BuildPayloadArgs) Id() engine.PayloadID {
 // the revenue. Therefore, the empty-block here is always available and full-block
 // will be set/updated afterwards.
 type Payload struct {
-<<<<<<< HEAD
-	id       engine.PayloadID
-	empty    *types.Block
-	full     *types.Block
-	sidecars types.BlobSidecars
-	fullFees *big.Int
-	stop     chan struct{}
-	lock     sync.Mutex
-	cond     *sync.Cond
-=======
 	id            engine.PayloadID
 	empty         *types.Block
 	emptyWitness  *stateless.Witness
@@ -91,7 +81,6 @@ type Payload struct {
 	stop          chan struct{}
 	lock          sync.Mutex
 	cond          *sync.Cond
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 // newPayload initializes the payload object.
