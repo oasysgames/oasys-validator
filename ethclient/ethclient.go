@@ -27,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
 )
@@ -44,6 +45,16 @@ func Dial(rawurl string) (*Client, error) {
 // DialContext connects a client to the given URL with context.
 func DialContext(ctx context.Context, rawurl string) (*Client, error) {
 	c, err := rpc.DialContext(ctx, rawurl)
+	if err != nil {
+		return nil, err
+	}
+	return NewClient(c), nil
+}
+
+// DialOptions creates a new RPC client for the given URL. You can supply any of the
+// pre-defined client options to configure the underlying transport.
+func DialOptions(ctx context.Context, rawurl string, opts ...rpc.ClientOption) (*Client, error) {
+	c, err := rpc.DialOptions(ctx, rawurl, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +222,13 @@ func (ec *Client) getBlock(ctx context.Context, method string, args ...interface
 		}
 		txs[i] = tx.tx
 	}
-	return types.NewBlockWithHeader(head).WithBody(txs, uncles).WithWithdrawals(body.Withdrawals), nil
+
+	return types.NewBlockWithHeader(head).WithBody(
+		types.Body{
+			Transactions: txs,
+			Uncles:       uncles,
+			Withdrawals:  body.Withdrawals,
+		}), nil
 }
 
 // HeaderByHash returns the block header with the given hash.
@@ -233,6 +250,27 @@ func (ec *Client) HeaderByNumber(ctx context.Context, number *big.Int) (*types.H
 		err = ethereum.NotFound
 	}
 	return head, err
+}
+
+// GetFinalizedHeader returns the requested finalized block header.
+func (ec *Client) FinalizedHeader(ctx context.Context, verifiedValidatorNum int64) (*types.Header, error) {
+	var head *types.Header
+	err := ec.c.CallContext(ctx, &head, "eth_getFinalizedHeader", verifiedValidatorNum)
+	if err == nil && head == nil {
+		err = ethereum.NotFound
+	}
+	return head, err
+}
+
+// GetFinalizedBlock returns the requested finalized block.
+func (ec *Client) FinalizedBlock(ctx context.Context, verifiedValidatorNum int64, fullTx bool) (*types.Block, error) {
+	return ec.getBlock(ctx, "eth_getFinalizedBlock", verifiedValidatorNum, fullTx)
+}
+
+func (ec *Client) GetRootByDiffHash(ctx context.Context, blockNr *big.Int, blockHash common.Hash, diffHash common.Hash) (*core.VerifyResult, error) {
+	var result core.VerifyResult
+	err := ec.c.CallContext(ctx, &result, "eth_getRootByDiffHash", toBlockNumArg(blockNr), blockHash, diffHash)
+	return &result, err
 }
 
 type rpcTransaction struct {
@@ -322,6 +360,44 @@ func (ec *Client) TransactionInBlock(ctx context.Context, blockHash common.Hash,
 	return json.tx, err
 }
 
+// TransactionsInBlock returns a single transaction at index in the given block.
+func (ec *Client) TransactionsInBlock(ctx context.Context, number *big.Int) ([]*types.Transaction, error) {
+	var rpcTxs []*rpcTransaction
+	err := ec.c.CallContext(ctx, &rpcTxs, "eth_getTransactionsByBlockNumber", toBlockNumArg(number))
+	if err != nil {
+		return nil, err
+	}
+	fmt.Println(len(rpcTxs))
+	txs := make([]*types.Transaction, 0, len(rpcTxs))
+	for _, tx := range rpcTxs {
+		txs = append(txs, tx.tx)
+	}
+	return txs, err
+}
+
+// TransactionRecipientsInBlock returns a single transaction at index in the given block.
+func (ec *Client) TransactionRecipientsInBlock(ctx context.Context, number *big.Int) ([]*types.Receipt, error) {
+	var rs []*types.Receipt
+	err := ec.c.CallContext(ctx, &rs, "eth_getTransactionReceiptsByBlockNumber", toBlockNumArg(number))
+	if err != nil {
+		return nil, err
+	}
+	return rs, err
+}
+
+// TransactionDataAndReceipt returns the original data and receipt of a transaction by transaction hash.
+// Note that the receipt is not available for pending transactions.
+func (ec *Client) TransactionDataAndReceipt(ctx context.Context, txHash common.Hash) (*types.OriginalDataAndReceipt, error) {
+	var r *types.OriginalDataAndReceipt
+	err := ec.c.CallContext(ctx, &r, "eth_getTransactionDataAndReceipt", txHash)
+	if err == nil {
+		if r == nil {
+			return nil, ethereum.NotFound
+		}
+	}
+	return r, err
+}
+
 // TransactionReceipt returns the receipt of a transaction by transaction hash.
 // Note that the receipt is not available for pending transactions.
 func (ec *Client) TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
@@ -385,7 +461,7 @@ func (ec *Client) NetworkID(ctx context.Context) (*big.Int, error) {
 	if err := ec.c.CallContext(ctx, &ver, "net_version"); err != nil {
 		return nil, err
 	}
-	if _, ok := version.SetString(ver, 10); !ok {
+	if _, ok := version.SetString(ver, 0); !ok {
 		return nil, fmt.Errorf("invalid net_version result %q", ver)
 	}
 	return version, nil
@@ -620,7 +696,8 @@ func (ec *Client) FeeHistory(ctx context.Context, blockCount uint64, lastBlock *
 	}
 	baseFee := make([]*big.Int, len(res.BaseFee))
 	for i, b := range res.BaseFee {
-		baseFee[i] = (*big.Int)(b)
+		// need this change, otherwise testStatusFunctions will fail, need more research
+		baseFee[i] = big.NewInt(b.ToInt().Int64())
 	}
 	return &ethereum.FeeHistory{
 		OldestBlock:  (*big.Int)(res.OldestBlock),
@@ -653,6 +730,79 @@ func (ec *Client) SendTransaction(ctx context.Context, tx *types.Transaction) er
 		return err
 	}
 	return ec.c.CallContext(ctx, nil, "eth_sendRawTransaction", hexutil.Encode(data))
+}
+
+// SendTransactionConditional injects a signed transaction into the pending pool for execution.
+//
+// If the transaction was a contract creation use the TransactionReceipt method to get the
+// contract address after the transaction has been mined.
+func (ec *Client) SendTransactionConditional(ctx context.Context, tx *types.Transaction, opts types.TransactionOpts) error {
+	data, err := tx.MarshalBinary()
+	if err != nil {
+		return err
+	}
+	return ec.c.CallContext(ctx, nil, "eth_sendRawTransactionConditional", hexutil.Encode(data), opts)
+}
+
+// MevRunning returns whether MEV is running
+func (ec *Client) MevRunning(ctx context.Context) (bool, error) {
+	var result bool
+	err := ec.c.CallContext(ctx, &result, "mev_running")
+	return result, err
+}
+
+// HasBuilder returns whether the builder is registered
+func (ec *Client) HasBuilder(ctx context.Context, address common.Address) (bool, error) {
+	var result bool
+	err := ec.c.CallContext(ctx, &result, "mev_hasBuilder", address)
+	return result, err
+}
+
+// SendBid sends a bid
+func (ec *Client) SendBid(ctx context.Context, args types.BidArgs) (common.Hash, error) {
+	var hash common.Hash
+	err := ec.c.CallContext(ctx, &hash, "mev_sendBid", args)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	return hash, nil
+}
+
+// BestBidGasFee returns the gas fee of the best bid for the given parent hash.
+func (ec *Client) BestBidGasFee(ctx context.Context, parentHash common.Hash) (*big.Int, error) {
+	var fee *big.Int
+	err := ec.c.CallContext(ctx, &fee, "mev_bestBidGasFee", parentHash)
+	if err != nil {
+		return nil, err
+	}
+	return fee, nil
+}
+
+// MevParams returns the static params of mev
+func (ec *Client) MevParams(ctx context.Context) (*types.MevParams, error) {
+	var params types.MevParams
+	err := ec.c.CallContext(ctx, &params, "mev_params")
+	if err != nil {
+		return nil, err
+	}
+	return &params, err
+}
+
+// RevertErrorData returns the 'revert reason' data of a contract call.
+//
+// This can be used with CallContract and EstimateGas, and only when the server is Geth.
+func RevertErrorData(err error) ([]byte, bool) {
+	var ec rpc.Error
+	var ed rpc.DataError
+	if errors.As(err, &ec) && errors.As(err, &ed) && ec.ErrorCode() == 3 {
+		if eds, ok := ed.ErrorData().(string); ok {
+			revertData, err := hexutil.Decode(eds)
+			if err == nil {
+				return revertData, true
+			}
+		}
+	}
+	return nil, false
 }
 
 func toBlockNumArg(number *big.Int) string {

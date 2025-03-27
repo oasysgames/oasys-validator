@@ -12,7 +12,10 @@ import (
 	"github.com/prysmaticlabs/prysm/v5/validator/accounts/iface"
 	"github.com/prysmaticlabs/prysm/v5/validator/accounts/wallet"
 	"github.com/prysmaticlabs/prysm/v5/validator/keymanager"
+<<<<<<< HEAD
 	"github.com/prysmaticlabs/prysm/v5/validator/keymanager/local"
+=======
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
@@ -30,7 +33,11 @@ type VoteSigner struct {
 	PubKey [48]byte
 }
 
+<<<<<<< HEAD
 func NewVoteSigner(blsPasswordPath, blsWalletPath, blsAccountName string) (*VoteSigner, error) {
+=======
+func NewVoteSigner(blsPasswordPath, blsWalletPath string) (*VoteSigner, error) {
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	dirExists, err := wallet.Exists(blsWalletPath)
 	if err != nil {
 		log.Error("Check BLS wallet exists", "err", err)
@@ -72,6 +79,7 @@ func NewVoteSigner(blsPasswordPath, blsWalletPath, blsAccountName string) (*Vote
 	if err != nil {
 		return nil, errors.Wrap(err, "could not fetch validating public keys")
 	}
+<<<<<<< HEAD
 	if len(pubKeys) == 0 {
 		return nil, errors.New("no public keys in the BLS wallet")
 	}
@@ -105,6 +113,12 @@ func NewVoteSigner(blsPasswordPath, blsWalletPath, blsAccountName string) (*Vote
 	return &VoteSigner{
 		km:     &km,
 		PubKey: pubKey,
+=======
+
+	return &VoteSigner{
+		km:     &km,
+		PubKey: pubKeys[0],
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	}, nil
 }
 

@@ -1,10 +1,10 @@
 package log
 
 import (
+	"log/slog"
 	"os"
 	"sync/atomic"
-
-	"golang.org/x/exp/slog"
+	"time"
 )
 
 var root atomic.Value
@@ -106,6 +106,7 @@ func Error(msg string, ctx ...interface{}) {
 //	log.Crit("msg", "key1", val1, "key2", val2)
 func Crit(msg string, ctx ...interface{}) {
 	Root().Write(LevelCrit, msg, ctx...)
+	time.Sleep(3 * time.Second)
 	os.Exit(1)
 }
 

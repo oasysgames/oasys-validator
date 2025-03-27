@@ -97,8 +97,15 @@ func (oracle *Oracle) processBlock(bf *blockFees, percentiles []float64) {
 	}
 	// Fill in blob base fee and next blob base fee.
 	if excessBlobGas := bf.header.ExcessBlobGas; excessBlobGas != nil {
+<<<<<<< HEAD
 		bf.results.blobBaseFee = eip4844.CalcBlobFee(*excessBlobGas)
 		bf.results.nextBlobBaseFee = eip4844.CalcBlobFee(eip4844.CalcExcessBlobGas(*excessBlobGas, *bf.header.BlobGasUsed))
+=======
+		bf.results.blobBaseFee = eip4844.CalcBlobFee(config, bf.header)
+		excess := eip4844.CalcExcessBlobGas(config, bf.header, bf.header.Time)
+		next := &types.Header{Number: bf.header.Number, Time: bf.header.Time, ExcessBlobGas: &excess}
+		bf.results.nextBlobBaseFee = eip4844.CalcBlobFee(config, next)
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	} else {
 		bf.results.blobBaseFee = new(big.Int)
 		bf.results.nextBlobBaseFee = new(big.Int)
@@ -106,7 +113,12 @@ func (oracle *Oracle) processBlock(bf *blockFees, percentiles []float64) {
 	// Compute gas used ratio for normal and blob gas.
 	bf.results.gasUsedRatio = float64(bf.header.GasUsed) / float64(bf.header.GasLimit)
 	if blobGasUsed := bf.header.BlobGasUsed; blobGasUsed != nil {
+<<<<<<< HEAD
 		bf.results.blobGasUsedRatio = float64(*blobGasUsed) / params.MaxBlobGasPerBlock
+=======
+		maxBlobGas := eip4844.MaxBlobGasPerBlock(config, bf.header.Time)
+		bf.results.blobGasUsedRatio = float64(*blobGasUsed) / float64(maxBlobGas)
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	}
 
 	if len(percentiles) == 0 {
@@ -181,7 +193,7 @@ func (oracle *Oracle) resolveBlockRange(ctx context.Context, reqEnd rpc.BlockNum
 		)
 		switch reqEnd {
 		case rpc.PendingBlockNumber:
-			if pendingBlock, pendingReceipts = oracle.backend.PendingBlockAndReceipts(); pendingBlock != nil {
+			if pendingBlock, pendingReceipts, _ = oracle.backend.Pending(); pendingBlock != nil {
 				resolved = pendingBlock.Header()
 			} else {
 				// Pending block not supported by backend, process only until latest block.

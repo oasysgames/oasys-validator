@@ -22,7 +22,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
@@ -32,18 +31,21 @@ import (
 // - gas limit check
 // - basefee check
 func VerifyEIP1559Header(config *params.ChainConfig, parent, header *types.Header) error {
-	// Verify that the gas limit remains within allowed bounds
-	parentGasLimit := parent.GasLimit
-	if !config.IsLondon(parent.Number) {
-		parentGasLimit = parent.GasLimit * config.ElasticityMultiplier()
-	}
-	if err := misc.VerifyGaslimit(parentGasLimit, header.GasLimit); err != nil {
-		return err
+	if config.Parlia == nil {
+		// Verify that the gas limit remains within allowed bounds
+		parentGasLimit := parent.GasLimit
+		if !config.IsLondon(parent.Number) {
+			parentGasLimit = parent.GasLimit * config.ElasticityMultiplier()
+		}
+		if err := misc.VerifyGaslimit(parentGasLimit, header.GasLimit); err != nil {
+			return err
+		}
 	}
 	// Verify the header is not malformed
 	if header.BaseFee == nil {
 		return errors.New("header is missing baseFee")
 	}
+
 	// Verify the baseFee is correct based on the parent header.
 	expectedBaseFee := CalcBaseFee(config, parent)
 	if header.BaseFee.Cmp(expectedBaseFee) != 0 {
@@ -55,6 +57,10 @@ func VerifyEIP1559Header(config *params.ChainConfig, parent, header *types.Heade
 
 // CalcBaseFee calculates the basefee of the header.
 func CalcBaseFee(config *params.ChainConfig, parent *types.Header) *big.Int {
+	if config.Parlia != nil {
+		return new(big.Int).SetUint64(params.InitialBaseFeeForBSC)
+	}
+
 	// If the current block is the first EIP-1559 block, return the InitialBaseFee.
 	if !config.IsLondon(parent.Number) {
 		return new(big.Int).SetUint64(params.InitialBaseFee)
@@ -78,9 +84,10 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header) *big.Int {
 		num.Mul(num, parent.BaseFee)
 		num.Div(num, denom.SetUint64(parentGasTarget))
 		num.Div(num, denom.SetUint64(config.BaseFeeChangeDenominator()))
-		baseFeeDelta := math.BigMax(num, common.Big1)
-
-		return num.Add(parent.BaseFee, baseFeeDelta)
+		if num.Cmp(common.Big1) < 0 {
+			return num.Add(parent.BaseFee, common.Big1)
+		}
+		return num.Add(parent.BaseFee, num)
 	} else {
 		// Otherwise if the parent block used less gas than its target, the baseFee should decrease.
 		// max(0, parentBaseFee * gasUsedDelta / parentGasTarget / baseFeeChangeDenominator)
@@ -88,8 +95,11 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header) *big.Int {
 		num.Mul(num, parent.BaseFee)
 		num.Div(num, denom.SetUint64(parentGasTarget))
 		num.Div(num, denom.SetUint64(config.BaseFeeChangeDenominator()))
-		baseFee := num.Sub(parent.BaseFee, num)
 
-		return math.BigMax(baseFee, common.Big0)
+		baseFee := num.Sub(parent.BaseFee, num)
+		if baseFee.Cmp(common.Big0) < 0 {
+			baseFee = common.Big0
+		}
+		return baseFee
 	}
 }

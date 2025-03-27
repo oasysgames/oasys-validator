@@ -58,7 +58,10 @@ var pregenerated bool
 func init() {
 	// Reduce some of the parameters to make the tester faster
 	FullMaxForkAncestry = 10000
+<<<<<<< HEAD
 	lightMaxForkAncestry = 10000
+=======
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	blockCacheMaxItems = 1024
 	fsHeaderSafetyNet = 256
 	fsHeaderContCheck = 500 * time.Millisecond

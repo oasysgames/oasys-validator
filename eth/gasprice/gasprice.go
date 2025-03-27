@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/lru"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -35,8 +36,8 @@ import (
 const sampleNumber = 3 // Number of transactions sampled in a block
 
 var (
-	DefaultMaxPrice    = big.NewInt(500 * params.GWei)
-	DefaultIgnorePrice = big.NewInt(2 * params.Wei)
+	DefaultMaxPrice    = big.NewInt(100 * params.GWei)
+	DefaultIgnorePrice = big.NewInt(4 * params.Wei)
 )
 
 type Config struct {
@@ -46,6 +47,7 @@ type Config struct {
 	MaxBlockHistory  uint64
 	MaxPrice         *big.Int `toml:",omitempty"`
 	IgnorePrice      *big.Int `toml:",omitempty"`
+	OracleThreshold  int      `toml:",omitempty"`
 }
 
 // OracleBackend includes all necessary background APIs for oracle.
@@ -53,7 +55,7 @@ type OracleBackend interface {
 	HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error)
 	BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error)
 	GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error)
-	PendingBlockAndReceipts() (*types.Block, types.Receipts)
+	Pending() (*types.Block, types.Receipts, *state.StateDB)
 	ChainConfig() *params.ChainConfig
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 }
@@ -69,7 +71,9 @@ type Oracle struct {
 	cacheLock   sync.RWMutex
 	fetchLock   sync.Mutex
 
+	defaultPrice                      *big.Int
 	checkBlocks, percentile           int
+	sampleTxThreshold                 int
 	maxHeaderHistory, maxBlockHistory uint64
 
 	historyCache *lru.Cache[cacheKey, processedFees]
@@ -119,18 +123,26 @@ func NewOracle(backend OracleBackend, params Config, startPrice *big.Int) *Oracl
 
 	cache := lru.NewCache[cacheKey, processedFees](2048)
 	headEvent := make(chan core.ChainHeadEvent, 1)
-	backend.SubscribeChainHeadEvent(headEvent)
-	go func() {
-		var lastHead common.Hash
-		for ev := range headEvent {
-			if ev.Block.ParentHash() != lastHead {
-				cache.Purge()
+	sub := backend.SubscribeChainHeadEvent(headEvent)
+	if sub != nil { // the gasprice testBackend doesn't support subscribing to head events
+		go func() {
+			var lastHead common.Hash
+			for {
+				select {
+				case ev := <-headEvent:
+					if ev.Header.ParentHash != lastHead {
+						cache.Purge()
+					}
+					lastHead = ev.Header.Hash()
+				case <-sub.Err():
+					return
+				}
 			}
-			lastHead = ev.Block.Hash()
-		}
-	}()
+		}()
+	}
 
 	return &Oracle{
+<<<<<<< HEAD
 		backend:          backend,
 		lastPrice:        startPrice,
 		maxPrice:         maxPrice,
@@ -140,6 +152,19 @@ func NewOracle(backend OracleBackend, params Config, startPrice *big.Int) *Oracl
 		maxHeaderHistory: maxHeaderHistory,
 		maxBlockHistory:  maxBlockHistory,
 		historyCache:     cache,
+=======
+		backend:           backend,
+		lastPrice:         startPrice,
+		maxPrice:          maxPrice,
+		ignorePrice:       ignorePrice,
+		checkBlocks:       blocks,
+		percentile:        percent,
+		maxHeaderHistory:  maxHeaderHistory,
+		maxBlockHistory:   maxBlockHistory,
+		historyCache:      cache,
+		sampleTxThreshold: params.OracleThreshold,
+		defaultPrice:      startPrice,
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	}
 }
 
@@ -209,9 +234,12 @@ func (oracle *Oracle) SuggestTipCap(ctx context.Context) (*big.Int, error) {
 		results = append(results, res.values...)
 	}
 	price := lastPrice
-	if len(results) > 0 {
+	if len(results) > oracle.sampleTxThreshold {
 		slices.SortFunc(results, func(a, b *big.Int) int { return a.Cmp(b) })
 		price = results[(len(results)-1)*oracle.percentile/100]
+	}
+	if price.Cmp(oracle.defaultPrice) < 0 {
+		price = new(big.Int).Set(oracle.defaultPrice)
 	}
 	if price.Cmp(oracle.maxPrice) > 0 {
 		price = new(big.Int).Set(oracle.maxPrice)

@@ -90,6 +90,15 @@ type Config struct {
 	// Deprecated: USB monitoring is disabled by default and must be enabled explicitly.
 	NoUSB bool `toml:",omitempty"`
 
+	// DirectBroadcast enable directly broadcast mined block to all peers
+	DirectBroadcast bool `toml:",omitempty"`
+
+	// DisableSnapProtocol disable the snap protocol
+	DisableSnapProtocol bool `toml:",omitempty"`
+
+	// RangeLimit enable 5000 blocks limit when handle range query
+	RangeLimit bool `toml:",omitempty"`
+
 	// USB enables hardware wallet monitoring and connectivity.
 	USB bool `toml:",omitempty"`
 
@@ -193,11 +202,19 @@ type Config struct {
 	// Logger is a custom logger to use with the p2p.Server.
 	Logger log.Logger `toml:",omitempty"`
 
+	LogConfig *LogConfig `toml:",omitempty"`
+
 	oldGethResourceWarning bool
 
 	// AllowUnprotectedTxs allows non EIP-155 protected transactions to be send over RPC.
 	AllowUnprotectedTxs bool `toml:",omitempty"`
 
+<<<<<<< HEAD
+=======
+	// EnableDoubleSignMonitor is a flag that whether to enable the double signature checker
+	EnableDoubleSignMonitor bool `toml:",omitempty"`
+
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	// EnableMaliciousVoteMonitor is a flag that whether to enable the malicious vote checker
 	EnableMaliciousVoteMonitor bool `toml:",omitempty"`
 
@@ -212,9 +229,12 @@ type Config struct {
 	// VoteJournalDir is the directory to store votes in the fast finality feature.
 	VoteJournalDir string `toml:",omitempty"`
 
+<<<<<<< HEAD
 	// VoteKeyName is name of the BLS public key used for voting
 	VoteKeyName string `toml:",omitempty"`
 
+=======
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	// BatchRequestLimit is the maximum number of requests in a batch.
 	BatchRequestLimit int `toml:",omitempty"`
 
@@ -228,6 +248,8 @@ type Config struct {
 	EnablePersonal bool `toml:"-"`
 
 	DBEngine string `toml:",omitempty"`
+
+	Instance int `toml:",omitempty"`
 }
 
 // IPCEndpoint resolves an IPC endpoint based on a configured value, taking into
@@ -494,4 +516,18 @@ func (c *Config) GetKeyStoreDir() (string, bool, error) {
 	}
 
 	return keydir, isEphemeral, nil
+}
+
+type LogConfig struct {
+	FileRoot     *string `toml:",omitempty"`
+	FilePath     *string `toml:",omitempty"`
+	MaxBytesSize *uint   `toml:",omitempty"`
+	Level        *string `toml:",omitempty"`
+	RotateHours  *uint   `toml:",omitempty"`
+	MaxBackups   *uint   `toml:",omitempty"`
+
+	// TermTimeFormat is the time format used for console logging.
+	TermTimeFormat *string `toml:",omitempty"`
+	// TimeFormat is the time format used for file logging.
+	TimeFormat *string `toml:",omitempty"`
 }

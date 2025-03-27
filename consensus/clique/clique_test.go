@@ -17,6 +17,7 @@
 package clique
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -30,11 +31,11 @@ import (
 )
 
 // This test case is a repro of an annoying bug that took us forever to catch.
-// In Clique PoA networks (Görli, etc), consecutive blocks might have
-// the same state root (no block subsidy, empty block). If a node crashes, the
-// chain ends up losing the recent state and needs to regenerate it from blocks
-// already in the database. The bug was that processing the block *prior* to an
-// empty one **also completes** the empty one, ending up in a known-block error.
+// In Clique PoA networks, consecutive blocks might have the same state root (no
+// block subsidy, empty block). If a node crashes, the chain ends up losing the
+// recent state and needs to regenerate it from blocks already in the database.
+// The bug was that processing the block *prior* to an empty one **also
+// completes** the empty one, ending up in a known-block error.
 func TestReimportMirroredState(t *testing.T) {
 	// Initialize a Clique chain with a single signer
 	var (
@@ -84,6 +85,11 @@ func TestReimportMirroredState(t *testing.T) {
 		sig, _ := crypto.Sign(SealHash(header).Bytes(), key)
 		copy(header.Extra[len(header.Extra)-extraSeal:], sig)
 		blocks[i] = block.WithSeal(header)
+		txHash := common.Hash{}
+		if block.Transactions().Len() > 0 {
+			txHash = block.Transactions()[0].Hash()
+		}
+		fmt.Println("check", block.Number(), block.Hash(), block.Root(), fmt.Sprintf("%+v", txHash))
 	}
 	// Insert the first two blocks and make sure the chain is valid
 	db = rawdb.NewMemoryDatabase()

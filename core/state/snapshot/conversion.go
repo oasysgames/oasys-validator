@@ -25,6 +25,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common/gopool"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -49,16 +51,6 @@ type (
 	// returns the subtrie root with the specified subtrie identifier.
 	leafCallbackFn func(db ethdb.KeyValueWriter, accountHash, codeHash common.Hash, stat *generateStats) (common.Hash, error)
 )
-
-// GenerateAccountTrieRoot takes an account iterator and reproduces the root hash.
-func GenerateAccountTrieRoot(it AccountIterator) (common.Hash, error) {
-	return generateTrieRoot(nil, "", it, common.Hash{}, stackTrieGenerate, nil, newGenerateStats(), true)
-}
-
-// GenerateStorageTrieRoot takes a storage iterator and reproduces the root hash.
-func GenerateStorageTrieRoot(account common.Hash, it StorageIterator) (common.Hash, error) {
-	return generateTrieRoot(nil, "", it, account, stackTrieGenerate, nil, newGenerateStats(), true)
-}
 
 // GenerateTrie takes the whole snapshot tree as the input, traverses all the
 // accounts as well as the corresponding storages and regenerate the whole state
@@ -316,7 +308,8 @@ func generateTrieRoot(db ethdb.KeyValueWriter, scheme string, it Iterator, accou
 				if err != nil {
 					return stop(err)
 				}
-				go func(hash common.Hash) {
+				hash := it.Hash()
+				gopool.Submit(func() {
 					subroot, err := leafCallback(db, hash, common.BytesToHash(account.CodeHash), stats)
 					if err != nil {
 						results <- err
@@ -327,7 +320,7 @@ func generateTrieRoot(db ethdb.KeyValueWriter, scheme string, it Iterator, accou
 						return
 					}
 					results <- nil
-				}(it.Hash())
+				})
 				fullData, err = rlp.EncodeToBytes(account)
 				if err != nil {
 					return stop(err)

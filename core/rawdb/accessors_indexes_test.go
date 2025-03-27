@@ -35,17 +35,17 @@ var newTestHasher = blocktest.NewHasher
 func TestLookupStorage(t *testing.T) {
 	tests := []struct {
 		name                        string
-		writeTxLookupEntriesByBlock func(ethdb.Writer, *types.Block)
+		writeTxLookupEntriesByBlock func(ethdb.KeyValueWriter, *types.Block)
 	}{
 		{
 			"DatabaseV6",
-			func(db ethdb.Writer, block *types.Block) {
+			func(db ethdb.KeyValueWriter, block *types.Block) {
 				WriteTxLookupEntriesByBlock(db, block)
 			},
 		},
 		{
 			"DatabaseV4-V5",
-			func(db ethdb.Writer, block *types.Block) {
+			func(db ethdb.KeyValueWriter, block *types.Block) {
 				for _, tx := range block.Transactions() {
 					db.Put(txLookupKey(tx.Hash()), block.Hash().Bytes())
 				}
@@ -53,7 +53,7 @@ func TestLookupStorage(t *testing.T) {
 		},
 		{
 			"DatabaseV3",
-			func(db ethdb.Writer, block *types.Block) {
+			func(db ethdb.KeyValueWriter, block *types.Block) {
 				for index, tx := range block.Transactions() {
 					entry := LegacyTxLookupEntry{
 						BlockHash:  block.Hash(),
@@ -76,7 +76,7 @@ func TestLookupStorage(t *testing.T) {
 			tx3 := types.NewTransaction(3, common.BytesToAddress([]byte{0x33}), big.NewInt(333), 3333, big.NewInt(33333), []byte{0x33, 0x33, 0x33})
 			txs := []*types.Transaction{tx1, tx2, tx3}
 
-			block := types.NewBlock(&types.Header{Number: big.NewInt(314)}, txs, nil, nil, newTestHasher())
+			block := types.NewBlock(&types.Header{Number: big.NewInt(314)}, &types.Body{Transactions: txs}, nil, newTestHasher())
 
 			// Check that no transactions entries are in a pristine database
 			for i, tx := range txs {
@@ -118,7 +118,6 @@ func TestDeleteBloomBits(t *testing.T) {
 	for i := uint(0); i < 2; i++ {
 		for s := uint64(0); s < 2; s++ {
 			WriteBloomBits(db, i, s, params.MainnetGenesisHash, []byte{0x01, 0x02})
-			WriteBloomBits(db, i, s, params.SepoliaGenesisHash, []byte{0x01, 0x02})
 		}
 	}
 	check := func(bit uint, section uint64, head common.Hash, exist bool) {
@@ -132,25 +131,18 @@ func TestDeleteBloomBits(t *testing.T) {
 	}
 	// Check the existence of written data.
 	check(0, 0, params.MainnetGenesisHash, true)
-	check(0, 0, params.SepoliaGenesisHash, true)
 
 	// Check the existence of deleted data.
 	DeleteBloombits(db, 0, 0, 1)
 	check(0, 0, params.MainnetGenesisHash, false)
-	check(0, 0, params.SepoliaGenesisHash, false)
 	check(0, 1, params.MainnetGenesisHash, true)
-	check(0, 1, params.SepoliaGenesisHash, true)
 
 	// Check the existence of deleted data.
 	DeleteBloombits(db, 0, 0, 2)
 	check(0, 0, params.MainnetGenesisHash, false)
-	check(0, 0, params.SepoliaGenesisHash, false)
 	check(0, 1, params.MainnetGenesisHash, false)
-	check(0, 1, params.SepoliaGenesisHash, false)
 
 	// Bit1 shouldn't be affect.
 	check(1, 0, params.MainnetGenesisHash, true)
-	check(1, 0, params.SepoliaGenesisHash, true)
 	check(1, 1, params.MainnetGenesisHash, true)
-	check(1, 1, params.SepoliaGenesisHash, true)
 }

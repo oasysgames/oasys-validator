@@ -4,13 +4,15 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"math/big"
+	"os"
+	"path"
 	"reflect"
 	"sync"
 	"time"
 
 	"github.com/holiman/uint256"
-	"golang.org/x/exp/slog"
 )
 
 type discardHandler struct{}
@@ -101,10 +103,10 @@ func (h *TerminalHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 }
 
 // ResetFieldPadding zeroes the field-padding for all attribute pairs.
-func (t *TerminalHandler) ResetFieldPadding() {
-	t.mu.Lock()
-	t.fieldPadding = make(map[string]int)
-	t.mu.Unlock()
+func (h *TerminalHandler) ResetFieldPadding() {
+	h.mu.Lock()
+	h.fieldPadding = make(map[string]int)
+	h.mu.Unlock()
 }
 
 type leveler struct{ minLevel slog.Level }
@@ -115,8 +117,15 @@ func (l *leveler) Level() slog.Level {
 
 // JSONHandler returns a handler which prints records in JSON format.
 func JSONHandler(wr io.Writer) slog.Handler {
+	return JSONHandlerWithLevel(wr, levelMaxVerbosity)
+}
+
+// JSONHandlerWithLevel returns a handler which prints records in JSON format that are less than or equal to
+// the specified verbosity level.
+func JSONHandlerWithLevel(wr io.Writer, level slog.Level) slog.Handler {
 	return slog.NewJSONHandler(wr, &slog.HandlerOptions{
 		ReplaceAttr: builtinReplaceJSON,
+		Level:       &leveler{level},
 	})
 }
 
@@ -189,4 +198,23 @@ func builtinReplace(_ []string, attr slog.Attr, logfmt bool) slog.Attr {
 		}
 	}
 	return attr
+}
+
+// RotatingFileHandler returns a handler which writes log records to file chunks
+// at the given path. When a file's size reaches the limit, the handler creates
+// a new file named after the timestamp of the first log record it will contain.
+func RotatingFileHandler(filePath string, limit uint, maxBackups uint, level string, rotateHours uint) slog.Handler {
+	if _, err := os.Stat(path.Dir(filePath)); os.IsNotExist(err) {
+		err := os.MkdirAll(path.Dir(filePath), 0755)
+		if err != nil {
+			panic(fmt.Errorf("could not create directory %s, %v", path.Dir(filePath), err))
+		}
+	}
+	logLevel, err := LevelFromString(level)
+	if err != nil {
+		panic(err)
+	}
+	fileWriter := NewAsyncFileWriter(filePath, int64(limit), int(maxBackups), rotateHours)
+	fileWriter.Start()
+	return LogfmtHandlerWithLevel(fileWriter, logLevel)
 }

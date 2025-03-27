@@ -53,7 +53,7 @@ func (h *ethHandler) PeerInfo(id enode.ID) interface{} {
 // AcceptTxs retrieves whether transaction processing is enabled on the node
 // or if inbound transactions should simply be dropped.
 func (h *ethHandler) AcceptTxs() bool {
-	return h.synced.Load()
+	return h.acceptTxs.Load()
 }
 
 // Handle is invoked from a peer's message handler when it receives a new remote
@@ -90,12 +90,6 @@ func (h *ethHandler) Handle(peer *eth.Peer, packet eth.Packet) error {
 // handleBlockAnnounces is invoked from a peer's message handler when it transmits a
 // batch of block announcements for the local node to process.
 func (h *ethHandler) handleBlockAnnounces(peer *eth.Peer, hashes []common.Hash, numbers []uint64) error {
-	// Drop all incoming block announces from the p2p network if
-	// the chain already entered the pos stage and disconnect the
-	// remote peer.
-	if h.merger.PoSFinalized() {
-		return errors.New("disallowed block announcement")
-	}
 	// Schedule all the unknown hashes for retrieval
 	var (
 		unknownHashes  = make([]common.Hash, 0, len(hashes))
@@ -107,6 +101,7 @@ func (h *ethHandler) handleBlockAnnounces(peer *eth.Peer, hashes []common.Hash, 
 			unknownNumbers = append(unknownNumbers, numbers[i])
 		}
 	}
+
 	for i := 0; i < len(unknownHashes); i++ {
 		h.blockFetcher.Notify(peer.ID(), unknownHashes[i], unknownNumbers[i], time.Now(), peer.RequestOneHeader, peer.RequestBodies)
 	}
@@ -116,6 +111,7 @@ func (h *ethHandler) handleBlockAnnounces(peer *eth.Peer, hashes []common.Hash, 
 // handleBlockBroadcast is invoked from a peer's message handler when it transmits a
 // block broadcast for the local node to process.
 func (h *ethHandler) handleBlockBroadcast(peer *eth.Peer, packet *eth.NewBlockPacket) error {
+<<<<<<< HEAD
 	// Drop all incoming block announces from the p2p network if
 	// the chain already entered the pos stage and disconnect the
 	// remote peer.
@@ -128,6 +124,14 @@ func (h *ethHandler) handleBlockBroadcast(peer *eth.Peer, packet *eth.NewBlockPa
 	if sidecars != nil {
 		block = block.WithSidecars(sidecars)
 	}
+=======
+	block := packet.Block
+	td := packet.TD
+	sidecars := packet.Sidecars
+	if sidecars != nil {
+		block = block.WithSidecars(sidecars)
+	}
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	// Schedule the block for import
 	h.blockFetcher.Enqueue(peer.ID(), block)

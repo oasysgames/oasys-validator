@@ -23,8 +23,11 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"unicode"
+
+	"github.com/ethereum/go-ethereum/eth/downloader"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/external"
@@ -34,9 +37,13 @@ import (
 	"github.com/ethereum/go-ethereum/beacon/fakebeacon"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
+<<<<<<< HEAD
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/eth/catalyst"
 	"github.com/ethereum/go-ethereum/eth/downloader"
+=======
+	"github.com/ethereum/go-ethereum/core/rawdb"
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/internal/flags"
@@ -55,7 +62,7 @@ var (
 		Name:        "dumpconfig",
 		Usage:       "Export configuration values in a TOML format",
 		ArgsUsage:   "<dumpfile (optional)>",
-		Flags:       flags.Merge(nodeFlags, rpcFlags),
+		Flags:       slices.Concat(nodeFlags, rpcFlags),
 		Description: `Export configuration values in TOML format (to stdout by default).`,
 	}
 
@@ -76,8 +83,8 @@ var tomlSettings = toml.Config{
 	},
 	MissingField: func(rt reflect.Type, field string) error {
 		id := fmt.Sprintf("%s.%s", rt.String(), field)
-		if deprecated(id) {
-			log.Warn("Config field is deprecated and won't have an effect", "name", id)
+		if deprecatedConfigFields[id] {
+			log.Warn(fmt.Sprintf("Config field '%s' is deprecated and won't have any effect.", id))
 			return nil
 		}
 		var link string
@@ -86,6 +93,19 @@ var tomlSettings = toml.Config{
 		}
 		return fmt.Errorf("field '%s' is not defined in %s%s", field, rt.String(), link)
 	},
+}
+
+var deprecatedConfigFields = map[string]bool{
+	"ethconfig.Config.EVMInterpreter":          true,
+	"ethconfig.Config.EWASMInterpreter":        true,
+	"ethconfig.Config.TrieCleanCacheJournal":   true,
+	"ethconfig.Config.TrieCleanCacheRejournal": true,
+	"ethconfig.Config.LightServ":               true,
+	"ethconfig.Config.LightIngress":            true,
+	"ethconfig.Config.LightEgress":             true,
+	"ethconfig.Config.LightPeers":              true,
+	"ethconfig.Config.LightNoPrune":            true,
+	"ethconfig.Config.LightNoSyncServe":        true,
 }
 
 type ethstatsConfig struct {
@@ -119,10 +139,10 @@ func defaultNodeConfig() node.Config {
 	git, _ := version.VCS()
 	cfg := node.DefaultConfig
 	cfg.Name = clientIdentifier
-	cfg.Version = params.VersionWithCommit(git.Commit, git.Date)
+	cfg.Version = version.WithCommit(git.Commit, git.Date)
 	cfg.HTTPModules = append(cfg.HTTPModules, "eth")
 	cfg.WSModules = append(cfg.WSModules, "eth")
-	cfg.IPCPath = "geth.ipc"
+	cfg.IPCPath = clientIdentifier + ".ipc"
 	return cfg
 }
 
@@ -141,6 +161,16 @@ func loadBaseConfig(ctx *cli.Context) gethConfig {
 		if err := loadConfig(file, &cfg); err != nil {
 			utils.Fatalf("%v", err)
 		}
+	}
+
+	scheme := cfg.Eth.StateScheme
+	if scheme != "" {
+		if !rawdb.ValidateStateScheme(scheme) {
+			utils.Fatalf("Invalid state scheme param in config: %s", scheme)
+		}
+	}
+	if cfg.Eth.Genesis != nil && cfg.Eth.Genesis.Config != nil {
+		log.Warn("Chain config in the configuration file is ignored!")
 	}
 
 	// Apply flags.
@@ -172,9 +202,26 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
 // makeFullNode loads geth configuration and creates the Ethereum backend.
 func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend) {
 	stack, cfg := makeConfigNode(ctx)
-	if ctx.IsSet(utils.OverrideCancun.Name) {
-		v := ctx.Uint64(utils.OverrideCancun.Name)
-		cfg.Eth.OverrideCancun = &v
+	if ctx.IsSet(utils.RialtoHash.Name) {
+		v := ctx.String(utils.RialtoHash.Name)
+		params.RialtoGenesisHash = common.HexToHash(v)
+	}
+
+	if ctx.IsSet(utils.OverridePassedForkTime.Name) {
+		v := ctx.Uint64(utils.OverridePassedForkTime.Name)
+		cfg.Eth.OverridePassedForkTime = &v
+	}
+	if ctx.IsSet(utils.OverridePascal.Name) {
+		v := ctx.Uint64(utils.OverridePascal.Name)
+		cfg.Eth.OverridePascal = &v
+	}
+	if ctx.IsSet(utils.OverridePrague.Name) {
+		v := ctx.Uint64(utils.OverridePrague.Name)
+		cfg.Eth.OverridePrague = &v
+	}
+	if ctx.IsSet(utils.OverrideLorentz.Name) {
+		v := ctx.Uint64(utils.OverrideLorentz.Name)
+		cfg.Eth.OverrideLorentz = &v
 	}
 	if ctx.IsSet(utils.OverrideVerkle.Name) {
 		v := ctx.Uint64(utils.OverrideVerkle.Name)
@@ -190,6 +237,16 @@ func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend) {
 	if ctx.IsSet(utils.OverrideDefaultExtraReserveForBlobRequests.Name) {
 		params.DefaultExtraReserveForBlobRequests = ctx.Uint64(utils.OverrideDefaultExtraReserveForBlobRequests.Name)
 	}
+<<<<<<< HEAD
+=======
+	if ctx.IsSet(utils.OverrideBreatheBlockInterval.Name) {
+		params.BreatheBlockInterval = ctx.Uint64(utils.OverrideBreatheBlockInterval.Name)
+	}
+	if ctx.IsSet(utils.OverrideFixedTurnLength.Name) {
+		params.FixedTurnLength = ctx.Uint64(utils.OverrideFixedTurnLength.Name)
+	}
+
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	backend, eth := utils.RegisterEthService(stack, &cfg.Eth)
 
 	// Create gauge with geth system and build information
@@ -220,6 +277,7 @@ func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend) {
 
 	if ctx.IsSet(utils.FakeBeaconAddrFlag.Name) {
 		cfg.FakeBeacon.Addr = ctx.String(utils.FakeBeaconAddrFlag.Name)
+<<<<<<< HEAD
 	}
 	if ctx.IsSet(utils.FakeBeaconPortFlag.Name) {
 		cfg.FakeBeacon.Port = ctx.Int(utils.FakeBeaconPortFlag.Name)
@@ -253,6 +311,23 @@ func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend) {
 	// 		utils.Fatalf("failed to register catalyst service: %v", err)
 	// 	}
 	// }
+=======
+	}
+	if ctx.IsSet(utils.FakeBeaconPortFlag.Name) {
+		cfg.FakeBeacon.Port = ctx.Int(utils.FakeBeaconPortFlag.Name)
+	}
+	if cfg.FakeBeacon.Enable || ctx.IsSet(utils.FakeBeaconEnabledFlag.Name) {
+		go fakebeacon.NewService(&cfg.FakeBeacon, backend).Run()
+	}
+
+	git, _ := version.VCS()
+	utils.SetupMetrics(&cfg.Metrics,
+		utils.EnableBuildInfo(git.Commit, git.Date),
+		utils.EnableMinerInfo(ctx, &cfg.Eth.Miner),
+		utils.EnableNodeInfo(&cfg.Eth.TxPool, stack.Server().NodeInfo()),
+		utils.EnableNodeTrack(ctx, &cfg.Eth, stack),
+	)
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	return stack, backend
 }
 
@@ -290,6 +365,7 @@ func applyMetricConfig(ctx *cli.Context, cfg *gethConfig) {
 		cfg.Metrics.Enabled = ctx.Bool(utils.MetricsEnabledFlag.Name)
 	}
 	if ctx.IsSet(utils.MetricsEnabledExpensiveFlag.Name) {
+		log.Warn("Expensive metrics will remain in BSC and may be removed in the future", "flag", utils.MetricsEnabledExpensiveFlag.Name)
 		cfg.Metrics.EnabledExpensive = ctx.Bool(utils.MetricsEnabledExpensiveFlag.Name)
 	}
 	if ctx.IsSet(utils.MetricsHTTPFlag.Name) {
@@ -328,20 +404,26 @@ func applyMetricConfig(ctx *cli.Context, cfg *gethConfig) {
 	if ctx.IsSet(utils.MetricsInfluxDBOrganizationFlag.Name) {
 		cfg.Metrics.InfluxDBOrganization = ctx.String(utils.MetricsInfluxDBOrganizationFlag.Name)
 	}
-}
+	// Sanity-check the commandline flags. It is fine if some unused fields is part
+	// of the toml-config, but we expect the commandline to only contain relevant
+	// arguments, otherwise it indicates an error.
+	var (
+		enableExport   = ctx.Bool(utils.MetricsEnableInfluxDBFlag.Name)
+		enableExportV2 = ctx.Bool(utils.MetricsEnableInfluxDBV2Flag.Name)
+	)
+	if enableExport || enableExportV2 {
+		v1FlagIsSet := ctx.IsSet(utils.MetricsInfluxDBUsernameFlag.Name) ||
+			ctx.IsSet(utils.MetricsInfluxDBPasswordFlag.Name)
 
-func deprecated(field string) bool {
-	switch field {
-	case "ethconfig.Config.EVMInterpreter":
-		return true
-	case "ethconfig.Config.EWASMInterpreter":
-		return true
-	case "ethconfig.Config.TrieCleanCacheJournal":
-		return true
-	case "ethconfig.Config.TrieCleanCacheRejournal":
-		return true
-	default:
-		return false
+		v2FlagIsSet := ctx.IsSet(utils.MetricsInfluxDBTokenFlag.Name) ||
+			ctx.IsSet(utils.MetricsInfluxDBOrganizationFlag.Name) ||
+			ctx.IsSet(utils.MetricsInfluxDBBucketFlag.Name)
+
+		if enableExport && v2FlagIsSet {
+			utils.Fatalf("Flags --influxdb.metrics.organization, --influxdb.metrics.token, --influxdb.metrics.bucket are only available for influxdb-v2")
+		} else if enableExportV2 && v1FlagIsSet {
+			utils.Fatalf("Flags --influxdb.metrics.username, --influxdb.metrics.password are only available for influxdb-v1")
+		}
 	}
 }
 

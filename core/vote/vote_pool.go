@@ -16,8 +16,13 @@ import (
 )
 
 const (
+<<<<<<< HEAD
 	maxCurVoteAmountPerBlock    = 50
 	maxFutureVoteAmountPerBlock = 100
+=======
+	maxCurVoteAmountPerBlock    = 21
+	maxFutureVoteAmountPerBlock = 50
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	voteBufferForPut = 256
 	// votes in the range (currentBlockNum-256,currentBlockNum+11] will be stored
@@ -62,12 +67,20 @@ type VotePool struct {
 
 	votesCh chan *types.VoteEnvelope
 
+<<<<<<< HEAD
 	engine consensus.PoS
+=======
+	engine consensus.PoSA
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 type votesPriorityQueue []*types.VoteData
 
+<<<<<<< HEAD
 func NewVotePool(chain *core.BlockChain, engine consensus.PoS) *VotePool {
+=======
+func NewVotePool(chain *core.BlockChain, engine consensus.PoSA) *VotePool {
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	votePool := &VotePool{
 		chain:                  chain,
 		receivedVotes:          mapset.NewSet[common.Hash](),
@@ -152,8 +165,12 @@ func (pool *VotePool) putIntoVotePool(vote *types.VoteEnvelope) bool {
 
 	if !isFutureVote {
 		// Verify if the vote comes from valid validators based on voteAddress (BLSPublicKey), only verify curVotes here, will verify futureVotes in transfer process.
+<<<<<<< HEAD
 		if err := pool.engine.VerifyVote(pool.chain, vote); err != nil {
 			log.Warn("invalid vote", "sourceNumber", vote.Data.SourceNumber, "targetNumber", vote.Data.TargetNumber, "err", err)
+=======
+		if pool.engine.VerifyVote(pool.chain, vote) != nil {
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 			return false
 		}
 
@@ -175,6 +192,11 @@ func (pool *VotePool) putVote(m map[common.Hash]*VoteBox, votesPq *votesPriority
 	targetHash := vote.Data.TargetHash
 	targetNumber := vote.Data.TargetNumber
 
+<<<<<<< HEAD
+=======
+	log.Debug("The vote info to put is:", "voteBlockNumber", targetNumber, "voteBlockHash", targetHash)
+
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 	if _, ok := m[targetHash]; !ok {
@@ -198,7 +220,11 @@ func (pool *VotePool) putVote(m map[common.Hash]*VoteBox, votesPq *votesPriority
 	m[targetHash].voteMessages = append(m[targetHash].voteMessages, vote)
 	// Add into received vote to avoid future duplicated vote comes.
 	pool.receivedVotes.Add(voteHash)
+<<<<<<< HEAD
 	log.Debug("VoteHash put into votepool is:", "voteHash", voteHash, "sourceNumber", vote.Data.SourceNumber, "targetNumber", vote.Data.TargetNumber, "signer", common.Bytes2Hex(vote.VoteAddress[:]))
+=======
+	log.Debug("VoteHash put into votepool is:", "voteHash", voteHash)
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	if isFutureVote {
 		localFutureVotesCounter.Inc(1)
@@ -254,8 +280,12 @@ func (pool *VotePool) transfer(blockHash common.Hash) {
 	validVotes := make([]*types.VoteEnvelope, 0, len(voteBox.voteMessages))
 	for _, vote := range voteBox.voteMessages {
 		// Verify if the vote comes from valid validators based on voteAddress (BLSPublicKey).
+<<<<<<< HEAD
 		if err := pool.engine.VerifyVote(pool.chain, vote); err != nil {
 			log.Warn("invalid vote", "sourceNumber", vote.Data.SourceNumber, "targetNumber", vote.Data.TargetNumber, "err", err)
+=======
+		if pool.engine.VerifyVote(pool.chain, vote) != nil {
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 			pool.receivedVotes.Remove(vote.Hash())
 			continue
 		}
@@ -338,12 +368,21 @@ func (pool *VotePool) basicVerify(vote *types.VoteEnvelope, headNumber uint64, m
 
 	// Check duplicate voteMessage firstly.
 	if pool.receivedVotes.Contains(voteHash) {
+<<<<<<< HEAD
 		log.Debug("Vote pool already contained the same vote", "voteHash", voteHash, "sourceNumber", vote.Data.SourceNumber, "targetNumber", vote.Data.TargetNumber)
 		return false
 	}
 
 	// To prevent DOS attacks, make sure no more than 50 votes per blockHash if not futureVotes
 	// and no more than 100 votes per blockHash if futureVotes.
+=======
+		log.Trace("Vote pool already contained the same vote", "voteHash", voteHash)
+		return false
+	}
+
+	// To prevent DOS attacks, make sure no more than 21 votes per blockHash if not futureVotes
+	// and no more than 50 votes per blockHash if futureVotes.
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	maxVoteAmountPerBlock := maxCurVoteAmountPerBlock
 	if isFutureVote {
 		maxVoteAmountPerBlock = maxFutureVoteAmountPerBlock

@@ -53,7 +53,8 @@ func (s *Suite) dial() (*Conn, error) {
 // dialAs attempts to dial a given node and perform a handshake using the given
 // private key.
 func (s *Suite) dialAs(key *ecdsa.PrivateKey) (*Conn, error) {
-	fd, err := net.Dial("tcp", fmt.Sprintf("%v:%d", s.Dest.IP(), s.Dest.TCP()))
+	tcpEndpoint, _ := s.Dest.TCPEndpoint()
+	fd, err := net.Dial("tcp", tcpEndpoint.String())
 	if err != nil {
 		return nil, err
 	}
@@ -315,14 +316,37 @@ loop:
 				return fmt.Errorf("wrong head block in status, want:  %#x (block %d) have %#x",
 					want, chain.blocks[chain.Len()-1].NumberU64(), have)
 			}
-			if have, want := msg.TD.Cmp(chain.TD()), 0; have != want {
-				return fmt.Errorf("wrong TD in status: have %v want %v", have, want)
-			}
 			if have, want := msg.ForkID, chain.ForkID(); !reflect.DeepEqual(have, want) {
 				return fmt.Errorf("wrong fork ID in status: have %v, want %v", have, want)
 			}
 			if have, want := msg.ProtocolVersion, c.ourHighestProtoVersion; have != uint32(want) {
 				return fmt.Errorf("wrong protocol version: have %v, want %v", have, want)
+			}
+			// make sure eth protocol version is set for negotiation
+			if c.negotiatedProtoVersion == 0 {
+				return errors.New("eth protocol version must be set in Conn")
+			}
+			if status == nil {
+				// default status message
+				status = &eth.StatusPacket{
+					ProtocolVersion: uint32(c.negotiatedProtoVersion),
+					NetworkID:       chain.config.ChainID.Uint64(),
+					TD:              chain.TD(),
+					Head:            chain.blocks[chain.Len()-1].Hash(),
+					Genesis:         chain.blocks[0].Hash(),
+					ForkID:          chain.ForkID(),
+				}
+			}
+			if err := c.Write(ethProto, eth.StatusMsg, status); err != nil {
+				return fmt.Errorf("write to connection failed: %v", err)
+			}
+		case eth.UpgradeStatusMsg + protoOffset(ethProto):
+			msg := new(eth.UpgradeStatusPacket)
+			if err := rlp.DecodeBytes(data, &msg); err != nil {
+				return fmt.Errorf("error decoding status packet: %w", err)
+			}
+			if err := c.Write(ethProto, eth.UpgradeStatusMsg, msg); err != nil {
+				return fmt.Errorf("write to connection failed: %v", err)
 			}
 			break loop
 		case discMsg:
@@ -339,23 +363,6 @@ loop:
 			return fmt.Errorf("bad status message: code %d", code)
 		}
 	}
-	// make sure eth protocol version is set for negotiation
-	if c.negotiatedProtoVersion == 0 {
-		return errors.New("eth protocol version must be set in Conn")
-	}
-	if status == nil {
-		// default status message
-		status = &eth.StatusPacket{
-			ProtocolVersion: uint32(c.negotiatedProtoVersion),
-			NetworkID:       chain.config.ChainID.Uint64(),
-			TD:              chain.TD(),
-			Head:            chain.blocks[chain.Len()-1].Hash(),
-			Genesis:         chain.blocks[0].Hash(),
-			ForkID:          chain.ForkID(),
-		}
-	}
-	if err := c.Write(ethProto, eth.StatusMsg, status); err != nil {
-		return fmt.Errorf("write to connection failed: %v", err)
-	}
+
 	return nil
 }

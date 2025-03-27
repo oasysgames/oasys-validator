@@ -17,15 +17,17 @@
 package nat
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common/gopool"
 	natpmp "github.com/jackpal/go-nat-pmp"
 )
 
-// natPMPClient adapts the NAT-PMP protocol implementation so it conforms to
+// pmp adapts the NAT-PMP protocol implementation so it conforms to
 // the common interface.
 type pmp struct {
 	gw net.IP
@@ -46,7 +48,7 @@ func (n *pmp) ExternalIP() (net.IP, error) {
 
 func (n *pmp) AddMapping(protocol string, extport, intport int, name string, lifetime time.Duration) (uint16, error) {
 	if lifetime <= 0 {
-		return 0, fmt.Errorf("lifetime must not be <= 0")
+		return 0, errors.New("lifetime must not be <= 0")
 	}
 	// Note order of port arguments is switched between our
 	// AddMapping and the client's AddPortMapping.
@@ -69,20 +71,24 @@ func (n *pmp) DeleteMapping(protocol string, extport, intport int) (err error) {
 	return err
 }
 
+func (n *pmp) MarshalText() ([]byte, error) {
+	return []byte(fmt.Sprintf("natpmp:%v", n.gw)), nil
+}
+
 func discoverPMP() Interface {
 	// run external address lookups on all potential gateways
 	gws := potentialGateways()
 	found := make(chan *pmp, len(gws))
 	for i := range gws {
 		gw := gws[i]
-		go func() {
+		gopool.Submit(func() {
 			c := natpmp.NewClient(gw)
 			if _, err := c.GetExternalAddress(); err != nil {
 				found <- nil
 			} else {
 				found <- &pmp{gw, c}
 			}
-		}()
+		})
 	}
 	// return the one that responds first.
 	// discovery needs to be quick, so we stop caring about

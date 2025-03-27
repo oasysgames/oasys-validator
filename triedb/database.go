@@ -18,13 +18,13 @@ package triedb
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/go-ethereum/trie/trienode"
-	"github.com/ethereum/go-ethereum/trie/triestate"
 	"github.com/ethereum/go-ethereum/triedb/database"
 	"github.com/ethereum/go-ethereum/triedb/hashdb"
 	"github.com/ethereum/go-ethereum/triedb/pathdb"
@@ -32,7 +32,9 @@ import (
 
 // Config defines all necessary options for database.
 type Config struct {
-	Preimages bool           // Flag whether the preimage of node key is recorded
+	Preimages bool // Flag whether the preimage of node key is recorded
+	Cache     int
+	NoTries   bool
 	IsVerkle  bool           // Flag whether the db is holding a verkle tree
 	HashDB    *hashdb.Config // Configs for hash-based scheme
 	PathDB    *pathdb.Config // Configs for experimental path-based scheme
@@ -42,33 +44,35 @@ type Config struct {
 // default settings.
 var HashDefaults = &Config{
 	Preimages: false,
+	IsVerkle:  false,
 	HashDB:    hashdb.Defaults,
+}
+
+// VerkleDefaults represents a config for holding verkle trie data
+// using path-based scheme with default settings.
+var VerkleDefaults = &Config{
+	Preimages: false,
+	IsVerkle:  true,
+	PathDB:    pathdb.Defaults,
 }
 
 // backend defines the methods needed to access/update trie nodes in different
 // state scheme.
 type backend interface {
-	// Scheme returns the identifier of used storage scheme.
-	Scheme() string
+	// NodeReader returns a reader for accessing trie nodes within the specified state.
+	// An error will be returned if the specified state is not available.
+	NodeReader(root common.Hash) (database.NodeReader, error)
 
-	// Initialized returns an indicator if the state data is already initialized
-	// according to the state scheme.
-	Initialized(genesisRoot common.Hash) bool
+	// StateReader returns a reader for accessing flat states within the specified
+	// state. An error will be returned if the specified state is not available.
+	StateReader(root common.Hash) (database.StateReader, error)
 
 	// Size returns the current storage size of the diff layers on top of the
 	// disk layer and the storage size of the nodes cached in the disk layer.
 	//
 	// For hash scheme, there is no differentiation between diff layer nodes
 	// and dirty disk layer nodes, so both are merged into the second return.
-	Size() (common.StorageSize, common.StorageSize)
-
-	// Update performs a state transition by committing dirty nodes contained
-	// in the given set in order to update state from the specified parent to
-	// the specified root.
-	//
-	// The passed in maps(nodes, states) will be retained to avoid copying
-	// everything. Therefore, these maps must not be changed afterwards.
-	Update(root common.Hash, parent common.Hash, block uint64, nodes *trienode.MergedNodeSet, states *triestate.Set) error
+	Size() (common.StorageSize, common.StorageSize, common.StorageSize)
 
 	// Commit writes all relevant trie nodes belonging to the specified state
 	// to disk. Report specifies whether logs will be displayed in info level.
@@ -82,8 +86,8 @@ type backend interface {
 // types of node backend as an entrypoint. It's responsible for all interactions
 // relevant with trie nodes and node preimages.
 type Database struct {
+	disk      ethdb.Database
 	config    *Config        // Configuration for trie database
-	diskdb    ethdb.Database // Persistent database to store the snapshot
 	preimages *preimageStore // The store for caching preimages
 	backend   backend        // The backend for managing trie nodes
 }
@@ -92,46 +96,85 @@ type Database struct {
 // the legacy hash-based scheme is used by default.
 func NewDatabase(diskdb ethdb.Database, config *Config) *Database {
 	// Sanitize the config and use the default one if it's not specified.
+	var triediskdb ethdb.Database
+	if diskdb != nil && diskdb.StateStore() != nil {
+		triediskdb = diskdb.StateStore()
+	} else {
+		triediskdb = diskdb
+	}
+	dbScheme := rawdb.ReadStateScheme(diskdb)
 	if config == nil {
-		config = HashDefaults
+		if dbScheme == rawdb.PathScheme {
+			config = &Config{
+				PathDB: pathdb.Defaults,
+			}
+		} else {
+			config = HashDefaults
+		}
+	}
+	if config.PathDB == nil && config.HashDB == nil {
+		if dbScheme == rawdb.PathScheme {
+			config.PathDB = pathdb.Defaults
+		} else {
+			config.HashDB = hashdb.Defaults
+		}
+	}
+	if config.PathDB != nil && config.NoTries {
+		config.PathDB.NoTries = true
 	}
 	var preimages *preimageStore
 	if config.Preimages {
-		preimages = newPreimageStore(diskdb)
+		preimages = newPreimageStore(triediskdb)
 	}
 	db := &Database{
+		disk:      diskdb,
 		config:    config,
-		diskdb:    diskdb,
 		preimages: preimages,
 	}
-	if config.HashDB != nil && config.PathDB != nil {
-		log.Crit("Both 'hash' and 'path' mode are configured")
-	}
-	if config.PathDB != nil {
-		db.backend = pathdb.New(diskdb, config.PathDB)
-	} else {
-		var resolver hashdb.ChildResolver
-		if config.IsVerkle {
-			// TODO define verkle resolver
-			log.Crit("Verkle node resolver is not defined")
-		} else {
-			resolver = trie.MerkleResolver{}
+	/*
+	 * 1. First, initialize db according to the user config
+	 * 2. Second, initialize the db according to the scheme already used by db
+	 * 3. Last, use the default scheme, namely hash scheme
+	 */
+	if config.HashDB != nil {
+		if rawdb.ReadStateScheme(triediskdb) == rawdb.PathScheme {
+			log.Warn("Incompatible state scheme", "old", rawdb.PathScheme, "new", rawdb.HashScheme)
 		}
-		db.backend = hashdb.New(diskdb, config.HashDB, resolver)
+		db.backend = hashdb.New(triediskdb, config.HashDB)
+	} else if config.PathDB != nil {
+		if rawdb.ReadStateScheme(triediskdb) == rawdb.HashScheme {
+			log.Warn("Incompatible state scheme", "old", rawdb.HashScheme, "new", rawdb.PathScheme)
+		}
+		db.backend = pathdb.New(triediskdb, config.PathDB, config.IsVerkle)
+	} else if strings.Compare(dbScheme, rawdb.PathScheme) == 0 {
+		if config.PathDB == nil {
+			config.PathDB = pathdb.Defaults
+		}
+		db.backend = pathdb.New(triediskdb, config.PathDB, config.IsVerkle)
+	} else {
+		if config.HashDB == nil {
+			config.HashDB = hashdb.Defaults
+		}
+		db.backend = hashdb.New(triediskdb, config.HashDB)
 	}
 	return db
 }
 
-// Reader returns a reader for accessing all trie nodes with provided state root.
-// An error will be returned if the requested state is not available.
-func (db *Database) Reader(blockRoot common.Hash) (database.Reader, error) {
-	switch b := db.backend.(type) {
-	case *hashdb.Database:
-		return b.Reader(blockRoot)
-	case *pathdb.Database:
-		return b.Reader(blockRoot)
-	}
-	return nil, errors.New("unknown backend")
+func (db *Database) Config() *Config {
+	return db.config
+}
+
+// NodeReader returns a reader for accessing trie nodes within the specified state.
+// An error will be returned if the specified state is not available.
+func (db *Database) NodeReader(blockRoot common.Hash) (database.NodeReader, error) {
+	return db.backend.NodeReader(blockRoot)
+}
+
+// StateReader returns a reader that allows access to the state data associated
+// with the specified state. An error will be returned if the specified state is
+// not available.
+func (db *Database) StateReader(blockRoot common.Hash) (database.StateReader, error) {
+	return db.backend.StateReader(blockRoot)
 }
 
 // Update performs a state transition by committing dirty nodes contained in the
@@ -141,11 +184,17 @@ func (db *Database) Reader(blockRoot common.Hash) (database.Reader, error) {
 //
 // The passed in maps(nodes, states) will be retained to avoid copying everything.
 // Therefore, these maps must not be changed afterwards.
-func (db *Database) Update(root common.Hash, parent common.Hash, block uint64, nodes *trienode.MergedNodeSet, states *triestate.Set) error {
+func (db *Database) Update(root common.Hash, parent common.Hash, block uint64, nodes *trienode.MergedNodeSet, states *StateSet) error {
 	if db.preimages != nil {
 		db.preimages.commit(false)
 	}
-	return db.backend.Update(root, parent, block, nodes, states)
+	switch b := db.backend.(type) {
+	case *hashdb.Database:
+		return b.Update(root, parent, block, nodes)
+	case *pathdb.Database:
+		return b.Update(root, parent, block, nodes, states.internal())
+	}
+	return errors.New("unknown backend")
 }
 
 // Commit iterates over all the children of a particular node, writes them out
@@ -161,27 +210,24 @@ func (db *Database) Commit(root common.Hash, report bool) error {
 // Size returns the storage size of diff layer nodes above the persistent disk
 // layer, the dirty nodes buffered within the disk layer, and the size of cached
 // preimages.
-func (db *Database) Size() (common.StorageSize, common.StorageSize, common.StorageSize) {
+func (db *Database) Size() (common.StorageSize, common.StorageSize, common.StorageSize, common.StorageSize) {
 	var (
-		diffs, nodes common.StorageSize
-		preimages    common.StorageSize
+		diffs, nodes, immutablenodes common.StorageSize
+		preimages                    common.StorageSize
 	)
-	diffs, nodes = db.backend.Size()
+	diffs, nodes, immutablenodes = db.backend.Size()
 	if db.preimages != nil {
 		preimages = db.preimages.size()
 	}
-	return diffs, nodes, preimages
-}
-
-// Initialized returns an indicator if the state data is already initialized
-// according to the state scheme.
-func (db *Database) Initialized(genesisRoot common.Hash) bool {
-	return db.backend.Initialized(genesisRoot)
+	return diffs, nodes, immutablenodes, preimages
 }
 
 // Scheme returns the node scheme used in the database.
 func (db *Database) Scheme() string {
-	return db.backend.Scheme()
+	if db.config.PathDB != nil {
+		return rawdb.PathScheme
+	}
+	return rawdb.HashScheme
 }
 
 // Close flushes the dangling preimages to disk and closes the trie database.
@@ -265,14 +311,7 @@ func (db *Database) Recover(target common.Hash) error {
 	if !ok {
 		return errors.New("not supported")
 	}
-	var loader triestate.TrieLoader
-	if db.config.IsVerkle {
-		// TODO define verkle loader
-		log.Crit("Verkle loader is not defined")
-	} else {
-		loader = trie.NewMerkleLoader(db)
-	}
-	return pdb.Recover(target, loader)
+	return pdb.Recover(target)
 }
 
 // Recoverable returns the indicator if the specified state is enabled to be
@@ -321,18 +360,35 @@ func (db *Database) Journal(root common.Hash) error {
 	return pdb.Journal(root)
 }
 
-// SetBufferSize sets the node buffer size to the provided value(in bytes).
-// It's only supported by path-based database and will return an error for
+// Head return the top non-fork difflayer/disklayer root hash for rewinding.
+// It's only supported by path-based database and will return empty hash for
 // others.
-func (db *Database) SetBufferSize(size int) error {
+func (db *Database) Head() common.Hash {
 	pdb, ok := db.backend.(*pathdb.Database)
 	if !ok {
-		return errors.New("not supported")
+		return common.Hash{}
 	}
-	return pdb.SetBufferSize(size)
+	return pdb.Head()
+}
+
+// GetAllRooHash returns all MPT root hash in diffLayer and diskLayer.
+// It's only supported by path-based database and will return nil for
+// others.
+func (db *Database) GetAllRooHash() [][]string {
+	pdb, ok := db.backend.(*pathdb.Database)
+	if !ok {
+		log.Error("Not supported")
+		return nil
+	}
+	return pdb.GetAllRooHash()
 }
 
 // IsVerkle returns the indicator if the database is holding a verkle tree.
 func (db *Database) IsVerkle() bool {
 	return db.config.IsVerkle
+}
+
+// Disk returns the underlying disk database.
+func (db *Database) Disk() ethdb.Database {
+	return db.disk
 }

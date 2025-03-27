@@ -9,7 +9,6 @@ assignees: ''
 #### System information
 
 Geth version: `geth version`
-CL client & version: e.g. lighthouse/nimbus/prysm@v1.0.0
 OS & Version: Windows/Linux/OSX
 Commit hash : (if `develop`)
 

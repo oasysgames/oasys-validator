@@ -75,6 +75,10 @@ func (mt *mockTransactor) SendTransaction(ctx context.Context, tx *types.Transac
 	return nil
 }
 
+func (mt *mockTransactor) SendTransactionConditional(ctx context.Context, tx *types.Transaction, opts types.TransactionOpts) error {
+	return nil
+}
+
 type mockCaller struct {
 	codeAtBlockNumber       *big.Int
 	callContractBlockNumber *big.Int

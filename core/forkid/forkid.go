@@ -24,12 +24,13 @@ import (
 	"math"
 	"math/big"
 	"reflect"
+	"slices"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
-	"golang.org/x/exp/slices"
 )
 
 var (
@@ -95,6 +96,32 @@ func NewID(config *params.ChainConfig, genesis *types.Block, head, time uint64) 
 		return ID{Hash: checksumToBytes(hash), Next: fork}
 	}
 	return ID{Hash: checksumToBytes(hash), Next: 0}
+}
+
+// NextForkHash calculates the forkHash from genesis to the next fork block number or time
+func NextForkHash(config *params.ChainConfig, genesisHash common.Hash, genesisTime uint64, head uint64, time uint64) [4]byte {
+	// Calculate the starting checksum from the genesis hash
+	hash := crc32.ChecksumIEEE(genesisHash[:])
+
+	// Calculate the next fork checksum
+	forksByBlock, forksByTime := gatherForks(config, genesisTime)
+	for _, fork := range forksByBlock {
+		if fork > head {
+			// Checksum the previous hash and nextFork number and return
+			return checksumToBytes(checksumUpdate(hash, fork))
+		}
+		// Fork already passed, checksum the previous hash and the fork number
+		hash = checksumUpdate(hash, fork)
+	}
+	for _, fork := range forksByTime {
+		if fork > time {
+			// Checksum the previous hash and nextFork time and return
+			return checksumToBytes(checksumUpdate(hash, fork))
+		}
+		// Fork already passed, checksum the previous hash and the fork time
+		hash = checksumUpdate(hash, fork)
+	}
+	return checksumToBytes(hash)
 }
 
 // NewIDWithChain calculates the Ethereum fork ID from an existing chain instance.

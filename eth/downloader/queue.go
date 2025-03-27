@@ -30,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/prque"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
+	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/params"
@@ -64,6 +65,7 @@ type fetchRequest struct {
 // all outstanding pieces complete and the result as a whole can be processed.
 type fetchResult struct {
 	pending atomic.Int32 // Flag telling what deliveries are outstanding
+	pid     string
 
 	Header       *types.Header
 	Uncles       []*types.Header
@@ -73,9 +75,10 @@ type fetchResult struct {
 	Sidecars     types.BlobSidecars
 }
 
-func newFetchResult(header *types.Header, fastSync bool) *fetchResult {
+func newFetchResult(header *types.Header, fastSync bool, pid string) *fetchResult {
 	item := &fetchResult{
 		Header: header,
+		pid:    pid,
 	}
 	if !header.EmptyBody() {
 		item.pending.Store(item.pending.Load() | (1 << bodyType))
@@ -86,6 +89,15 @@ func newFetchResult(header *types.Header, fastSync bool) *fetchResult {
 		item.pending.Store(item.pending.Load() | (1 << receiptType))
 	}
 	return item
+}
+
+// body returns a representation of the fetch result as a types.Body object.
+func (f *fetchResult) body() types.Body {
+	return types.Body{
+		Transactions: f.Transactions,
+		Uncles:       f.Uncles,
+		Withdrawals:  f.Withdrawals,
+	}
 }
 
 // SetBodyDone flags the body as finished.
@@ -172,7 +184,7 @@ func (q *queue) Reset(blockCacheLimit int, thresholdInitialSize int) {
 	defer q.lock.Unlock()
 
 	q.closed = false
-	q.mode = FullSync
+	q.mode = ethconfig.FullSync
 
 	q.headerHead = common.Hash{}
 	q.headerPendPool = make(map[string]*fetchRequest)
@@ -320,7 +332,7 @@ func (q *queue) Schedule(headers []*types.Header, hashes []common.Hash, from uin
 			q.blockTaskQueue.Push(header, -int64(header.Number.Uint64()))
 		}
 		// Queue for receipt retrieval
-		if q.mode == SnapSync && !header.EmptyReceipts() {
+		if q.mode == ethconfig.SnapSync && !header.EmptyReceipts() {
 			if _, ok := q.receiptTaskPool[hash]; ok {
 				log.Warn("Header already scheduled for receipt fetch", "number", header.Number, "hash", hash)
 			} else {
@@ -377,6 +389,7 @@ func (q *queue) Results(block bool) []*fetchResult {
 		for _, tx := range result.Transactions {
 			size += common.StorageSize(tx.Size())
 		}
+		size += common.StorageSize(result.Withdrawals.Size())
 		q.resultSize = common.StorageSize(blockCacheSizeWeight)*size +
 			(1-common.StorageSize(blockCacheSizeWeight))*q.resultSize
 	}
@@ -514,7 +527,7 @@ func (q *queue) reserveHeaders(p *peerConnection, count int, taskPool map[common
 		// we can ask the resultcache if this header is within the
 		// "prioritized" segment of blocks. If it is not, we need to throttle
 
-		stale, throttle, item, err := q.resultCache.AddFetch(header, q.mode == SnapSync)
+		stale, throttle, item, err := q.resultCache.AddFetch(header, q.mode == ethconfig.SnapSync, p.id)
 		if stale {
 			// Don't put back in the task queue, this item has already been
 			// delivered upstream
@@ -645,7 +658,7 @@ func (q *queue) expire(peer string, pendPool map[string]*fetchRequest, taskQueue
 	// as there's no order of events that should lead to such expirations.
 	req := pendPool[peer]
 	if req == nil {
-		log.Error("Expired request does not exist", "peer", peer)
+		log.Trace("Expired request does not exist", "peer", peer)
 		return 0
 	}
 	delete(pendPool, peer)
@@ -775,7 +788,12 @@ func (q *queue) DeliverHeaders(id string, headers []*types.Header, hashes []comm
 // also wakes any threads waiting for data delivery.
 func (q *queue) DeliverBodies(id string, txLists [][]*types.Transaction, txListHashes []common.Hash,
 	uncleLists [][]*types.Header, uncleListHashes []common.Hash,
+<<<<<<< HEAD
 	withdrawalLists [][]*types.Withdrawal, withdrawalListHashes []common.Hash, sidecars []types.BlobSidecars) (int, error) {
+=======
+	withdrawalLists [][]*types.Withdrawal, withdrawalListHashes []common.Hash, sidecars []types.BlobSidecars,
+) (int, error) {
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
@@ -825,7 +843,11 @@ func (q *queue) DeliverBodies(id string, txLists [][]*types.Transaction, txListH
 			if want := *header.BlobGasUsed / params.BlobTxBlobGasPerBlob; uint64(blobs) != want { // div because the header is surely good vs the body might be bloated
 				return errInvalidBody
 			}
+<<<<<<< HEAD
 			if blobs > params.MaxBlobGasPerBlock/params.BlobTxBlobGasPerBlob {
+=======
+			if blobs > params.MaxBlobsPerBlockForBSC {
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 				return errInvalidBody
 			}
 		} else {
@@ -882,7 +904,7 @@ func (q *queue) DeliverReceipts(id string, receiptList [][]*types.Receipt, recei
 // to access the queue, so they already need a lock anyway.
 func (q *queue) deliver(id string, taskPool map[common.Hash]*types.Header,
 	taskQueue *prque.Prque[int64, *types.Header], pendPool map[string]*fetchRequest,
-	reqTimer metrics.Timer, resInMeter metrics.Meter, resDropMeter metrics.Meter,
+	reqTimer *metrics.Timer, resInMeter, resDropMeter *metrics.Meter,
 	results int, validate func(index int, header *types.Header) error,
 	reconstruct func(index int, result *fetchResult)) (int, error) {
 	// Short circuit if the data was never requested

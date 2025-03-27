@@ -22,6 +22,17 @@ func (s BlobSidecars) EncodeIndex(i int, w *bytes.Buffer) {
 	rlp.Encode(w, s[i])
 }
 
+<<<<<<< HEAD
+=======
+func (s BlobSidecars) BlobTxSidecarList() []*BlobTxSidecar {
+	var inner []*BlobTxSidecar
+	for _, sidecar := range s {
+		inner = append(inner, &(sidecar.BlobTxSidecar))
+	}
+	return inner
+}
+
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 type BlobSidecar struct {
 	BlobTxSidecar
 	BlockNumber *big.Int    `json:"blockNumber"`

@@ -14,14 +14,13 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-//go:build !nacl && !js && cgo && !gofuzz
-// +build !nacl,!js,cgo,!gofuzz
+//go:build !nacl && !js && !wasip1 && cgo && !gofuzz
+// +build !nacl,!js,!wasip1,cgo,!gofuzz
 
 package crypto
 
 import (
 	"crypto/ecdsa"
-	"crypto/elliptic"
 	"errors"
 	"fmt"
 
@@ -40,9 +39,13 @@ func SigToPub(hash, sig []byte) (*ecdsa.PublicKey, error) {
 	if err != nil {
 		return nil, err
 	}
+<<<<<<< HEAD
 
 	x, y := elliptic.Unmarshal(S256(), s) //nolint:all, TODO
 	return &ecdsa.PublicKey{Curve: S256(), X: x, Y: y}, nil
+=======
+	return UnmarshalPubkey(s)
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 // Sign calculates an ECDSA signature.
@@ -84,6 +87,6 @@ func CompressPubkey(pubkey *ecdsa.PublicKey) []byte {
 }
 
 // S256 returns an instance of the secp256k1 curve.
-func S256() elliptic.Curve {
+func S256() EllipticCurve {
 	return secp256k1.S256()
 }

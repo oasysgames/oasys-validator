@@ -3,14 +3,20 @@ package types
 import (
 	"bytes"
 	"math/big"
+<<<<<<< HEAD
 	"reflect"
+=======
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	"sync/atomic"
 
 	"github.com/pkg/errors"
 	"github.com/prysmaticlabs/prysm/v5/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
+<<<<<<< HEAD
 	"github.com/ethereum/go-ethereum/common/hexutil"
+=======
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 )
 
 const (
@@ -20,10 +26,13 @@ const (
 	MaxAttestationExtraLength = 256
 )
 
+<<<<<<< HEAD
 var (
 	blsPublicKeyT = reflect.TypeOf(BLSPublicKey{})
 )
 
+=======
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 type BLSPublicKey [BLSPublicKeyLength]byte
 type BLSSignature [BLSSignatureLength]byte
 type ValidatorsBitSet uint64
@@ -77,6 +86,7 @@ func (v *VoteEnvelope) calcVoteHash() common.Hash {
 	return rlpHash(vote)
 }
 
+<<<<<<< HEAD
 func (b BLSPublicKey) Bytes() []byte  { return b[:] }
 func (b BLSPublicKey) String() string { return hexutil.Encode(b[:]) }
 
@@ -94,16 +104,31 @@ func (b *BLSPublicKey) UnmarshalJSON(input []byte) error {
 // Verify vote using BLS.
 func (vote *VoteEnvelope) Verify() error {
 	blsPubKey, err := bls.PublicKeyFromBytes(vote.VoteAddress[:])
+=======
+func (b BLSPublicKey) Bytes() []byte { return b[:] }
+
+// Verify vote using BLS.
+func (v *VoteEnvelope) Verify() error {
+	blsPubKey, err := bls.PublicKeyFromBytes(v.VoteAddress[:])
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	if err != nil {
 		return errors.Wrap(err, "convert public key from bytes to bls failed")
 	}
 
+<<<<<<< HEAD
 	sig, err := bls.SignatureFromBytes(vote.Signature[:])
+=======
+	sig, err := bls.SignatureFromBytes(v.Signature[:])
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	if err != nil {
 		return errors.Wrap(err, "invalid signature")
 	}
 
+<<<<<<< HEAD
 	voteDataHash := vote.Data.Hash()
+=======
+	voteDataHash := v.Data.Hash()
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	if !sig.Verify(blsPubKey, voteDataHash[:]) {
 		return errors.New("verify bls signature failed.")
 	}

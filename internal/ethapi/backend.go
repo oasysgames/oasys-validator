@@ -44,6 +44,11 @@ type Backend interface {
 	SyncProgress() ethereum.SyncProgress
 
 	SuggestGasTipCap(ctx context.Context) (*big.Int, error)
+<<<<<<< HEAD
+=======
+
+	Chain() *core.BlockChain
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	FeeHistory(ctx context.Context, blockCount uint64, lastBlock rpc.BlockNumber, rewardPercentiles []float64) (*big.Int, [][]*big.Int, []*big.Int, []float64, []*big.Int, []float64, error)
 	BlobBaseFee(ctx context.Context) *big.Int
 	ChainDb() ethdb.Database
@@ -66,13 +71,16 @@ type Backend interface {
 	BlockByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*types.Block, error)
 	StateAndHeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*state.StateDB, *types.Header, error)
 	StateAndHeaderByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*state.StateDB, *types.Header, error)
-	PendingBlockAndReceipts() (*types.Block, types.Receipts)
+	Pending() (*types.Block, types.Receipts, *state.StateDB)
 	GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error)
 	GetTd(ctx context.Context, hash common.Hash) *big.Int
-	GetEVM(ctx context.Context, msg *core.Message, state *state.StateDB, header *types.Header, vmConfig *vm.Config, blockCtx *vm.BlockContext) *vm.EVM
+	GetEVM(ctx context.Context, state *state.StateDB, header *types.Header, vmConfig *vm.Config, blockCtx *vm.BlockContext) *vm.EVM
 	SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
+<<<<<<< HEAD
 	SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription
+=======
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	GetBlobSidecars(ctx context.Context, hash common.Hash) (types.BlobSidecars, error)
 
 	// Transaction pool API
@@ -88,6 +96,8 @@ type Backend interface {
 
 	ChainConfig() *params.ChainConfig
 	Engine() consensus.Engine
+	// CurrentValidators return the list of validator at the latest block
+	CurrentValidators() ([]common.Address, error)
 
 	// This is copied from filters.Backend
 	// eth/filters needs to be initialized from this backend type, so methods needed by
@@ -96,11 +106,34 @@ type Backend interface {
 	GetLogs(ctx context.Context, blockHash common.Hash, number uint64) ([][]*types.Log, error)
 	SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription
 	SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription
-	SubscribePendingLogsEvent(ch chan<- []*types.Log) event.Subscription
 	BloomStatus() (uint64, uint64)
 	ServiceFilter(ctx context.Context, session *bloombits.MatcherSession)
 	SubscribeFinalizedHeaderEvent(ch chan<- core.FinalizedHeaderEvent) event.Subscription
 	SubscribeNewVoteEvent(chan<- core.NewVoteEvent) event.Subscription
+<<<<<<< HEAD
+=======
+
+	// MevRunning return true if mev is running
+	MevRunning() bool
+	// MevParams returns the static params of mev
+	MevParams() *types.MevParams
+	// StartMev starts mev
+	StartMev()
+	// StopMev stops mev
+	StopMev()
+	// AddBuilder adds a builder to the bid simulator.
+	AddBuilder(builder common.Address, builderUrl string) error
+	// RemoveBuilder removes a builder from the bid simulator.
+	RemoveBuilder(builder common.Address) error
+	// HasBuilder returns true if the builder is in the builder list.
+	HasBuilder(builder common.Address) bool
+	// SendBid receives bid from the builders.
+	SendBid(ctx context.Context, bid *types.BidArgs) (common.Hash, error)
+	// BestBidGasFee returns the gas fee of the best bid for the given parent hash.
+	BestBidGasFee(parentHash common.Hash) *big.Int
+	// MinerInTurn returns true if the validator is in turn to propose the block.
+	MinerInTurn() bool
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 func GetAPIs(apiBackend Backend) []rpc.API {
@@ -125,8 +158,8 @@ func GetAPIs(apiBackend Backend) []rpc.API {
 			Namespace: "eth",
 			Service:   NewEthereumAccountAPI(apiBackend.AccountManager()),
 		}, {
-			Namespace: "personal",
-			Service:   NewPersonalAccountAPI(apiBackend, nonceLock),
+			Namespace: "mev",
+			Service:   NewMevAPI(apiBackend),
 		},
 	}
 }

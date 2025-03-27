@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/forkid"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -46,7 +47,7 @@ var ProtocolVersions = []uint{ETH68}
 var protocolLengths = map[uint]uint64{ETH68: 17}
 
 // maxMessageSize is the maximum cap on the size of a protocol message.
-const maxMessageSize = 10 * 1024 * 1024
+var maxMessageSize = params.MaxMessageSize
 
 const (
 	StatusMsg                     = 0x00
@@ -60,6 +61,7 @@ const (
 	NewPooledTransactionHashesMsg = 0x08
 	GetPooledTransactionsMsg      = 0x09
 	PooledTransactionsMsg         = 0x0a
+	UpgradeStatusMsg              = 0x0b // Protocol messages overloaded in eth/66
 	GetReceiptsMsg                = 0x0f
 	ReceiptsMsg                   = 0x10
 )
@@ -89,6 +91,35 @@ type StatusPacket struct {
 	Head            common.Hash
 	Genesis         common.Hash
 	ForkID          forkid.ID
+}
+
+type UpgradeStatusExtension struct {
+	DisablePeerTxBroadcast bool
+}
+
+func (e *UpgradeStatusExtension) Encode() (*rlp.RawValue, error) {
+	rawBytes, err := rlp.EncodeToBytes(e)
+	if err != nil {
+		return nil, err
+	}
+	raw := rlp.RawValue(rawBytes)
+	return &raw, nil
+}
+
+type UpgradeStatusPacket struct {
+	Extension *rlp.RawValue `rlp:"nil"`
+}
+
+func (p *UpgradeStatusPacket) GetExtension() (*UpgradeStatusExtension, error) {
+	extension := &UpgradeStatusExtension{}
+	if p.Extension == nil {
+		return extension, nil
+	}
+	err := rlp.DecodeBytes(*p.Extension, extension)
+	if err != nil {
+		return nil, err
+	}
+	return extension, nil
 }
 
 // NewBlockHashesPacket is the network packet for the block announcements.
@@ -253,7 +284,10 @@ type BlockBody struct {
 // Unpack retrieves the transactions and uncles from the range packet and returns
 // them in a split flat format that's more consistent with the internal data structures.
 func (p *BlockBodiesResponse) Unpack() ([][]*types.Transaction, [][]*types.Header, [][]*types.Withdrawal, []types.BlobSidecars) {
+<<<<<<< HEAD
 	// TODO(matt): add support for withdrawals to fetchers
+=======
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	var (
 		txset         = make([][]*types.Transaction, len(*p))
 		uncleset      = make([][]*types.Header, len(*p))
@@ -332,6 +366,9 @@ type PooledTransactionsRLPPacket struct {
 
 func (*StatusPacket) Name() string { return "Status" }
 func (*StatusPacket) Kind() byte   { return StatusMsg }
+
+func (*UpgradeStatusPacket) Name() string { return "UpgradeStatus" }
+func (*UpgradeStatusPacket) Kind() byte   { return UpgradeStatusMsg }
 
 func (*NewBlockHashesPacket) Name() string { return "NewBlockHashes" }
 func (*NewBlockHashesPacket) Kind() byte   { return NewBlockHashesMsg }

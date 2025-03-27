@@ -21,13 +21,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"mime"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus/clique"
+<<<<<<< HEAD
 	"github.com/ethereum/go-ethereum/consensus/oasys"
+=======
+	"github.com/ethereum/go-ethereum/consensus/parlia"
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -165,17 +170,33 @@ func (api *SignerAPI) determineSignatureFormat(ctx context.Context, contentType 
 		// Clique uses V on the form 0 or 1
 		useEthereumV = false
 		req = &SignDataRequest{ContentType: mediaType, Rawdata: cliqueRlp, Messages: messages, Hash: sighash}
+<<<<<<< HEAD
 	case apitypes.ApplicationOasys.Mime:
 		// Oasys is the customized PoS
 		oasysData, err := fromHex(data)
+=======
+	case apitypes.ApplicationParlia.Mime:
+		stringData, ok := data.(string)
+		if !ok {
+			return nil, useEthereumV, fmt.Errorf("input for %v must be an hex-encoded string", apitypes.ApplicationParlia.Mime)
+		}
+		parliaData, err := hexutil.Decode(stringData)
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		if err != nil {
 			return nil, useEthereumV, err
 		}
 		header := &types.Header{}
+<<<<<<< HEAD
 		if err := rlp.DecodeBytes(oasysData, header); err != nil {
 			return nil, useEthereumV, err
 		}
 		// The incoming oasys header is already truncated, sent to us with a extradata already shortened
+=======
+		if err := rlp.DecodeBytes(parliaData, header); err != nil {
+			return nil, useEthereumV, err
+		}
+		// The incoming parlia header is already truncated, sent to us with a extradata already shortened
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		if len(header.Extra) < 65 {
 			// Need to add it back, to get a suitable length for hashing
 			newExtra := make([]byte, len(header.Extra)+65)
@@ -183,12 +204,17 @@ func (api *SignerAPI) determineSignatureFormat(ctx context.Context, contentType 
 			header.Extra = newExtra
 		}
 		// Get back the rlp data, encoded by us
+<<<<<<< HEAD
 		sighash, oasysRlp, err := oasysHeaderHashAndRlp(header)
+=======
+		sighash, parliaRlp, err := parliaHeaderHashAndRlp(header, api.chainID)
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		if err != nil {
 			return nil, useEthereumV, err
 		}
 		messages := []*apitypes.NameValueType{
 			{
+<<<<<<< HEAD
 				Name:  "Oasys header",
 				Typ:   "oasys",
 				Value: fmt.Sprintf("oasys header %d [%#x]", header.Number, header.Hash()),
@@ -197,6 +223,16 @@ func (api *SignerAPI) determineSignatureFormat(ctx context.Context, contentType 
 		// Oasys uses V on the form 0 or 1
 		useEthereumV = false
 		req = &SignDataRequest{ContentType: mediaType, Rawdata: oasysRlp, Messages: messages, Hash: sighash}
+=======
+				Name:  "Parlia header",
+				Typ:   "parlia",
+				Value: fmt.Sprintf("parlia header %d [0x%x]", header.Number, header.Hash()),
+			},
+		}
+		// Parlia uses V on the form 0 or 1
+		useEthereumV = false
+		req = &SignDataRequest{ContentType: mediaType, Rawdata: parliaRlp, Messages: messages, Hash: sighash}
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	case apitypes.DataTyped.Mime:
 		// EIP-712 conformant typed data
 		var err error
@@ -252,6 +288,7 @@ func cliqueHeaderHashAndRlp(header *types.Header) (hash, rlp []byte, err error) 
 	return hash, rlp, err
 }
 
+<<<<<<< HEAD
 func oasysHeaderHashAndRlp(header *types.Header) (hash, rlp []byte, err error) {
 	if len(header.Extra) < 65 {
 		err = fmt.Errorf("oasys header extradata too short, %d < 65", len(header.Extra))
@@ -259,6 +296,15 @@ func oasysHeaderHashAndRlp(header *types.Header) (hash, rlp []byte, err error) {
 	}
 	rlp = oasys.OasysRLP(header)
 	hash = types.SealHash(header).Bytes()
+=======
+func parliaHeaderHashAndRlp(header *types.Header, chainId *big.Int) (hash, rlp []byte, err error) {
+	if len(header.Extra) < 65 {
+		err = fmt.Errorf("clique header extradata too short, %d < 65", len(header.Extra))
+		return
+	}
+	rlp = parlia.ParliaRLP(header, chainId)
+	hash = types.SealHash(header, chainId).Bytes()
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	return hash, rlp, err
 }
 
@@ -303,7 +349,7 @@ func fromHex(data any) ([]byte, error) {
 	return nil, fmt.Errorf("wrong type %T", data)
 }
 
-// typeDataRequest tries to convert the data into a SignDataRequest.
+// typedDataRequest tries to convert the data into a SignDataRequest.
 func typedDataRequest(data any) (*SignDataRequest, error) {
 	var typedData apitypes.TypedData
 	if td, ok := data.(apitypes.TypedData); ok {
@@ -337,7 +383,7 @@ func typedDataRequest(data any) (*SignDataRequest, error) {
 func (api *SignerAPI) EcRecover(ctx context.Context, data hexutil.Bytes, sig hexutil.Bytes) (common.Address, error) {
 	// Returns the address for the Account that was used to create the signature.
 	//
-	// Note, this function is compatible with eth_sign and personal_sign. As such it recovers
+	// Note, this function is compatible with eth_sign. As such it recovers
 	// the address of:
 	// hash = keccak256("\x19Ethereum Signed Message:\n${message length}${message}")
 	// addr = ecrecover(hash, signature)

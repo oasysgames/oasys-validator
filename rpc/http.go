@@ -236,7 +236,7 @@ func (hc *httpConn) doRequest(ctx context.Context, msg interface{}) (io.ReadClos
 		if _, err := buf.ReadFrom(resp.Body); err == nil {
 			body = buf.Bytes()
 		}
-
+		resp.Body.Close()
 		return nil, HTTPError{
 			Status:     resp.Status,
 			StatusCode: resp.StatusCode,
@@ -329,6 +329,19 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// All checks passed, create a codec that reads directly from the request body
 	// until EOF, writes the response to w, and orders the server to process a
 	// single request.
+	ctx = context.WithValue(ctx, "remote", r.RemoteAddr)
+	ctx = context.WithValue(ctx, "scheme", r.Proto)
+	ctx = context.WithValue(ctx, "local", r.Host)
+	if ua := r.Header.Get("User-Agent"); ua != "" {
+		ctx = context.WithValue(ctx, "User-Agent", ua)
+	}
+	if origin := r.Header.Get("Origin"); origin != "" {
+		ctx = context.WithValue(ctx, "Origin", origin)
+	}
+	if xForward := r.Header.Get("X-Forwarded-For"); xForward != "" {
+		ctx = context.WithValue(ctx, "X-Forwarded-For", xForward)
+	}
+
 	w.Header().Set("content-type", contentType)
 	codec := s.newHTTPServerConn(r, w)
 	defer codec.close()

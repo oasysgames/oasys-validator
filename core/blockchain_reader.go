@@ -20,13 +20,14 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/state/snapshot"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -54,13 +55,25 @@ func (bc *BlockChain) CurrentSnapBlock() *types.Header {
 // CurrentFinalBlock retrieves the current finalized block of the canonical
 // chain. The block is retrieved from the blockchain's internal cache.
 func (bc *BlockChain) CurrentFinalBlock() *types.Header {
-	return bc.currentFinalBlock.Load()
+	if p, ok := bc.engine.(consensus.PoSA); ok {
+		currentHeader := bc.CurrentHeader()
+		if currentHeader == nil {
+			return nil
+		}
+		return p.GetFinalizedHeader(bc, currentHeader)
+	}
+
+	return nil
 }
 
 // CurrentSafeBlock retrieves the current safe block of the canonical
 // chain. The block is retrieved from the blockchain's internal cache.
 func (bc *BlockChain) CurrentSafeBlock() *types.Header {
+<<<<<<< HEAD
 	if p, ok := bc.engine.(consensus.PoS); ok {
+=======
+	if p, ok := bc.engine.(consensus.PoSA); ok {
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		currentHeader := bc.CurrentHeader()
 		if currentHeader == nil {
 			return nil
@@ -302,6 +315,9 @@ func (bc *BlockChain) GetAncestor(hash common.Hash, number, ancestor uint64, max
 // transaction indexing is already finished. The transaction is not existent
 // from the node's perspective.
 func (bc *BlockChain) GetTransactionLookup(hash common.Hash) (*rawdb.LegacyTxLookupEntry, *types.Transaction, error) {
+	bc.txLookupLock.RLock()
+	defer bc.txLookupLock.RUnlock()
+
 	// Short circuit if the txlookup already in the cache, retrieve otherwise
 	if item, exist := bc.txLookupCache.Get(hash); exist {
 		return item.lookup, item.transaction, nil
@@ -310,6 +326,13 @@ func (bc *BlockChain) GetTransactionLookup(hash common.Hash) (*rawdb.LegacyTxLoo
 	if tx == nil {
 		progress, err := bc.TxIndexProgress()
 		if err != nil {
+			// No error is returned if the transaction indexing progress is unreachable
+			// due to unexpected internal errors. In such cases, it is impossible to
+			// determine whether the transaction does not exist or has simply not been
+			// indexed yet without a progress marker.
+			//
+			// In such scenarios, the transaction is treated as unreachable, though
+			// this is clearly an unintended and unexpected situation.
 			return nil, nil, nil
 		}
 		// The transaction indexing is not finished yet, returning an
@@ -341,7 +364,19 @@ func (bc *BlockChain) GetTd(hash common.Hash, number uint64) *big.Int {
 
 // HasState checks if state trie is fully present in the database or not.
 func (bc *BlockChain) HasState(hash common.Hash) bool {
-	_, err := bc.stateCache.OpenTrie(hash)
+	if bc.NoTries() {
+		if bc.snaps != nil {
+			return bc.snaps.Snapshot(hash) != nil
+		}
+		// snaps is nil when the blockchain creates
+		found, err := snapshot.PreCheckSnapshot(bc.db, hash)
+		if err != nil {
+			log.Warn("Check HasState in NoTries mode failed", "root", hash, "err", err)
+			return false
+		}
+		return found
+	}
+	_, err := bc.statedb.OpenTrie(hash)
 	return err == nil
 }
 
@@ -370,16 +405,10 @@ func (bc *BlockChain) stateRecoverable(root common.Hash) bool {
 
 // ContractCodeWithPrefix retrieves a blob of data associated with a contract
 // hash either from ephemeral in-memory cache, or from persistent storage.
-//
-// If the code doesn't exist in the in-memory cache, check the storage with
-// new code scheme.
-func (bc *BlockChain) ContractCodeWithPrefix(hash common.Hash) ([]byte, error) {
-	type codeReader interface {
-		ContractCodeWithPrefix(address common.Address, codeHash common.Hash) ([]byte, error)
-	}
+func (bc *BlockChain) ContractCodeWithPrefix(hash common.Hash) []byte {
 	// TODO(rjl493456442) The associated account address is also required
 	// in Verkle scheme. Fix it once snap-sync is supported for Verkle.
-	return bc.stateCache.(codeReader).ContractCodeWithPrefix(common.Address{}, hash)
+	return bc.statedb.ContractCodeWithPrefix(common.Address{}, hash)
 }
 
 // State returns a new mutable state based on the current HEAD block.
@@ -389,7 +418,20 @@ func (bc *BlockChain) State() (*state.StateDB, error) {
 
 // StateAt returns a new mutable state based on a particular point in time.
 func (bc *BlockChain) StateAt(root common.Hash) (*state.StateDB, error) {
-	return state.New(root, bc.stateCache, bc.snaps)
+	stateDb, err := state.New(root, bc.statedb)
+	if err != nil {
+		return nil, err
+	}
+
+	// If there's no trie and the specified snapshot is not available, getting
+	// any state will by default return nil.
+	// Instead of that, it will be more useful to return an error to indicate
+	// the state is not available.
+	if stateDb.NoTrie() && stateDb.GetSnap() == nil {
+		return nil, errors.New("state is not available")
+	}
+
+	return stateDb, err
 }
 
 // Config retrieves the chain's fork configuration.
@@ -415,7 +457,7 @@ func (bc *BlockChain) Processor() Processor {
 
 // StateCache returns the caching database underpinning the blockchain instance.
 func (bc *BlockChain) StateCache() state.Database {
-	return bc.stateCache
+	return bc.statedb
 }
 
 // GasLimit returns the gas limit of the current HEAD block.
@@ -428,9 +470,9 @@ func (bc *BlockChain) Genesis() *types.Block {
 	return bc.genesisBlock
 }
 
-// GetVMConfig returns the block chain VM config.
-func (bc *BlockChain) GetVMConfig() *vm.Config {
-	return &bc.vmConfig
+// GenesisHeader retrieves the chain's genesis block header.
+func (bc *BlockChain) GenesisHeader() *types.Header {
+	return bc.genesisBlock.Header()
 }
 
 // TxIndexProgress returns the transaction indexing progress.
@@ -466,14 +508,24 @@ func (bc *BlockChain) SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) event.Su
 	return bc.scope.Track(bc.chainHeadFeed.Subscribe(ch))
 }
 
+<<<<<<< HEAD
 // SubscribeHighestVerifiedBlockEvent registers a subscription of HighestVerifiedBlockEvent.
+=======
+// SubscribeHighestVerifiedHeaderEvent registers a subscription of HighestVerifiedBlockEvent.
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 func (bc *BlockChain) SubscribeHighestVerifiedHeaderEvent(ch chan<- HighestVerifiedBlockEvent) event.Subscription {
 	return bc.scope.Track(bc.highestVerifiedBlockFeed.Subscribe(ch))
 }
 
+<<<<<<< HEAD
 // SubscribeChainSideEvent registers a subscription of ChainSideEvent.
 func (bc *BlockChain) SubscribeChainSideEvent(ch chan<- ChainSideEvent) event.Subscription {
 	return bc.scope.Track(bc.chainSideFeed.Subscribe(ch))
+=======
+// SubscribeChainBlockEvent registers a subscription of ChainBlockEvent.
+func (bc *BlockChain) SubscribeChainBlockEvent(ch chan<- ChainHeadEvent) event.Subscription {
+	return bc.scope.Track(bc.chainBlockFeed.Subscribe(ch))
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 // SubscribeLogsEvent registers a subscription of []*types.Log.
@@ -491,3 +543,15 @@ func (bc *BlockChain) SubscribeBlockProcessingEvent(ch chan<- bool) event.Subscr
 func (bc *BlockChain) SubscribeFinalizedHeaderEvent(ch chan<- FinalizedHeaderEvent) event.Subscription {
 	return bc.scope.Track(bc.finalizedHeaderFeed.Subscribe(ch))
 }
+<<<<<<< HEAD
+=======
+
+// AncientTail retrieves the tail the ancients blocks
+func (bc *BlockChain) AncientTail() (uint64, error) {
+	tail, err := bc.db.BlockStore().Tail()
+	if err != nil {
+		return 0, err
+	}
+	return tail, nil
+}
+>>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
