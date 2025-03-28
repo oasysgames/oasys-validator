@@ -24,7 +24,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -547,34 +546,22 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 
 	fee := new(uint256.Int).SetUint64(st.gasUsed())
 	fee.Mul(fee, effectiveTipU256)
-	// consensus engine is parlia
-	if st.evm.ChainConfig().Parlia != nil {
-		st.state.AddBalance(consensus.SystemAddress, fee, tracing.BalanceIncreaseRewardTransactionFee)
+	// consensus engine is oasys
+	if st.evm.ChainConfig().Oasys != nil {
+		st.state.AddBalance(st.evm.Context.Coinbase, fee, tracing.BalanceIncreaseRewardTransactionFee)
 		// add extra blob fee reward
 		if rules.IsCancun {
 			blobFee := new(big.Int).SetUint64(st.blobGasUsed())
 			blobFee.Mul(blobFee, st.evm.Context.BlobBaseFee)
 			blobFeeU256, _ := uint256.FromBig(blobFee)
-			st.state.AddBalance(consensus.SystemAddress, blobFeeU256, tracing.BalanceIncreaseRewardTransactionFee)
+			st.state.AddBalance(st.evm.Context.Coinbase, blobFeeU256, tracing.BalanceIncreaseRewardTransactionFee)
 		}
 	} else {
-<<<<<<< HEAD
-		fee := new(uint256.Int).SetUint64(st.gasUsed())
-		fee.Mul(fee, effectiveTipU256)
-		st.state.AddBalance(st.evm.Context.Coinbase, fee)
-		if st.evm.ChainConfig().Oasys != nil && rules.IsCancun {
-			// add extra blob fee reward
-			blobFee := new(big.Int).SetUint64(st.blobGasUsed())
-			blobFee.Mul(blobFee, st.evm.Context.BlobBaseFee)
-			blobFeeU256, _ := uint256.FromBig(blobFee)
-			st.state.AddBalance(st.evm.Context.Coinbase, blobFeeU256)
-=======
 		st.state.AddBalance(st.evm.Context.Coinbase, fee, tracing.BalanceIncreaseRewardTransactionFee)
 
 		// add the coinbase to the witness iff the fee is greater than 0
 		if rules.IsEIP4762 && fee.Sign() != 0 {
 			st.evm.AccessEvents.AddAccount(st.evm.Context.Coinbase, true)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		}
 	}
 
