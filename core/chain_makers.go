@@ -28,7 +28,6 @@ import (
 	contracts "github.com/ethereum/go-ethereum/contracts/oasys"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/systemcontracts"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -189,13 +188,10 @@ func (b *BlockGen) AddBlobSidecar(sidecar *types.BlobSidecar) {
 	b.sidecars = append(b.sidecars, sidecar)
 }
 
-<<<<<<< HEAD
-=======
 func (b *BlockGen) HeadBlock() *types.Header {
 	return b.header
 }
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 // Number returns the block number of the block being generated.
 func (b *BlockGen) Number() *big.Int {
 	return new(big.Int).Set(b.header.Number)
@@ -414,12 +410,10 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		if config.DAOForkSupport && config.DAOForkBlock != nil && config.DAOForkBlock.Cmp(b.header.Number) == 0 {
 			misc.ApplyDAOHardFork(statedb)
 		}
-<<<<<<< HEAD
+
 		// Deploy oasys built-in contracts
 		contracts.Deploy(config, statedb, b.header.Number.Uint64())
-=======
 
-		systemcontracts.TryUpdateBuildInSystemContract(config, b.header.Number, parent.Time(), b.header.Time, statedb, true)
 		if config.IsPrague(b.header.Number, b.header.Time) || config.IsVerkle(b.header.Number, b.header.Time) {
 			// EIP-2935
 			blockContext := NewEVMBlockContext(b.header, cm, &b.header.Coinbase)
@@ -428,21 +422,11 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 			ProcessParentBlockHash(b.header.ParentHash, evm)
 		}
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		// Execute any user modifications to the block
 		if gen != nil {
 			gen(i, b)
 		}
 
-<<<<<<< HEAD
-		block, _, err := b.engine.FinalizeAndAssemble(cm, b.header, statedb, b.txs, b.uncles, b.receipts, b.withdrawals)
-		if err != nil {
-			panic(err)
-		}
-		if block.Header().EmptyWithdrawalsHash() {
-			block = block.WithWithdrawals(make([]*types.Withdrawal, 0))
-		}
-=======
 		requests := b.collectRequests(false)
 		if requests != nil {
 			reqHash := types.CalcRequestsHash(requests)
@@ -454,7 +438,6 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		if err != nil {
 			panic(err)
 		}
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		if config.IsCancun(block.Number(), block.Time()) {
 			for _, s := range b.sidecars {
 				s.BlockNumber = block.Number()
@@ -656,24 +639,13 @@ func (cm *chainMaker) makeHeader(parent *types.Block, state *state.StateDB, engi
 		excessBlobGas := eip4844.CalcExcessBlobGas(cm.config, parentHeader, time)
 		header.ExcessBlobGas = &excessBlobGas
 		header.BlobGasUsed = new(uint64)
-<<<<<<< HEAD
+		header.ParentBeaconRoot = new(common.Hash)
 		if cm.config.Oasys != nil {
 			header.WithdrawalsHash = &types.EmptyWithdrawalsHash
-		}
-		header.ParentBeaconRoot = new(common.Hash)
-=======
-		if cm.config.Parlia == nil {
-			header.ParentBeaconRoot = new(common.Hash)
-		} else {
-			header.WithdrawalsHash = &types.EmptyWithdrawalsHash
-			if cm.config.IsBohr(header.Number, header.Time) {
-				header.ParentBeaconRoot = new(common.Hash)
-			}
 			if cm.config.IsPrague(header.Number, header.Time) {
 				header.RequestsHash = &types.EmptyRequestsHash
 			}
 		}
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	}
 	return header
 }
@@ -802,13 +774,8 @@ func (cm *chainMaker) GetTd(hash common.Hash, number uint64) *big.Int {
 	return nil // not supported
 }
 
-<<<<<<< HEAD
-func (cm *chainMaker) GetCanonicalHash(number uint64) common.Hash {
-	return common.Hash{}
-=======
 func (cm *chainMaker) GetHighestVerifiedHeader() *types.Header {
 	panic("not supported")
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 func (cm *chainMaker) GetVerifiedBlockByHash(hash common.Hash) *types.Header {
