@@ -24,10 +24,6 @@ import (
 	mrand "math/rand"
 
 	"github.com/ethereum/go-ethereum/common"
-<<<<<<< HEAD
-	"github.com/ethereum/go-ethereum/common/math"
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
@@ -143,27 +139,16 @@ func (f *ForkChoice) ReorgNeeded(current *types.Header, extern *types.Header) (b
 
 // ReorgNeededWithFastFinality compares justified block numbers firstly, backoff to compare tds when equal
 func (f *ForkChoice) ReorgNeededWithFastFinality(current *types.Header, header *types.Header) (bool, error) {
-<<<<<<< HEAD
 	_, ok := f.chain.Engine().(consensus.PoS)
-=======
-	_, ok := f.chain.Engine().(consensus.PoSA)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	if !ok {
 		return f.ReorgNeeded(current, header)
 	}
 
 	justifiedNumber, curJustifiedNumber := uint64(0), uint64(0)
-<<<<<<< HEAD
 	if f.chain.Config().IsFastFinalityEnabled(header.Number) {
 		justifiedNumber = f.chain.GetJustifiedNumber(header)
 	}
 	if f.chain.Config().IsFastFinalityEnabled(current.Number) {
-=======
-	if f.chain.Config().IsPlato(header.Number) {
-		justifiedNumber = f.chain.GetJustifiedNumber(header)
-	}
-	if f.chain.Config().IsPlato(current.Number) {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		curJustifiedNumber = f.chain.GetJustifiedNumber(current)
 	}
 	if justifiedNumber == curJustifiedNumber {

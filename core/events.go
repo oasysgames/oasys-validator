@@ -46,9 +46,4 @@ type ChainHeadEvent struct {
 	Header *types.Header
 }
 
-<<<<<<< HEAD
-type ChainHeadEvent struct{ Block *types.Block }
-
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 type HighestVerifiedBlockEvent struct{ Header *types.Header }
