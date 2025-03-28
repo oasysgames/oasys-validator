@@ -326,6 +326,7 @@ func SetupGenesisBlockWithOverride(db ethdb.Database, triedb *triedb.Database, g
 	}
 	// Commit the genesis if the database is empty
 	ghash := rawdb.ReadCanonicalHash(db, 0)
+	oasys.GenesisHash = ghash
 	if (ghash == common.Hash{}) {
 		if genesis == nil {
 			log.Info("Writing default BSC mainnet genesis block")
@@ -344,12 +345,6 @@ func SetupGenesisBlockWithOverride(db ethdb.Database, triedb *triedb.Database, g
 		log.Info("genesis block hash", "hash", block.Hash())
 		return genesis.Config, block.Hash(), nil, nil
 	}
-<<<<<<< HEAD
-	// Just commit the new block if there is no stored genesis block.
-	stored := rawdb.ReadCanonicalHash(db, 0)
-	oasys.GenesisHash = stored
-	if (stored == common.Hash{}) {
-=======
 	// Commit the genesis if the genesis block exists in the ancient database
 	// but the key-value database is empty without initializing the genesis
 	// fields. This scenario can occur when the node is created from scratch
@@ -359,7 +354,6 @@ func SetupGenesisBlockWithOverride(db ethdb.Database, triedb *triedb.Database, g
 		// Ensure the stored genesis block matches with the given genesis. Private
 		// networks must explicitly specify the genesis in the config file, mainnet
 		// genesis will be used as default and the initialization will always fail.
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		if genesis == nil {
 			log.Info("Writing default main-net genesis block")
 			genesis = DefaultGenesisBlock()
@@ -390,32 +384,6 @@ func SetupGenesisBlockWithOverride(db ethdb.Database, triedb *triedb.Database, g
 		if hash := genesis.ToBlock().Hash(); hash != ghash {
 			return nil, common.Hash{}, nil, &GenesisMismatchError{ghash, hash}
 		}
-<<<<<<< HEAD
-	}
-	// Get the existing chain configuration.
-	newcfg := genesis.configOrDefault(stored)
-	applyOverrides(newcfg)
-	if err := newcfg.CheckConfigForkOrder(); err != nil {
-		return newcfg, common.Hash{}, err
-	}
-	storedcfg := rawdb.ReadChainConfig(db, stored)
-	if storedcfg == nil {
-		log.Warn("Found genesis block without chain config")
-		rawdb.WriteChainConfig(db, stored, newcfg)
-		return newcfg, stored, nil
-	}
-	storedData, _ := json.Marshal(storedcfg)
-	// Special case: if a private network is being used (no genesis and also no
-	// mainnet hash in the database), we must not apply the `configOrDefault`
-	// chain config as that would be AllProtocolChanges (applying any new fork
-	// on top of an existing private network genesis block). In that case, only
-	// apply the overrides.
-	if genesis == nil && stored != params.MainnetGenesisHash &&
-		stored != params.OasysMainnetGenesisHash && stored != params.OasysTestnetGenesisHash {
-		newcfg = storedcfg
-		applyOverrides(newcfg)
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	}
 	// Check config compatibility and write the config. Compatibility errors
 	// are returned to the caller unless we're already at block zero.
@@ -456,11 +424,7 @@ func LoadChainConfig(db ethdb.Database, genesis *Genesis) (*params.ChainConfig, 
 	if stored != (common.Hash{}) {
 		builtInConf := params.GetBuiltInChainConfig(stored)
 		if builtInConf != nil {
-<<<<<<< HEAD
-			return builtInConf, nil
-=======
 			return builtInConf, stored, nil
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		}
 		storedcfg := rawdb.ReadChainConfig(db, stored)
 		if storedcfg != nil {
@@ -487,14 +451,10 @@ func LoadChainConfig(db ethdb.Database, genesis *Genesis) (*params.ChainConfig, 
 	return params.BSCChainConfig, params.BSCGenesisHash, nil
 }
 
-<<<<<<< HEAD
-func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
-=======
 // chainConfigOrDefault retrieves the attached chain configuration. If the genesis
 // object is null, it returns the default chain configuration based on the given
 // genesis hash, or the locally stored config if it's not a pre-defined network.
 func (g *Genesis) chainConfigOrDefault(ghash common.Hash, stored *params.ChainConfig) *params.ChainConfig {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	conf := params.GetBuiltInChainConfig(ghash)
 	if conf != nil {
 		return conf
@@ -502,11 +462,7 @@ func (g *Genesis) chainConfigOrDefault(ghash common.Hash, stored *params.ChainCo
 	if g != nil {
 		return g.Config // it could be a custom config for QA test, just return
 	}
-<<<<<<< HEAD
-	return params.AllEthashProtocolChanges
-=======
 	return stored
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 // IsVerkle indicates whether the state is already stored in a verkle
@@ -566,23 +522,14 @@ func (g *Genesis) toBlockWithRoot(root common.Hash) *types.Block {
 	)
 	if conf := g.Config; conf != nil {
 		num := big.NewInt(int64(g.Number))
-<<<<<<< HEAD
 		if conf.Oasys == nil && conf.IsShanghai(num, g.Timestamp) {
-=======
-		if conf.Parlia == nil && conf.IsShanghai(num, g.Timestamp) {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 			head.WithdrawalsHash = &types.EmptyWithdrawalsHash
 			withdrawals = make([]*types.Withdrawal, 0)
 		}
 		if conf.IsCancun(num, g.Timestamp) {
-<<<<<<< HEAD
 			if conf.Oasys != nil {
 				head.WithdrawalsHash = &types.EmptyWithdrawalsHash
-=======
-			if conf.Parlia != nil {
-				head.WithdrawalsHash = &types.EmptyWithdrawalsHash
 				withdrawals = make([]*types.Withdrawal, 0)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 			}
 
 			// EIP-4788: The parentBeaconBlockRoot of the genesis block is always
@@ -625,19 +572,9 @@ func (g *Genesis) Commit(db ethdb.Database, triedb *triedb.Database) (*types.Blo
 	if config.Clique != nil && len(g.ExtraData) < 32+crypto.SignatureLength {
 		return nil, errors.New("can't start clique chain without signers")
 	}
-<<<<<<< HEAD
-	if config.Oasys != nil && len(block.Extra()) < 32+crypto.SignatureLength {
-		return nil, errors.New("can't start oasys chain without signers")
-	}
-	// All the checks has passed, flushAlloc the states derived from the genesis
-	// specification as well as the specification itself into the provided
-	// database.
-	if err := flushAlloc(&g.Alloc, db, triedb, block.Hash()); err != nil {
-=======
 	// flush the data to disk and compute the state root
 	root, err := flushAlloc(&g.Alloc, triedb)
 	if err != nil {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		return nil, err
 	}
 	block := g.toBlockWithRoot(root)
