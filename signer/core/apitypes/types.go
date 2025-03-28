@@ -300,13 +300,8 @@ var (
 		accounts.MimetypeClique,
 		0x02,
 	}
-<<<<<<< HEAD
 	ApplicationOasys = SigFormat{
 		accounts.MimetypeOasys,
-=======
-	ApplicationParlia = SigFormat{
-		accounts.MimetypeParlia,
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		0x03,
 	}
 	TextPlain = SigFormat{
