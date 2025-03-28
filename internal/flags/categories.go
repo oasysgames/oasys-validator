@@ -19,28 +19,6 @@ package flags
 import "github.com/urfave/cli/v2"
 
 const (
-<<<<<<< HEAD
-	EthCategory        = "ETHEREUM"
-	LightCategory      = "LIGHT CLIENT"
-	DevCategory        = "DEVELOPER CHAIN"
-	StateCategory      = "STATE HISTORY MANAGEMENT"
-	TxPoolCategory     = "TRANSACTION POOL (EVM)"
-	BlobPoolCategory   = "TRANSACTION POOL (BLOB)"
-	PerfCategory       = "PERFORMANCE TUNING"
-	AccountCategory    = "ACCOUNT"
-	APICategory        = "API AND CONSOLE"
-	NetworkingCategory = "NETWORKING"
-	MinerCategory      = "MINER"
-	GasPriceCategory   = "GAS PRICE ORACLE"
-	VMCategory         = "VIRTUAL MACHINE"
-	LoggingCategory    = "LOGGING AND DEBUGGING"
-	MetricsCategory    = "METRICS AND STATS"
-	MiscCategory       = "MISC"
-	TestingCategory    = "TESTING"
-	DeprecatedCategory = "ALIASED (deprecated)"
-	// for finality
-	FastFinalityCategory = "FAST FINALITY"
-=======
 	EthCategory          = "ETHEREUM"
 	BeaconCategory       = "BEACON CHAIN"
 	DevCategory          = "DEVELOPER CHAIN"
@@ -63,7 +41,6 @@ const (
 	FastNodeCategory     = "FAST NODE"
 	FastFinalityCategory = "FAST FINALITY"
 	BlockHistoryCategory = "BLOCK HISTORY MANAGEMENT"
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 )
 
 func init() {
