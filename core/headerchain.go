@@ -96,24 +96,15 @@ func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, engine c
 	}
 	hc.currentHeaderHash = hc.CurrentHeader().Hash()
 	headHeaderGauge.Update(hc.CurrentHeader().Number.Int64())
-<<<<<<< HEAD
-=======
 	justifiedBlockGauge.Update(int64(hc.GetJustifiedNumber(hc.CurrentHeader())))
 	finalizedBlockGauge.Update(int64(hc.getFinalizedNumber(hc.CurrentHeader())))
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	return hc, nil
 }
 
-<<<<<<< HEAD
 // getJustifiedNumber returns the highest justified blockNumber on the branch including and before `header`.
 func (hc *HeaderChain) GetJustifiedNumber(header *types.Header) uint64 {
 	if p, ok := hc.engine.(consensus.PoS); ok {
-=======
-// GetJustifiedNumber returns the highest justified blockNumber on the branch including and before `header`.
-func (hc *HeaderChain) GetJustifiedNumber(header *types.Header) uint64 {
-	if p, ok := hc.engine.(consensus.PoSA); ok {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		justifiedBlockNumber, _, err := p.GetJustifiedNumberAndHash(hc, []*types.Header{header})
 		if err == nil {
 			return justifiedBlockNumber
@@ -124,8 +115,6 @@ func (hc *HeaderChain) GetJustifiedNumber(header *types.Header) uint64 {
 	return 0
 }
 
-<<<<<<< HEAD
-=======
 // getFinalizedNumber returns the highest finalized number before the specific block.
 func (hc *HeaderChain) getFinalizedNumber(header *types.Header) uint64 {
 	if p, ok := hc.engine.(consensus.PoSA); ok {
@@ -141,7 +130,6 @@ func (hc *HeaderChain) GenesisHeader() *types.Header {
 	return hc.genesisHeader
 }
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 // GetBlockNumber retrieves the block number belonging to the given hash
 // from the cache or database
 func (hc *HeaderChain) GetBlockNumber(hash common.Hash) *uint64 {
@@ -405,8 +393,6 @@ func (hc *HeaderChain) InsertHeaderChain(chain []*types.Header, start time.Time,
 	return res.status, err
 }
 
-<<<<<<< HEAD
-=======
 // GetBlockHashesFromHash retrieves a number of block hashes starting at a given
 // hash, fetching towards the genesis block.
 func (hc *HeaderChain) GetBlockHashesFromHash(hash common.Hash, max uint64) []common.Hash {
@@ -434,7 +420,6 @@ func (hc *HeaderChain) GetHighestVerifiedHeader() *types.Header {
 	return nil
 }
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 func (hc *HeaderChain) GetVerifiedBlockByHash(hash common.Hash) *types.Header {
 	return hc.GetHeaderByHash(hash)
 }
