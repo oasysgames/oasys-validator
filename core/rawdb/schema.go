@@ -157,13 +157,7 @@ var (
 	BloomTrieIndexPrefix = []byte("bltIndex-")
 
 	CliqueSnapshotPrefix = []byte("clique-")
-<<<<<<< HEAD
 	OasysSnapshotPrefix  = []byte("oasys-")
-
-	BlockBlobSidecarsPrefix = []byte("blobs")
-=======
-	ParliaSnapshotPrefix = []byte("parlia-")
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	BlockBlobSidecarsPrefix = []byte("blobs")
 
@@ -226,14 +220,11 @@ func blockBlobSidecarsKey(number uint64, hash common.Hash) []byte {
 	return append(append(BlockBlobSidecarsPrefix, encodeBlockNumber(number)...), hash.Bytes()...)
 }
 
-<<<<<<< HEAD
-=======
 // diffLayerKey = diffLayerKeyPrefix + hash
 func diffLayerKey(hash common.Hash) []byte {
 	return append(diffLayerPrefix, hash.Bytes()...)
 }
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 // txLookupKey = txLookupPrefix + hash
 func txLookupKey(hash common.Hash) []byte {
 	return append(txLookupPrefix, hash.Bytes()...)

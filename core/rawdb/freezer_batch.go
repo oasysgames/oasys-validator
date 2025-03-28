@@ -25,12 +25,6 @@ import (
 
 	"golang.org/x/exp/slices"
 
-<<<<<<< HEAD
-	"golang.org/x/exp/slices"
-
-	"github.com/ethereum/go-ethereum/common/math"
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/golang/snappy"
 )
