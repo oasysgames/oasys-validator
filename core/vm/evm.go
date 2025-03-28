@@ -183,20 +183,18 @@ func isSystemCall(caller ContractRef) bool {
 // the necessary steps to create accounts and reverses the state in case of an
 // execution error or failed value transfer.
 func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas uint64, value *uint256.Int) (ret []byte, leftOverGas uint64, err error) {
-<<<<<<< HEAD
 	// Fail if the address is not allowed to call
 	// Skip the check if this call is readonly (eth_call)
 	readOnly := evm.Config.NoBaseFee
 	if !readOnly && IsDeniedToCall(evm.StateDB, addr) {
 		return nil, 0, ErrUnauthorizedCall
-=======
+	}
 	// Capture the tracer start/end events in debug mode
 	if evm.Config.Tracer != nil {
 		evm.captureBegin(evm.depth, CALL, caller.Address(), addr, input, gas, value.ToBig())
 		defer func(startGas uint64) {
 			evm.captureEnd(evm.depth, startGas, leftOverGas, ret, err)
 		}(gas)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	}
 	// Fail if we're trying to execute above the call depth limit
 	if evm.depth > int(params.CallCreateDepth) {
@@ -456,8 +454,8 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	if nonce+1 < nonce {
 		return nil, common.Address{}, gas, ErrNonceUintOverflow
 	}
-<<<<<<< HEAD
-	evm.StateDB.SetNonce(caller.Address(), nonce+1)
+	evm.StateDB.SetNonce(caller.Address(), nonce+1, tracing.NonceChangeContractCreator)
+
 	// Fail if the caller is not allowed to create. Limited to `CREATE`
 	// because this check targets raw transactions from EOA, and `CREATE2`
 	// within internal transactions is excluded.
@@ -465,12 +463,6 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	if evm.depth == 0 && typ == CREATE && !IsAllowedToCreate(evm.StateDB, caller.Address()) {
 		return nil, common.Address{}, 0, ErrUnauthorizedCreate
 	}
-	// We add this to the access list _before_ taking a snapshot. Even if the creation fails,
-	// the access-list change should not be rolled back
-	if evm.chainRules.IsBerlin {
-=======
-	evm.StateDB.SetNonce(caller.Address(), nonce+1, tracing.NonceChangeContractCreator)
-
 	// Charge the contract creation init gas in verkle mode
 	if evm.chainRules.IsEIP4762 {
 		statelessGas := evm.AccessEvents.ContractCreatePreCheckGas(address)
@@ -486,7 +478,6 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	// We add this to the access list _before_ taking a snapshot. Even if the
 	// creation fails, the access-list change should not be rolled back.
 	if evm.chainRules.IsEIP2929 {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		evm.StateDB.AddAddressToAccessList(address)
 	}
 	// Ensure there's no existing contract already at the designated address.

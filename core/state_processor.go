@@ -27,7 +27,6 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	contracts "github.com/ethereum/go-ethereum/contracts/oasys"
 	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/systemcontracts"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -61,10 +60,7 @@ func NewStateProcessor(config *params.ChainConfig, chain *HeaderChain) *StatePro
 // transactions failed to execute due to insufficient gas it will return an error.
 func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg vm.Config) (*ProcessResult, error) {
 	var (
-<<<<<<< HEAD
-=======
 		receipts    = make([]*types.Receipt, 0)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		usedGas     = new(uint64)
 		header      = block.Header()
 		blockHash   = block.Hash()
@@ -77,36 +73,13 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	if p.config.DAOForkSupport && p.config.DAOForkBlock != nil && p.config.DAOForkBlock.Cmp(block.Number()) == 0 {
 		misc.ApplyDAOHardFork(statedb)
 	}
-<<<<<<< HEAD
-	// Deploy oasys built-in contracts
-	contracts.Deploy(p.config, statedb, block.Number().Uint64())
-
-	engine := p.engine
-	if cl, ok := engine.(*beacon.Beacon); ok {
-		engine = cl.InnerEngine()
-	}
-
-	var (
-		context    = NewEVMBlockContext(header, p.bc, nil)
-		vmenv      = vm.NewEVM(context, vm.TxContext{}, statedb, p.config, cfg)
-		signer     = types.MakeSigner(p.config, header.Number, header.Time)
-		pos, isPoS = engine.(consensus.PoS)
-		generalTxs = make([]*types.Transaction, 0)
-		systemTxs  = make([]*types.Transaction, 0)
-		receipts   = make([]*types.Receipt, 0)
-		txs        = block.Transactions()
-	)
-	if beaconRoot := block.BeaconRoot(); beaconRoot != nil {
-		ProcessBeaconBlockRoot(*beaconRoot, vmenv, statedb)
-=======
 
 	lastBlock := p.chain.GetHeaderByHash(block.ParentHash())
 	if lastBlock == nil {
 		return nil, errors.New("could not get parent block")
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	}
-	// Handle upgrade build-in system contract code
-	systemcontracts.TryUpdateBuildInSystemContract(p.config, blockNumber, lastBlock.Time, block.Time(), statedb, true)
+	// Deploy oasys built-in contracts
+	contracts.Deploy(p.config, statedb, block.Number().Uint64())
 
 	var (
 		context vm.BlockContext
@@ -131,16 +104,11 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	}
 
 	// Iterate over and process the individual transactions
-<<<<<<< HEAD
-	for i, tx := range txs {
-		if isPoS {
-			isSystemTx, err := pos.IsSystemTransaction(tx, block.Header())
-			if err != nil {
-				return nil, nil, 0, err
-			}
-			if isSystemTx {
-=======
-	posa, isPoSA := p.chain.engine.(consensus.PoSA)
+	engine := p.chain.engine
+	if cl, ok := engine.(*beacon.Beacon); ok {
+		engine = cl.InnerEngine()
+	}
+	pos, isPoS = engine.(consensus.PoS)
 	commonTxs := make([]*types.Transaction, 0, txNum)
 
 	// initialise bloom processors
@@ -151,18 +119,15 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	systemTxs := make([]*types.Transaction, 0, 2)
 
 	for i, tx := range block.Transactions() {
-		if isPoSA {
-			if isSystemTx, err := posa.IsSystemTransaction(tx, block.Header()); err != nil {
+		if isPoS {
+			if isSystemTx, err := pos.IsSystemTransaction(tx, block.Header()); err != nil {
 				bloomProcessors.Close()
 				return nil, err
 			} else if isSystemTx {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 				systemTxs = append(systemTxs, tx)
 				continue
 			}
 		}
-<<<<<<< HEAD
-=======
 		if p.config.IsCancun(block.Number(), block.Time()) {
 			if len(systemTxs) > 0 {
 				bloomProcessors.Close()
@@ -171,7 +136,6 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 			}
 		}
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		msg, err := TransactionToMessage(tx, signer, header.BaseFee)
 		if err != nil {
 			bloomProcessors.Close()
@@ -184,25 +148,6 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 			bloomProcessors.Close()
 			return nil, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 		}
-<<<<<<< HEAD
-		generalTxs = append(generalTxs, tx)
-		receipts = append(receipts, receipt)
-	}
-	// Fail if Shanghai not enabled and len(withdrawals) is non-zero.
-	withdrawals := block.Withdrawals()
-	if len(withdrawals) > 0 && !p.config.IsShanghai(block.Number(), block.Time()) {
-		return nil, nil, 0, errors.New("withdrawals before shanghai")
-	}
-
-	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
-	err := p.engine.Finalize(p.bc, header, statedb, &generalTxs, block.Uncles(), withdrawals, &receipts, &systemTxs, usedGas)
-	if err != nil {
-		return nil, nil, 0, err
-	}
-	for _, receipt := range receipts {
-		allLogs = append(allLogs, receipt.Logs...)
-	}
-=======
 		commonTxs = append(commonTxs, tx)
 		receipts = append(receipts, receipt)
 	}
@@ -234,7 +179,6 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	for _, receipt := range receipts {
 		allLogs = append(allLogs, receipt.Logs...)
 	}
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	return &ProcessResult{
 		Receipts: receipts,
@@ -329,18 +273,6 @@ func ApplyTransaction(evm *vm.EVM, gp *GasPool, statedb *state.StateDB, header *
 
 // ProcessBeaconBlockRoot applies the EIP-4788 system call to the beacon block root
 // contract. This method is exported to be used in tests.
-<<<<<<< HEAD
-func ProcessBeaconBlockRoot(beaconRoot common.Hash, vmenv *vm.EVM, statedb *state.StateDB) {
-	// Return immediately if beaconRoot equals the zero hash when using the Oasys engine.
-	if beaconRoot == (common.Hash{}) {
-		if chainConfig := vmenv.ChainConfig(); chainConfig != nil && chainConfig.Oasys != nil {
-			return
-		}
-	}
-
-	// If EIP-4788 is enabled, we need to invoke the beaconroot storage contract with
-	// the new root
-=======
 func ProcessBeaconBlockRoot(beaconRoot common.Hash, evm *vm.EVM) {
 	// Return immediately if beaconRoot equals the zero hash when using the Parlia engine.
 	if beaconRoot == (common.Hash{}) {
@@ -354,7 +286,6 @@ func ProcessBeaconBlockRoot(beaconRoot common.Hash, evm *vm.EVM) {
 			defer tracer.OnSystemCallEnd()
 		}
 	}
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	msg := &Message{
 		From:      params.SystemAddress,
 		GasLimit:  30_000_000,
@@ -364,12 +295,6 @@ func ProcessBeaconBlockRoot(beaconRoot common.Hash, evm *vm.EVM) {
 		To:        &params.BeaconRootsAddress,
 		Data:      beaconRoot[:],
 	}
-<<<<<<< HEAD
-	vmenv.Reset(NewEVMTxContext(msg), statedb)
-	statedb.AddAddressToAccessList(params.BeaconRootsAddress)
-	_, _, _ = vmenv.Call(vm.AccountRef(msg.From), *msg.To, msg.Data, 30_000_000, common.U2560)
-	statedb.Finalise(true)
-=======
 	evm.SetTxContext(NewEVMTxContext(msg))
 	evm.StateDB.AddAddressToAccessList(params.BeaconRootsAddress)
 	_, _, _ = evm.Call(vm.AccountRef(msg.From), *msg.To, msg.Data, 30_000_000, common.U2560)
@@ -473,5 +398,4 @@ func onSystemCallStart(tracer *tracing.Hooks, ctx *tracing.VMContext) {
 	} else if tracer.OnSystemCallStart != nil {
 		tracer.OnSystemCallStart()
 	}
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }

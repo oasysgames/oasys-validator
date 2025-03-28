@@ -788,12 +788,8 @@ func (q *queue) DeliverHeaders(id string, headers []*types.Header, hashes []comm
 // also wakes any threads waiting for data delivery.
 func (q *queue) DeliverBodies(id string, txLists [][]*types.Transaction, txListHashes []common.Hash,
 	uncleLists [][]*types.Header, uncleListHashes []common.Hash,
-<<<<<<< HEAD
-	withdrawalLists [][]*types.Withdrawal, withdrawalListHashes []common.Hash, sidecars []types.BlobSidecars) (int, error) {
-=======
 	withdrawalLists [][]*types.Withdrawal, withdrawalListHashes []common.Hash, sidecars []types.BlobSidecars,
 ) (int, error) {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
@@ -843,11 +839,7 @@ func (q *queue) DeliverBodies(id string, txLists [][]*types.Transaction, txListH
 			if want := *header.BlobGasUsed / params.BlobTxBlobGasPerBlob; uint64(blobs) != want { // div because the header is surely good vs the body might be bloated
 				return errInvalidBody
 			}
-<<<<<<< HEAD
-			if blobs > params.MaxBlobGasPerBlock/params.BlobTxBlobGasPerBlob {
-=======
 			if blobs > params.MaxBlobsPerBlockForBSC {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 				return errInvalidBody
 			}
 		} else {

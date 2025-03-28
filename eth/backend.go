@@ -30,13 +30,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus"
-<<<<<<< HEAD
 	"github.com/ethereum/go-ethereum/consensus/beacon"
 	"github.com/ethereum/go-ethereum/consensus/clique"
 	"github.com/ethereum/go-ethereum/consensus/oasys"
-=======
-	"github.com/ethereum/go-ethereum/consensus/parlia"
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/bloombits"
 	"github.com/ethereum/go-ethereum/core/monitor"
@@ -94,20 +90,8 @@ type Ethereum struct {
 	localTxTracker *locals.TxTracker
 	blockchain     *core.BlockChain
 
-<<<<<<< HEAD
-	// Handlers
-	txPool *txpool.TxPool
-
-	blockchain          *core.BlockChain
-	handler             *handler
-	ethDialCandidates   enode.Iterator
-	snapDialCandidates  enode.Iterator
-	emptyDialCandidates enode.Iterator
-	merger              *consensus.Merger
-=======
 	handler *handler
 	discmix *enode.FairMix
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	// DB interfaces
 	chainDb ethdb.Database // Block chain database
@@ -200,11 +184,6 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	}
 	// Override the chain config with provided settings.
 	var overrides core.ChainOverrides
-<<<<<<< HEAD
-	if config.OverrideCancun != nil {
-		chainConfig.CancunTime = config.OverrideCancun
-		overrides.OverrideCancun = config.OverrideCancun
-=======
 	if config.OverridePassedForkTime != nil {
 		chainConfig.ShanghaiTime = config.OverridePassedForkTime
 		chainConfig.KeplerTime = config.OverridePassedForkTime
@@ -216,18 +195,9 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		chainConfig.BohrTime = config.OverridePassedForkTime
 		overrides.OverridePassedForkTime = config.OverridePassedForkTime
 	}
-	if config.OverridePascal != nil {
-		chainConfig.PascalTime = config.OverridePascal
-		overrides.OverridePascal = config.OverridePascal
-	}
 	if config.OverridePrague != nil {
 		chainConfig.PragueTime = config.OverridePrague
 		overrides.OverridePrague = config.OverridePrague
-	}
-	if config.OverrideLorentz != nil {
-		chainConfig.LorentzTime = config.OverrideLorentz
-		overrides.OverrideLorentz = config.OverrideLorentz
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	}
 	if config.OverrideVerkle != nil {
 		chainConfig.VerkleTime = config.OverrideVerkle
@@ -235,15 +205,11 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	}
 
 	// startup ancient freeze
-<<<<<<< HEAD
-	if err = chainDb.SetupFreezerEnv(&ethdb.FreezerEnv{
-=======
 	freezeDb := chainDb
 	if stack.CheckIfMultiDataBase() {
 		freezeDb = chainDb.BlockStore()
 	}
 	if err = freezeDb.SetupFreezerEnv(&ethdb.FreezerEnv{
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		ChainCfg:         chainConfig,
 		BlobExtraReserve: config.BlobExtraReserve,
 	}); err != nil {
@@ -275,11 +241,7 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		log.Info("Unprotected transactions allowed")
 	}
 	ethAPI := ethapi.NewBlockChainAPI(eth.APIBackend)
-<<<<<<< HEAD
-	eth.engine, err = ethconfig.CreateConsensusEngine(chainConfig, chainDb, ethAPI)
-=======
 	eth.engine, err = ethconfig.CreateConsensusEngine(chainConfig, chainDb, ethAPI, genesisHash)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	if err != nil {
 		return nil, err
 	}
@@ -332,9 +294,6 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 			JournalFile:         config.JournalFileEnabled,
 		}
 	)
-<<<<<<< HEAD
-	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, config.Genesis, &overrides, eth.engine, vmConfig, eth.shouldPreserve, &config.TransactionHistory)
-=======
 	if config.VMTrace != "" {
 		traceConfig := json.RawMessage("{}")
 		if config.VMTraceJsonConfig != "" {
@@ -362,7 +321,6 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		return false
 	}
 	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, config.Genesis, &overrides, eth.engine, vmConfig, shouldPreserve, &config.TransactionHistory, bcOps...)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	if err != nil {
 		return nil, err
 	}
@@ -417,7 +375,6 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	eth.miner.SetPrioAddresses(config.TxPool.Locals)
 
 	// Create voteManager instance
-<<<<<<< HEAD
 	if posa, ok := eth.engine.(consensus.PoS); ok {
 		// Create votePool instance
 		votePool := vote.NewVotePool(eth.blockchain, posa)
@@ -429,19 +386,6 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 			}
 		} else {
 			return nil, errors.New("Engine is not Oasys type")
-=======
-	if posa, ok := eth.engine.(consensus.PoSA); ok {
-		// Create votePool instance
-		votePool := vote.NewVotePool(eth.blockchain, posa)
-		eth.votePool = votePool
-		if parlia, ok := eth.engine.(*parlia.Parlia); ok {
-			if !config.Miner.DisableVoteAttestation {
-				// if there is no VotePool in Parlia Engine, the miner can't get votes for assembling
-				parlia.VotePool = votePool
-			}
-		} else {
-			return nil, errors.New("Engine is not Parlia type")
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		}
 		log.Info("Create votePool successfully")
 		eth.handler.votepool = votePool
@@ -449,7 +393,6 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 			eth.handler.maliciousVoteMonitor = monitor.NewMaliciousVoteMonitor()
 			log.Info("Create MaliciousVoteMonitor successfully")
 		}
-<<<<<<< HEAD
 
 		if config.Miner.VoteEnable {
 			conf := stack.Config()
@@ -464,31 +407,7 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 			log.Info("Create voteManager successfully")
 		}
 	}
-
 	eth.APIBackend.gpo = gasprice.NewOracle(eth.APIBackend, config.GPO, config.Miner.GasPrice)
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
-
-		if config.Miner.VoteEnable {
-			conf := stack.Config()
-			blsPasswordPath := stack.ResolvePath(conf.BLSPasswordFile)
-			blsWalletPath := stack.ResolvePath(conf.BLSWalletDir)
-			voteJournalPath := stack.ResolvePath(conf.VoteJournalDir)
-			if _, err := vote.NewVoteManager(eth, eth.blockchain, votePool, voteJournalPath, blsPasswordPath, blsWalletPath, posa); err != nil {
-				log.Error("Failed to Initialize voteManager", "err", err)
-				return nil, err
-			}
-			log.Info("Create voteManager successfully")
-		}
-	}
-<<<<<<< HEAD
-	eth.emptyDialCandidates, err = dnsclient.NewIterator()
-	if err != nil {
-		return nil, err
-	}
-=======
-	eth.APIBackend.gpo = gasprice.NewOracle(eth.APIBackend, config.GPO, config.Miner.GasPrice)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	// Start the RPC service
 	eth.netRPCService = ethapi.NewNetAPI(eth.p2pServer, networkID)
@@ -571,66 +490,6 @@ func (s *Ethereum) Etherbase() (eb common.Address, err error) {
 	return common.Address{}, errors.New("etherbase must be explicitly specified")
 }
 
-<<<<<<< HEAD
-// isLocalBlock checks whether the specified block is mined
-// by local miner accounts.
-//
-// We regard two types of accounts as local miner account: etherbase
-// and accounts specified via `txpool.locals` flag.
-func (s *Ethereum) isLocalBlock(header *types.Header) bool {
-	author, err := s.engine.Author(header)
-	if err != nil {
-		log.Warn("Failed to retrieve block author", "number", header.Number.Uint64(), "hash", header.Hash(), "err", err)
-		return false
-	}
-	// Check whether the given address is etherbase.
-	s.lock.RLock()
-	etherbase := s.etherbase
-	s.lock.RUnlock()
-	if author == etherbase {
-		return true
-	}
-	// Check whether the given address is specified by `txpool.local`
-	// CLI flag.
-	for _, account := range s.config.TxPool.Locals {
-		if account == author {
-			return true
-		}
-	}
-	return false
-}
-
-// shouldPreserve checks whether we should preserve the given block
-// during the chain reorg depending on whether the author of block
-// is a local account.
-func (s *Ethereum) shouldPreserve(header *types.Header) bool {
-	// The reason we need to disable the self-reorg preserving for clique
-	// is it can be probable to introduce a deadlock.
-	//
-	// e.g. If there are 7 available signers
-	//
-	// r1   A
-	// r2     B
-	// r3       C
-	// r4         D
-	// r5   A      [X] F G
-	// r6    [X]
-	//
-	// In the round5, the in-turn signer E is offline, so the worst case
-	// is A, F and G sign the block of round5 and reject the block of opponents
-	// and in the round6, the last available signer B is offline, the whole
-	// network is stuck.
-	if _, ok := s.engine.(*clique.Clique); ok {
-		return false
-	}
-	if _, ok := s.engine.(*oasys.Oasys); ok {
-		return false
-	}
-	return s.isLocalBlock(header)
-}
-
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 // SetEtherbase sets the mining reward address.
 func (s *Ethereum) SetEtherbase(etherbase common.Address) {
 	s.lock.Lock()
@@ -658,7 +517,6 @@ func (s *Ethereum) StartMining() error {
 			log.Error("Cannot start mining without etherbase", "err", err)
 			return fmt.Errorf("etherbase missing: %v", err)
 		}
-<<<<<<< HEAD
 		var (
 			cli *clique.Clique
 			oas *oasys.Oasys
@@ -675,17 +533,13 @@ func (s *Ethereum) StartMining() error {
 			}
 		}
 		if cli != nil {
-=======
-		if parlia, ok := s.engine.(*parlia.Parlia); ok {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 			wallet, err := s.accountManager.Find(accounts.Account{Address: eb})
 			if wallet == nil || err != nil {
 				log.Error("Etherbase account unavailable locally", "err", err)
 				return fmt.Errorf("signer missing: %v", err)
 			}
-			parlia.Authorize(eb, wallet.SignData, wallet.SignTx)
+			cli.Authorize(eb, wallet.SignData)
 		}
-<<<<<<< HEAD
 		if oas != nil {
 			wallet, err := s.accountManager.Find(accounts.Account{Address: eb})
 			if wallet == nil || err != nil {
@@ -701,11 +555,6 @@ func (s *Ethereum) StartMining() error {
 				return fmt.Errorf("temporarily force validators to enable voting. Please proceed with registering your BLS key. For more details, refer to the technical documentation: %s, err: %v", techDocRef, err)
 			}
 		}
-		// If mining is started, we can disable the transaction rejection mechanism
-		// introduced to speed sync times.
-		s.handler.enableSyncedFeatures()
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 		go s.miner.Start()
 	}
@@ -754,15 +603,11 @@ func (s *Ethereum) Protocols() []p2p.Protocol {
 	if !s.config.DisableSnapProtocol && s.config.SnapshotCache > 0 {
 		protos = append(protos, snap.MakeProtocols((*snapHandler)(s.handler))...)
 	}
-<<<<<<< HEAD
-	protos = append(protos, bsc.MakeProtocols((*bscHandler)(s.handler), s.emptyDialCandidates)...)
-=======
 	if s.config.EnableTrustProtocol {
 		protos = append(protos, trust.MakeProtocols((*trustHandler)(s.handler))...)
 	}
 	protos = append(protos, bsc.MakeProtocols((*bscHandler)(s.handler))...)
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	return protos
 }
 

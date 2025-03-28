@@ -69,11 +69,7 @@ func (bc *BlockChain) CurrentFinalBlock() *types.Header {
 // CurrentSafeBlock retrieves the current safe block of the canonical
 // chain. The block is retrieved from the blockchain's internal cache.
 func (bc *BlockChain) CurrentSafeBlock() *types.Header {
-<<<<<<< HEAD
 	if p, ok := bc.engine.(consensus.PoS); ok {
-=======
-	if p, ok := bc.engine.(consensus.PoSA); ok {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		currentHeader := bc.CurrentHeader()
 		if currentHeader == nil {
 			return nil
@@ -508,24 +504,14 @@ func (bc *BlockChain) SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) event.Su
 	return bc.scope.Track(bc.chainHeadFeed.Subscribe(ch))
 }
 
-<<<<<<< HEAD
-// SubscribeHighestVerifiedBlockEvent registers a subscription of HighestVerifiedBlockEvent.
-=======
 // SubscribeHighestVerifiedHeaderEvent registers a subscription of HighestVerifiedBlockEvent.
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 func (bc *BlockChain) SubscribeHighestVerifiedHeaderEvent(ch chan<- HighestVerifiedBlockEvent) event.Subscription {
 	return bc.scope.Track(bc.highestVerifiedBlockFeed.Subscribe(ch))
 }
 
-<<<<<<< HEAD
-// SubscribeChainSideEvent registers a subscription of ChainSideEvent.
-func (bc *BlockChain) SubscribeChainSideEvent(ch chan<- ChainSideEvent) event.Subscription {
-	return bc.scope.Track(bc.chainSideFeed.Subscribe(ch))
-=======
 // SubscribeChainBlockEvent registers a subscription of ChainBlockEvent.
 func (bc *BlockChain) SubscribeChainBlockEvent(ch chan<- ChainHeadEvent) event.Subscription {
 	return bc.scope.Track(bc.chainBlockFeed.Subscribe(ch))
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 // SubscribeLogsEvent registers a subscription of []*types.Log.
@@ -543,8 +529,6 @@ func (bc *BlockChain) SubscribeBlockProcessingEvent(ch chan<- bool) event.Subscr
 func (bc *BlockChain) SubscribeFinalizedHeaderEvent(ch chan<- FinalizedHeaderEvent) event.Subscription {
 	return bc.scope.Track(bc.finalizedHeaderFeed.Subscribe(ch))
 }
-<<<<<<< HEAD
-=======
 
 // AncientTail retrieves the tail the ancients blocks
 func (bc *BlockChain) AncientTail() (uint64, error) {
@@ -554,4 +538,3 @@ func (bc *BlockChain) AncientTail() (uint64, error) {
 	}
 	return tail, nil
 }
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1

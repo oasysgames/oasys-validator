@@ -26,14 +26,5 @@ import (
 
 // byteArrayBytes returns a slice of the byte array v.
 func byteArrayBytes(v reflect.Value, length int) []byte {
-<<<<<<< HEAD
-	var s []byte
-	hdr := (*reflect.SliceHeader)(unsafe.Pointer(&s)) //nolint:all //TODO
-	hdr.Data = v.UnsafeAddr()
-	hdr.Cap = length
-	hdr.Len = length
-	return s
-=======
 	return unsafe.Slice((*byte)(unsafe.Pointer(v.UnsafeAddr())), length)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }

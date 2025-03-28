@@ -30,13 +30,10 @@ all:
 test: all
 	$(GORUN) build/ci.go test -timeout 1h
 
-<<<<<<< HEAD
 #? test-oasys: Run Oasys consensus tests
 test-oasys:
 	go test -v ./consensus/oasys/...
 
-#? lint: Run certain pre-selected linters
-=======
 #? truffle-test: Run the integration test.
 truffle-test:
 	docker build . -f ./docker/Dockerfile --target bsc -t bsc
@@ -49,7 +46,6 @@ truffle-test:
 	docker compose -f ./tests/truffle/docker-compose.yml down
 
 #? lint: Run certain pre-selected linters.
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 lint: ## Run linters.
 	$(GORUN) build/ci.go lint
 

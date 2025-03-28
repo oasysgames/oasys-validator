@@ -102,14 +102,8 @@ func newTester() *fetcherTester {
 		blocks:  map[common.Hash]*types.Block{genesis.Hash(): genesis},
 		drops:   make(map[string]bool),
 	}
-<<<<<<< HEAD
-	tester.fetcher = NewBlockFetcher(light, tester.getHeader, tester.getBlock, tester.verifyHeader,
-		tester.broadcastBlock, tester.chainHeight, tester.chainFinalizedHeight, tester.insertHeaders,
-		tester.insertChain, tester.dropPeer)
-=======
 	tester.fetcher = NewBlockFetcher(tester.getBlock, tester.verifyHeader, tester.broadcastBlock,
 		tester.chainHeight, tester.chainFinalizedHeight, tester.insertChain, tester.dropPeer)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	tester.fetcher.Start()
 
 	return tester
@@ -145,33 +139,6 @@ func (f *fetcherTester) chainFinalizedHeight() uint64 {
 	defer f.lock.RUnlock()
 	if len(f.hashes) < 3 {
 		return 0
-<<<<<<< HEAD
-	}
-	if f.fetcher.light {
-		return f.headers[f.hashes[len(f.hashes)-3]].Number.Uint64()
-	}
-	return f.blocks[f.hashes[len(f.hashes)-3]].NumberU64()
-}
-
-// insertChain injects a new headers into the simulated chain.
-func (f *fetcherTester) insertHeaders(headers []*types.Header) (int, error) {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-
-	for i, header := range headers {
-		// Make sure the parent in known
-		if _, ok := f.headers[header.ParentHash]; !ok {
-			return i, errors.New("unknown parent")
-		}
-		// Discard any new blocks if the same height already exists
-		if header.Number.Uint64() <= f.headers[f.hashes[len(f.hashes)-1]].Number.Uint64() {
-			return i, nil
-		}
-		// Otherwise build our current chain
-		f.hashes = append(f.hashes, header.Hash())
-		f.headers[header.Hash()] = header
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	}
 	return f.blocks[f.hashes[len(f.hashes)-3]].NumberU64()
 }
@@ -711,20 +678,10 @@ func testDistantAnnouncementDiscarding(t *testing.T) {
 // Tests that announcements with numbers much lower or equal to the current finalized block
 // head get discarded to prevent wasting resources on useless blocks from faulty peers.
 func TestFullFinalizedAnnouncementDiscarding(t *testing.T) {
-<<<<<<< HEAD
-	testFinalizedAnnouncementDiscarding(t, false)
-}
-func TestLightFinalizedAnnouncementDiscarding(t *testing.T) {
-	testFinalizedAnnouncementDiscarding(t, true)
-}
-
-func testFinalizedAnnouncementDiscarding(t *testing.T, light bool) {
-=======
 	testFinalizedAnnouncementDiscarding(t)
 }
 
 func testFinalizedAnnouncementDiscarding(t *testing.T) {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	// Create a long chain to import and define the discard boundaries
 	hashes, blocks := makeChain(3*maxQueueDist, 0, genesis)
 
@@ -736,11 +693,7 @@ func testFinalizedAnnouncementDiscarding(t *testing.T) {
 	low, equal := len(hashes)/2+3, len(hashes)/2+2
 
 	// Create a tester and simulate a head block being the middle of the above chain
-<<<<<<< HEAD
-	tester := newTester(light)
-=======
 	tester := newTester()
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	tester.lock.Lock()
 	tester.hashes = []common.Hash{beforeFinalized, finalized, justified, head}

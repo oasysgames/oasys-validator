@@ -37,13 +37,7 @@ const (
 	BloomBitLength = 8 * BloomByteLength
 )
 
-<<<<<<< HEAD
-var (
-	EmptyBloom = Bloom{}
-)
-=======
 var EmptyBloom = Bloom{}
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 // Bloom represents a 2048 bit bloom filter.
 type Bloom [BloomByteLength]byte

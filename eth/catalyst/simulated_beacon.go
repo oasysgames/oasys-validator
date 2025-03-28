@@ -179,11 +179,7 @@ func (c *SimulatedBeacon) sealBlock(withdrawals []*types.Withdrawal, timestamp u
 		Withdrawals:           withdrawals,
 		Random:                random,
 		BeaconRoot:            &common.Hash{},
-<<<<<<< HEAD
-	}, engine.PayloadV3, true)
-=======
 	}, engine.PayloadV3, false)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	if err != nil {
 		return err
 	}
@@ -221,12 +217,8 @@ func (c *SimulatedBeacon) sealBlock(withdrawals []*types.Withdrawal, timestamp u
 		}
 	}
 	// Mark the payload as canon
-<<<<<<< HEAD
-	if _, err = c.engineAPI.NewPayloadV3(*payload, blobHashes, &common.Hash{}); err != nil {
-=======
 	_, err = c.engineAPI.newPayload(*payload, blobHashes, &common.Hash{}, envelope.Requests, false)
 	if err != nil {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		return err
 	}
 	c.setCurrentState(payload.BlockHash, finalizedHash)

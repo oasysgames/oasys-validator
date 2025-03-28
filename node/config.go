@@ -209,12 +209,9 @@ type Config struct {
 	// AllowUnprotectedTxs allows non EIP-155 protected transactions to be send over RPC.
 	AllowUnprotectedTxs bool `toml:",omitempty"`
 
-<<<<<<< HEAD
-=======
 	// EnableDoubleSignMonitor is a flag that whether to enable the double signature checker
 	EnableDoubleSignMonitor bool `toml:",omitempty"`
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	// EnableMaliciousVoteMonitor is a flag that whether to enable the malicious vote checker
 	EnableMaliciousVoteMonitor bool `toml:",omitempty"`
 
@@ -229,12 +226,9 @@ type Config struct {
 	// VoteJournalDir is the directory to store votes in the fast finality feature.
 	VoteJournalDir string `toml:",omitempty"`
 
-<<<<<<< HEAD
 	// VoteKeyName is name of the BLS public key used for voting
 	VoteKeyName string `toml:",omitempty"`
 
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	// BatchRequestLimit is the maximum number of requests in a batch.
 	BatchRequestLimit int `toml:",omitempty"`
 

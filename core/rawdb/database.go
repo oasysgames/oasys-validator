@@ -36,9 +36,6 @@ import (
 type freezerdb struct {
 	ethdb.KeyValueStore
 	ethdb.AncientStore
-<<<<<<< HEAD
-	ethdb.AncientFreezer
-=======
 
 	readOnly    bool
 	ancientRoot string
@@ -61,7 +58,6 @@ func (frdb *freezerdb) BlockStoreReader() ethdb.Reader {
 		return frdb
 	}
 	return frdb.blockStore
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 // AncientDatadir returns the path of root ancient directory.
@@ -632,16 +628,7 @@ func NewDatabaseWithFreezer(db ethdb.KeyValueStore, ancient string, namespace st
 			frdb.wg.Done()
 		}()
 	}
-<<<<<<< HEAD
-	return &freezerdb{
-		ancientRoot:    ancient,
-		KeyValueStore:  db,
-		AncientStore:   frdb,
-		AncientFreezer: frdb,
-	}, nil
-=======
 	return freezerDb, nil
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 // NewMemoryDatabase creates an ephemeral in-memory key-value database without a
@@ -835,15 +822,11 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		preimages       stat
 		bloomBits       stat
 		cliqueSnaps     stat
-<<<<<<< HEAD
 		oasysSnaps      stat
-=======
-		parliaSnaps     stat
 
 		// Verkle statistics
 		verkleTries        stat
 		verkleStateLookups stat
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 		// Les statistic
 		chtTrieNodes   stat
@@ -906,13 +889,8 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 			bloomBits.Add(size)
 		case bytes.HasPrefix(key, CliqueSnapshotPrefix) && len(key) == 7+common.HashLength:
 			cliqueSnaps.Add(size)
-<<<<<<< HEAD
 		case bytes.HasPrefix(key, OasysSnapshotPrefix) && len(key) == 7+common.HashLength:
 			oasysSnaps.Add(size)
-=======
-		case bytes.HasPrefix(key, ParliaSnapshotPrefix) && len(key) == 7+common.HashLength:
-			parliaSnaps.Add(size)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		case bytes.HasPrefix(key, ChtTablePrefix) ||
 			bytes.HasPrefix(key, ChtIndexTablePrefix) ||
 			bytes.HasPrefix(key, ChtPrefix): // Canonical hash trie
@@ -1078,11 +1056,7 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		{"Key-Value store", "Account snapshot", accountSnaps.Size(), accountSnaps.Count()},
 		{"Key-Value store", "Storage snapshot", storageSnaps.Size(), storageSnaps.Count()},
 		{"Key-Value store", "Clique snapshots", cliqueSnaps.Size(), cliqueSnaps.Count()},
-<<<<<<< HEAD
 		{"Key-Value store", "Oasys snapshots", oasysSnaps.Size(), oasysSnaps.Count()},
-=======
-		{"Key-Value store", "Parlia snapshots", parliaSnaps.Size(), parliaSnaps.Count()},
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		{"Key-Value store", "Singleton metadata", metadata.Size(), metadata.Count()},
 		{"Light client", "CHT trie nodes", chtTrieNodes.Size(), chtTrieNodes.Count()},
 		{"Light client", "Bloom trie nodes", bloomTrieNodes.Size(), bloomTrieNodes.Count()},

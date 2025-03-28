@@ -668,14 +668,10 @@ func exportPubkey(pub *ecies.PublicKey) []byte {
 	if pub == nil {
 		panic("nil pubkey")
 	}
-<<<<<<< HEAD
-	return elliptic.Marshal(pub.Curve, pub.X, pub.Y)[1:] //nolint:all //TODO
-=======
 	if curve, ok := pub.Curve.(crypto.EllipticCurve); ok {
 		return curve.Marshal(pub.X, pub.Y)[1:]
 	}
 	return []byte{}
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 func xor(one, other []byte) (xor []byte) {

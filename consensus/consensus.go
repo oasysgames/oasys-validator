@@ -58,13 +58,11 @@ type ChainHeaderReader interface {
 	// GetTd retrieves the total difficulty from the database by hash and number.
 	GetTd(hash common.Hash, number uint64) *big.Int
 
-<<<<<<< HEAD
 	// GetCanonicalHash returns the canonical hash for a given block number
 	GetCanonicalHash(number uint64) common.Hash
-=======
+
 	// GetHighestVerifiedHeader retrieves the highest header verified.
 	GetHighestVerifiedHeader() *types.Header
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	// GetVerifiedBlockByHash retrieves the highest verified block.
 	GetVerifiedBlockByHash(hash common.Hash) *types.Header
@@ -122,25 +120,15 @@ type Engine interface {
 	//
 	// Note: The state database might be updated to reflect any consensus rules
 	// that happen at finalization (e.g. block rewards).
-<<<<<<< HEAD
-	Finalize(chain ChainHeaderReader, header *types.Header, state *state.StateDB, txs *[]*types.Transaction,
-		uncles []*types.Header, withdrawals []*types.Withdrawal, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64) error
-=======
 	Finalize(chain ChainHeaderReader, header *types.Header, state vm.StateDB, txs *[]*types.Transaction,
 		uncles []*types.Header, withdrawals []*types.Withdrawal, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64, tracer *tracing.Hooks) error
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	// FinalizeAndAssemble runs any post-transaction state modifications (e.g. block
 	// rewards or process withdrawals) and assembles the final block.
 	//
 	// Note: The block header and state database might be updated to reflect any
 	// consensus rules that happen at finalization (e.g. block rewards).
-<<<<<<< HEAD
-	FinalizeAndAssemble(chain ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
-		uncles []*types.Header, receipts []*types.Receipt, withdrawals []*types.Withdrawal) (*types.Block, []*types.Receipt, error)
-=======
 	FinalizeAndAssemble(chain ChainHeaderReader, header *types.Header, state *state.StateDB, body *types.Body, receipts []*types.Receipt, tracer *tracing.Hooks) (*types.Block, []*types.Receipt, error)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	// Seal generates a new sealing request for the given input block and pushes
 	// the result into the given channel.

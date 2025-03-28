@@ -92,12 +92,6 @@ type chainHeightFn func() uint64
 
 // chainFinalizedHeightFn is a callback type to retrieve the current chain finalized height.
 type chainFinalizedHeightFn func() uint64
-<<<<<<< HEAD
-
-// headersInsertFn is a callback type to insert a batch of headers into the local chain.
-type headersInsertFn func(headers []*types.Header) (int, error)
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 // chainInsertFn is a callback type to insert a batch of blocks into the local chain.
 type chainInsertFn func(types.Blocks) (int, error)
@@ -188,19 +182,11 @@ type BlockFetcher struct {
 	queued map[common.Hash]*blockOrHeaderInject      // Set of already queued blocks (to dedup imports)
 
 	// Callbacks
-<<<<<<< HEAD
-	getHeader            HeaderRetrievalFn      // Retrieves a header from the local chain
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	getBlock             blockRetrievalFn       // Retrieves a block from the local chain
 	verifyHeader         headerVerifierFn       // Checks if a block's headers have a valid proof of work
 	broadcastBlock       blockBroadcasterFn     // Broadcasts a block to connected peers
 	chainHeight          chainHeightFn          // Retrieves the current chain's height
 	chainFinalizedHeight chainFinalizedHeightFn // Retrieves the current chain's finalized height
-<<<<<<< HEAD
-	insertHeaders        headersInsertFn        // Injects a batch of headers into the chain
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	insertChain          chainInsertFn          // Injects a batch of blocks into the chain
 	dropPeer             peerDropFn             // Drops a peer for misbehaving
 
@@ -213,27 +199,16 @@ type BlockFetcher struct {
 }
 
 // NewBlockFetcher creates a block fetcher to retrieve blocks based on hash announcements.
-<<<<<<< HEAD
-func NewBlockFetcher(light bool, getHeader HeaderRetrievalFn, getBlock blockRetrievalFn, verifyHeader headerVerifierFn,
-	broadcastBlock blockBroadcasterFn, chainHeight chainHeightFn, chainFinalizedHeight chainFinalizedHeightFn,
-	insertHeaders headersInsertFn, insertChain chainInsertFn, dropPeer peerDropFn) *BlockFetcher {
-	return &BlockFetcher{
-		light:                light,
-=======
 func NewBlockFetcher(getBlock blockRetrievalFn, verifyHeader headerVerifierFn, broadcastBlock blockBroadcasterFn,
 	chainHeight chainHeightFn, chainFinalizedHeight chainFinalizedHeightFn, insertChain chainInsertFn, dropPeer peerDropFn) *BlockFetcher {
 	return &BlockFetcher{
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		notify:               make(chan *blockAnnounce),
 		inject:               make(chan *blockOrHeaderInject),
 		headerFilter:         make(chan chan *headerFilterTask),
 		bodyFilter:           make(chan chan *bodyFilterTask),
 		done:                 make(chan common.Hash),
 		quit:                 make(chan struct{}),
-<<<<<<< HEAD
-=======
 		requeue:              make(chan *blockOrHeaderInject),
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		announces:            make(map[string]int),
 		announced:            make(map[common.Hash][]*blockAnnounce),
 		fetching:             make(map[common.Hash]*blockAnnounce),
@@ -242,19 +217,11 @@ func NewBlockFetcher(getBlock blockRetrievalFn, verifyHeader headerVerifierFn, b
 		queue:                prque.New[int64, *blockOrHeaderInject](nil),
 		queues:               make(map[string]int),
 		queued:               make(map[common.Hash]*blockOrHeaderInject),
-<<<<<<< HEAD
-		getHeader:            getHeader,
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		getBlock:             getBlock,
 		verifyHeader:         verifyHeader,
 		broadcastBlock:       broadcastBlock,
 		chainHeight:          chainHeight,
 		chainFinalizedHeight: chainFinalizedHeight,
-<<<<<<< HEAD
-		insertHeaders:        insertHeaders,
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		insertChain:          insertChain,
 		dropPeer:             dropPeer,
 	}
@@ -337,11 +304,7 @@ func (f *BlockFetcher) FilterHeaders(peer string, headers []*types.Header, time 
 // FilterBodies extracts all the block bodies that were explicitly requested by
 // the fetcher, returning those that should be handled differently.
 func (f *BlockFetcher) FilterBodies(peer string, transactions [][]*types.Transaction, uncles [][]*types.Header, sidecars []types.BlobSidecars, time time.Time) ([][]*types.Transaction, [][]*types.Header, []types.BlobSidecars) {
-<<<<<<< HEAD
-	log.Trace("Filtering bodies", "peer", peer, "txs", len(transactions), "uncles", len(uncles))
-=======
 	log.Trace("Filtering bodies", "peer", peer, "txs", len(transactions), "uncles", len(uncles), "sidecars", len(sidecars))
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	// Send the filter channel to the fetcher
 	filter := make(chan *bodyFilterTask)
@@ -405,11 +368,7 @@ func (f *BlockFetcher) loop() {
 			}
 			// Otherwise if fresh and still unknown, try and import
 			finalizedHeight := f.chainFinalizedHeight()
-<<<<<<< HEAD
-			if (number+maxUncleDist < height) || number <= finalizedHeight || (f.light && f.getHeader(hash) != nil) || (!f.light && f.getBlock(hash) != nil) {
-=======
 			if (number+maxUncleDist < height) || number <= finalizedHeight || f.getBlock(hash) != nil {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 				f.forgetBlock(hash)
 				continue
 			}
@@ -592,11 +551,7 @@ func (f *BlockFetcher) loop() {
 					select {
 					case res := <-resCh:
 						res.Done <- nil
-<<<<<<< HEAD
-						// Ignoring withdrawals here, since the block fetcher is not used post-merge.
-=======
 						// Ignoring withdrawals here, will set it to empty later if EmptyWithdrawalsHash in header.
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 						txs, uncles, _, sidecars := res.Res.(*eth.BlockBodiesResponse).Unpack()
 						f.FilterBodies(peer, txs, uncles, sidecars, time.Now())
 
@@ -735,11 +690,7 @@ func (f *BlockFetcher) loop() {
 						// Mark the body matched, reassemble if still unknown
 						matched = true
 						if f.getBlock(hash) == nil {
-<<<<<<< HEAD
-							block := types.NewBlockWithHeader(announce.header).WithBody(task.transactions[i], task.uncles[i])
-=======
 							block := types.NewBlockWithHeader(announce.header).WithBody(types.Body{Transactions: task.transactions[i], Uncles: task.uncles[i]})
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 							block = block.WithSidecars(task.sidecars[i])
 							block.ReceivedAt = task.time
 							blocks = append(blocks, block)

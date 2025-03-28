@@ -80,11 +80,7 @@ func makeLegacyProgress() legacyProgress {
 				Next: common.Hash{},
 				Last: common.Hash{0x77},
 				SubTasks: map[common.Hash][]*legacyStorageTask{
-<<<<<<< HEAD
-					common.Hash{0x1}: {
-=======
 					{0x1}: {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 						{
 							Next: common.Hash{},
 							Last: common.Hash{0xff},

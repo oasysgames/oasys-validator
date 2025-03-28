@@ -178,15 +178,11 @@ func (pre *Prestate) Apply(vmConfig vm.Config, chainConfig *params.ChainConfig, 
 	var excessBlobGas uint64
 	if pre.Env.ExcessBlobGas != nil {
 		excessBlobGas = *pre.Env.ExcessBlobGas
-<<<<<<< HEAD
-		vmContext.BlobBaseFee = eip4844.CalcBlobFee(excessBlobGas)
-=======
 		header := &types.Header{
 			Time:          pre.Env.Timestamp,
 			ExcessBlobGas: pre.Env.ExcessBlobGas,
 		}
 		vmContext.BlobBaseFee = eip4844.CalcBlobFee(chainConfig, header)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	} else {
 		// If it is not explicitly defined, but we have the parent values, we try
 		// to calculate it ourselves.

@@ -143,14 +143,6 @@ type AncientWriter interface {
 	// Sync flushes all in-memory ancient store data to disk.
 	Sync() error
 
-<<<<<<< HEAD
-	// MigrateTable processes and migrates entries of a given table to a new format.
-	// The second argument is a function that takes a raw entry and returns it
-	// in the newest format.
-	MigrateTable(string, func([]byte) ([]byte, error)) error
-
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	// TruncateTableTail will truncate certain table to new tail
 	TruncateTableTail(kind string, tail uint64) (uint64, error)
 
@@ -224,20 +216,6 @@ type AncientStore interface {
 	io.Closer
 }
 
-<<<<<<< HEAD
-// Database contains all the methods required by the high level database to not
-// only access the key-value data store but also the chain freezer.
-type Database interface {
-	Reader
-	Writer
-	Batcher
-	Iteratee
-	Stater
-	Compacter
-	Snapshotter
-	AncientFreezer
-	io.Closer
-=======
 type DiffStore interface {
 	DiffStore() KeyValueStore
 	SetDiffStore(diff KeyValueStore)
@@ -275,5 +253,4 @@ type Database interface {
 
 	KeyValueStore
 	AncientStore
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }

@@ -124,19 +124,6 @@ type votePool interface {
 // handlerConfig is the collection of initialization parameters to create a full
 // node network handler.
 type handlerConfig struct {
-<<<<<<< HEAD
-	Database       ethdb.Database         // Database for direct sync insertions
-	Chain          *core.BlockChain       // Blockchain to serve data from
-	TxPool         txPool                 // Transaction pool to propagate from
-	Merger         *consensus.Merger      // The manager for eth1/2 transition
-	Network        uint64                 // Network identifier to advertise
-	Sync           downloader.SyncMode    // Whether to snap or full sync
-	BloomCache     uint64                 // Megabytes to alloc for snap sync bloom
-	EventMux       *event.TypeMux         // Legacy event mux, deprecate for `feed`
-	RequiredBlocks map[uint64]common.Hash // Hard coded map of required block hashes for sync challenges
-	// for finality
-	VotePool votePool
-=======
 	NodeID                 enode.ID         // P2P node ID used for tx propagation topology
 	Database               ethdb.Database   // Database for direct sync insertions
 	Chain                  *core.BlockChain // Blockchain to serve data from
@@ -150,7 +137,6 @@ type handlerConfig struct {
 	DirectBroadcast        bool
 	DisablePeerTxBroadcast bool
 	PeerSet                *peerSet
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 type handler struct {
@@ -164,13 +150,6 @@ type handler struct {
 	acceptTxs       atomic.Bool
 	directBroadcast bool
 
-<<<<<<< HEAD
-	database ethdb.Database
-	txpool   txPool
-	votepool votePool
-	chain    *core.BlockChain
-	maxPeers int
-=======
 	database             ethdb.Database
 	txpool               txPool
 	votepool             votePool
@@ -180,28 +159,12 @@ type handler struct {
 	maxPeersPerIP        int
 	peersPerIP           map[string]int
 	peerPerIPLock        sync.Mutex
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	downloader   *downloader.Downloader
 	blockFetcher *fetcher.BlockFetcher
 	txFetcher    *fetcher.TxFetcher
 	peers        *peerSet
 
-<<<<<<< HEAD
-	eventMux      *event.TypeMux
-	txsCh         chan core.NewTxsEvent
-	txsSub        event.Subscription
-	minedBlockSub *event.TypeMuxSubscription
-	voteCh        chan core.NewVoteEvent
-	votesSub      event.Subscription
-
-	voteMonitorSub       event.Subscription
-	maliciousVoteMonitor *monitor.MaliciousVoteMonitor
-
-	// Used for calcurate average difficulty per block
-	firstTDInBroadcastVote     *big.Int
-	firstHeightInBroadcastVote uint64
-=======
 	eventMux       *event.TypeMux
 	txsCh          chan core.NewTxsEvent
 	txsSub         event.Subscription
@@ -211,7 +174,10 @@ type handler struct {
 	voteCh         chan core.NewVoteEvent
 	votesSub       event.Subscription
 	voteMonitorSub event.Subscription
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
+
+	// Used for calcurate average difficulty per block
+	firstTDInBroadcastVote     *big.Int
+	firstHeightInBroadcastVote uint64
 
 	requiredBlocks map[uint64]common.Hash
 
@@ -232,25 +198,8 @@ func newHandler(config *handlerConfig) (*handler, error) {
 	if config.EventMux == nil {
 		config.EventMux = new(event.TypeMux) // Nicety initialization for tests
 	}
-<<<<<<< HEAD
-	h := &handler{
-		networkID:      config.Network,
-		forkFilter:     forkid.NewFilter(config.Chain),
-		eventMux:       config.EventMux,
-		database:       config.Database,
-		txpool:         config.TxPool,
-		votepool:       config.VotePool,
-		chain:          config.Chain,
-		peers:          newPeerSet(),
-		merger:         config.Merger,
-		requiredBlocks: config.RequiredBlocks,
-		quitSync:       make(chan struct{}),
-		handlerDoneCh:  make(chan struct{}),
-		handlerStartCh: make(chan struct{}),
-=======
 	if config.PeerSet == nil {
 		config.PeerSet = newPeerSet() // Nicety initialization for tests
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	}
 	h := &handler{
 		nodeID:                 config.NodeID,
@@ -329,26 +278,6 @@ func newHandler(config *handlerConfig) (*handler, error) {
 		fblock := h.chain.CurrentFinalBlock()
 		if fblock == nil {
 			return 0
-<<<<<<< HEAD
-		}
-		return fblock.Number.Uint64()
-	}
-	inserter := func(blocks types.Blocks) (int, error) {
-		// All the block fetcher activities should be disabled
-		// after the transition. Print the warning log.
-		if h.merger.PoSFinalized() {
-			var ctx []interface{}
-			ctx = append(ctx, "blocks", len(blocks))
-			if len(blocks) > 0 {
-				ctx = append(ctx, "firsthash", blocks[0].Hash())
-				ctx = append(ctx, "firstnumber", blocks[0].Number())
-				ctx = append(ctx, "lasthash", blocks[len(blocks)-1].Hash())
-				ctx = append(ctx, "lastnumber", blocks[len(blocks)-1].Number())
-			}
-			log.Warn("Unexpected insertion activity", ctx...)
-			return 0, errors.New("unexpected behavior after transition")
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		}
 		return fblock.Number.Uint64()
 	}
@@ -367,14 +296,11 @@ func newHandler(config *handlerConfig) (*handler, error) {
 
 	broadcastBlockWithCheck := func(block *types.Block, propagate bool) {
 		if propagate {
-<<<<<<< HEAD
-=======
 			if !(block.Header().WithdrawalsHash == nil && block.Withdrawals() == nil) &&
 				!(block.Header().EmptyWithdrawalsHash() && block.Withdrawals() != nil && len(block.Withdrawals()) == 0) {
 				log.Error("Propagated block has invalid withdrawals")
 				return
 			}
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 			if err := core.IsDataAvailable(h.chain, block); err != nil {
 				log.Error("Propagating block with invalid sidecars", "number", block.Number(), "hash", block.Hash(), "err", err)
 				return
@@ -383,13 +309,8 @@ func newHandler(config *handlerConfig) (*handler, error) {
 		h.BroadcastBlock(block, propagate)
 	}
 
-<<<<<<< HEAD
-	h.blockFetcher = fetcher.NewBlockFetcher(false, nil, h.chain.GetBlockByHash, validator, broadcastBlockWithCheck,
-		heighter, finalizeHeighter, nil, inserter, h.removePeer)
-=======
 	h.blockFetcher = fetcher.NewBlockFetcher(h.chain.GetBlockByHash, validator, broadcastBlockWithCheck,
 		heighter, finalizeHeighter, inserter, h.removePeer)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	fetchTx := func(peer string, hashes []common.Hash) error {
 		p := h.peers.peer(peer)
@@ -470,14 +391,11 @@ func (h *handler) runEthPeer(peer *eth.Peer, handler eth.Handler) error {
 		peer.Log().Error("Snapshot extension barrier failed", "err", err)
 		return err
 	}
-<<<<<<< HEAD
-=======
 	trust, err := h.peers.waitTrustExtension(peer)
 	if err != nil {
 		peer.Log().Error("Trust extension barrier failed", "err", err)
 		return err
 	}
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	bsc, err := h.peers.waitBscExtension(peer)
 	if err != nil {
 		peer.Log().Error("Bsc extension barrier failed", "err", err)
@@ -535,11 +453,7 @@ func (h *handler) runEthPeer(peer *eth.Peer, handler eth.Handler) error {
 	}
 
 	// Register the peer locally
-<<<<<<< HEAD
-	if err := h.peers.registerPeer(peer, snap, bsc); err != nil {
-=======
 	if err := h.peers.registerPeer(peer, snap, trust, bsc); err != nil {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		peer.Log().Error("Ethereum peer registration failed", "err", err)
 		return err
 	}
@@ -644,8 +558,6 @@ func (h *handler) runSnapExtension(peer *snap.Peer, handler snap.Handler) error 
 	return handler(peer)
 }
 
-<<<<<<< HEAD
-=======
 // runTrustExtension registers a `trust` peer into the joint eth/trust peerset and
 // starts handling inbound messages. As `trust` is only a satellite protocol to
 // `eth`, all subsystem registrations and lifecycle management will be done by
@@ -670,7 +582,6 @@ func (h *handler) runTrustExtension(peer *trust.Peer, handler trust.Handler) err
 	return handler(peer)
 }
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 // runBscExtension registers a `bsc` peer into the joint eth/bsc peerset and
 // starts handling inbound messages. As `bsc` is only a satellite protocol to
 // `eth`, all subsystem registrations and lifecycle management will be done by
@@ -682,22 +593,14 @@ func (h *handler) runBscExtension(peer *bsc.Peer, handler bsc.Handler) error {
 	defer h.decHandlers()
 
 	if err := h.peers.registerBscExtension(peer); err != nil {
-<<<<<<< HEAD
-		if metrics.Enabled {
-=======
 		if metrics.Enabled() {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 			if peer.Inbound() {
 				bsc.IngressRegistrationErrorMeter.Mark(1)
 			} else {
 				bsc.EgressRegistrationErrorMeter.Mark(1)
 			}
 		}
-<<<<<<< HEAD
-		peer.Log().Error("Bsc extension registration failed", "err", err)
-=======
 		peer.Log().Error("Bsc extension registration failed", "err", err, "name", peer.Name())
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		return err
 	}
 	return handler(peer)
@@ -786,15 +689,12 @@ func (h *handler) Start(maxPeers int, maxPeersPerIP int) {
 		}
 	}
 
-<<<<<<< HEAD
-=======
 	// announce local pending transactions again
 	h.wg.Add(1)
 	h.reannoTxsCh = make(chan core.ReannoTxsEvent, txChanSize)
 	h.reannoTxsSub = h.txpool.SubscribeReannoTxsEvent(h.reannoTxsCh)
 	go h.txReannounceLoop()
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	// broadcast mined blocks
 	h.wg.Add(1)
 	h.minedBlockSub = h.eventMux.Subscribe(core.NewMinedBlockEvent{})
@@ -836,10 +736,7 @@ func (h *handler) Stop() {
 			h.voteMonitorSub.Unsubscribe()
 		}
 	}
-<<<<<<< HEAD
-=======
 	close(h.stopCh)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	// Quit chainSync and txsync64.
 	// After this is done, no new peers will be accepted.
 	close(h.quitSync)

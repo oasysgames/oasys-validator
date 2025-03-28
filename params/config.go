@@ -28,20 +28,12 @@ import (
 
 // Genesis hashes to enforce below configs on.
 var (
-<<<<<<< HEAD
 	MainnetGenesisHash      = common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
 	HoleskyGenesisHash      = common.HexToHash("0xb5f7f912443c940f21fd611f12828d75b534364ed9e95ca4e307729a4661bde4")
 	SepoliaGenesisHash      = common.HexToHash("0x25a5cc106eea7138acab33231d7160d69cb777ee0c2c553fcddf5138993e6dd9")
 	GoerliGenesisHash       = common.HexToHash("0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a")
 	OasysMainnetGenesisHash = common.HexToHash("0x7027e4041ce0185f45aab280b852d49193f5adb0f728a0cb3846a9c9bbf4b7fe")
 	OasysTestnetGenesisHash = common.HexToHash("0xb11d2e6372646124ff853037eb8e93e84a0cc8503e6c505264eade54b8ef281d")
-=======
-	MainnetGenesisHash = common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
-
-	BSCGenesisHash    = common.HexToHash("0x0d21840abff46b96c84b2ac9e10e4f5cdaeb5693cb665db62a2f3b02d2d57b5b")
-	ChapelGenesisHash = common.HexToHash("0x6d3c66c5357ec91d5c43af47e234a939b22557cbb552dc45bebbceeed90fbe34")
-	RialtoGenesisHash = common.HexToHash("0xee835a629f9cf5510b48b6ba41d69e0ff7d6ef10f977166ef939db41f59f5501")
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 )
 
 func newUint64(val uint64) *uint64 { return &val }
@@ -162,197 +154,6 @@ var (
 		},
 	}
 
-<<<<<<< HEAD
-=======
-	BSCChainConfig = &ChainConfig{
-		ChainID:             big.NewInt(56),
-		HomesteadBlock:      big.NewInt(0),
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(0),
-		PetersburgBlock:     big.NewInt(0),
-		IstanbulBlock:       big.NewInt(0),
-		MuirGlacierBlock:    big.NewInt(0),
-		RamanujanBlock:      big.NewInt(0),
-		NielsBlock:          big.NewInt(0),
-		MirrorSyncBlock:     big.NewInt(5184000),
-		BrunoBlock:          big.NewInt(13082000),
-		EulerBlock:          big.NewInt(18907621),
-		NanoBlock:           big.NewInt(21962149),
-		MoranBlock:          big.NewInt(22107423),
-		GibbsBlock:          big.NewInt(23846001),
-		PlanckBlock:         big.NewInt(27281024),
-		LubanBlock:          big.NewInt(29020050),
-		PlatoBlock:          big.NewInt(30720096),
-		BerlinBlock:         big.NewInt(31302048),
-		LondonBlock:         big.NewInt(31302048),
-		HertzBlock:          big.NewInt(31302048),
-		HertzfixBlock:       big.NewInt(34140700),
-		ShanghaiTime:        newUint64(1705996800), // 2024-01-23 08:00:00 AM UTC
-		KeplerTime:          newUint64(1705996800), // 2024-01-23 08:00:00 AM UTC
-		FeynmanTime:         newUint64(1713419340), // 2024-04-18 05:49:00 AM UTC
-		FeynmanFixTime:      newUint64(1713419340), // 2024-04-18 05:49:00 AM UTC
-		CancunTime:          newUint64(1718863500), // 2024-06-20 06:05:00 AM UTC
-		HaberTime:           newUint64(1718863500), // 2024-06-20 06:05:00 AM UTC
-		HaberFixTime:        newUint64(1727316120), // 2024-09-26 02:02:00 AM UTC
-		BohrTime:            newUint64(1727317200), // 2024-09-26 02:20:00 AM UTC
-		PascalTime:          newUint64(1742436600),
-		PragueTime:          newUint64(1742436600),
-		LorentzTime:         nil,
-
-		Parlia: &ParliaConfig{
-			Period: 3,
-			Epoch:  200,
-		},
-		BlobScheduleConfig: &BlobScheduleConfig{
-			Cancun: DefaultCancunBlobConfig,
-			Prague: DefaultPragueBlobConfigBSC,
-		},
-	}
-
-	ChapelChainConfig = &ChainConfig{
-		ChainID:             big.NewInt(97),
-		HomesteadBlock:      big.NewInt(0),
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(0),
-		PetersburgBlock:     big.NewInt(0),
-		IstanbulBlock:       big.NewInt(0),
-		MuirGlacierBlock:    big.NewInt(0),
-		RamanujanBlock:      big.NewInt(1010000),
-		NielsBlock:          big.NewInt(1014369),
-		MirrorSyncBlock:     big.NewInt(5582500),
-		BrunoBlock:          big.NewInt(13837000),
-		EulerBlock:          big.NewInt(19203503),
-		GibbsBlock:          big.NewInt(22800220),
-		NanoBlock:           big.NewInt(23482428),
-		MoranBlock:          big.NewInt(23603940),
-		PlanckBlock:         big.NewInt(28196022),
-		LubanBlock:          big.NewInt(29295050),
-		PlatoBlock:          big.NewInt(29861024),
-		BerlinBlock:         big.NewInt(31103030),
-		LondonBlock:         big.NewInt(31103030),
-		HertzBlock:          big.NewInt(31103030),
-		HertzfixBlock:       big.NewInt(35682300),
-		ShanghaiTime:        newUint64(1702972800), // 2023-12-19 8:00:00 AM UTC
-		KeplerTime:          newUint64(1702972800),
-		FeynmanTime:         newUint64(1710136800), // 2024-03-11 6:00:00 AM UTC
-		FeynmanFixTime:      newUint64(1711342800), // 2024-03-25 5:00:00 AM UTC
-		CancunTime:          newUint64(1713330442), // 2024-04-17 05:07:22 AM UTC
-		HaberTime:           newUint64(1716962820), // 2024-05-29 06:07:00 AM UTC
-		HaberFixTime:        newUint64(1719986788), // 2024-07-03 06:06:28 AM UTC
-		BohrTime:            newUint64(1724116996), // 2024-08-20 01:23:16 AM UTC
-		PascalTime:          newUint64(1740452880), // 2025-02-25 03:08:00 AM UTC
-		PragueTime:          newUint64(1740452880), // 2025-02-25 03:08:00 AM UTC
-		// TODO
-		LorentzTime: nil,
-
-		Parlia: &ParliaConfig{
-			Period: 3,
-			Epoch:  200,
-		},
-		BlobScheduleConfig: &BlobScheduleConfig{
-			Cancun: DefaultCancunBlobConfig,
-			Prague: DefaultPragueBlobConfigBSC,
-		},
-	}
-
-	// used to test hard fork upgrade, following https://github.com/bnb-chain/bsc-genesis-contract/blob/master/genesis.json
-	RialtoChainConfig = &ChainConfig{
-		ChainID:             big.NewInt(714),
-		HomesteadBlock:      big.NewInt(0),
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(0),
-		PetersburgBlock:     big.NewInt(0),
-		IstanbulBlock:       big.NewInt(0),
-		MuirGlacierBlock:    big.NewInt(0),
-		RamanujanBlock:      big.NewInt(0),
-		NielsBlock:          big.NewInt(0),
-		MirrorSyncBlock:     big.NewInt(1),
-		BrunoBlock:          big.NewInt(1),
-		EulerBlock:          big.NewInt(2),
-		NanoBlock:           big.NewInt(3),
-		MoranBlock:          big.NewInt(3),
-		GibbsBlock:          big.NewInt(4),
-		PlanckBlock:         big.NewInt(5),
-		LubanBlock:          big.NewInt(6),
-		PlatoBlock:          big.NewInt(7),
-		BerlinBlock:         big.NewInt(8),
-		LondonBlock:         big.NewInt(8),
-		HertzBlock:          big.NewInt(8),
-		HertzfixBlock:       big.NewInt(8),
-		ShanghaiTime:        newUint64(0),
-		KeplerTime:          newUint64(0),
-		FeynmanTime:         newUint64(0),
-		FeynmanFixTime:      newUint64(0),
-		CancunTime:          newUint64(0),
-		HaberTime:           newUint64(0),
-		HaberFixTime:        newUint64(0),
-		BohrTime:            newUint64(0),
-		// TODO: set them to `0` when passed on the mainnet
-		PascalTime:  nil,
-		PragueTime:  nil,
-		LorentzTime: nil,
-
-		Parlia: &ParliaConfig{
-			Period: 3,
-			Epoch:  200,
-		},
-		BlobScheduleConfig: &BlobScheduleConfig{
-			Cancun: DefaultCancunBlobConfig,
-			Prague: DefaultPragueBlobConfigBSC,
-		},
-	}
-
-	ParliaTestChainConfig = &ChainConfig{
-		ChainID:             big.NewInt(2),
-		HomesteadBlock:      big.NewInt(0),
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(0),
-		PetersburgBlock:     big.NewInt(0),
-		IstanbulBlock:       big.NewInt(0),
-		MuirGlacierBlock:    big.NewInt(0),
-		RamanujanBlock:      big.NewInt(0),
-		NielsBlock:          big.NewInt(0),
-		MirrorSyncBlock:     big.NewInt(0),
-		BrunoBlock:          big.NewInt(0),
-		EulerBlock:          big.NewInt(0),
-		NanoBlock:           big.NewInt(0),
-		MoranBlock:          big.NewInt(0),
-		GibbsBlock:          big.NewInt(0),
-		PlanckBlock:         big.NewInt(0),
-		LubanBlock:          big.NewInt(0),
-		PlatoBlock:          big.NewInt(0),
-		BerlinBlock:         big.NewInt(0),
-		LondonBlock:         big.NewInt(0),
-		HertzBlock:          big.NewInt(0),
-		HertzfixBlock:       big.NewInt(0),
-		ShanghaiTime:        newUint64(0),
-		KeplerTime:          newUint64(0),
-		FeynmanTime:         newUint64(0),
-		FeynmanFixTime:      newUint64(0),
-		CancunTime:          newUint64(0),
-
-		Parlia: &ParliaConfig{
-			Period: 3,
-			Epoch:  200,
-		},
-		BlobScheduleConfig: &BlobScheduleConfig{
-			Cancun: DefaultCancunBlobConfig,
-		},
-	}
-
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	// AllEthashProtocolChanges contains every protocol change (EIPs) introduced
 	// and accepted by the Ethereum core developers into the Ethash consensus.
 	AllEthashProtocolChanges = &ChainConfig{
@@ -582,7 +383,6 @@ func GetBuiltInChainConfig(ghash common.Hash) *ChainConfig {
 	switch ghash {
 	case MainnetGenesisHash:
 		return MainnetChainConfig
-<<<<<<< HEAD
 	case HoleskyGenesisHash:
 		return HoleskyChainConfig
 	case SepoliaGenesisHash:
@@ -593,21 +393,11 @@ func GetBuiltInChainConfig(ghash common.Hash) *ChainConfig {
 		return OasysMainnetChainConfig
 	case OasysTestnetGenesisHash:
 		return OasysTestnetChainConfig
-=======
-	case BSCGenesisHash:
-		return BSCChainConfig
-	case ChapelGenesisHash:
-		return ChapelChainConfig
-	case RialtoGenesisHash:
-		return RialtoChainConfig
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	default:
 		return nil
 	}
 }
 
-<<<<<<< HEAD
-=======
 var (
 	// DefaultCancunBlobConfig is the default blob configuration for the Cancun fork.
 	DefaultCancunBlobConfig = &BlobConfig{
@@ -632,7 +422,6 @@ var (
 	MaxBlobsPerBlockForBSC = DefaultCancunBlobConfig.Max
 )
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 // NetworkNames are user friendly names to use in the chain spec banner.
 var NetworkNames = map[string]string{
 	MainnetChainConfig.ChainID.String(): "mainnet",
@@ -725,16 +514,10 @@ type ChainConfig struct {
 	HertzfixBlock   *big.Int `json:"hertzfixBlock,omitempty"`   // hertzfixBlock switch block (nil = no fork, 0 = already activated)
 
 	// Various consensus engines
-<<<<<<< HEAD
-	Ethash *EthashConfig `json:"ethash,omitempty"`
-	Clique *CliqueConfig `json:"clique,omitempty"`
-	Oasys  *OasysConfig  `json:"oasys,omitempty"`
-=======
 	Ethash             *EthashConfig       `json:"ethash,omitempty"`
 	Clique             *CliqueConfig       `json:"clique,omitempty"`
-	Parlia             *ParliaConfig       `json:"parlia,omitempty"`
+	Oasys              *OasysConfig        `json:"oasys,omitempty"`
 	BlobScheduleConfig *BlobScheduleConfig `json:"blobSchedule,omitempty"`
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.
@@ -767,7 +550,6 @@ func (b *ParliaConfig) String() string {
 	return "parlia"
 }
 
-<<<<<<< HEAD
 // OasysConfig is the consensus engine configs for proof-of-stake based sealing.
 type OasysConfig struct {
 	Period uint64 `json:"period"` // Number of seconds between blocks to enforce
@@ -780,8 +562,6 @@ func (o *OasysConfig) String() string {
 }
 
 // Description returns a human-readable description of ChainConfig.
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 func (c *ChainConfig) Description() string {
 	var banner string
 
@@ -792,29 +572,16 @@ func (c *ChainConfig) Description() string {
 	}
 	banner += fmt.Sprintf("Chain ID:  %v (%s)\n", c.ChainID, network)
 	switch {
-	case c.Parlia != nil:
-		banner += "Consensus: Parlia (proof-of-staked--authority)\n"
+	case c.Oasys != nil:
+		banner += "Consensus: Oasys (proof-of-stake)\n"
 	case c.Ethash != nil:
 		banner += "Consensus: Beacon (proof-of-stake), merged from Ethash (proof-of-work)\n"
 	case c.Clique != nil:
-<<<<<<< HEAD
-		if c.TerminalTotalDifficulty == nil {
-			banner += "Consensus: Clique (proof-of-authority)\n"
-		} else if !c.TerminalTotalDifficultyPassed {
-			banner += "Consensus: Beacon (proof-of-stake), merging from Clique (proof-of-authority)\n"
-		} else {
-			banner += "Consensus: Beacon (proof-of-stake), merged from Clique (proof-of-authority)\n"
-		}
-	case c.Oasys != nil:
-		banner += "Consensus: Oasys (proof-of-stake)\n"
-=======
 		banner += "Consensus: Beacon (proof-of-stake), merged from Clique (proof-of-authority)\n"
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	default:
 		banner += "Consensus: unknown\n"
 	}
 
-<<<<<<< HEAD
 	// Create a list of forks with a short description of them. Forks that only
 	// makes sense for mainnet should be optional at printing to avoid bloating
 	// the output for testnets and private networks.
@@ -862,11 +629,12 @@ func (c *ChainConfig) Description() string {
 	if c.PragueTime != nil {
 		banner += fmt.Sprintf(" - Prague:                      @%-10v\n", *c.PragueTime)
 	}
+	if c.OsakaTime != nil {
+		banner += fmt.Sprintf(" - Osaka:                      @%-10v\n", *c.OsakaTime)
+	}
 	if c.VerkleTime != nil {
 		banner += fmt.Sprintf(" - Verkle:                      @%-10v\n", *c.VerkleTime)
 	}
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	return banner
 }
 
@@ -1480,13 +1248,8 @@ func (c *ChainConfig) CheckCompatible(newcfg *ChainConfig, height uint64, time u
 // CheckConfigForkOrder checks that we don't "skip" any forks, geth isn't pluggable enough
 // to guarantee that forks can be implemented in a different order than on official networks
 func (c *ChainConfig) CheckConfigForkOrder() error {
-<<<<<<< HEAD
 	// skip checking for non-Oasys egine
 	if c.Oasys == nil {
-=======
-	// skip checking for non-Parlia egine
-	if c.Parlia == nil {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		return nil
 	}
 	type fork struct {
@@ -1497,7 +1260,6 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 	}
 	var lastFork fork
 	for _, cur := range []fork{
-<<<<<<< HEAD
 		{name: "homesteadBlock", block: c.HomesteadBlock},
 		{name: "daoForkBlock", block: c.DAOForkBlock, optional: true},
 		{name: "eip150Block", block: c.EIP150Block},
@@ -1516,28 +1278,7 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "shanghaiTime", timestamp: c.ShanghaiTime},
 		{name: "cancunTime", timestamp: c.CancunTime},
 		{name: "pragueTime", timestamp: c.PragueTime, optional: true},
-=======
-		{name: "mirrorSyncBlock", block: c.MirrorSyncBlock},
-		{name: "brunoBlock", block: c.BrunoBlock},
-		{name: "eulerBlock", block: c.EulerBlock},
-		{name: "gibbsBlock", block: c.GibbsBlock},
-		{name: "planckBlock", block: c.PlanckBlock},
-		{name: "lubanBlock", block: c.LubanBlock},
-		{name: "platoBlock", block: c.PlatoBlock},
-		{name: "hertzBlock", block: c.HertzBlock},
-		{name: "hertzfixBlock", block: c.HertzfixBlock},
-		{name: "keplerTime", timestamp: c.KeplerTime},
-		{name: "feynmanTime", timestamp: c.FeynmanTime},
-		{name: "feynmanFixTime", timestamp: c.FeynmanFixTime},
-		{name: "cancunTime", timestamp: c.CancunTime},
-		{name: "haberTime", timestamp: c.HaberTime},
-		{name: "haberFixTime", timestamp: c.HaberFixTime},
-		{name: "bohrTime", timestamp: c.BohrTime},
-		{name: "pascalTime", timestamp: c.PascalTime},
-		{name: "pragueTime", timestamp: c.PragueTime},
 		{name: "osakaTime", timestamp: c.OsakaTime, optional: true},
-		{name: "lorentzTime", timestamp: c.LorentzTime},
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		{name: "verkleTime", timestamp: c.VerkleTime, optional: true},
 	} {
 		if lastFork.name != "" {
@@ -1956,31 +1697,11 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 		IsEIP2929:        c.IsBerlin(num) && !isVerkle,
 		IsLondon:         c.IsLondon(num),
 		IsMerge:          isMerge,
-<<<<<<< HEAD
 		IsShanghai:       c.IsShanghai(num, timestamp),
 		IsCancun:         c.IsCancun(num, timestamp),
-		IsPrague:         c.IsPrague(num, timestamp),
-		IsVerkle:         c.IsVerkle(num, timestamp),
-=======
-		IsNano:           c.IsNano(num),
-		IsMoran:          c.IsMoran(num),
-		IsPlanck:         c.IsPlanck(num),
-		IsLuban:          c.IsLuban(num),
-		IsPlato:          c.IsPlato(num),
-		IsHertz:          c.IsHertz(num),
-		IsHertzfix:       c.IsHertzfix(num),
-		IsShanghai:       c.IsShanghai(num, timestamp),
-		IsKepler:         c.IsKepler(num, timestamp),
-		IsFeynman:        c.IsFeynman(num, timestamp),
-		IsCancun:         c.IsCancun(num, timestamp),
-		IsHaber:          c.IsHaber(num, timestamp),
-		IsBohr:           c.IsBohr(num, timestamp),
-		IsPascal:         c.IsPascal(num, timestamp),
 		IsPrague:         c.IsPrague(num, timestamp),
 		IsOsaka:          c.IsOsaka(num, timestamp),
-		IsLorentz:        c.IsLorentz(num, timestamp),
 		IsVerkle:         c.IsVerkle(num, timestamp),
 		IsEIP4762:        isVerkle,
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	}
 }

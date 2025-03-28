@@ -3,19 +3,12 @@ package vote
 import (
 	"bytes"
 	"fmt"
-<<<<<<< HEAD
-=======
 	"math/big"
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
-<<<<<<< HEAD
 	"github.com/ethereum/go-ethereum/consensus/oasys"
-=======
-	"github.com/ethereum/go-ethereum/consensus/parlia"
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/downloader"
@@ -26,9 +19,6 @@ import (
 
 const blocksNumberSinceMining = 5 // the number of blocks need to wait before voting, counting from the validator begin to mine
 
-<<<<<<< HEAD
-var votesManagerCounter = metrics.NewRegisteredCounter("votesManager/local", nil)
-=======
 var diffInTurn = big.NewInt(2) // Block difficulty for in-turn signatures
 var votesManagerCounter = metrics.NewRegisteredCounter("votesManager/local", nil)
 var notJustified = metrics.NewRegisteredCounter("votesManager/notJustified", nil)
@@ -36,7 +26,6 @@ var inTurnJustified = metrics.NewRegisteredCounter("votesManager/inTurnJustified
 var notInTurnJustified = metrics.NewRegisteredCounter("votesManager/notInTurnJustified", nil)
 var continuousJustified = metrics.NewRegisteredCounter("votesManager/continuousJustified", nil)
 var notContinuousJustified = metrics.NewRegisteredCounter("votesManager/notContinuousJustified", nil)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 // Backend wraps all methods required for voting.
 type Backend interface {
@@ -61,17 +50,10 @@ type VoteManager struct {
 	signer  *VoteSigner
 	journal *VoteJournal
 
-<<<<<<< HEAD
 	engine consensus.PoS
 }
 
 func NewVoteManager(eth Backend, chain *core.BlockChain, pool *VotePool, journalPath, blsPasswordPath, blsWalletPath, blsAccountName string, engine consensus.PoS) (*VoteManager, error) {
-=======
-	engine consensus.PoSA
-}
-
-func NewVoteManager(eth Backend, chain *core.BlockChain, pool *VotePool, journalPath, blsPasswordPath, blsWalletPath string, engine consensus.PoSA) (*VoteManager, error) {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	voteManager := &VoteManager{
 		eth:                    eth,
 		chain:                  chain,
@@ -82,22 +64,13 @@ func NewVoteManager(eth Backend, chain *core.BlockChain, pool *VotePool, journal
 	}
 
 	// Create voteSigner.
-<<<<<<< HEAD
 	voteSigner, err := NewVoteSigner(blsPasswordPath, blsWalletPath, blsAccountName)
 	if err != nil {
 		return nil, err
 	}
 	log.Info("Create voteSigner successfully", "pubKey", common.Bytes2Hex(voteSigner.PubKey[:]))
 	voteManager.signer = voteSigner
-=======
-	voteSigner, err := NewVoteSigner(blsPasswordPath, blsWalletPath)
-	if err != nil {
-		return nil, err
-	}
-	log.Info("Create voteSigner successfully")
-	voteManager.signer = voteSigner
 	metrics.GetOrRegisterLabel("miner-info", nil).Mark(map[string]interface{}{"VoteKey": common.Bytes2Hex(voteManager.signer.PubKey[:])})
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	// Create voteJournal
 	voteJournal, err := NewVoteJournal(journalPath)
@@ -169,22 +142,13 @@ func (voteManager *VoteManager) loop() {
 			}
 
 			if cHead.Header == nil {
-<<<<<<< HEAD
-				log.Debug("cHead.Block is nil, continue")
-=======
 				log.Debug("cHead.Header is nil, continue")
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 				continue
 			}
 
 			curHead := cHead.Header
-<<<<<<< HEAD
 			if o, ok := voteManager.engine.(*oasys.Oasys); ok {
 				nextBlockMinedTime := time.Unix(int64((curHead.Time + o.Period(voteManager.chain, curHead))), 0)
-=======
-			if p, ok := voteManager.engine.(*parlia.Parlia); ok {
-				nextBlockMinedTime := time.Unix(int64((curHead.Time + p.Period())), 0)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 				timeForBroadcast := 50 * time.Millisecond // enough to broadcast a vote
 				if time.Now().Add(timeForBroadcast).After(nextBlockMinedTime) {
 					log.Warn("too late to vote", "Head.Time(Second)", curHead.Time, "Now(Millisecond)", time.Now().UnixMilli())
@@ -197,11 +161,7 @@ func (voteManager *VoteManager) loop() {
 				func(bLSPublicKey *types.BLSPublicKey) bool {
 					return bytes.Equal(voteManager.signer.PubKey[:], bLSPublicKey[:])
 				}) {
-<<<<<<< HEAD
 				log.Debug("cur validator is not within the validatorSet at curHead or registered blsPubKey does not match", "signer", common.Bytes2Hex(voteManager.signer.PubKey[:]), "curHead", curHead.Number)
-=======
-				log.Debug("local validator with voteKey is not within the validatorSet at curHead")
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 				continue
 			}
 
@@ -240,8 +200,6 @@ func (voteManager *VoteManager) loop() {
 				voteManager.pool.PutVote(voteMessage)
 				votesManagerCounter.Inc(1)
 			}
-<<<<<<< HEAD
-=======
 
 			// check the latest justified block, which indicating the stability of the network
 			curJustifiedNumber, _, err := voteManager.engine.GetJustifiedNumberAndHash(voteManager.chain, []*types.Header{curHead})
@@ -272,7 +230,6 @@ func (voteManager *VoteManager) loop() {
 				}
 			}
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		case event := <-voteManager.syncVoteCh:
 			voteMessage := event.Vote
 			if voteManager.eth.IsMining() || !bytes.Equal(voteManager.signer.PubKey[:], voteMessage.VoteAddress[:]) {

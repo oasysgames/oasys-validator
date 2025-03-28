@@ -75,17 +75,7 @@ type Freezer struct {
 	tables       map[string]*freezerTable // Data tables for storing everything
 	instanceLock *flock.Flock             // File-system lock to prevent double opens
 	closeOnce    sync.Once
-<<<<<<< HEAD
-}
-
-// NewChainFreezer is a small utility method around NewFreezer that sets the
-// default parameters for the chain storage.
-// additionTables indicates the new add tables for freezerDB, it has some special rules.
-func NewChainFreezer(datadir string, namespace string, readonly bool) (*Freezer, error) {
-	return NewFreezer(datadir, namespace, readonly, freezerTableSize, chainFreezerNoSnappy)
-=======
 	offset       uint64 // Starting BlockNumber in current freezer
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 // NewFreezer creates a freezer instance for maintaining immutable ordered
@@ -187,11 +177,7 @@ func NewFreezer(datadir string, namespace string, readonly bool, offset uint64, 
 }
 
 // openAdditionTable create table, it will auto create new files when it was first initialized
-<<<<<<< HEAD
-func openAdditionTable(datadir, name string, readMeter, writeMeter metrics.Meter, sizeGauge metrics.Gauge, maxTableSize uint32, disableSnappy, readonly bool) (*freezerTable, error) {
-=======
 func openAdditionTable(datadir, name string, readMeter, writeMeter *metrics.Meter, sizeGauge *metrics.Gauge, maxTableSize uint32, disableSnappy, readonly bool) (*freezerTable, error) {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	if readonly {
 		f, err := newTable(datadir, name, readMeter, writeMeter, sizeGauge, maxTableSize, disableSnappy, false)
 		if err != nil {
@@ -204,11 +190,7 @@ func openAdditionTable(datadir, name string, readMeter, writeMeter *metrics.Mete
 	return newTable(datadir, name, readMeter, writeMeter, sizeGauge, maxTableSize, disableSnappy, readonly)
 }
 
-<<<<<<< HEAD
-// Close terminates the chain freezer, unmapping all the data files.
-=======
 // Close terminates the chain freezer, closing all the data files.
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 func (f *Freezer) Close() error {
 	f.writeLock.Lock()
 	defer f.writeLock.Unlock()
@@ -361,11 +343,7 @@ func (f *Freezer) TruncateHead(items uint64) (uint64, error) {
 		return oitems, nil
 	}
 	for kind, table := range f.tables {
-<<<<<<< HEAD
-		err := table.truncateHead(items)
-=======
 		err := table.truncateHead(items - f.offset)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		if err == errTruncationBelowTail {
 			// This often happens in chain rewinds, but the blob table is special.
 			// It has the same head, but a different tail from other tables (like bodies, receipts).
@@ -373,11 +351,7 @@ func (f *Freezer) TruncateHead(items uint64) (uint64, error) {
 			if kind != ChainFreezerBlobSidecarTable {
 				return 0, err
 			}
-<<<<<<< HEAD
-			nt, err := table.resetItems(items)
-=======
 			nt, err := table.resetItems(items - f.offset)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 			if err != nil {
 				return 0, err
 			}
@@ -651,75 +625,6 @@ func (f *Freezer) ResetTable(kind string, startAt uint64, onlyEmpty bool) error 
 	return nil
 }
 
-<<<<<<< HEAD
-// TruncateTableTail will truncate certain table to new tail
-func (f *Freezer) TruncateTableTail(kind string, tail uint64) (uint64, error) {
-	if f.readonly {
-		return 0, errReadOnly
-	}
-
-	f.writeLock.Lock()
-	defer f.writeLock.Unlock()
-
-	if !slices.Contains(additionTables, kind) {
-		return 0, errors.New("only new added table could be truncated independently")
-	}
-	t, exist := f.tables[kind]
-	if !exist {
-		return 0, errors.New("you reset a non-exist table")
-	}
-
-	old := t.itemHidden.Load()
-	if err := t.truncateTail(tail); err != nil {
-		return 0, err
-	}
-	return old, nil
-}
-
-// ResetTable will reset certain table with new start point
-// only used for ChainFreezerBlobSidecarTable now
-func (f *Freezer) ResetTable(kind string, startAt uint64, onlyEmpty bool) error {
-	if f.readonly {
-		return errReadOnly
-	}
-
-	f.writeLock.Lock()
-	defer f.writeLock.Unlock()
-
-	t, exist := f.tables[kind]
-	if !exist {
-		return errors.New("you reset a non-exist table")
-	}
-
-	// if you reset a non empty table just skip
-	if onlyEmpty && !EmptyTable(t) {
-		return nil
-	}
-
-	if err := f.Sync(); err != nil {
-		return err
-	}
-	nt, err := t.resetItems(startAt)
-	if err != nil {
-		return err
-	}
-	f.tables[kind] = nt
-
-	// repair all tables with same tail & head
-	if err := f.repair(); err != nil {
-		for _, table := range f.tables {
-			table.Close()
-		}
-		return err
-	}
-
-	f.writeBatch = newFreezerBatch(f)
-	log.Debug("Reset Table", "kind", kind, "tail", f.tables[kind].itemHidden.Load(), "frozen", f.tables[kind].items.Load())
-	return nil
-}
-
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 func EmptyTable(t *freezerTable) bool {
 	return t.items.Load() == 0
 }

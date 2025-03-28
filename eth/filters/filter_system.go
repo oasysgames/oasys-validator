@@ -69,10 +69,6 @@ type Backend interface {
 	SubscribeFinalizedHeaderEvent(ch chan<- core.FinalizedHeaderEvent) event.Subscription
 	SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription
 	SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription
-<<<<<<< HEAD
-	SubscribePendingLogsEvent(ch chan<- []*types.Log) event.Subscription
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	SubscribeNewVoteEvent(chan<- core.NewVoteEvent) event.Subscription
 
 	BloomStatus() (uint64, uint64)
@@ -205,40 +201,20 @@ type EventSystem struct {
 	sys     *FilterSystem
 
 	// Subscriptions
-<<<<<<< HEAD
-	txsSub         event.Subscription // Subscription for new transaction event
-	logsSub        event.Subscription // Subscription for new log event
-	rmLogsSub      event.Subscription // Subscription for removed log event
-	pendingLogsSub event.Subscription // Subscription for pending log event
-	chainSub       event.Subscription // Subscription for new chain event
-	// for finality
-=======
 	txsSub             event.Subscription // Subscription for new transaction event
 	logsSub            event.Subscription // Subscription for new log event
 	rmLogsSub          event.Subscription // Subscription for removed log event
 	chainSub           event.Subscription // Subscription for new chain event
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	finalizedHeaderSub event.Subscription // Subscription for new finalized header
 	voteSub            event.Subscription // Subscription for new vote event
 
 	// Channels
-<<<<<<< HEAD
-	install       chan *subscription         // install filter for event notification
-	uninstall     chan *subscription         // remove filter for event notification
-	txsCh         chan core.NewTxsEvent      // Channel to receive new transactions event
-	logsCh        chan []*types.Log          // Channel to receive new log event
-	pendingLogsCh chan []*types.Log          // Channel to receive new log event
-	rmLogsCh      chan core.RemovedLogsEvent // Channel to receive removed log event
-	chainCh       chan core.ChainEvent       // Channel to receive new chain event
-	// for finality
-=======
 	install           chan *subscription             // install filter for event notification
 	uninstall         chan *subscription             // remove filter for event notification
 	txsCh             chan core.NewTxsEvent          // Channel to receive new transactions event
 	logsCh            chan []*types.Log              // Channel to receive new log event
 	rmLogsCh          chan core.RemovedLogsEvent     // Channel to receive removed log event
 	chainCh           chan core.ChainEvent           // Channel to receive new chain event
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	finalizedHeaderCh chan core.FinalizedHeaderEvent // Channel to receive new finalized header event
 	voteCh            chan core.NewVoteEvent         // Channel to receive new vote event
 }
@@ -251,19 +227,6 @@ type EventSystem struct {
 // or by stopping the given mux.
 func NewEventSystem(sys *FilterSystem) *EventSystem {
 	m := &EventSystem{
-<<<<<<< HEAD
-		sys:           sys,
-		backend:       sys.backend,
-		lightMode:     lightMode,
-		install:       make(chan *subscription),
-		uninstall:     make(chan *subscription),
-		txsCh:         make(chan core.NewTxsEvent, txChanSize),
-		logsCh:        make(chan []*types.Log, logsChanSize),
-		rmLogsCh:      make(chan core.RemovedLogsEvent, rmLogsChanSize),
-		pendingLogsCh: make(chan []*types.Log, logsChanSize),
-		chainCh:       make(chan core.ChainEvent, chainEvChanSize),
-		// for finality
-=======
 		sys:               sys,
 		backend:           sys.backend,
 		install:           make(chan *subscription),
@@ -272,7 +235,6 @@ func NewEventSystem(sys *FilterSystem) *EventSystem {
 		logsCh:            make(chan []*types.Log, logsChanSize),
 		rmLogsCh:          make(chan core.RemovedLogsEvent, rmLogsChanSize),
 		chainCh:           make(chan core.ChainEvent, chainEvChanSize),
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		finalizedHeaderCh: make(chan core.FinalizedHeaderEvent, finalizedHeaderEvChanSize),
 		voteCh:            make(chan core.NewVoteEvent, voteChanSize),
 	}
@@ -282,10 +244,6 @@ func NewEventSystem(sys *FilterSystem) *EventSystem {
 	m.logsSub = m.backend.SubscribeLogsEvent(m.logsCh)
 	m.rmLogsSub = m.backend.SubscribeRemovedLogsEvent(m.rmLogsCh)
 	m.chainSub = m.backend.SubscribeChainEvent(m.chainCh)
-<<<<<<< HEAD
-	m.pendingLogsSub = m.backend.SubscribePendingLogsEvent(m.pendingLogsCh)
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	m.finalizedHeaderSub = m.backend.SubscribeFinalizedHeaderEvent(m.finalizedHeaderCh)
 	m.voteSub = m.backend.SubscribeNewVoteEvent(m.voteCh)
 
@@ -386,27 +344,6 @@ func (es *EventSystem) SubscribeLogs(crit ethereum.FilterQuery, logs chan []*typ
 	return nil, errInvalidBlockRange
 }
 
-<<<<<<< HEAD
-// subscribeMinedPendingLogs creates a subscription that returned mined and
-// pending logs that match the given criteria.
-func (es *EventSystem) subscribeMinedPendingLogs(crit ethereum.FilterQuery, logs chan []*types.Log) *Subscription {
-	sub := &subscription{
-		id:        rpc.NewID(),
-		typ:       MinedAndPendingLogsSubscription,
-		logsCrit:  crit,
-		created:   time.Now(),
-		logs:      logs,
-		txs:       make(chan []*types.Transaction),
-		headers:   make(chan *types.Header),
-		votes:     make(chan *types.VoteEnvelope),
-		installed: make(chan struct{}),
-		err:       make(chan error),
-	}
-	return es.subscribe(sub)
-}
-
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 // subscribeLogs creates a subscription that will write all logs matching the
 // given criteria to the given logs channel.
 func (es *EventSystem) subscribeLogs(crit ethereum.FilterQuery, logs chan []*types.Log) *Subscription {
@@ -419,27 +356,6 @@ func (es *EventSystem) subscribeLogs(crit ethereum.FilterQuery, logs chan []*typ
 		txs:       make(chan []*types.Transaction),
 		headers:   make(chan *types.Header),
 		votes:     make(chan *types.VoteEnvelope),
-<<<<<<< HEAD
-		installed: make(chan struct{}),
-		err:       make(chan error),
-	}
-	return es.subscribe(sub)
-}
-
-// subscribePendingLogs creates a subscription that writes contract event logs for
-// transactions that enter the transaction pool.
-func (es *EventSystem) subscribePendingLogs(crit ethereum.FilterQuery, logs chan []*types.Log) *Subscription {
-	sub := &subscription{
-		id:        rpc.NewID(),
-		typ:       PendingLogsSubscription,
-		logsCrit:  crit,
-		created:   time.Now(),
-		logs:      logs,
-		txs:       make(chan []*types.Transaction),
-		headers:   make(chan *types.Header),
-		votes:     make(chan *types.VoteEnvelope),
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		installed: make(chan struct{}),
 		err:       make(chan error),
 	}

@@ -33,9 +33,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
-<<<<<<< HEAD
-	"golang.org/x/crypto/sha3"
-=======
 	"github.com/ethereum/go-verkle"
 )
 
@@ -63,7 +60,6 @@ var (
 
 	// StatusUnexpectedError is unexpected internal error.
 	StatusUnexpectedError = VerifyStatus{Code: 0x400, Msg: "can’t verify because of unexpected internal error"}
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 )
 
 // A BlockNonce is a 64-bit hash which proves (combined with the
@@ -543,10 +539,7 @@ func (b *Block) WithSeal(header *Header) *Block {
 		transactions: b.transactions,
 		uncles:       b.uncles,
 		withdrawals:  b.withdrawals,
-<<<<<<< HEAD
-=======
 		witness:      b.witness,
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		sidecars:     b.sidecars,
 	}
 }
@@ -556,16 +549,10 @@ func (b *Block) WithSeal(header *Header) *Block {
 func (b *Block) WithBody(body Body) *Block {
 	block := &Block{
 		header:       b.header,
-<<<<<<< HEAD
-		transactions: make([]*Transaction, len(transactions)),
-		uncles:       make([]*Header, len(uncles)),
-		withdrawals:  b.withdrawals,
-=======
 		transactions: slices.Clone(body.Transactions),
 		uncles:       make([]*Header, len(body.Uncles)),
 		withdrawals:  slices.Clone(body.Withdrawals),
 		witness:      b.witness,
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		sidecars:     b.sidecars,
 	}
 	for i := range body.Uncles {
@@ -580,10 +567,7 @@ func (b *Block) WithWithdrawals(withdrawals []*Withdrawal) *Block {
 		header:       b.header,
 		transactions: b.transactions,
 		uncles:       b.uncles,
-<<<<<<< HEAD
-=======
 		witness:      b.witness,
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		sidecars:     b.sidecars,
 	}
 	if withdrawals != nil {
@@ -600,10 +584,7 @@ func (b *Block) WithSidecars(sidecars BlobSidecars) *Block {
 		transactions: b.transactions,
 		uncles:       b.uncles,
 		withdrawals:  b.withdrawals,
-<<<<<<< HEAD
-=======
 		witness:      b.witness,
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	}
 	if sidecars != nil {
 		block.sidecars = make(BlobSidecars, len(sidecars))
@@ -612,8 +593,6 @@ func (b *Block) WithSidecars(sidecars BlobSidecars) *Block {
 	return block
 }
 
-<<<<<<< HEAD
-=======
 func (b *Block) WithWitness(witness *ExecutionWitness) *Block {
 	return &Block{
 		header:       b.header,
@@ -625,7 +604,6 @@ func (b *Block) WithWitness(witness *ExecutionWitness) *Block {
 	}
 }
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 // Hash returns the keccak256 hash of b's header.
 // The hash is computed on the first call and cached thereafter.
 func (b *Block) Hash() common.Hash {
@@ -657,15 +635,6 @@ func HeaderParentHashFromRLP(header []byte) common.Hash {
 	return common.BytesToHash(parentHash)
 }
 
-<<<<<<< HEAD
-var (
-	extraSeal = 65 // Fixed number of extra-data suffix bytes reserved for signer seal
-)
-
-func SealHash(header *Header) (hash common.Hash) {
-	hasher := sha3.NewLegacyKeccak256()
-	EncodeSigHeader(hasher, header)
-=======
 type DiffLayer struct {
 	BlockHash common.Hash
 	Number    uint64
@@ -763,56 +732,42 @@ var extraSeal = 65 // Fixed number of extra-data suffix bytes reserved for signe
 func SealHash(header *Header, chainId *big.Int) (hash common.Hash) {
 	hasher := sha3.NewLegacyKeccak256()
 	EncodeSigHeader(hasher, header, chainId)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	hasher.Sum(hash[:0])
 	return hash
 }
 
-<<<<<<< HEAD
 func EncodeSigHeader(w io.Writer, header *Header) {
-	var enc []interface{}
+	enc := []interface{}{
+		header.ParentHash,
+		header.UncleHash,
+		header.Coinbase,
+		header.Root,
+		header.TxHash,
+		header.ReceiptHash,
+		header.Bloom,
+		header.Difficulty,
+		header.Number,
+		header.GasLimit,
+		header.GasUsed,
+		header.Time,
+		header.Extra[:len(header.Extra)-extraSeal], // this will panic if extra is too short, should check before calling encodeSigHeader
+		header.MixDigest,
+		header.Nonce,
+	}
+
 	cancun := header.ParentBeaconRoot != nil && *header.ParentBeaconRoot == (common.Hash{})
+	prague := header.RequestsHash != nil && *header.RequestsHash == (common.Hash{})
 	if cancun {
-		enc = []interface{}{
-			header.ParentHash,
-			header.UncleHash,
-			header.Coinbase,
-			header.Root,
-			header.TxHash,
-			header.ReceiptHash,
-			header.Bloom,
-			header.Difficulty,
-			header.Number,
-			header.GasLimit,
-			header.GasUsed,
-			header.Time,
-			header.Extra[:len(header.Extra)-extraSeal], // this will panic if extra is too short, should check before calling encodeSigHeader
-			header.MixDigest,
-			header.Nonce,
+		enc = append(enc,
 			header.BaseFee,
 			header.WithdrawalsHash,
 			header.BlobGasUsed,
 			header.ExcessBlobGas,
-			header.ParentBeaconRoot,
+			header.ParentBeaconRoot)
+		if prague {
+			enc = append(enc, header.RequestsHash)
 		}
 	} else {
-		enc = []interface{}{
-			header.ParentHash,
-			header.UncleHash,
-			header.Coinbase,
-			header.Root,
-			header.TxHash,
-			header.ReceiptHash,
-			header.Bloom,
-			header.Difficulty,
-			header.Number,
-			header.GasLimit,
-			header.GasUsed,
-			header.Time,
-			header.Extra[:len(header.Extra)-extraSeal], // this will panic if extra is too short, should check before calling encodeSigHeader
-			header.MixDigest,
-			header.Nonce,
-		}
 		if header.BaseFee != nil {
 			enc = append(enc, header.BaseFee)
 		}
@@ -830,40 +785,6 @@ func EncodeSigHeader(w io.Writer, header *Header) {
 		}
 	}
 	if err := rlp.Encode(w, enc); err != nil {
-=======
-func EncodeSigHeader(w io.Writer, header *Header, chainId *big.Int) {
-	toEncode := []interface{}{
-		chainId,
-		header.ParentHash,
-		header.UncleHash,
-		header.Coinbase,
-		header.Root,
-		header.TxHash,
-		header.ReceiptHash,
-		header.Bloom,
-		header.Difficulty,
-		header.Number,
-		header.GasLimit,
-		header.GasUsed,
-		header.Time,
-		header.Extra[:len(header.Extra)-extraSeal], // this will panic if extra is too short, should check before calling encodeSigHeader
-		header.MixDigest,
-		header.Nonce,
-	}
-	if header.ParentBeaconRoot != nil {
-		toEncode = append(toEncode, header.BaseFee,
-			header.WithdrawalsHash,
-			header.BlobGasUsed,
-			header.ExcessBlobGas,
-			header.ParentBeaconRoot)
-
-		if header.RequestsHash != nil {
-			toEncode = append(toEncode, header.RequestsHash)
-		}
-	}
-	err := rlp.Encode(w, toEncode)
-	if err != nil {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		panic("can't encode: " + err.Error())
 	}
 }

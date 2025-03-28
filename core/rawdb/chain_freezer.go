@@ -47,35 +47,22 @@ var (
 	missFreezerEnvErr = errors.New("missing freezer env error")
 )
 
-<<<<<<< HEAD
-// chainFreezer is a wrapper of freezer with additional chain freezing feature.
-// The background thread will keep moving ancient chain segments from key-value
-// database to flat files for saving space on live database.
-type chainFreezer struct {
-	threshold atomic.Uint64 // Number of recent blocks not to freeze (params.FullImmutabilityThreshold apart from tests)
-=======
 // chainFreezer is a wrapper of chain ancient store with additional chain freezing
 // feature. The background thread will keep moving ancient chain segments from
 // key-value database to flat files for saving space on live database.
 type chainFreezer struct {
 	ethdb.AncientStore // Ancient store for storing cold chain segment
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	quit    chan struct{}
 	wg      sync.WaitGroup
 	trigger chan chan struct{} // Manual blocking freeze trigger, test determinism
 
-<<<<<<< HEAD
-	freezeEnv    atomic.Value
-	waitEnvTimes int
-=======
 	threshold atomic.Uint64 // Number of recent blocks not to freeze (params.FullImmutabilityThreshold apart from tests)
 
 	freezeEnv    atomic.Value
 	waitEnvTimes int
 
 	multiDatabase bool
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 // newChainFreezer initializes the freezer for ancient chain segment.
@@ -317,27 +304,8 @@ func (f *chainFreezer) freeze(db ethdb.KeyValueStore) {
 		var (
 			start = time.Now()
 		)
-<<<<<<< HEAD
-		if limit-first > freezerBatchLimit {
-			limit = first + freezerBatchLimit
-		}
-
-		// check env first before chain freeze, it must wait when the env is necessary
-		if err := f.checkFreezerEnv(); err != nil {
-			f.waitEnvTimes++
-			if f.waitEnvTimes%30 == 0 {
-				log.Warn("Freezer need related env, may wait for a while, and it's not a issue when non-import block", "err", err)
-				return
-			}
-			backoff = true
-			continue
-		}
-
-		ancients, err := f.freezeRangeWithBlobs(nfdb, first, limit)
-=======
 
 		ancients, err := f.freezeRangeWithBlobs(nfdb, first, last)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		if err != nil {
 			log.Error("Error in block freeze operation", "err", err)
 			backoff = true
@@ -512,23 +480,16 @@ func (f *chainFreezer) freezeRangeWithBlobs(nfdb *nofreezedb, number, limit uint
 	return hashes, err
 }
 
-<<<<<<< HEAD
-=======
 // freezeRange moves a batch of chain segments from the fast database to the freezer.
 // The parameters (number, limit) specify the relevant block range, both of which
 // are included.
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 func (f *chainFreezer) freezeRange(nfdb *nofreezedb, number, limit uint64) (hashes []common.Hash, err error) {
 	if number > limit {
 		return nil, nil
 	}
 
 	env, _ := f.freezeEnv.Load().(*ethdb.FreezerEnv)
-<<<<<<< HEAD
-	hashes = make([]common.Hash, 0, limit-number)
-=======
 	hashes = make([]common.Hash, 0, limit-number+1)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	_, err = f.ModifyAncients(func(op ethdb.AncientWriteOp) error {
 		for ; number <= limit; number++ {
 			// Retrieve all the components of the canonical block.

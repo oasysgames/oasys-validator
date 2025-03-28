@@ -35,23 +35,9 @@ type Backend interface {
 }
 
 // MakeProtocols constructs the P2P protocol definitions for `bsc`.
-<<<<<<< HEAD
-func MakeProtocols(backend Backend, dnsdisc enode.Iterator) []p2p.Protocol {
-	// Filter the discovery iterator for nodes advertising vote support.
-	dnsdisc = enode.Filter(dnsdisc, func(n *enode.Node) bool {
-		var vote enrEntry
-		return n.Load(&vote) == nil
-	})
-
-	protocols := make([]p2p.Protocol, len(ProtocolVersions))
-	for i, version := range ProtocolVersions {
-		version := version // Closure
-
-=======
 func MakeProtocols(backend Backend) []p2p.Protocol {
 	protocols := make([]p2p.Protocol, len(ProtocolVersions))
 	for i, version := range ProtocolVersions {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		protocols[i] = p2p.Protocol{
 			Name:    ProtocolName,
 			Version: version,
@@ -70,12 +56,7 @@ func MakeProtocols(backend Backend) []p2p.Protocol {
 			PeerInfo: func(id enode.ID) interface{} {
 				return backend.PeerInfo(id)
 			},
-<<<<<<< HEAD
-			Attributes:     []enr.Entry{&enrEntry{}},
-			DialCandidates: dnsdisc,
-=======
 			Attributes: []enr.Entry{&enrEntry{}},
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		}
 	}
 	return protocols
@@ -118,11 +99,7 @@ func handleMessage(backend Backend, peer *Peer) error {
 	var handlers = bsc1
 
 	// Track the amount of time it takes to serve the request and run the handler
-<<<<<<< HEAD
-	if metrics.Enabled {
-=======
 	if metrics.Enabled() {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		h := fmt.Sprintf("%s/%s/%d/%#02x", p2p.HandleHistName, ProtocolName, peer.Version(), msg.Code)
 		defer func(start time.Time) {
 			sampler := func() metrics.Sample {

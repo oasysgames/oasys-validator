@@ -346,10 +346,6 @@ func (task *accountTask) activeSubTasks() map[common.Hash][]*storageTask {
 		last  = task.res.hashes[len(task.res.hashes)-1]
 	)
 	for hash, subTasks := range task.SubTasks {
-<<<<<<< HEAD
-		subTasks := subTasks // closure
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		if hash.Cmp(last) <= 0 {
 			tasks[hash] = subTasks
 		}
@@ -777,16 +773,6 @@ func (s *Syncer) loadSyncStatus() {
 				}
 				task.StorageCompleted = nil
 
-<<<<<<< HEAD
-				// Restore the completed storages
-				task.stateCompleted = make(map[common.Hash]struct{})
-				for _, hash := range task.StorageCompleted {
-					task.stateCompleted[hash] = struct{}{}
-				}
-				task.StorageCompleted = nil
-
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 				// Allocate batch for account trie generation
 				task.genBatch = ethdb.HookedBatch{
 					Batch: stateDiskDB.NewBatch(),
@@ -1938,11 +1924,7 @@ func (s *Syncer) processAccountResponse(res *accountResponse) {
 				}
 				// Mark the healing tag if storage root node is inconsistent, or
 				// it's non-existent due to storage chunking.
-<<<<<<< HEAD
-				if !rawdb.HasTrieNode(s.db, res.hashes[i], nil, account.Root, s.scheme) {
-=======
 				if !rawdb.HasTrieNode(s.db.StateStoreReader(), res.hashes[i], nil, account.Root, s.scheme) {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 					res.task.needHeal[i] = true
 				}
 			} else {
@@ -2484,8 +2466,6 @@ func (s *Syncer) forwardAccountTask(task *accountTask) {
 				panic(err) // Really shouldn't ever happen
 			}
 			task.genTrie.update(hash[:], full)
-<<<<<<< HEAD
-=======
 		} else {
 			// If the storage task is incomplete, explicitly delete the corresponding
 			// account item from the account trie to ensure that all nodes along the
@@ -2493,7 +2473,6 @@ func (s *Syncer) forwardAccountTask(task *accountTask) {
 			if err := task.genTrie.delete(hash[:]); err != nil {
 				panic(err) // Really shouldn't ever happen
 			}
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		}
 	}
 	// Flush anything written just now and update the stats

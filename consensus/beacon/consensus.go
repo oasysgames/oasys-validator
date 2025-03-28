@@ -380,12 +380,6 @@ func (beacon *Beacon) Prepare(chain consensus.ChainHeaderReader, header *types.H
 	return nil
 }
 
-<<<<<<< HEAD
-// Finalize implements consensus.Engine and processes withdrawals on top.
-func (beacon *Beacon) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs *[]*types.Transaction, uncles []*types.Header, withdrawals []*types.Withdrawal, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64) error {
-	if !beacon.IsPoSHeader(header) {
-		return beacon.ethone.Finalize(chain, header, state, txs, uncles, withdrawals, receipts, nil, nil)
-=======
 func (beacon *Beacon) Delay(_ consensus.ChainReader, _ *types.Header, _ *time.Duration) *time.Duration {
 	return nil
 }
@@ -396,7 +390,6 @@ func (beacon *Beacon) Finalize(chain consensus.ChainHeaderReader, header *types.
 	if !beacon.IsPoSHeader(header) {
 		beacon.ethone.Finalize(chain, header, state, txs, uncles, nil, nil, nil, nil, tracer)
 		return nil
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	}
 	// Withdrawals processing.
 	for _, w := range withdrawals {
@@ -411,12 +404,8 @@ func (beacon *Beacon) Finalize(chain consensus.ChainHeaderReader, header *types.
 
 // FinalizeAndAssemble implements consensus.Engine, setting the final state and
 // assembling the block.
-<<<<<<< HEAD
-func (beacon *Beacon) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt, withdrawals []*types.Withdrawal) (*types.Block, []*types.Receipt, error) {
-=======
 func (beacon *Beacon) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, body *types.Body, receipts []*types.Receipt, tracer *tracing.Hooks) (*types.Block, []*types.Receipt, error) {
 	// FinalizeAndAssemble is different with Prepare, it can be used in both block generation.
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	if !beacon.IsPoSHeader(header) {
 		return beacon.ethone.FinalizeAndAssemble(chain, header, state, body, receipts, tracer)
 	}
@@ -427,31 +416,16 @@ func (beacon *Beacon) FinalizeAndAssemble(chain consensus.ChainHeaderReader, hea
 			body.Withdrawals = make([]*types.Withdrawal, 0)
 		}
 	} else {
-<<<<<<< HEAD
-		if len(withdrawals) > 0 {
-			return nil, receipts, errors.New("withdrawals set before Shanghai activation")
-		}
-	}
-	// Finalize and assemble the block.
-	if err := beacon.Finalize(chain, header, state, &txs, uncles, withdrawals, &receipts, nil, nil); err != nil {
-		return nil, receipts, err
-	}
-=======
 		if len(body.Withdrawals) > 0 {
 			return nil, nil, errors.New("withdrawals set before Shanghai activation")
 		}
 	}
 	// Finalize and assemble the block.
 	beacon.Finalize(chain, header, state, &body.Transactions, body.Uncles, body.Withdrawals, nil, nil, nil, tracer)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	// Assign the final state root to header.
 	header.Root = state.IntermediateRoot(true)
 
-<<<<<<< HEAD
-	// Assemble and return the final block.
-	return types.NewBlockWithWithdrawals(header, txs, uncles, receipts, withdrawals, trie.NewStackTrie(nil)), receipts, nil
-=======
 	// Assemble the final block.
 	block := types.NewBlock(header, body, receipts, trie.NewStackTrie(nil))
 
@@ -489,7 +463,6 @@ func (beacon *Beacon) FinalizeAndAssemble(chain consensus.ChainHeaderReader, hea
 	}
 
 	return block, receipts, nil
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 // Seal generates a new sealing request for the given input block and pushes

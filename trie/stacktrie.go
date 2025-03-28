@@ -48,11 +48,8 @@ type StackTrie struct {
 	h          *hasher
 	last       []byte
 	onTrieNode OnTrieNode
-<<<<<<< HEAD
-=======
 	kBuf       []byte // buf space used for hex-key during insertions
 	pBuf       []byte // buf space used for path during insertions
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 // NewStackTrie allocates and initializes an empty trie. The committed nodes
@@ -62,8 +59,6 @@ func NewStackTrie(onTrieNode OnTrieNode) *StackTrie {
 		root:       stPool.Get().(*stNode),
 		h:          newHasher(false),
 		onTrieNode: onTrieNode,
-<<<<<<< HEAD
-=======
 		kBuf:       make([]byte, 64),
 		pBuf:       make([]byte, 64),
 	}
@@ -75,7 +70,6 @@ func (t *StackTrie) grow(key []byte) {
 	}
 	if cap(t.pBuf) < 2*len(key) {
 		t.pBuf = make([]byte, 2*len(key))
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	}
 }
 
@@ -399,11 +393,8 @@ func (t *StackTrie) hash(st *stNode, path []byte) {
 	st.typ = hashedNode
 	st.key = st.key[:0]
 
-<<<<<<< HEAD
-=======
 	st.val = nil // Release reference to potentially externally held slice.
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	// Skip committing the non-root node if the size is smaller than 32 bytes
 	// as tiny nodes are always embedded in their parent except root node.
 	if len(blob) < 32 && len(path) > 0 {

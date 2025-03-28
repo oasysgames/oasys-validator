@@ -27,10 +27,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
-<<<<<<< HEAD
-=======
-	"github.com/ethereum/go-ethereum/consensus/parlia"
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/bloombits"
 	"github.com/ethereum/go-ethereum/core/rawdb"
@@ -247,10 +243,6 @@ func (b *EthAPIBackend) GetReceipts(ctx context.Context, hash common.Hash) (type
 func (b *EthAPIBackend) GetBlobSidecars(ctx context.Context, hash common.Hash) (types.BlobSidecars, error) {
 	return b.eth.blockchain.GetSidecarsByHash(hash), nil
 }
-<<<<<<< HEAD
-
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 func (b *EthAPIBackend) GetLogs(ctx context.Context, hash common.Hash, number uint64) ([][]*types.Log, error) {
 	return rawdb.ReadLogs(b.eth.chainDb, hash, number), nil
 }
@@ -289,13 +281,6 @@ func (b *EthAPIBackend) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) e
 
 func (b *EthAPIBackend) SubscribeFinalizedHeaderEvent(ch chan<- core.FinalizedHeaderEvent) event.Subscription {
 	return b.eth.BlockChain().SubscribeFinalizedHeaderEvent(ch)
-<<<<<<< HEAD
-}
-
-func (b *EthAPIBackend) SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription {
-	return b.eth.BlockChain().SubscribeChainSideEvent(ch)
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 func (b *EthAPIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
@@ -378,13 +363,10 @@ func (b *EthAPIBackend) SubscribeNewVoteEvent(ch chan<- core.NewVoteEvent) event
 	return b.eth.VotePool().SubscribeNewVoteEvent(ch)
 }
 
-<<<<<<< HEAD
-=======
 func (b *EthAPIBackend) Downloader() *downloader.Downloader {
 	return b.eth.Downloader()
 }
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 func (b *EthAPIBackend) SyncProgress() ethereum.SyncProgress {
 	prog := b.eth.Downloader().Progress()
 	if txProg, err := b.eth.blockchain.TxIndexProgress(); err == nil {
@@ -402,11 +384,6 @@ func (b *EthAPIBackend) FeeHistory(ctx context.Context, blockCount uint64, lastB
 	return b.gpo.FeeHistory(ctx, blockCount, lastBlock, rewardPercentiles)
 }
 
-<<<<<<< HEAD
-func (b *EthAPIBackend) BlobBaseFee(ctx context.Context) *big.Int {
-	if excess := b.CurrentHeader().ExcessBlobGas; excess != nil {
-		return eip4844.CalcBlobFee(*excess)
-=======
 func (b *EthAPIBackend) Chain() *core.BlockChain {
 	return b.eth.BlockChain()
 }
@@ -414,7 +391,6 @@ func (b *EthAPIBackend) Chain() *core.BlockChain {
 func (b *EthAPIBackend) BlobBaseFee(ctx context.Context) *big.Int {
 	if excess := b.CurrentHeader().ExcessBlobGas; excess != nil {
 		return eip4844.CalcBlobFee(b.ChainConfig(), b.CurrentHeader())
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	}
 	return nil
 }
@@ -464,16 +440,6 @@ func (b *EthAPIBackend) ServiceFilter(ctx context.Context, session *bloombits.Ma
 
 func (b *EthAPIBackend) Engine() consensus.Engine {
 	return b.eth.engine
-}
-
-func (b *EthAPIBackend) CurrentValidators() ([]common.Address, error) {
-	if p, ok := b.eth.engine.(*parlia.Parlia); ok {
-		service := p.APIs(b.Chain())[0].Service
-		currentHead := rpc.LatestBlockNumber
-		return service.(*parlia.API).GetValidators(&currentHead)
-	}
-
-	return []common.Address{}, errors.New("not supported")
 }
 
 func (b *EthAPIBackend) CurrentHeader() *types.Header {

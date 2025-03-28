@@ -325,11 +325,7 @@ func ReadHeaderRange(db ethdb.Reader, number uint64, count uint64) []rlp.RawValu
 		return rlpHeaders
 	}
 	// read remaining from ancients, cap at 2M
-<<<<<<< HEAD
-	data, err := db.AncientRange(ChainFreezerHeaderTable, i+1-count, count, 2*1024*1024)
-=======
 	data, err := db.BlockStoreReader().AncientRange(ChainFreezerHeaderTable, i+1-count, count, 2*1024*1024)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	if err != nil {
 		log.Error("Failed to read headers from freezer", "err", err)
 		return rlpHeaders
@@ -875,22 +871,14 @@ func WriteAncientBlocks(db ethdb.AncientWriter, blocks []*types.Block, receipts 
 // ReadBlobSidecarsRLP retrieves all the transaction blobs belonging to a block in RLP encoding.
 func ReadBlobSidecarsRLP(db ethdb.Reader, hash common.Hash, number uint64) rlp.RawValue {
 	var data []byte
-<<<<<<< HEAD
-	db.ReadAncients(func(reader ethdb.AncientReaderOp) error {
-=======
 	db.BlockStoreReader().ReadAncients(func(reader ethdb.AncientReaderOp) error {
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		// Check if the data is in ancients
 		if isCanon(reader, number, hash) {
 			data, _ = reader.Ancient(ChainFreezerBlobSidecarTable, number)
 			return nil
 		}
 		// If not, try reading from leveldb
-<<<<<<< HEAD
-		data, _ = db.Get(blockBlobSidecarsKey(number, hash))
-=======
 		data, _ = db.BlockStoreReader().Get(blockBlobSidecarsKey(number, hash))
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		return nil
 	})
 	return data

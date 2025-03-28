@@ -39,10 +39,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/beacon/fakebeacon"
-<<<<<<< HEAD
-=======
 	bparams "github.com/ethereum/go-ethereum/beacon/params"
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/fdlimit"
 	"github.com/ethereum/go-ethereum/core"
@@ -342,9 +339,6 @@ var (
 		Value:    params.DefaultExtraReserveForBlobRequests,
 		Category: flags.EthCategory,
 	}
-<<<<<<< HEAD
-	SyncModeFlag = &flags.TextMarshalerFlag{
-=======
 	OverrideBreatheBlockInterval = &cli.Uint64Flag{
 		Name:     "override.breatheblockinterval",
 		Usage:    "It changes the interval between breathe blocks, only for testing purpose",
@@ -358,7 +352,6 @@ var (
 		Category: flags.EthCategory,
 	}
 	SyncModeFlag = &cli.StringFlag{
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		Name:     "syncmode",
 		Usage:    `Blockchain sync mode ("snap" or "full")`,
 		Value:    ethconfig.Defaults.SyncMode.String(),
@@ -1144,8 +1137,6 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 		Category: flags.MetricsCategory,
 	}
 
-<<<<<<< HEAD
-=======
 	BlockAmountReserved = &cli.Uint64Flag{
 		Name:     "block-amount-reserved",
 		Usage:    "Sets the expected remained amount of blocks for offline block prune",
@@ -1165,7 +1156,6 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 		Category: flags.MinerCategory,
 	}
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	VotingEnabledFlag = &cli.BoolFlag{
 		Name:     "vote",
 		Usage:    "Enable voting when mining",
@@ -1178,30 +1168,18 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 		Category: flags.FastFinalityCategory,
 	}
 
-<<<<<<< HEAD
-	BLSPasswordFileFlag = &cli.StringFlag{
-		Name:     "blspassword",
-		Usage:    "Password file path for the BLS wallet, which contains the password to unlock BLS wallet for managing votes in fast_finality feature",
-		Category: flags.AccountCategory,
-	}
-
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	EnableMaliciousVoteMonitorFlag = &cli.BoolFlag{
 		Name:     "monitor.maliciousvote",
 		Usage:    "Enable malicious vote monitor to check whether any validator violates the voting rules of fast finality",
 		Category: flags.FastFinalityCategory,
 	}
 
-<<<<<<< HEAD
-=======
 	BLSPasswordFileFlag = &cli.StringFlag{
 		Name:     "blspassword",
 		Usage:    "Password file path for the BLS wallet, which contains the password to unlock BLS wallet for managing votes in fast_finality feature",
 		Category: flags.AccountCategory,
 	}
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	BLSWalletDirFlag = &flags.DirectoryFlag{
 		Name:     "blswallet",
 		Usage:    "Path for the blsWallet dir in fast finality feature (default = inside the datadir)",
@@ -1213,23 +1191,17 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 		Usage:    "Path for the voteJournal dir in fast finality feature (default = inside the datadir)",
 		Category: flags.FastFinalityCategory,
 	}
-<<<<<<< HEAD
+
 	VoteKeyNameFlag = &cli.StringFlag{
 		Name:     "vote-key-name",
 		Usage:    "Name of the BLS public key used for voting (default = first found key)",
 		Category: flags.FastFinalityCategory,
 	}
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	// Blob setting
 	BlobExtraReserveFlag = &cli.Uint64Flag{
 		Name:     "blob.extra-reserve",
-<<<<<<< HEAD
 		Usage:    "Extra reserve threshold for blob, blob never expires when 0 is set, default 14400",
-=======
-		Usage:    "Extra reserve threshold for blob, blob never expires when 0 is set, default 28800",
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 		Value:    params.DefaultExtraReserveForBlobRequests,
 		Category: flags.MiscCategory,
 	}
@@ -1541,12 +1513,9 @@ func setLes(ctx *cli.Context, cfg *ethconfig.Config) {
 
 // setMonitors enable monitors from the command line flags.
 func setMonitors(ctx *cli.Context, cfg *node.Config) {
-<<<<<<< HEAD
-=======
 	if ctx.Bool(EnableDoubleSignMonitorFlag.Name) {
 		cfg.EnableDoubleSignMonitor = true
 	}
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	if ctx.Bool(EnableMaliciousVoteMonitorFlag.Name) {
 		cfg.EnableMaliciousVoteMonitor = true
 	}
@@ -1769,12 +1738,9 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	if ctx.IsSet(BLSPasswordFileFlag.Name) {
 		cfg.BLSPasswordFile = ctx.String(BLSPasswordFileFlag.Name)
 	}
-<<<<<<< HEAD
 	if ctx.IsSet(VoteKeyNameFlag.Name) {
 		cfg.VoteKeyName = ctx.String(VoteKeyNameFlag.Name)
 	}
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	if ctx.IsSet(DBEngineFlag.Name) {
 		dbEngine := ctx.String(DBEngineFlag.Name)
 		if dbEngine != "leveldb" && dbEngine != "pebble" {
@@ -2365,8 +2331,6 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		}
 		cfg.BlobExtraReserve = extraReserve
 	}
-<<<<<<< HEAD
-=======
 	// VM tracing config.
 	if ctx.IsSet(VMTraceFlag.Name) {
 		if name := ctx.String(VMTraceFlag.Name); name != "" {
@@ -2374,7 +2338,6 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 			cfg.VMTraceJsonConfig = ctx.String(VMTraceJsonConfigFlag.Name)
 		}
 	}
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 // SetDNSDiscoveryDefaults configures DNS discovery with the given URL if
@@ -2747,11 +2710,7 @@ func MakeChain(ctx *cli.Context, stack *node.Node, readonly bool) (*core.BlockCh
 	if err != nil {
 		Fatalf("%v", err)
 	}
-<<<<<<< HEAD
-	engine, err := ethconfig.CreateConsensusEngine(config, chainDb, nil)
-=======
 	engine, err := ethconfig.CreateConsensusEngine(config, chainDb, nil, genesisHash)
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	if err != nil {
 		Fatalf("%v", err)
 	}

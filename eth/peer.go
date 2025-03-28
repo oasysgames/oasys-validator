@@ -17,15 +17,11 @@
 package eth
 
 import (
-<<<<<<< HEAD
-	"github.com/ethereum/go-ethereum/eth/protocols/bsc"
-=======
 	"net"
 
 	"github.com/ethereum/go-ethereum/eth/protocols/bsc"
 	"github.com/ethereum/go-ethereum/eth/protocols/trust"
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/eth/protocols/snap"
 )
@@ -39,14 +35,9 @@ type ethPeerInfo struct {
 // ethPeer is a wrapper around eth.Peer to maintain a few extra metadata.
 type ethPeer struct {
 	*eth.Peer
-<<<<<<< HEAD
-	snapExt *snapPeer // Satellite `snap` connection
-	bscExt  *bscPeer  // Satellite `bsc` connection
-=======
 	snapExt  *snapPeer // Satellite `snap` connection
 	trustExt *trustPeer
 	bscExt   *bscPeer // Satellite `bsc` connection
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 // info gathers and returns some `eth` protocol metadata known about a peer.
@@ -69,15 +60,12 @@ type snapPeerInfo struct {
 	Version uint `json:"version"` // Snapshot protocol version negotiated
 }
 
-<<<<<<< HEAD
-=======
 // trustPeerInfo represents a short summary of the `trust` sub-protocol metadata known
 // about a connected peer.
 type trustPeerInfo struct {
 	Version uint `json:"version"` // Trust protocol version negotiated
 }
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 // bscPeerInfo represents a short summary of the `bsc` sub-protocol metadata known
 // about a connected peer.
 type bscPeerInfo struct {
@@ -89,14 +77,11 @@ type snapPeer struct {
 	*snap.Peer
 }
 
-<<<<<<< HEAD
-=======
 // trustPeer is a wrapper around trust.Peer to maintain a few extra metadata.
 type trustPeer struct {
 	*trust.Peer
 }
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 // bscPeer is a wrapper around bsc.Peer to maintain a few extra metadata.
 type bscPeer struct {
 	*bsc.Peer
@@ -109,8 +94,6 @@ func (p *snapPeer) info() *snapPeerInfo {
 	}
 }
 
-<<<<<<< HEAD
-=======
 // info gathers and returns some `trust` protocol metadata known about a peer.
 func (p *trustPeer) info() *trustPeerInfo {
 	return &trustPeerInfo{
@@ -118,7 +101,6 @@ func (p *trustPeer) info() *trustPeerInfo {
 	}
 }
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 // info gathers and returns some `bsc` protocol metadata known about a peer.
 func (p *bscPeer) info() *bscPeerInfo {
 	return &bscPeerInfo{

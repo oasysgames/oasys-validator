@@ -1256,8 +1256,6 @@ func (t *freezerTable) dumpIndex(w io.Writer, start, stop int64) {
 	fmt.Fprintf(w, "|--------------------------|\n")
 }
 
-<<<<<<< HEAD
-=======
 func (t *freezerTable) ResetItemsOffset(virtualTail uint64) error {
 	stat, err := t.index.Stat()
 	if err != nil {
@@ -1288,7 +1286,6 @@ func (t *freezerTable) ResetItemsOffset(virtualTail uint64) error {
 	return nil
 }
 
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 // resetItems reset freezer table to 0 items with new startAt
 // only used for ChainFreezerBlobSidecarTable now
 func (t *freezerTable) resetItems(startAt uint64) (*freezerTable, error) {
@@ -1304,21 +1301,11 @@ func (t *freezerTable) resetItems(startAt uint64) (*freezerTable, error) {
 	t.releaseFile(0)
 
 	// overwrite metadata file
-<<<<<<< HEAD
-	if err := writeMetadata(t.meta, newMetadata(startAt)); err != nil {
-		return nil, err
-	}
-	if err := t.meta.Sync(); err != nil {
-		return nil, err
-	}
-	t.meta.Close()
-=======
 	t.metadata.setVirtualTail(startAt, false)
 	if err := t.metadata.write(true); err != nil {
 		return nil, err
 	}
 	t.metadata.file.Close()
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	// recreate the index file
 	t.index.Close()

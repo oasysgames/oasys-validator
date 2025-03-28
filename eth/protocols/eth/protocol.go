@@ -284,10 +284,6 @@ type BlockBody struct {
 // Unpack retrieves the transactions and uncles from the range packet and returns
 // them in a split flat format that's more consistent with the internal data structures.
 func (p *BlockBodiesResponse) Unpack() ([][]*types.Transaction, [][]*types.Header, [][]*types.Withdrawal, []types.BlobSidecars) {
-<<<<<<< HEAD
-	// TODO(matt): add support for withdrawals to fetchers
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	var (
 		txset         = make([][]*types.Transaction, len(*p))
 		uncleset      = make([][]*types.Header, len(*p))

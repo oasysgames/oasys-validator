@@ -841,23 +841,6 @@ func (s *StateDB) copyInternal(doPrefetch bool) *StateDB {
 		}
 		state.logs[hash] = cpy
 	}
-<<<<<<< HEAD
-	// Deep copy the preimages occurred in the scope of block
-	for hash, preimage := range s.preimages {
-		state.preimages[hash] = preimage
-	}
-	// Do we need to copy the access list and transient storage?
-	// In practice: No. At the start of a transaction, these two lists are empty.
-	// In practice, we only ever copy state _between_ transactions/blocks, never
-	// in the middle of a transaction. However, it doesn't cost us much to copy
-	// empty lists, so we do it anyway to not blow up if we ever decide copy them
-	// in the middle of a transaction.
-	if s.accessList != nil {
-		state.accessList = s.accessList.Copy()
-	}
-	state.transientStorage = s.transientStorage.Copy()
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 
 	state.prefetcher = s.prefetcher
 	if s.prefetcher != nil && !doPrefetch {

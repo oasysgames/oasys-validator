@@ -44,11 +44,8 @@ type Backend interface {
 	SyncProgress() ethereum.SyncProgress
 
 	SuggestGasTipCap(ctx context.Context) (*big.Int, error)
-<<<<<<< HEAD
-=======
 
 	Chain() *core.BlockChain
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	FeeHistory(ctx context.Context, blockCount uint64, lastBlock rpc.BlockNumber, rewardPercentiles []float64) (*big.Int, [][]*big.Int, []*big.Int, []float64, []*big.Int, []float64, error)
 	BlobBaseFee(ctx context.Context) *big.Int
 	ChainDb() ethdb.Database
@@ -77,10 +74,6 @@ type Backend interface {
 	GetEVM(ctx context.Context, state *state.StateDB, header *types.Header, vmConfig *vm.Config, blockCtx *vm.BlockContext) *vm.EVM
 	SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
-<<<<<<< HEAD
-	SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription
-=======
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 	GetBlobSidecars(ctx context.Context, hash common.Hash) (types.BlobSidecars, error)
 
 	// Transaction pool API
@@ -110,8 +103,6 @@ type Backend interface {
 	ServiceFilter(ctx context.Context, session *bloombits.MatcherSession)
 	SubscribeFinalizedHeaderEvent(ch chan<- core.FinalizedHeaderEvent) event.Subscription
 	SubscribeNewVoteEvent(chan<- core.NewVoteEvent) event.Subscription
-<<<<<<< HEAD
-=======
 
 	// MevRunning return true if mev is running
 	MevRunning() bool
@@ -133,7 +124,6 @@ type Backend interface {
 	BestBidGasFee(parentHash common.Hash) *big.Int
 	// MinerInTurn returns true if the validator is in turn to propose the block.
 	MinerInTurn() bool
->>>>>>> 294c7321ab439545b2ab1bb7eea74a44d83e94a1
 }
 
 func GetAPIs(apiBackend Backend) []rpc.API {
