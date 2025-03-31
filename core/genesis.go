@@ -264,9 +264,7 @@ func (e *GenesisMismatchError) Error() string {
 // Typically, these modifications involve hardforks that are not enabled on the BSC mainnet, intended for testing purposes.
 type ChainOverrides struct {
 	OverridePassedForkTime *uint64
-	OverridePascal         *uint64
 	OverridePrague         *uint64
-	OverrideLorentz        *uint64
 	OverrideVerkle         *uint64
 }
 
@@ -277,22 +275,10 @@ func (o *ChainOverrides) apply(cfg *params.ChainConfig) error {
 	}
 	if o.OverridePassedForkTime != nil {
 		cfg.ShanghaiTime = o.OverridePassedForkTime
-		cfg.KeplerTime = o.OverridePassedForkTime
-		cfg.FeynmanTime = o.OverridePassedForkTime
-		cfg.FeynmanFixTime = o.OverridePassedForkTime
 		cfg.CancunTime = o.OverridePassedForkTime
-		cfg.HaberTime = o.OverridePassedForkTime
-		cfg.HaberFixTime = o.OverridePassedForkTime
-		cfg.BohrTime = o.OverridePassedForkTime
-	}
-	if o.OverridePascal != nil {
-		cfg.PascalTime = o.OverridePascal
 	}
 	if o.OverridePrague != nil {
 		cfg.PragueTime = o.OverridePrague
-	}
-	if o.OverrideLorentz != nil {
-		cfg.LorentzTime = o.OverrideLorentz
 	}
 	if o.OverrideVerkle != nil {
 		cfg.VerkleTime = o.OverrideVerkle
