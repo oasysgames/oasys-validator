@@ -32,7 +32,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
-	"github.com/ethereum/go-ethereum/consensus/parlia"
+	"github.com/ethereum/go-ethereum/consensus/oasys"
 	contracts "github.com/ethereum/go-ethereum/contracts/oasys"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -460,7 +460,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			}
 			clearPending(head.Header.Number.Uint64())
 			timestamp = time.Now().Unix()
-			if p, ok := w.engine.(*parlia.Parlia); ok {
+			if p, ok := w.engine.(*oasys.Oasys); ok {
 				signedRecent, err := p.SignRecently(w.chain, head.Header)
 				if err != nil {
 					log.Debug("Not allowed to propose block", "err", err)
@@ -798,7 +798,7 @@ func (w *worker) commitTransactions(env *environment, plainTxs, blobTxs *transac
 	gasLimit := env.header.GasLimit
 	if env.gasPool == nil {
 		env.gasPool = new(core.GasPool).AddGas(gasLimit)
-		if p, ok := w.engine.(*parlia.Parlia); ok {
+		if p, ok := w.engine.(*oasys.Oasys); ok {
 			gasReserved := p.EstimateGasReservedForSystemTxs(w.chain, env.header)
 			env.gasPool.SubGas(gasReserved)
 			log.Debug("commitTransactions", "number", env.header.Number.Uint64(), "time", env.header.Time, "EstimateGasReservedForSystemTxs", gasReserved)
