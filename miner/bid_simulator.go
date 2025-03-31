@@ -477,7 +477,7 @@ func (b *bidSimulator) newBidLoop() {
 
 func (b *bidSimulator) bidBetterBefore(parentHash common.Hash) time.Time {
 	parentHeader := b.chain.GetHeaderByHash(parentHash)
-	return bidutil.BidBetterBefore(parentHeader, b.chainConfig.Parlia.Period, b.delayLeftOver, b.config.BidSimulationLeftOver)
+	return bidutil.BidBetterBefore(parentHeader, b.chainConfig.Oasys.Period, b.delayLeftOver, b.config.BidSimulationLeftOver)
 }
 
 func (b *bidSimulator) clearLoop() {

@@ -32,7 +32,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/gopool"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
-	cmath "github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/core"
@@ -538,88 +537,6 @@ func (api *BlockChainAPI) Health() bool {
 		return rpc.RpcServingTimer.Snapshot().Percentile(0.75) < float64(UnHealthyTimeout)
 	}
 	return true
-}
-
-func (api *BlockChainAPI) getFinalizedNumber(ctx context.Context, verifiedValidatorNum int64) (int64, error) {
-	parliaConfig := api.b.ChainConfig().Parlia
-	if parliaConfig == nil {
-		return 0, fmt.Errorf("only parlia engine supported")
-	}
-
-	curValidators, err := api.b.CurrentValidators()
-	if err != nil { // impossible
-		return 0, err
-	}
-	valLen := len(curValidators)
-	if verifiedValidatorNum == -1 {
-		verifiedValidatorNum = int64(cmath.CeilDiv(valLen, 2))
-	} else if verifiedValidatorNum == -2 {
-		verifiedValidatorNum = int64(cmath.CeilDiv(valLen*2, 3))
-	} else if verifiedValidatorNum == -3 {
-		verifiedValidatorNum = int64(valLen)
-	} else if verifiedValidatorNum < 1 || verifiedValidatorNum > int64(valLen) {
-		return 0, fmt.Errorf("%d neither within the range [1,%d] nor the range [-3,-1]", verifiedValidatorNum, valLen)
-	}
-
-	fastFinalizedHeader, err := api.b.HeaderByNumber(ctx, rpc.FinalizedBlockNumber)
-	if err != nil { // impossible
-		return 0, err
-	}
-
-	latestHeader, err := api.b.HeaderByNumber(ctx, rpc.LatestBlockNumber)
-	if err != nil { // impossible
-		return 0, err
-	}
-	lastHeader := latestHeader
-	confirmedValSet := make(map[common.Address]struct{}, valLen)
-	confirmedValSet[lastHeader.Coinbase] = struct{}{}
-	for count := 1; int64(len(confirmedValSet)) < verifiedValidatorNum && count <= int(parliaConfig.Epoch) && lastHeader.Number.Int64() > max(fastFinalizedHeader.Number.Int64(), 1); count++ {
-		lastHeader, err = api.b.HeaderByHash(ctx, lastHeader.ParentHash)
-		if err != nil { // impossible
-			return 0, err
-		}
-		confirmedValSet[lastHeader.Coinbase] = struct{}{}
-	}
-
-	finalizedBlockNumber := max(fastFinalizedHeader.Number.Int64(), lastHeader.Number.Int64())
-	log.Debug("getFinalizedNumber", "LatestBlockNumber", latestHeader.Number.Int64(), "fastFinalizedHeight", fastFinalizedHeader.Number.Int64(),
-		"lastHeader", lastHeader.Number.Int64(), "finalizedBlockNumber", finalizedBlockNumber, "len(confirmedValSet)", len(confirmedValSet))
-
-	return finalizedBlockNumber, nil
-}
-
-// GetFinalizedHeader returns the finalized block header based on the specified parameters.
-//   - `verifiedValidatorNum` must be within the range [1, len(currentValidators)],with the exception that:
-//     -1 represents at least len(currentValidators) * 1/2
-//     -2 represents at least len(currentValidators) * 2/3
-//     -3 represents at least len(currentValidators)
-//   - The function calculates `probabilisticFinalizedHeight` as the highest height of the block verified by `verifiedValidatorNum` validators,
-//     it then returns the block header with a height equal to `max(fastFinalizedHeight, probabilisticFinalizedHeight)`.
-//   - The height of the returned block header is guaranteed to be monotonically increasing.
-func (api *BlockChainAPI) GetFinalizedHeader(ctx context.Context, verifiedValidatorNum int64) (map[string]interface{}, error) {
-	finalizedBlockNumber, err := api.getFinalizedNumber(ctx, verifiedValidatorNum)
-	if err != nil { // impossible
-		return nil, err
-	}
-	return api.GetHeaderByNumber(ctx, rpc.BlockNumber(finalizedBlockNumber))
-}
-
-// GetFinalizedBlock returns the finalized block based on the specified parameters.
-//   - `verifiedValidatorNum` must be within the range [1, len(currentValidators)],with the exception that:
-//     -1 represents at least len(currentValidators) * 1/2
-//     -2 represents at least len(currentValidators) * 2/3
-//     -3 represents at least len(currentValidators)
-//   - The function calculates `probabilisticFinalizedHeight` as the highest height of the block verified by `verifiedValidatorNum` validators,
-//     it then returns the block with a height equal to `max(fastFinalizedHeight, probabilisticFinalizedHeight)`.
-//   - If `fullTx` is true, the block includes all transactions; otherwise, only transaction hashes are included.
-//   - The height of the returned block is guaranteed to be monotonically increasing.
-func (api *BlockChainAPI) GetFinalizedBlock(ctx context.Context, verifiedValidatorNum int64, fullTx bool) (map[string]interface{}, error) {
-	finalizedBlockNumber, err := api.getFinalizedNumber(ctx, verifiedValidatorNum)
-	if err != nil { // impossible
-		return nil, err
-	}
-
-	return api.GetBlockByNumber(ctx, rpc.BlockNumber(finalizedBlockNumber), fullTx)
 }
 
 // GetUncleByBlockNumberAndIndex returns the uncle block for the given block hash and index.

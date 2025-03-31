@@ -508,11 +508,7 @@ func (g *Genesis) toBlockWithRoot(root common.Hash) *types.Block {
 		if g.BaseFee != nil {
 			head.BaseFee = g.BaseFee
 		} else {
-			if g.Config.Parlia != nil {
-				head.BaseFee = new(big.Int).SetUint64(params.InitialBaseFeeForBSC)
-			} else {
-				head.BaseFee = new(big.Int).SetUint64(params.InitialBaseFee)
-			}
+			head.BaseFee = new(big.Int).SetUint64(params.InitialBaseFee)
 		}
 	}
 	var (
@@ -533,10 +529,7 @@ func (g *Genesis) toBlockWithRoot(root common.Hash) *types.Block {
 			// EIP-4788: The parentBeaconBlockRoot of the genesis block is always
 			// the zero hash. This is because the genesis block does not have a parent
 			// by definition.
-			if conf.Parlia == nil || conf.IsBohr(num, g.Timestamp) {
-				head.ParentBeaconRoot = new(common.Hash)
-			}
-
+			head.ParentBeaconRoot = new(common.Hash)
 			// EIP-4844 fields
 			head.ExcessBlobGas = g.ExcessBlobGas
 			head.BlobGasUsed = g.BlobGasUsed

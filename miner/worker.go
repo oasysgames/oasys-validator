@@ -1035,7 +1035,7 @@ func (w *worker) prepareWork(genParams *generateParams, witness bool) (*environm
 	// Set baseFee and GasLimit if we are on an EIP-1559 chain
 	if w.chainConfig.IsLondon(header.Number) {
 		header.BaseFee = eip1559.CalcBaseFee(w.chainConfig, parent)
-		if w.chainConfig.Parlia == nil && !w.chainConfig.IsLondon(parent.Number) {
+		if !w.chainConfig.IsLondon(parent.Number) {
 			parentGasLimit := parent.GasLimit * w.chainConfig.ElasticityMultiplier()
 			header.GasLimit = core.CalcGasLimit(parentGasLimit, w.config.GasCeil)
 		}
@@ -1197,7 +1197,7 @@ func (w *worker) generateWork(params *generateParams, witness bool) *newPayloadR
 	}
 	// Collect consensus-layer requests if Prague is enabled.
 	var requests [][]byte
-	if w.chainConfig.IsPrague(work.header.Number, work.header.Time) && w.chainConfig.Parlia == nil {
+	if w.chainConfig.IsPrague(work.header.Number, work.header.Time) && w.chainConfig.Oasys == nil {
 		requests = [][]byte{}
 		// EIP-6110 deposits
 		if err := core.ParseDepositLogs(&requests, allLogs, w.chainConfig); err != nil {

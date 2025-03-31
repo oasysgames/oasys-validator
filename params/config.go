@@ -539,17 +539,6 @@ func (c CliqueConfig) String() string {
 	return fmt.Sprintf("clique(period: %d, epoch: %d)", c.Period, c.Epoch)
 }
 
-// ParliaConfig is the consensus engine configs for proof-of-staked-authority based sealing.
-type ParliaConfig struct {
-	Period uint64 `json:"period"` // Number of seconds between blocks to enforce
-	Epoch  uint64 `json:"epoch"`  // Epoch length to update validatorSet
-}
-
-// String implements the stringer interface, returning the consensus engine details.
-func (b *ParliaConfig) String() string {
-	return "parlia"
-}
-
 // OasysConfig is the consensus engine configs for proof-of-stake based sealing.
 type OasysConfig struct {
 	Period uint64 `json:"period"` // Number of seconds between blocks to enforce
@@ -647,8 +636,8 @@ func (c *ChainConfig) String() string {
 		engine = c.Ethash
 	case c.Clique != nil:
 		engine = c.Clique
-	case c.Parlia != nil:
-		engine = c.Parlia
+	case c.Oasys != nil:
+		engine = c.Oasys
 	default:
 		engine = "unknown"
 	}
