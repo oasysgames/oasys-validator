@@ -1074,7 +1074,7 @@ func (w *worker) prepareWork(genParams *generateParams, witness bool) (*environm
 	}
 
 	// Handle upgrade build-in system contract code
-	systemcontracts.TryUpdateBuildInSystemContract(w.chainConfig, header.Number, parent.Time, header.Time, env.state, true)
+	contracts.Deploy(w.chainConfig, env.state, header.Number.Uint64())
 
 	if header.ParentBeaconRoot != nil {
 		core.ProcessBeaconBlockRoot(*header.ParentBeaconRoot, env.evm)
