@@ -104,9 +104,6 @@ type Engine interface {
 	// VerifyRequests verifies the consistency between Requests and header.RequestsHash.
 	VerifyRequests(header *types.Header, Requests [][]byte) error
 
-	// NextInTurnValidator return the next in-turn validator for header
-	NextInTurnValidator(chain ChainHeaderReader, header *types.Header) (common.Address, error)
-
 	// Prepare initializes the consensus fields of a block header according to the
 	// rules of a particular engine. The changes are executed inline.
 	Prepare(chain ChainHeaderReader, header *types.Header) error

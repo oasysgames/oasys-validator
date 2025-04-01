@@ -926,28 +926,6 @@ func (c *Oasys) assembleVoteAttestation(chain consensus.ChainHeaderReader, heade
 	return nil
 }
 
-// NextInTurnValidator return the next in-turn validator for header
-func (c *Oasys) NextInTurnValidator(chain consensus.ChainHeaderReader, header *types.Header) (common.Address, error) {
-	snap, err := c.snapshot(chain, header.Number.Uint64(), header.Hash(), nil)
-	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to get snapshot, in: NextInTurnValidator, err: %v", err)
-	}
-	env, err := c.environment(chain, header, snap, false)
-	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to get environment, in: NextInTurnValidator, err: %v", err)
-	}
-	validators, err := c.getNextValidators(chain, header, snap, false)
-	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to get validators, in: NextInTurnValidator, err: %v", err)
-	}
-	scheduler, err := c.scheduler(chain, header, env, validators.Operators, validators.Stakes)
-	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to get scheduler, in: NextInTurnValidator, err: %v", err)
-	}
-
-	return *scheduler.expect(header.Number.Uint64()), nil
-}
-
 // Prepare implements consensus.Engine, preparing all the consensus fields of the
 // header for running the transactions on top.
 func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header) error {
@@ -1649,7 +1627,6 @@ func (c *Oasys) scheduler(chain consensus.ChainHeaderReader, header *types.Heade
 	return created, nil
 }
 
-// TODO: Should be deleted
 func (c *Oasys) Delay(chain consensus.ChainReader, header *types.Header, leftOver *time.Duration) *time.Duration {
 	return nil
 }

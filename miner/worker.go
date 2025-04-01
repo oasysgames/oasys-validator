@@ -24,7 +24,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	mapset "github.com/deckarep/golang-set/v2"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/holiman/uint256"
 
@@ -32,7 +31,6 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
-	"github.com/ethereum/go-ethereum/consensus/oasys"
 	contracts "github.com/ethereum/go-ethereum/contracts/oasys"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -78,20 +76,13 @@ const (
 )
 
 var (
-	bidExistGauge        = metrics.NewRegisteredGauge("worker/bidExist", nil)
-	bidWinGauge          = metrics.NewRegisteredGauge("worker/bidWin", nil)
-	inturnBlocksGauge    = metrics.NewRegisteredGauge("worker/inturnBlocks", nil)
-	bestBidGasUsedGauge  = metrics.NewRegisteredGauge("worker/bestBidGasUsed", nil)  // MGas
-	bestWorkGasUsedGauge = metrics.NewRegisteredGauge("worker/bestWorkGasUsed", nil) // MGas
-
 	writeBlockTimer    = metrics.NewRegisteredTimer("worker/writeblock", nil)
 	finalizeBlockTimer = metrics.NewRegisteredTimer("worker/finalizeblock", nil)
 
-	errBlockInterruptedByNewHead   = errors.New("new head arrived while building block")
-	errBlockInterruptedByRecommit  = errors.New("recommit interrupt while building block")
-	errBlockInterruptedByTimeout   = errors.New("timeout while building block")
-	errBlockInterruptedByOutOfGas  = errors.New("out of gas while building block")
-	errBlockInterruptedByBetterBid = errors.New("better bid arrived while building block")
+	errBlockInterruptedByNewHead  = errors.New("new head arrived while building block")
+	errBlockInterruptedByRecommit = errors.New("recommit interrupt while building block")
+	errBlockInterruptedByTimeout  = errors.New("timeout while building block")
+	errBlockInterruptedByOutOfGas = errors.New("out of gas while building block")
 )
 
 // environment is the worker's current environment and holds all
@@ -165,7 +156,6 @@ const (
 	commitInterruptResubmit
 	commitInterruptTimeout
 	commitInterruptOutOfGas
-	commitInterruptBetterBid
 )
 
 // newWorkReq represents a request for new sealing work submitting with relative interrupt notifier.
@@ -192,15 +182,9 @@ type getWorkReq struct {
 	result chan *newPayloadResult // non-blocking channel
 }
 
-type bidFetcher interface {
-	GetBestBid(parentHash common.Hash) *BidRuntime
-	GetSimulatingBid(prevBlockHash common.Hash) *BidRuntime
-}
-
 // worker is the main object which takes care of submitting new work to consensus engine
 // and gathering the sealing result.
 type worker struct {
-	bidFetcher  bidFetcher
 	prefetcher  core.Prefetcher
 	config      *minerconfig.Config
 	chainConfig *params.ChainConfig
@@ -307,10 +291,6 @@ func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend,
 	}
 
 	return worker
-}
-
-func (w *worker) setBestBidFetcher(fetcher bidFetcher) {
-	w.bidFetcher = fetcher
 }
 
 // setEtherbase sets the etherbase used to initialize the block coinbase field.
@@ -460,17 +440,6 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			}
 			clearPending(head.Header.Number.Uint64())
 			timestamp = time.Now().Unix()
-			if p, ok := w.engine.(*oasys.Oasys); ok {
-				signedRecent, err := p.SignRecently(w.chain, head.Header)
-				if err != nil {
-					log.Debug("Not allowed to propose block", "err", err)
-					continue
-				}
-				if signedRecent {
-					log.Info("Signed recently, must wait")
-					continue
-				}
-			}
 			commit(commitInterruptNewHead)
 
 		case <-timer.C:
@@ -798,11 +767,6 @@ func (w *worker) commitTransactions(env *environment, plainTxs, blobTxs *transac
 	gasLimit := env.header.GasLimit
 	if env.gasPool == nil {
 		env.gasPool = new(core.GasPool).AddGas(gasLimit)
-		if p, ok := w.engine.(*oasys.Oasys); ok {
-			gasReserved := p.EstimateGasReservedForSystemTxs(w.chain, env.header)
-			env.gasPool.SubGas(gasReserved)
-			log.Debug("commitTransactions", "number", env.header.Number.Uint64(), "time", env.header.Time, "EstimateGasReservedForSystemTxs", gasReserved)
-		}
 	}
 
 	var coalescedLogs []*types.Log
@@ -1092,7 +1056,7 @@ func (w *worker) prepareWork(genParams *generateParams, witness bool) (*environm
 // fillTransactions retrieves the pending transactions from the txpool and fills them
 // into the given sealing block. The transaction selection and ordering strategy can
 // be customized with the plugin in the future.
-func (w *worker) fillTransactions(interruptCh chan int32, env *environment, stopTimer *time.Timer, bidTxs mapset.Set[common.Hash]) (err error) {
+func (w *worker) fillTransactions(interruptCh chan int32, env *environment, stopTimer *time.Timer) (err error) {
 	w.confMu.RLock()
 	tip := w.tip
 	prio := w.prio
@@ -1113,26 +1077,6 @@ func (w *worker) fillTransactions(interruptCh chan int32, env *environment, stop
 
 	filter.OnlyPlainTxs, filter.OnlyBlobTxs = false, true
 	pendingBlobTxs := w.eth.TxPool().Pending(filter)
-
-	if bidTxs != nil {
-		filterBidTxs := func(commonTxs map[common.Address][]*txpool.LazyTransaction) {
-			for acc, txs := range commonTxs {
-				for i := len(txs) - 1; i >= 0; i-- {
-					if bidTxs.Contains(txs[i].Hash) {
-						if i == len(txs)-1 {
-							delete(commonTxs, acc)
-						} else {
-							commonTxs[acc] = txs[i+1:]
-						}
-						break
-					}
-				}
-			}
-		}
-
-		filterBidTxs(pendingPlainTxs)
-		filterBidTxs(pendingBlobTxs)
-	}
 
 	// Split the pending transactions into locals and remotes.
 	prioPlainTxs, normalPlainTxs := make(map[common.Address][]*txpool.LazyTransaction), pendingPlainTxs
@@ -1185,7 +1129,7 @@ func (w *worker) generateWork(params *generateParams, witness bool) *newPayloadR
 		})
 		defer timer.Stop()
 
-		err := w.fillTransactions(nil, work, nil, nil)
+		err := w.fillTransactions(nil, work, nil)
 		if errors.Is(err, errBlockInterruptedByTimeout) {
 			log.Warn("Block building is interrupted", "allowance", common.PrettyDuration(w.recommit))
 		}
@@ -1213,7 +1157,6 @@ func (w *worker) generateWork(params *generateParams, witness bool) *newPayloadR
 		work.header.RequestsHash = &reqHash
 	}
 
-	fees := work.state.GetBalance(consensus.SystemAddress)
 	block, receipts, err := w.engine.FinalizeAndAssemble(w.chain, work.header, work.state, &body, work.receipts, nil)
 	if err != nil {
 		return &newPayloadResult{err: err}
@@ -1221,7 +1164,7 @@ func (w *worker) generateWork(params *generateParams, witness bool) *newPayloadR
 
 	return &newPayloadResult{
 		block:    block,
-		fees:     fees.ToBig(),
+		fees:     totalFees(block, work.receipts),
 		sidecars: work.sidecars.BlobTxSidecarList(),
 		stateDB:  work.state,
 		receipts: receipts,
@@ -1285,9 +1228,10 @@ LOOP:
 		prevWork = work
 		workList = append(workList, work)
 
+		// Note: Oasys engine always returns nil, so it is always a single work
 		delay := w.engine.Delay(w.chain, work.header, &w.config.DelayLeftOver)
 		if delay == nil {
-			log.Warn("commitWork delay is nil, something is wrong")
+			// log.Warn("commitWork delay is nil, something is wrong")
 			stopTimer = nil
 		} else if *delay <= 0 {
 			log.Debug("Not enough time for commitWork")
@@ -1312,7 +1256,7 @@ LOOP:
 
 		// Fill pending transactions from the txpool into the block.
 		fillStart := time.Now()
-		err = w.fillTransactions(interruptCh, work, stopTimer, nil)
+		err = w.fillTransactions(interruptCh, work, stopTimer)
 		fillDuration := time.Since(fillStart)
 		switch {
 		case errors.Is(err, errBlockInterruptedByNewHead):
@@ -1331,7 +1275,7 @@ LOOP:
 
 		if interruptCh == nil || stopTimer == nil {
 			// it is single commit work, no need to try several time.
-			log.Info("commitWork interruptCh or stopTimer is nil")
+			// log.Info("commitWork interruptCh or stopTimer is nil")
 			break
 		}
 
@@ -1385,96 +1329,21 @@ LOOP:
 			sub.Unsubscribe()
 		}
 	}
-	// get the most profitable work
-	bestWork := workList[0]
-	bestReward := new(uint256.Int)
-	for i, wk := range workList {
-		balance := wk.state.GetBalance(consensus.SystemAddress)
-		log.Debug("Get the most profitable work", "index", i, "balance", balance, "bestReward", bestReward)
-		if balance.Cmp(bestReward) > 0 {
-			bestWork = wk
-			bestReward = balance
-		}
-	}
-
-	// when out-turn, use bestWork to prevent bundle leakage.
-	// when in-turn, compare with remote work.
-	from := bestWork.coinbase
-	if w.bidFetcher != nil && bestWork.header.Difficulty.Cmp(diffInTurn) == 0 {
-		inturnBlocksGauge.Inc(1)
-		// We want to start sealing the block as late as possible here if mev is enabled, so we could give builder the chance to send their final bid.
-		// Time left till sealing the block.
-		tillSealingTime := time.Until(time.Unix(int64(bestWork.header.Time), 0)) - w.config.DelayLeftOver
-		if tillSealingTime > 0 {
-			// Still some time left, wait for the best bid.
-			// This happens during the peak time of the network, the local block building LOOP would break earlier than
-			// the final sealing time by meeting the errBlockInterruptedByOutOfGas criteria.
-
-			log.Info("commitWork local building finished, wait for the best bid", "tillSealingTime", common.PrettyDuration(tillSealingTime))
-			stopTimer.Reset(tillSealingTime)
-			select {
-			case <-stopTimer.C:
-			case <-interruptCh:
-				log.Debug("commitWork interruptCh closed, new block imported or resubmit triggered")
-				return
-			}
-		}
-
-		bestBid := w.bidFetcher.GetBestBid(bestWork.header.ParentHash)
-
-		if bestBid != nil {
-			bidExistGauge.Inc(1)
-			bestBidGasUsedGauge.Update(int64(bestBid.bid.GasUsed) / 1_000_000)
-			bestWorkGasUsedGauge.Update(int64(bestWork.header.GasUsed) / 1_000_000)
-
-			log.Debug("BidSimulator: final compare", "block", bestWork.header.Number.Uint64(),
-				"localBlockReward", bestReward.String(),
-				"bidBlockReward", bestBid.packedBlockReward.String())
-		}
-
-		if bestBid != nil && bestReward.CmpBig(bestBid.packedBlockReward) < 0 {
-			// localValidatorReward is the reward for the validator self by the local block.
-			localValidatorReward := new(uint256.Int).Mul(bestReward, uint256.NewInt(w.config.Mev.ValidatorCommission))
-			localValidatorReward.Div(localValidatorReward, uint256.NewInt(10000))
-
-			log.Debug("BidSimulator: final compare", "block", bestWork.header.Number.Uint64(),
-				"localValidatorReward", localValidatorReward.String(),
-				"bidValidatorReward", bestBid.packedValidatorReward.String())
-
-			// blockReward(benefits delegators) and validatorReward(benefits the validator) are both optimal
-			if localValidatorReward.CmpBig(bestBid.packedValidatorReward) < 0 {
-				bidWinGauge.Inc(1)
-
-				bestWork = bestBid.env
-				from = bestBid.bid.Builder
-
-				log.Info("[BUILDER BLOCK]",
-					"block", bestWork.header.Number.Uint64(),
-					"builder", from,
-					"blockReward", weiToEtherStringF6(bestBid.packedBlockReward),
-					"validatorReward", weiToEtherStringF6(bestBid.packedValidatorReward),
-					"bid", bestBid.bid.Hash().TerminalString(),
-				)
-			}
-		}
-	}
-
+	work := workList[0]
+	from := work.coinbase
 	metrics.GetOrRegisterCounter(fmt.Sprintf("block/from/%v", from), nil).Inc(1)
 
-	w.commit(bestWork, w.fullTaskHook, true, start)
+	// Submit the generated block for consensus sealing.
+	if err := w.commit(work, w.fullTaskHook, true, start); err != nil {
+		log.Warn("Failed to commit work", "in", "commitWork", "err", err)
+	}
 
 	// Swap out the old work with the new one, terminating any leftover
 	// prefetcher processes in the mean time and starting a new one.
 	if w.current != nil {
 		w.current.discard()
 	}
-	w.current = bestWork
-}
-
-// inTurn return true if the current worker is in turn.
-func (w *worker) inTurn() bool {
-	validator, _ := w.engine.NextInTurnValidator(w.chain, w.chain.CurrentBlock())
-	return validator != common.Address{} && validator == w.etherbase()
+	w.current = work
 }
 
 // commit runs any post-transaction state modifications, assembles the final block
@@ -1486,8 +1355,6 @@ func (w *worker) commit(env *environment, interval func(), update bool, start ti
 		if interval != nil {
 			interval()
 		}
-		fees := env.state.GetBalance(consensus.SystemAddress).ToBig()
-		feesInEther := new(big.Float).Quo(new(big.Float).SetInt(fees), big.NewFloat(params.Ether))
 		// Withdrawals are set to nil here, because this is only called in PoW.
 		finalizeStart := time.Now()
 		body := types.Body{Transactions: env.txs}
@@ -1515,7 +1382,7 @@ func (w *worker) commit(env *environment, interval func(), update bool, start ti
 		select {
 		case w.taskCh <- &task{receipts: receipts, state: env.state, block: block, createdAt: time.Now()}:
 			log.Info("Commit new sealing work", "number", block.Number(), "sealhash", w.engine.SealHash(block.Header()),
-				"txs", env.tcount, "blobs", env.blobs, "gas", block.GasUsed(), "fees", feesInEther, "elapsed", common.PrettyDuration(time.Since(start)))
+				"txs", env.tcount, "blobs", env.blobs, "gas", block.GasUsed(), "elapsed", common.PrettyDuration(time.Since(start)))
 
 		case <-w.exitCh:
 			log.Info("Worker has exited")
@@ -1553,6 +1420,16 @@ func copyReceipts(receipts []*types.Receipt) []*types.Receipt {
 	return result
 }
 
+// totalFees computes total consumed miner fees in Wei. Block transactions and receipts have to have the same order.
+func totalFees(block *types.Block, receipts []*types.Receipt) *big.Int {
+	feesWei := new(big.Int)
+	for i, tx := range block.Transactions() {
+		minerFee, _ := tx.EffectiveGasTip(block.BaseFee())
+		feesWei.Add(feesWei, new(big.Int).Mul(new(big.Int).SetUint64(receipts[i].GasUsed), minerFee))
+	}
+	return feesWei
+}
+
 // signalToErr converts the interruption signal to a concrete error type for return.
 // The given signal must be a valid interruption signal.
 func signalToErr(signal int32) error {
@@ -1567,8 +1444,6 @@ func signalToErr(signal int32) error {
 		return errBlockInterruptedByTimeout
 	case commitInterruptOutOfGas:
 		return errBlockInterruptedByOutOfGas
-	case commitInterruptBetterBid:
-		return errBlockInterruptedByBetterBid
 	default:
 		panic(fmt.Errorf("undefined signal %d", signal))
 	}

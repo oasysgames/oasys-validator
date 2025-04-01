@@ -497,7 +497,3 @@ func (b *EthAPIBackend) SendBid(ctx context.Context, bid *types.BidArgs) (common
 func (b *EthAPIBackend) BestBidGasFee(parentHash common.Hash) *big.Int {
 	return b.Miner().BestPackedBlockReward(parentHash)
 }
-
-func (b *EthAPIBackend) MinerInTurn() bool {
-	return b.Miner().InTurn()
-}
