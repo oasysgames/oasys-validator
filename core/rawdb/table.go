@@ -264,10 +264,6 @@ func (t *table) SetupFreezerEnv(env *ethdb.FreezerEnv) error {
 	return nil
 }
 
-func (t *table) SetupFreezerEnv(env *ethdb.FreezerEnv) error {
-	return nil
-}
-
 // tableBatch is a wrapper around a database batch that prefixes each key access
 // with a pre-configured string.
 type tableBatch struct {

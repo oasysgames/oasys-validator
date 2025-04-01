@@ -468,18 +468,6 @@ func (es *EventSystem) handleFinalizedHeaderEvent(filters filterIndex, ev core.F
 	}
 }
 
-func (es *EventSystem) handleFinalizedHeaderEvent(filters filterIndex, ev core.FinalizedHeaderEvent) {
-	for _, f := range filters[FinalizedHeadersSubscription] {
-		f.headers <- ev.Header
-	}
-}
-
-func (es *EventSystem) handleVoteEvent(filters filterIndex, ev core.NewVoteEvent) {
-	for _, f := range filters[VotesSubscription] {
-		f.votes <- ev.Vote
-	}
-}
-
 // eventLoop (un)installs filters and processes mux events.
 func (es *EventSystem) eventLoop() {
 	// Ensure all subscriptions get cleaned up
