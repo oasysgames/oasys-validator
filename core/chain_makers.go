@@ -785,3 +785,7 @@ func (cm *chainMaker) GetVerifiedBlockByHash(hash common.Hash) *types.Header {
 func (cm *chainMaker) ChasingHead() *types.Header {
 	panic("not supported")
 }
+
+func (cm *chainMaker) GetCanonicalHash(number uint64) common.Hash {
+	panic("not supported")
+}

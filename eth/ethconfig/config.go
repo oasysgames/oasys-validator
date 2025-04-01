@@ -206,7 +206,7 @@ type Config struct {
 // only exist on already merged networks.
 func CreateConsensusEngine(config *params.ChainConfig, db ethdb.Database, ee *ethapi.BlockChainAPI, genesisHash common.Hash) (consensus.Engine, error) {
 	if config.Oasys != nil {
-		return oasys.New(config, config.Oasys, db, ethAPI), nil
+		return oasys.New(config, config.Oasys, db, ee), nil
 	}
 	if config.TerminalTotalDifficulty == nil {
 		log.Error("Geth only supports PoS networks. Please transition legacy networks using Geth v1.13.x.")

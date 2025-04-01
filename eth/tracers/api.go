@@ -36,7 +36,6 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth/tracers/logger"
@@ -47,7 +46,6 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/holiman/uint256"
 )
 
 const (
@@ -279,16 +277,10 @@ func (api *API) traceChain(start, end *types.Block, config *TraceConfig, closed 
 				)
 				// Trace all the transactions contained within
 				for i, tx := range task.block.Transactions() {
-					// upgrade build-in system contract before system txs if Feynman is enabled
+					// upgrade build-in system contract before system txs
 					if beforeSystemTx {
-						if posa, ok := api.backend.Engine().(consensus.PoSA); ok {
-							if isSystem, _ := posa.IsSystemTransaction(tx, task.block.Header()); isSystem {
-								balance := task.statedb.GetBalance(consensus.SystemAddress)
-								if balance.Cmp(common.U2560) > 0 {
-									task.statedb.SetBalance(consensus.SystemAddress, uint256.NewInt(0), tracing.BalanceChangeUnspecified)
-									task.statedb.AddBalance(blockCtx.Coinbase, balance, tracing.BalanceChangeUnspecified)
-								}
-
+						if pos, ok := api.backend.Engine().(consensus.PoS); ok {
+							if isSystem, _ := pos.IsSystemTransaction(tx, task.block.Header()); isSystem {
 								contracts.Deploy(api.backend.ChainConfig(), task.statedb, task.block.NumberU64())
 								beforeSystemTx = false
 							}
@@ -580,14 +572,8 @@ func (api *API) IntermediateRoots(ctx context.Context, hash common.Hash, config 
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		if posa, ok := api.backend.Engine().(consensus.PoSA); ok {
-			if isSystem, _ := posa.IsSystemTransaction(tx, block.Header()); isSystem {
-				balance := statedb.GetBalance(consensus.SystemAddress)
-				if balance.Cmp(common.U2560) > 0 {
-					statedb.SetBalance(consensus.SystemAddress, uint256.NewInt(0), tracing.BalanceChangeUnspecified)
-					statedb.AddBalance(vmctx.Coinbase, balance, tracing.BalanceChangeUnspecified)
-				}
-
+		if pos, ok := api.backend.Engine().(consensus.PoS); ok {
+			if isSystem, _ := pos.IsSystemTransaction(tx, block.Header()); isSystem {
 				if beforeSystemTx {
 					contracts.Deploy(api.backend.ChainConfig(), statedb, block.NumberU64())
 					beforeSystemTx = false
@@ -678,16 +664,10 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 		beforeSystemTx = true
 	)
 	for i, tx := range txs {
-		// upgrade build-in system contract before system txs if Feynman is enabled
+		// upgrade build-in system contract before system txs
 		if beforeSystemTx {
-			if posa, ok := api.backend.Engine().(consensus.PoSA); ok {
-				if isSystem, _ := posa.IsSystemTransaction(tx, block.Header()); isSystem {
-					balance := statedb.GetBalance(consensus.SystemAddress)
-					if balance.Cmp(common.U2560) > 0 {
-						statedb.SetBalance(consensus.SystemAddress, uint256.NewInt(0), tracing.BalanceChangeUnspecified)
-						statedb.AddBalance(blockCtx.Coinbase, balance, tracing.BalanceChangeUnspecified)
-					}
-
+			if pos, ok := api.backend.Engine().(consensus.PoS); ok {
+				if isSystem, _ := pos.IsSystemTransaction(tx, block.Header()); isSystem {
 					contracts.Deploy(api.backend.ChainConfig(), statedb, block.NumberU64())
 					beforeSystemTx = false
 				}
@@ -766,16 +746,10 @@ func (api *API) traceBlockParallel(ctx context.Context, block *types.Block, stat
 
 txloop:
 	for i, tx := range txs {
-		// upgrade build-in system contract before system txs if Feynman is enabled
+		// upgrade build-in system contract before system txs
 		if beforeSystemTx {
-			if posa, ok := api.backend.Engine().(consensus.PoSA); ok {
-				if isSystem, _ := posa.IsSystemTransaction(tx, block.Header()); isSystem {
-					balance := statedb.GetBalance(consensus.SystemAddress)
-					if balance.Cmp(common.U2560) > 0 {
-						statedb.SetBalance(consensus.SystemAddress, uint256.NewInt(0), tracing.BalanceChangeUnspecified)
-						statedb.AddBalance(block.Header().Coinbase, balance, tracing.BalanceChangeUnspecified)
-					}
-
+			if pos, ok := api.backend.Engine().(consensus.PoS); ok {
+				if isSystem, _ := pos.IsSystemTransaction(tx, block.Header()); isSystem {
 					contracts.Deploy(api.backend.ChainConfig(), statedb, block.NumberU64())
 					beforeSystemTx = false
 				}
@@ -879,16 +853,10 @@ func (api *API) standardTraceBlockToFile(ctx context.Context, block *types.Block
 		core.ProcessParentBlockHash(block.ParentHash(), evm)
 	}
 	for i, tx := range block.Transactions() {
-		// upgrade build-in system contract before system txs if Feynman is enabled
+		// upgrade build-in system contract before system txs
 		if beforeSystemTx {
-			if posa, ok := api.backend.Engine().(consensus.PoSA); ok {
-				if isSystem, _ := posa.IsSystemTransaction(tx, block.Header()); isSystem {
-					balance := statedb.GetBalance(consensus.SystemAddress)
-					if balance.Cmp(common.U2560) > 0 {
-						statedb.SetBalance(consensus.SystemAddress, uint256.NewInt(0), tracing.BalanceChangeUnspecified)
-						statedb.AddBalance(vmctx.Coinbase, balance, tracing.BalanceChangeUnspecified)
-					}
-
+			if pos, ok := api.backend.Engine().(consensus.PoS); ok {
+				if isSystem, _ := pos.IsSystemTransaction(tx, block.Header()); isSystem {
 					contracts.Deploy(api.backend.ChainConfig(), statedb, block.NumberU64())
 					beforeSystemTx = false
 				}
@@ -999,8 +967,8 @@ func (api *API) TraceTransaction(ctx context.Context, hash common.Hash, config *
 	}
 
 	var isSystemTx bool
-	if posa, ok := api.backend.Engine().(consensus.PoSA); ok {
-		if isSystem, _ := posa.IsSystemTransaction(tx, block.Header()); isSystem {
+	if pos, ok := api.backend.Engine().(consensus.PoS); ok {
+		if isSystem, _ := pos.IsSystemTransaction(tx, block.Header()); isSystem {
 			isSystemTx = true
 		}
 	}

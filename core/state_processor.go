@@ -108,7 +108,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	if cl, ok := engine.(*beacon.Beacon); ok {
 		engine = cl.InnerEngine()
 	}
-	pos, isPoS = engine.(consensus.PoS)
+	pos, isPoS := engine.(consensus.PoS)
 	commonTxs := make([]*types.Transaction, 0, txNum)
 
 	// initialise bloom processors

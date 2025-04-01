@@ -18,7 +18,9 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
 	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
@@ -350,7 +352,7 @@ func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 		if header.ParentBeaconRoot == nil || *header.ParentBeaconRoot != (common.Hash{}) {
 			return errors.New("header is missing beaconRoot")
 		}
-		if err := eip4844.VerifyEIP4844Header(parent, header); err != nil {
+		if err := eip4844.VerifyEIP4844Header(chain.Config(), parent, header); err != nil {
 			return err
 		}
 	}
@@ -744,6 +746,10 @@ func (c *Oasys) VerifyUncles(chain consensus.ChainReader, block *types.Block) er
 	return nil
 }
 
+func (c *Oasys) VerifyRequests(header *types.Header, Requests [][]byte) error {
+	return nil
+}
+
 // verifySeal checks whether the signature contained in the header satisfies the
 // consensus protocol requirements. The method accepts an optional list of parent
 // headers that aren't yet part of the local blockchain to generate the snapshots
@@ -920,6 +926,28 @@ func (c *Oasys) assembleVoteAttestation(chain consensus.ChainHeaderReader, heade
 	return nil
 }
 
+// NextInTurnValidator return the next in-turn validator for header
+func (c *Oasys) NextInTurnValidator(chain consensus.ChainHeaderReader, header *types.Header) (common.Address, error) {
+	snap, err := c.snapshot(chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to get snapshot, in: NextInTurnValidator, err: %v", err)
+	}
+	env, err := c.environment(chain, header, snap, false)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to get environment, in: NextInTurnValidator, err: %v", err)
+	}
+	validators, err := c.getNextValidators(chain, header, snap, false)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to get validators, in: NextInTurnValidator, err: %v", err)
+	}
+	scheduler, err := c.scheduler(chain, header, env, validators.Operators, validators.Stakes)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to get scheduler, in: NextInTurnValidator, err: %v", err)
+	}
+
+	return *scheduler.expect(header.Number.Uint64()), nil
+}
+
 // Prepare implements consensus.Engine, preparing all the consensus fields of the
 // header for running the transactions on top.
 func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header) error {
@@ -982,8 +1010,8 @@ func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 
 // Finalize implements consensus.Engine, ensuring no uncles are set, nor block
 // rewards given.
-func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs *[]*types.Transaction,
-	uncles []*types.Header, withdrawals []*types.Withdrawal, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64) error {
+func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state vm.StateDB, txs *[]*types.Transaction,
+	uncles []*types.Header, withdrawals []*types.Withdrawal, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64, tracer *tracing.Hooks) error {
 	if len(withdrawals) > 0 {
 		return errors.New("oasys does not support withdrawals")
 	}
@@ -1052,16 +1080,16 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 
 // FinalizeAndAssemble implements consensus.Engine, ensuring no uncles are set,
 // nor block rewards given, and returns the final block.
-func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
-	uncles []*types.Header, receipts []*types.Receipt, withdrawals []*types.Withdrawal) (*types.Block, []*types.Receipt, error) {
-	if txs == nil {
-		txs = make([]*types.Transaction, 0)
+func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB,
+	body *types.Body, receipts []*types.Receipt, tracer *tracing.Hooks) (*types.Block, []*types.Receipt, error) {
+	if body.Transactions == nil {
+		body.Transactions = make([]*types.Transaction, 0)
 	}
 	if receipts == nil {
 		receipts = make([]*types.Receipt, 0)
 	}
 
-	if len(withdrawals) > 0 {
+	if len(body.Withdrawals) > 0 {
 		return nil, receipts, errors.New("oasys does not support withdrawals")
 	}
 
@@ -1070,7 +1098,7 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 
 	cx := chainContext{Chain: chain, oasys: c}
 	if number == 1 {
-		err := c.initializeSystemContracts(state, header, cx, &txs, &receipts, nil, &header.GasUsed, true)
+		err := c.initializeSystemContracts(state, header, cx, &body.Transactions, &receipts, nil, &header.GasUsed, true)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to initialize system contracts, in: FinalizeAndAssemble, blockNumber: %d, blockHash: %s, err: %v", number, hash, err)
 		}
@@ -1101,7 +1129,7 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 
 	if number >= c.config.Epoch {
 		if expected := *scheduler.expect(number); expected != header.Coinbase {
-			if err := c.slash(expected, scheduler.schedules(), state, header, cx, &txs, &receipts, nil, &header.GasUsed, true); err != nil {
+			if err := c.slash(expected, scheduler.schedules(), state, header, cx, &body.Transactions, &receipts, nil, &header.GasUsed, true); err != nil {
 				log.Warn("failed to slash validator", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "address", expected, "err", err)
 			}
 		}
@@ -1113,7 +1141,7 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 	header.UncleHash = types.CalcUncleHash(nil)
-	return types.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil)), receipts, nil
+	return types.NewBlock(header, body, receipts, trie.NewStackTrie(nil)), receipts, nil
 }
 
 func (c *Oasys) IsActiveValidatorAt(chain consensus.ChainHeaderReader, header *types.Header, checkVoteKeyFn func(bLSPublicKey *types.BLSPublicKey) bool) bool {
@@ -1529,7 +1557,7 @@ func OasysRLP(header *types.Header) []byte {
 	return b.Bytes()
 }
 
-func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash, number uint64, env *params.EnvironmentValue) error {
+func (c *Oasys) addBalanceToStakeManager(state vm.StateDB, hash common.Hash, number uint64, env *params.EnvironmentValue) error {
 	if !env.IsEpoch(number) || env.Epoch(number) < 3 || env.Epoch(number) > 60 {
 		return nil
 	}
@@ -1545,7 +1573,7 @@ func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash,
 		return nil
 	}
 
-	state.AddBalance(stakeManager.address, uint256.MustFromBig(rewards))
+	state.AddBalance(stakeManager.address, uint256.MustFromBig(rewards), tracing.BalanceChangeUnspecified)
 	log.Info("Balance added to stake manager", "hash", hash, "amount", rewards.String())
 	return nil
 }
@@ -1619,4 +1647,9 @@ func (c *Oasys) scheduler(chain consensus.ChainHeaderReader, header *types.Heade
 		newWeightedChooser(validators, stakes, seed))
 	schedulerCache.Add(seedHash, created)
 	return created, nil
+}
+
+// TODO: Should be deleted
+func (c *Oasys) Delay(chain consensus.ChainReader, header *types.Header, leftOver *time.Duration) *time.Duration {
+	return nil
 }

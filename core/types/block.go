@@ -729,9 +729,9 @@ type DiffAccountsInBlock struct {
 var extraSeal = 65 // Fixed number of extra-data suffix bytes reserved for signer seal
 
 // SealHash returns the hash of a block prior to it being sealed.
-func SealHash(header *Header, chainId *big.Int) (hash common.Hash) {
+func SealHash(header *Header) (hash common.Hash) {
 	hasher := sha3.NewLegacyKeccak256()
-	EncodeSigHeader(hasher, header, chainId)
+	EncodeSigHeader(hasher, header)
 	hasher.Sum(hash[:0])
 	return hash
 }
