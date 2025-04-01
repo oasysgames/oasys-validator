@@ -110,17 +110,6 @@ type votePool interface {
 	SubscribeNewVoteEvent(ch chan<- core.NewVoteEvent) event.Subscription
 }
 
-// votePool defines the methods needed from a votes pool implementation to
-// support all the operations needed by the Ethereum chain protocols.
-type votePool interface {
-	PutVote(vote *types.VoteEnvelope)
-	GetVotes() []*types.VoteEnvelope
-
-	// SubscribeNewVoteEvent should return an event subscription of
-	// NewVotesEvent and send events to the given channel.
-	SubscribeNewVoteEvent(ch chan<- core.NewVoteEvent) event.Subscription
-}
-
 // handlerConfig is the collection of initialization parameters to create a full
 // node network handler.
 type handlerConfig struct {
@@ -907,37 +896,6 @@ func (h *handler) BroadcastVote(vote *types.VoteEnvelope) {
 	peers := h.peers.peersWithoutVote(vote.Hash())
 	headBlock := h.chain.CurrentBlock()
 	currentTD := h.chain.GetTd(headBlock.Hash(), headBlock.Number.Uint64())
-	for _, peer := range peers {
-		_, peerTD := peer.Head()
-		deltaTD := new(big.Int).Abs(new(big.Int).Sub(currentTD, peerTD))
-		if deltaTD.Cmp(big.NewInt(deltaTdThreshold)) < 1 && peer.bscExt != nil {
-			voteMap[peer] = vote
-		}
-	}
-
-	for peer, _vote := range voteMap {
-		directPeers++
-		directCount += 1
-		votes := []*types.VoteEnvelope{_vote}
-		peer.bscExt.AsyncSendVotes(votes)
-	}
-	log.Debug("Vote broadcast", "vote packs", directPeers, "broadcast vote", directCount)
-}
-
-// BroadcastVote will propagate a batch of votes to all peers
-// which are not known to already have the given vote.
-func (h *handler) BroadcastVote(vote *types.VoteEnvelope) {
-	var (
-		directCount int // Count of announcements made
-		directPeers int
-
-		voteMap = make(map[*ethPeer]*types.VoteEnvelope) // Set peer->hash to transfer directly
-	)
-
-	// Broadcast vote to a batch of peers not knowing about it
-	peers := h.peers.peersWithoutVote(vote.Hash())
-	headBlock := h.chain.CurrentBlock()
-	currentTD := h.chain.GetTd(headBlock.Hash(), headBlock.Number.Uint64())
 	var averageDifficulty *big.Int
 	if h.firstTDInBroadcastVote == nil || h.firstHeightInBroadcastVote == 0 {
 		h.firstTDInBroadcastVote = currentTD
@@ -1027,36 +985,6 @@ func (h *handler) voteBroadcastLoop() {
 			// so one vote will be sent instantly without waiting for other votes for batch sending by design.
 			h.BroadcastVote(event.Vote)
 		case <-h.votesSub.Err():
-			return
-		}
-	}
-}
-
-// voteBroadcastLoop announces new vote to connected peers.
-func (h *handler) voteBroadcastLoop() {
-	defer h.wg.Done()
-	for {
-		select {
-		case event := <-h.voteCh:
-			// The timeliness of votes is very important,
-			// so one vote will be sent instantly without waiting for other votes for batch sending by design.
-			h.BroadcastVote(event.Vote)
-		case <-h.votesSub.Err():
-			return
-		}
-	}
-}
-
-func (h *handler) startMaliciousVoteMonitor() {
-	defer h.wg.Done()
-	voteCh := make(chan core.NewVoteEvent, voteChanSize)
-	h.voteMonitorSub = h.votepool.SubscribeNewVoteEvent(voteCh)
-	for {
-		select {
-		case event := <-voteCh:
-			pendingBlockNumber := h.chain.CurrentHeader().Number.Uint64() + 1
-			h.maliciousVoteMonitor.ConflictDetect(event.Vote, pendingBlockNumber)
-		case <-h.voteMonitorSub.Err():
 			return
 		}
 	}
