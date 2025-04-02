@@ -293,7 +293,6 @@ func init() {
 		blsCommand,
 		// See verkle.go
 		verkleCommand,
-		blsCommand,
 	}
 	if logTestCommand != nil {
 		app.Commands = append(app.Commands, logTestCommand)
