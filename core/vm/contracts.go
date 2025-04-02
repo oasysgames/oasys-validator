@@ -1592,8 +1592,8 @@ func (c *verifyDoubleSignEvidence) Run(input []byte) ([]byte, error) {
 	}
 
 	// check sig
-	msgHash1 := types.SealHash(header1, evidence.ChainId)
-	msgHash2 := types.SealHash(header2, evidence.ChainId)
+	msgHash1 := types.SealHash(header1)
+	msgHash2 := types.SealHash(header2)
 	if bytes.Equal(msgHash1.Bytes(), msgHash2.Bytes()) {
 		return nil, errInvalidEvidence
 	}
