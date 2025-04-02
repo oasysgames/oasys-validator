@@ -623,7 +623,7 @@ func DefaultOasysMainnetGenesisBlock() *Genesis {
 	alloc := decodePrealloc(oasysMainnetAllocData)
 	return &Genesis{
 		Config:     params.OasysMainnetChainConfig,
-		Nonce:      0,
+		Nonce:      1,
 		ExtraData:  hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000d7a54d58305934e2d725f3573b4419e905fbdfe50000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
 		GasLimit:   30_000_000,
 		Difficulty: big.NewInt(1),
@@ -639,7 +639,7 @@ func DefaultOasysTestnetGenesisBlock() *Genesis {
 	alloc := decodePrealloc(oasysTestnetAllocData)
 	return &Genesis{
 		Config:     params.OasysTestnetChainConfig,
-		Nonce:      0,
+		Nonce:      1,
 		ExtraData:  hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000175d849f30997607FE18F708c45FD2D70d9Eaecc0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
 		GasLimit:   30_000_000,
 		Difficulty: big.NewInt(1),
