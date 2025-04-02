@@ -72,49 +72,6 @@ func (p *Peer) Handshake(network uint64, td *big.Int, head common.Hash, genesis 
 	}
 	p.td, p.head = status.TD, status.Head
 
-	if p.version >= ETH68 {
-		var upgradeStatus UpgradeStatusPacket // safe to read after two values have been received from errc
-		if extension == nil {
-			extension = &UpgradeStatusExtension{}
-		}
-		extensionRaw, err := extension.Encode()
-		if err != nil {
-			return err
-		}
-
-		gopool.Submit(func() {
-			errc <- p2p.Send(p.rw, UpgradeStatusMsg, &UpgradeStatusPacket{
-				Extension: extensionRaw,
-			})
-		})
-		gopool.Submit(func() {
-			errc <- p.readUpgradeStatus(&upgradeStatus)
-		})
-		timeout := time.NewTimer(handshakeTimeout)
-		defer timeout.Stop()
-		for i := 0; i < 2; i++ {
-			select {
-			case err := <-errc:
-				if err != nil {
-					return err
-				}
-			case <-timeout.C:
-				return p2p.DiscReadTimeout
-			}
-		}
-
-		extension, err := upgradeStatus.GetExtension()
-		if err != nil {
-			return err
-		}
-		p.statusExtension = extension
-
-		if p.statusExtension.DisablePeerTxBroadcast {
-			p.Log().Debug("peer does not need broadcast txs, closing broadcast routines")
-			p.CloseTxBroadcast()
-		}
-	}
-
 	// TD at mainnet block #7753254 is 76 bits. If it becomes 100 million times
 	// larger, it will still fit within 100 bits
 	if tdlen := p.td.BitLen(); tdlen > 100 {
