@@ -186,13 +186,7 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	var overrides core.ChainOverrides
 	if config.OverridePassedForkTime != nil {
 		chainConfig.ShanghaiTime = config.OverridePassedForkTime
-		chainConfig.KeplerTime = config.OverridePassedForkTime
-		chainConfig.FeynmanTime = config.OverridePassedForkTime
-		chainConfig.FeynmanFixTime = config.OverridePassedForkTime
 		chainConfig.CancunTime = config.OverridePassedForkTime
-		chainConfig.HaberTime = config.OverridePassedForkTime
-		chainConfig.HaberFixTime = config.OverridePassedForkTime
-		chainConfig.BohrTime = config.OverridePassedForkTime
 		overrides.OverridePassedForkTime = config.OverridePassedForkTime
 	}
 	if config.OverridePrague != nil {
@@ -375,9 +369,9 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	eth.miner.SetPrioAddresses(config.TxPool.Locals)
 
 	// Create voteManager instance
-	if posa, ok := eth.engine.(consensus.PoS); ok {
+	if pos, ok := eth.engine.(consensus.PoS); ok {
 		// Create votePool instance
-		votePool := vote.NewVotePool(eth.blockchain, posa)
+		votePool := vote.NewVotePool(eth.blockchain, pos)
 		eth.votePool = votePool
 		if oasys, ok := eth.engine.(*oasys.Oasys); ok {
 			if !config.Miner.DisableVoteAttestation {
@@ -400,7 +394,7 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 			blsWalletPath := stack.ResolvePath(conf.BLSWalletDir)
 			blsAccountName := conf.VoteKeyName
 			voteJournalPath := stack.ResolvePath(conf.VoteJournalDir)
-			if _, err := vote.NewVoteManager(eth, eth.blockchain, votePool, voteJournalPath, blsPasswordPath, blsWalletPath, blsAccountName, posa); err != nil {
+			if _, err := vote.NewVoteManager(eth, eth.blockchain, votePool, voteJournalPath, blsPasswordPath, blsWalletPath, blsAccountName, pos); err != nil {
 				log.Error("Failed to Initialize voteManager", "err", err)
 				return nil, err
 			}
@@ -653,15 +647,6 @@ func (s *Ethereum) setupDiscovery() error {
 	// Add trust nodes from DNS.
 	if len(s.config.TrustDiscoveryURLs) > 0 {
 		iter, err := dnsclient.NewIterator(s.config.TrustDiscoveryURLs...)
-		if err != nil {
-			return err
-		}
-		s.discmix.AddSource(iter)
-	}
-
-	// Add bsc nodes from DNS.
-	if len(s.config.BscDiscoveryURLs) > 0 {
-		iter, err := dnsclient.NewIterator(s.config.BscDiscoveryURLs...)
 		if err != nil {
 			return err
 		}

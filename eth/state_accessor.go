@@ -28,14 +28,12 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth/tracers"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/go-ethereum/triedb"
-	"github.com/holiman/uint256"
 )
 
 // noopReleaser is returned in case there is no operation expected
@@ -262,16 +260,10 @@ func (eth *Ethereum) stateAtTransaction(ctx context.Context, block *types.Block,
 		beforeSystemTx = true
 	)
 	for idx, tx := range block.Transactions() {
-		// upgrade build-in system contract before system txs if Feynman is enabled
+		// upgrade build-in system contract before system txs
 		if beforeSystemTx {
-			if posa, ok := eth.Engine().(consensus.PoSA); ok {
-				if isSystem, _ := posa.IsSystemTransaction(tx, block.Header()); isSystem {
-					balance := statedb.GetBalance(consensus.SystemAddress)
-					if balance.Cmp(common.U2560) > 0 {
-						statedb.SetBalance(consensus.SystemAddress, uint256.NewInt(0), tracing.BalanceChangeUnspecified)
-						statedb.AddBalance(block.Header().Coinbase, balance, tracing.BalanceChangeUnspecified)
-					}
-
+			if pos, ok := eth.Engine().(consensus.PoS); ok {
+				if isSystem, _ := pos.IsSystemTransaction(tx, block.Header()); isSystem {
 					contracts.Deploy(eth.blockchain.Config(), statedb, block.Number().Uint64())
 					beforeSystemTx = false
 				}

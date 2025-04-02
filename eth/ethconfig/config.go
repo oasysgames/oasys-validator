@@ -99,7 +99,6 @@ type Config struct {
 	EthDiscoveryURLs   []string
 	SnapDiscoveryURLs  []string
 	TrustDiscoveryURLs []string
-	BscDiscoveryURLs   []string
 
 	// State options.
 	NoPruning  bool // Whether to disable pruning and flush everything to disk
