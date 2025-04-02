@@ -51,9 +51,9 @@ type NodeFilterFunc func(*enr.Record) bool
 func ParseEthFilter(chain string) (NodeFilterFunc, error) {
 	var filter forkid.Filter
 	switch chain {
-	case "oasys":
+	case "oasys-mainnet":
 		filter = forkid.NewStaticFilter(params.OasysMainnetChainConfig, core.DefaultOasysMainnetGenesisBlock().ToBlock())
-	case "testnet":
+	case "oasys-testnet":
 		filter = forkid.NewStaticFilter(params.OasysTestnetChainConfig, core.DefaultOasysTestnetGenesisBlock().ToBlock())
 	default:
 		return nil, fmt.Errorf("unknown network %q", chain)
