@@ -177,14 +177,14 @@ var (
 		Value:    ethconfig.Defaults.NetworkId,
 		Category: flags.EthCategory,
 	}
-	BSCMainnetFlag = &cli.BoolFlag{
+	OasysMainnetFlag = &cli.BoolFlag{
 		Name:     "mainnet",
-		Usage:    "BSC mainnet",
+		Usage:    "Oasys mainnet",
 		Category: flags.EthCategory,
 	}
-	ChapelFlag = &cli.BoolFlag{
-		Name:     "chapel",
-		Usage:    "Chapel network: pre-configured Proof-of-Stake-Authority BSC test network",
+	OasysTestnetFlag = &cli.BoolFlag{
+		Name:     "testnet",
+		Usage:    "Oasys testnet",
 		Category: flags.EthCategory,
 	}
 	DeveloperFlag = &cli.BoolFlag{
@@ -291,29 +291,14 @@ var (
 		Value:    ethconfig.Defaults.TriesVerifyMode.String(),
 		Category: flags.FastNodeCategory,
 	}
-	RialtoHash = &cli.StringFlag{
-		Name:     "rialtohash",
-		Usage:    "Manually specify the Rialto Genesis Hash, to trigger builtin network logic",
-		Category: flags.EthCategory,
-	}
 	OverridePassedForkTime = &cli.Uint64Flag{
 		Name:     "override.passedforktime",
 		Usage:    "Manually specify the hard fork timestamps which have passed on the mainnet, overriding the bundled setting",
 		Category: flags.EthCategory,
 	}
-	OverridePascal = &cli.Uint64Flag{
-		Name:     "override.pascal",
-		Usage:    "Manually specify the Pascal fork timestamp, overriding the bundled setting",
-		Category: flags.EthCategory,
-	}
 	OverridePrague = &cli.Uint64Flag{
 		Name:     "override.prague",
 		Usage:    "Manually specify the Prague fork timestamp, overriding the bundled setting",
-		Category: flags.EthCategory,
-	}
-	OverrideLorentz = &cli.Uint64Flag{
-		Name:     "override.lorentz",
-		Usage:    "Manually specify the Lorentz fork timestamp, overriding the bundled setting",
 		Category: flags.EthCategory,
 	}
 	OverrideVerkle = &cli.Uint64Flag{
@@ -1229,10 +1214,10 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 var (
 	// TestnetFlags is the flag group of all built-in supported testnets.
 	TestnetFlags = []cli.Flag{
-		ChapelFlag,
+		OasysTestnetFlag,
 	}
 	// NetworkFlags is the flag group of all built-in supported networks.
-	NetworkFlags = append([]cli.Flag{BSCMainnetFlag}, TestnetFlags...)
+	NetworkFlags = append([]cli.Flag{OasysMainnetFlag}, TestnetFlags...)
 
 	// DatabaseFlags is the flag group of all database flags.
 	DatabaseFlags = []cli.Flag{
@@ -1611,22 +1596,6 @@ func MakePasswordListFromPath(path string) []string {
 	return lines
 }
 
-func MakePasswordListFromPath(path string) []string {
-	if path == "" {
-		return nil
-	}
-	text, err := os.ReadFile(path)
-	if err != nil {
-		Fatalf("Failed to read password file: %v", err)
-	}
-	lines := strings.Split(string(text), "\n")
-	// Sanitise DOS line endings.
-	for i := range lines {
-		lines[i] = strings.TrimRight(lines[i], "\r")
-	}
-	return lines
-}
-
 func SetP2PConfig(ctx *cli.Context, cfg *p2p.Config) {
 	setNodeKey(ctx, cfg)
 	setNAT(ctx, cfg)
@@ -1784,24 +1753,6 @@ func SetDataDir(ctx *cli.Context, cfg *node.Config) {
 		cfg.DataDir = ctx.String(DataDirFlag.Name)
 	case ctx.Bool(DeveloperFlag.Name):
 		cfg.DataDir = "" // unless explicitly requested, use memory databases
-	}
-}
-
-func setVoteJournalDir(ctx *cli.Context, cfg *node.Config) {
-	dataDir := cfg.DataDir
-	if ctx.IsSet(VoteJournalDirFlag.Name) {
-		cfg.VoteJournalDir = ctx.String(VoteJournalDirFlag.Name)
-	} else if cfg.VoteJournalDir == "" {
-		cfg.VoteJournalDir = filepath.Join(dataDir, "voteJournal")
-	}
-}
-
-func setBLSWalletDir(ctx *cli.Context, cfg *node.Config) {
-	dataDir := cfg.DataDir
-	if ctx.IsSet(BLSWalletDirFlag.Name) {
-		cfg.BLSWalletDir = ctx.String(BLSWalletDirFlag.Name)
-	} else if cfg.BLSWalletDir == "" {
-		cfg.BLSWalletDir = filepath.Join(dataDir, "bls/wallet")
 	}
 }
 
@@ -2005,7 +1956,7 @@ func CheckExclusive(ctx *cli.Context, args ...interface{}) {
 // SetEthConfig applies eth-related command line flags to the config.
 func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	// Avoid conflicting network flags
-	CheckExclusive(ctx, BSCMainnetFlag, DeveloperFlag)
+	CheckExclusive(ctx, OasysMainnetFlag, OasysTestnetFlag, DeveloperFlag)
 	CheckExclusive(ctx, DeveloperFlag, ExternalSignerFlag) // Can't use both ephemeral unlocked and external signer
 
 	// Set configurations from CLI flags
@@ -2212,18 +2163,18 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	}
 	// Override any default configs for hard coded networks.
 	switch {
-	case ctx.Bool(BSCMainnetFlag.Name):
+	case ctx.Bool(OasysMainnetFlag.Name):
 		if !ctx.IsSet(NetworkIdFlag.Name) {
-			cfg.NetworkId = 56
+			cfg.NetworkId = params.OasysMainnetChainConfig.ChainID.Uint64()
 		}
-		cfg.Genesis = core.DefaultBSCGenesisBlock()
-		SetDNSDiscoveryDefaults(cfg, params.BSCGenesisHash)
-	case ctx.Bool(ChapelFlag.Name) || cfg.NetworkId == 97:
+		cfg.Genesis = core.DefaultOasysMainnetGenesisBlock()
+		SetDNSDiscoveryDefaults(cfg, params.OasysMainnetGenesisHash)
+	case ctx.Bool(OasysTestnetFlag.Name):
 		if !ctx.IsSet(NetworkIdFlag.Name) {
-			cfg.NetworkId = 97
+			cfg.NetworkId = params.OasysTestnetChainConfig.ChainID.Uint64()
 		}
-		cfg.Genesis = core.DefaultChapelGenesisBlock()
-		SetDNSDiscoveryDefaults(cfg, params.ChapelGenesisHash)
+		cfg.Genesis = core.DefaultOasysTestnetGenesisBlock()
+		SetDNSDiscoveryDefaults(cfg, params.OasysTestnetGenesisHash)
 	case ctx.Bool(DeveloperFlag.Name):
 		if !ctx.IsSet(NetworkIdFlag.Name) {
 			cfg.NetworkId = 1337
@@ -2686,10 +2637,10 @@ func DialRPCWithHeaders(endpoint string, headers []string) (*rpc.Client, error) 
 func MakeGenesis(ctx *cli.Context) *core.Genesis {
 	var genesis *core.Genesis
 	switch {
-	case ctx.Bool(BSCMainnetFlag.Name):
-		genesis = core.DefaultBSCGenesisBlock()
-	case ctx.Bool(ChapelFlag.Name):
-		genesis = core.DefaultChapelGenesisBlock()
+	case ctx.Bool(OasysMainnetFlag.Name):
+		genesis = core.DefaultOasysMainnetGenesisBlock()
+	case ctx.Bool(OasysTestnetFlag.Name):
+		genesis = core.DefaultOasysTestnetGenesisBlock()
 	case ctx.Bool(DeveloperFlag.Name):
 		Fatalf("Developer chains are ephemeral")
 	}

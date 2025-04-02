@@ -62,9 +62,7 @@ var (
 		Flags: slices.Concat([]cli.Flag{
 			utils.CachePreimagesFlag,
 			utils.OverridePassedForkTime,
-			utils.OverridePascal,
 			utils.OverridePrague,
-			utils.OverrideLorentz,
 			utils.OverrideVerkle,
 			utils.MultiDataBaseFlag,
 		}, utils.DatabaseFlags),
@@ -261,17 +259,9 @@ func initGenesis(ctx *cli.Context) error {
 		v := ctx.Uint64(utils.OverridePassedForkTime.Name)
 		overrides.OverridePassedForkTime = &v
 	}
-	if ctx.IsSet(utils.OverridePascal.Name) {
-		v := ctx.Uint64(utils.OverridePascal.Name)
-		overrides.OverridePascal = &v
-	}
 	if ctx.IsSet(utils.OverridePrague.Name) {
 		v := ctx.Uint64(utils.OverridePrague.Name)
 		overrides.OverridePrague = &v
-	}
-	if ctx.IsSet(utils.OverrideLorentz.Name) {
-		v := ctx.Uint64(utils.OverrideLorentz.Name)
-		overrides.OverrideLorentz = &v
 	}
 	if ctx.IsSet(utils.OverrideVerkle.Name) {
 		v := ctx.Uint64(utils.OverrideVerkle.Name)
@@ -655,10 +645,10 @@ func importHistory(ctx *cli.Context) error {
 	// Determine network.
 	if utils.IsNetworkPreset(ctx) {
 		switch {
-		case ctx.Bool(utils.BSCMainnetFlag.Name):
+		case ctx.Bool(utils.OasysMainnetFlag.Name):
 			network = "mainnet"
-		case ctx.Bool(utils.ChapelFlag.Name):
-			network = "chapel"
+		case ctx.Bool(utils.OasysTestnetFlag.Name):
+			network = "testnet"
 		}
 	} else {
 		// No network flag set, try to determine network based on files
