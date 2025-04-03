@@ -1285,16 +1285,7 @@ type Rules struct {
 	IsEIP2929, IsEIP4762                                    bool
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
 	IsBerlin, IsLondon                                      bool
-	IsMerge                                                 bool
-	IsNano                                                  bool
-	IsMoran                                                 bool
-	IsPlanck                                                bool
-	IsLuban                                                 bool
-	IsPlato                                                 bool
-	IsHertz                                                 bool
-	IsHertzfix                                              bool
-	IsShanghai, IsKepler, IsFeynman, IsCancun, IsHaber      bool
-	IsBohr, IsPascal, IsPrague, IsLorentz, IsOsaka          bool
+	IsMerge, IsShanghai, IsCancun, IsPrague, IsOsaka        bool
 	IsVerkle                                                bool
 }
 
