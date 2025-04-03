@@ -625,17 +625,6 @@ func (pool *LegacyPool) Pending(filter txpool.PendingFilter) map[common.Address]
 // This check is meant as an early check which only needs to be performed once,
 // and does not require the pool mutex to be held.
 func (pool *LegacyPool) validateTxBasics(tx *types.Transaction) error {
-	sender, err := types.Sender(pool.signer, tx)
-	if err != nil {
-		return err
-	}
-	for _, blackAddr := range types.NanoBlackList {
-		if sender == blackAddr || (tx.To() != nil && *tx.To() == blackAddr) {
-			log.Error("blacklist account detected", "account", blackAddr, "tx", tx.Hash())
-			return txpool.ErrInBlackList
-		}
-	}
-
 	opts := &txpool.ValidationOptions{
 		Config: pool.chainconfig,
 		Accept: 0 |
@@ -656,17 +645,6 @@ func (pool *LegacyPool) validateTxBasics(tx *types.Transaction) error {
 // validateTx checks whether a transaction is valid according to the consensus
 // rules and adheres to some heuristic limits of the local node (price and size).
 func (pool *LegacyPool) validateTx(tx *types.Transaction) error {
-	sender, err := types.Sender(pool.signer, tx)
-	if err != nil {
-		return err
-	}
-	for _, blackAddr := range types.NanoBlackList {
-		if sender == blackAddr || (tx.To() != nil && *tx.To() == blackAddr) {
-			log.Error("blacklist account detected", "account", blackAddr, "tx", tx.Hash())
-			return txpool.ErrInBlackList
-		}
-	}
-
 	opts := &txpool.ValidationOptionsWithState{
 		State: pool.currentState,
 
