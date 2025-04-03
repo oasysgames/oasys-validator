@@ -30,10 +30,6 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
-var (
-	SystemAddress = common.HexToAddress("0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE")
-)
-
 // ChainHeaderReader defines a small collection of methods needed to access the local
 // blockchain during header verification.
 type ChainHeaderReader interface {
@@ -108,9 +104,6 @@ type Engine interface {
 	// VerifyRequests verifies the consistency between Requests and header.RequestsHash.
 	VerifyRequests(header *types.Header, Requests [][]byte) error
 
-	// NextInTurnValidator return the next in-turn validator for header
-	NextInTurnValidator(chain ChainHeaderReader, header *types.Header) (common.Address, error)
-
 	// Prepare initializes the consensus fields of a block header according to the
 	// rules of a particular engine. The changes are executed inline.
 	Prepare(chain ChainHeaderReader, header *types.Header) error
@@ -152,21 +145,6 @@ type Engine interface {
 
 	// Close terminates any background threads maintained by the consensus engine.
 	Close() error
-}
-
-type PoSA interface {
-	Engine
-
-	IsSystemTransaction(tx *types.Transaction, header *types.Header) (bool, error)
-	IsSystemContract(to *common.Address) bool
-	EnoughDistance(chain ChainReader, header *types.Header) bool
-	IsLocalBlock(header *types.Header) bool
-	GetJustifiedNumberAndHash(chain ChainHeaderReader, headers []*types.Header) (uint64, common.Hash, error)
-	GetFinalizedHeader(chain ChainHeaderReader, header *types.Header) *types.Header
-	VerifyVote(chain ChainHeaderReader, vote *types.VoteEnvelope) error
-	IsActiveValidatorAt(chain ChainHeaderReader, header *types.Header, checkVoteKeyFn func(bLSPublicKey *types.BLSPublicKey) bool) bool
-	BlockInterval() uint64
-	NextProposalBlock(chain ChainHeaderReader, header *types.Header, proposer common.Address) (uint64, uint64, error)
 }
 
 type PoS interface {

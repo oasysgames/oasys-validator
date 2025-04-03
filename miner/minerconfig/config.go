@@ -39,51 +39,26 @@ type Config struct {
 	MaxWaitProposalInSecs uint64         // The maximum time to wait for the proposal to be done, it's aimed to prevent validator being slashed when restarting
 
 	DisableVoteAttestation bool // Whether to skip assembling vote attestation
-
-	Mev MevConfig // Mev configuration
 }
 
 // DefaultConfig contains default settings for miner.
 var DefaultConfig = Config{
-	GasCeil:  0,
+	GasCeil:  30000000,
 	GasPrice: big.NewInt(params.GWei),
 
 	// The default recommit time is chosen as two seconds since
 	// consensus-layer usually will wait a half slot of time(6s)
 	// for payload generation. It should be enough for Geth to
 	// run 3 rounds.
-	Recommit:      3 * time.Second,
+	Recommit:      2 * time.Second,
 	DelayLeftOver: 50 * time.Millisecond,
 
 	// The default value is set to 30 seconds.
 	// Because the avg restart time in mainnet is around 30s, so the node try to wait for the next multi-proposals to be done.
 	MaxWaitProposalInSecs: 30,
-
-	Mev: DefaultMevConfig,
 }
 
 type BuilderConfig struct {
 	Address common.Address
 	URL     string
-}
-
-type MevConfig struct {
-	Enabled               bool            // Whether to enable Mev or not
-	GreedyMergeTx         bool            // Whether to merge local transactions to the bid
-	BuilderFeeCeil        string          // The maximum builder fee of a bid
-	SentryURL             string          // The url of Mev sentry
-	Builders              []BuilderConfig // The list of builders
-	ValidatorCommission   uint64          // 100 means the validator claims 1% from block reward
-	BidSimulationLeftOver time.Duration
-	NoInterruptLeftOver   time.Duration
-}
-
-var DefaultMevConfig = MevConfig{
-	Enabled:               false,
-	GreedyMergeTx:         true,
-	SentryURL:             "",
-	Builders:              nil,
-	ValidatorCommission:   100,
-	BidSimulationLeftOver: 50 * time.Millisecond,
-	NoInterruptLeftOver:   400 * time.Millisecond,
 }

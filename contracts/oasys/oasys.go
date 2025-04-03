@@ -31,8 +31,8 @@ var (
 // StateDB is an interface of state.StateDB.
 type StateDB interface {
 	GetCode(addr common.Address) []byte
-	SetCode(addr common.Address, code []byte)
-	SetState(addr common.Address, key common.Hash, value common.Hash)
+	SetCode(addr common.Address, code []byte) (prev []byte)
+	SetState(addr common.Address, key, value common.Hash) (prev common.Hash)
 }
 
 // Deploy oasys built-in contracts.

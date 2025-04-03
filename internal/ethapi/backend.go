@@ -89,8 +89,6 @@ type Backend interface {
 
 	ChainConfig() *params.ChainConfig
 	Engine() consensus.Engine
-	// CurrentValidators return the list of validator at the latest block
-	CurrentValidators() ([]common.Address, error)
 
 	// This is copied from filters.Backend
 	// eth/filters needs to be initialized from this backend type, so methods needed by
@@ -103,27 +101,6 @@ type Backend interface {
 	ServiceFilter(ctx context.Context, session *bloombits.MatcherSession)
 	SubscribeFinalizedHeaderEvent(ch chan<- core.FinalizedHeaderEvent) event.Subscription
 	SubscribeNewVoteEvent(chan<- core.NewVoteEvent) event.Subscription
-
-	// MevRunning return true if mev is running
-	MevRunning() bool
-	// MevParams returns the static params of mev
-	MevParams() *types.MevParams
-	// StartMev starts mev
-	StartMev()
-	// StopMev stops mev
-	StopMev()
-	// AddBuilder adds a builder to the bid simulator.
-	AddBuilder(builder common.Address, builderUrl string) error
-	// RemoveBuilder removes a builder from the bid simulator.
-	RemoveBuilder(builder common.Address) error
-	// HasBuilder returns true if the builder is in the builder list.
-	HasBuilder(builder common.Address) bool
-	// SendBid receives bid from the builders.
-	SendBid(ctx context.Context, bid *types.BidArgs) (common.Hash, error)
-	// BestBidGasFee returns the gas fee of the best bid for the given parent hash.
-	BestBidGasFee(parentHash common.Hash) *big.Int
-	// MinerInTurn returns true if the validator is in turn to propose the block.
-	MinerInTurn() bool
 }
 
 func GetAPIs(apiBackend Backend) []rpc.API {
@@ -147,9 +124,6 @@ func GetAPIs(apiBackend Backend) []rpc.API {
 		}, {
 			Namespace: "eth",
 			Service:   NewEthereumAccountAPI(apiBackend.AccountManager()),
-		}, {
-			Namespace: "mev",
-			Service:   NewMevAPI(apiBackend),
 		},
 	}
 }

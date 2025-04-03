@@ -170,7 +170,7 @@ func (api *SignerAPI) determineSignatureFormat(ctx context.Context, contentType 
 		if !ok {
 			return nil, useEthereumV, fmt.Errorf("input for %v must be an hex-encoded string", apitypes.ApplicationOasys.Mime)
 		}
-		oasysData, err := fromHex(data)
+		oasysData, err := hexutil.Decode(stringData)
 		if err != nil {
 			return nil, useEthereumV, err
 		}

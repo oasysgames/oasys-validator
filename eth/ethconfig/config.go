@@ -99,7 +99,6 @@ type Config struct {
 	EthDiscoveryURLs   []string
 	SnapDiscoveryURLs  []string
 	TrustDiscoveryURLs []string
-	BscDiscoveryURLs   []string
 
 	// State options.
 	NoPruning  bool // Whether to disable pruning and flush everything to disk
@@ -185,14 +184,8 @@ type Config struct {
 	// OverridePassedForkTime
 	OverridePassedForkTime *uint64 `toml:",omitempty"`
 
-	// OverridePascal (TODO: remove after the fork)
-	OverridePascal *uint64 `toml:",omitempty"`
-
 	// OverridePrague (TODO: remove after the fork)
 	OverridePrague *uint64 `toml:",omitempty"`
-
-	// OverrideLorentz (TODO: remove after the fork)
-	OverrideLorentz *uint64 `toml:",omitempty"`
 
 	// OverrideVerkle (TODO: remove after the fork)
 	OverrideVerkle *uint64 `toml:",omitempty"`
@@ -206,7 +199,7 @@ type Config struct {
 // only exist on already merged networks.
 func CreateConsensusEngine(config *params.ChainConfig, db ethdb.Database, ee *ethapi.BlockChainAPI, genesisHash common.Hash) (consensus.Engine, error) {
 	if config.Oasys != nil {
-		return oasys.New(config, config.Oasys, db, ethAPI), nil
+		return oasys.New(config, config.Oasys, db, ee), nil
 	}
 	if config.TerminalTotalDifficulty == nil {
 		log.Error("Geth only supports PoS networks. Please transition legacy networks using Geth v1.13.x.")

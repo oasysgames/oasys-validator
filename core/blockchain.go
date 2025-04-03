@@ -25,6 +25,7 @@ import (
 	"runtime"
 	"slices"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -36,12 +37,12 @@ import (
 	"github.com/ethereum/go-ethereum/common/prque"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
+	contracts "github.com/ethereum/go-ethereum/contracts/oasys"
 	"github.com/ethereum/go-ethereum/core/monitor"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/state/snapshot"
 	"github.com/ethereum/go-ethereum/core/stateless"
-	"github.com/ethereum/go-ethereum/core/systemcontracts"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -357,17 +358,15 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, genesis *Genesis
 	if err != nil {
 		return nil, err
 	}
-	systemcontracts.GenesisHash = genesisHash
-	log.Info("Initialised chain configuration", "config", chainConfig)
-	/*
-		log.Info("")
-		log.Info(strings.Repeat("-", 153))
-		for _, line := range strings.Split(chainConfig.Description(), "\n") {
-			log.Info(line)
-		}
-		log.Info(strings.Repeat("-", 153))
-		log.Info("")
-	*/
+	contracts.GenesisHash = genesisHash
+	// log.Info("Initialised chain configuration", "config", chainConfig)
+	log.Info("")
+	log.Info(strings.Repeat("-", 153))
+	for _, line := range strings.Split(chainConfig.Description(), "\n") {
+		log.Info(line)
+	}
+	log.Info(strings.Repeat("-", 153))
+	log.Info("")
 
 	bc := &BlockChain{
 		chainConfig:        chainConfig,
@@ -1872,30 +1871,21 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	flushInterval := time.Duration(bc.flushInterval.Load())
 	// If we exceeded out time allowance, flush an entire trie to disk
 	if bc.gcproc > flushInterval {
-		canWrite := true
-		if posa, ok := bc.engine.(consensus.PoSA); ok {
-			if !posa.EnoughDistance(bc, block.Header()) {
-				canWrite = false
+		// If the header is missing (canonical chain behind), we're reorging a low
+		// diff sidechain. Suspend committing until this operation is completed.
+		header := bc.GetHeaderByNumber(chosen)
+		if header == nil {
+			log.Warn("Reorg in progress, trie commit postponed", "number", chosen)
+		} else {
+			// If we're exceeding limits but haven't reached a large enough memory gap,
+			// warn the user that the system is becoming unstable.
+			if chosen < bc.lastWrite+state.TriesInMemory && bc.gcproc >= 2*flushInterval {
+				log.Info("State in memory for too long, committing", "time", bc.gcproc, "allowance", flushInterval, "optimum", float64(chosen-bc.lastWrite)/state.TriesInMemory)
 			}
-		}
-		if canWrite {
-			// If the header is missing (canonical chain behind), we're reorging a low
-			// diff sidechain. Suspend committing until this operation is completed.
-			header := bc.GetHeaderByNumber(chosen)
-			if header == nil {
-				log.Warn("Reorg in progress, trie commit postponed", "number", chosen)
-			} else {
-				// If we're exceeding limits but haven't reached a large enough memory gap,
-				// warn the user that the system is becoming unstable.
-				if chosen < bc.lastWrite+state.TriesInMemory && bc.gcproc >= 2*flushInterval {
-					log.Info("State in memory for too long, committing", "time", bc.gcproc, "allowance", flushInterval, "optimum", float64(chosen-bc.lastWrite)/float64(state.TriesInMemory))
-				}
-				// Flush an entire trie and restart the counters
-				bc.triedb.Commit(header.Root, true)
-				rawdb.WriteSafePointBlockNumber(bc.db, chosen)
-				bc.lastWrite = chosen
-				bc.gcproc = 0
-			}
+			// Flush an entire trie and restart the counters
+			bc.triedb.Commit(header.Root, true)
+			bc.lastWrite = chosen
+			bc.gcproc = 0
 		}
 	}
 	// Garbage collect anything below our required write retention

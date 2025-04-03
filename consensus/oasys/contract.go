@@ -21,10 +21,11 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
+	"github.com/ethereum/go-ethereum/internal/ethapi/override"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -142,7 +143,7 @@ func (b *contract) parseABI() error {
 // Contracts deployed in the genesis block
 type genesisContract = contract
 
-func (g *genesisContract) verifyCode(state *state.StateDB) bool {
+func (g *genesisContract) verifyCode(state vm.StateDB) bool {
 	deployed := state.GetCode(g.address)
 	expect := common.FromHex(g.artifact.DeployedBytecode)
 	return bytes.Equal(deployed, expect)
@@ -163,6 +164,10 @@ func (c chainContext) Engine() consensus.Engine {
 
 func (c chainContext) GetHeader(hash common.Hash, number uint64) *types.Header {
 	return c.Chain.GetHeader(hash, number)
+}
+
+func (c chainContext) Config() *params.ChainConfig {
+	return c.Chain.Config()
 }
 
 // nextValidators
@@ -280,7 +285,7 @@ func (c *Oasys) IsSystemTransaction(tx *types.Transaction, header *types.Header)
 
 // Transact the `Environment.initialize` and `StakeManager.initialize` method.
 func (c *Oasys) initializeSystemContracts(
-	state *state.StateDB,
+	state vm.StateDB,
 	header *types.Header,
 	cx core.ChainContext,
 	txs *[]*types.Transaction,
@@ -324,7 +329,7 @@ func (c *Oasys) initializeSystemContracts(
 func (c *Oasys) slash(
 	validator common.Address,
 	schedules []*common.Address,
-	state *state.StateDB,
+	state vm.StateDB,
 	header *types.Header,
 	cx core.ChainContext,
 	txs *[]*types.Transaction,
@@ -348,7 +353,7 @@ func (c *Oasys) slash(
 }
 
 type blockchainAPI interface {
-	Call(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash *rpc.BlockNumberOrHash, overrides *ethapi.StateOverride, blockOverrides *ethapi.BlockOverrides) (hexutil.Bytes, error)
+	Call(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash *rpc.BlockNumberOrHash, overrides *override.StateOverride, blockOverrides *override.BlockOverrides) (hexutil.Bytes, error)
 }
 
 // view functions
@@ -707,7 +712,7 @@ func getNextEnvironmentValue(ethAPI blockchainAPI, hash common.Hash) (*params.En
 
 func (c *Oasys) applyTransaction(
 	msg callmsg,
-	state *state.StateDB,
+	state vm.StateDB,
 	header *types.Header,
 	cx core.ChainContext,
 	txs *[]*types.Transaction,
@@ -766,7 +771,7 @@ func (c *Oasys) applyTransaction(
 	receipt.BlockNumber = header.Number
 	receipt.TransactionIndex = uint(state.TxIndex())
 	*receipts = append(*receipts, receipt)
-	state.SetNonce(msg.From(), nonce+1)
+	state.SetNonce(msg.From(), nonce+1, tracing.NonceChangeEoACall)
 	return nil
 }
 
@@ -785,13 +790,13 @@ func getMessage(from, toAddress common.Address, data []byte, value *big.Int) cal
 
 func applyMessage(
 	msg callmsg,
-	state *state.StateDB,
+	state vm.StateDB,
 	header *types.Header,
 	chainConfig *params.ChainConfig,
 	chain core.ChainContext,
 ) (uint64, error) {
 	context := core.NewEVMBlockContext(header, chain, nil)
-	vmenv := vm.NewEVM(context, vm.TxContext{Origin: msg.From(), GasPrice: big.NewInt(0)}, state, chainConfig, vm.Config{})
+	vmenv := vm.NewEVM(context, state, chainConfig, vm.Config{})
 	ret, returnGas, err := vmenv.Call(
 		vm.AccountRef(msg.From()),
 		*msg.To(),

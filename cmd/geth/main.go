@@ -72,11 +72,8 @@ var (
 		utils.RangeLimitFlag,
 		utils.USBFlag,
 		utils.SmartCardDaemonPathFlag,
-		utils.RialtoHash,
 		utils.OverridePassedForkTime,
-		utils.OverridePascal,
 		utils.OverridePrague,
-		utils.OverrideLorentz,
 		utils.OverrideVerkle,
 		utils.OverrideFullImmutabilityThreshold,
 		utils.OverrideMinBlocksForBlobRequests,
@@ -296,7 +293,6 @@ func init() {
 		blsCommand,
 		// See verkle.go
 		verkleCommand,
-		blsCommand,
 	}
 	if logTestCommand != nil {
 		app.Commands = append(app.Commands, logTestCommand)
@@ -341,8 +337,8 @@ func main() {
 func prepare(ctx *cli.Context) {
 	// If we're running a known preset, log it for convenience.
 	switch {
-	case ctx.IsSet(utils.ChapelFlag.Name):
-		log.Info("Starting BSC on Chapel testnet...")
+	case ctx.IsSet(utils.OasysTestnetFlag.Name):
+		log.Info("Starting Oasys testnet...")
 
 	case ctx.IsSet(utils.DeveloperFlag.Name):
 		log.Info("Starting Geth in ephemeral dev mode...")
@@ -365,7 +361,7 @@ func prepare(ctx *cli.Context) {
 	// If we're a full node on mainnet without --cache specified, bump default cache allowance
 	if !ctx.IsSet(utils.CacheFlag.Name) && !ctx.IsSet(utils.NetworkIdFlag.Name) {
 		// Make sure we're not on any supported preconfigured testnet either
-		if !ctx.IsSet(utils.ChapelFlag.Name) &&
+		if !ctx.IsSet(utils.OasysTestnetFlag.Name) &&
 			!ctx.IsSet(utils.DeveloperFlag.Name) {
 			// Nope, we're really on mainnet. Bump that cache up!
 			log.Info("Bumping default cache on mainnet", "provided", ctx.Int(utils.CacheFlag.Name), "updated", 4096)

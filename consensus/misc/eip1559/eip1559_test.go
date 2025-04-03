@@ -52,7 +52,7 @@ func copyConfig(original *params.ChainConfig) *params.ChainConfig {
 func config() *params.ChainConfig {
 	config := copyConfig(params.TestChainConfig)
 	config.Ethash = nil
-	config.Parlia = &params.ParliaConfig{
+	config.Oasys = &params.OasysConfig{
 		Period: 3,
 		Epoch:  200,
 	}

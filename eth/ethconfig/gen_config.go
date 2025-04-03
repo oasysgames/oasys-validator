@@ -23,7 +23,6 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		EthDiscoveryURLs        []string
 		SnapDiscoveryURLs       []string
 		TrustDiscoveryURLs      []string
-		BscDiscoveryURLs        []string
 		NoPruning               bool
 		NoPrefetch              bool
 		DirectBroadcast         bool
@@ -64,9 +63,7 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		RPCEVMTimeout           time.Duration
 		RPCTxFeeCap             float64
 		OverridePassedForkTime  *uint64 `toml:",omitempty"`
-		OverridePascal          *uint64 `toml:",omitempty"`
 		OverridePrague          *uint64 `toml:",omitempty"`
-		OverrideLorentz         *uint64 `toml:",omitempty"`
 		OverrideVerkle          *uint64 `toml:",omitempty"`
 		BlobExtraReserve        uint64
 	}
@@ -78,7 +75,6 @@ func (c Config) MarshalTOML() (interface{}, error) {
 	enc.EthDiscoveryURLs = c.EthDiscoveryURLs
 	enc.SnapDiscoveryURLs = c.SnapDiscoveryURLs
 	enc.TrustDiscoveryURLs = c.TrustDiscoveryURLs
-	enc.BscDiscoveryURLs = c.BscDiscoveryURLs
 	enc.NoPruning = c.NoPruning
 	enc.NoPrefetch = c.NoPrefetch
 	enc.DirectBroadcast = c.DirectBroadcast
@@ -119,9 +115,7 @@ func (c Config) MarshalTOML() (interface{}, error) {
 	enc.RPCEVMTimeout = c.RPCEVMTimeout
 	enc.RPCTxFeeCap = c.RPCTxFeeCap
 	enc.OverridePassedForkTime = c.OverridePassedForkTime
-	enc.OverridePascal = c.OverridePascal
 	enc.OverridePrague = c.OverridePrague
-	enc.OverrideLorentz = c.OverrideLorentz
 	enc.OverrideVerkle = c.OverrideVerkle
 	enc.BlobExtraReserve = c.BlobExtraReserve
 	return &enc, nil
@@ -137,7 +131,6 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		EthDiscoveryURLs        []string
 		SnapDiscoveryURLs       []string
 		TrustDiscoveryURLs      []string
-		BscDiscoveryURLs        []string
 		NoPruning               *bool
 		NoPrefetch              *bool
 		DirectBroadcast         *bool
@@ -178,9 +171,7 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		RPCEVMTimeout           *time.Duration
 		RPCTxFeeCap             *float64
 		OverridePassedForkTime  *uint64 `toml:",omitempty"`
-		OverridePascal          *uint64 `toml:",omitempty"`
 		OverridePrague          *uint64 `toml:",omitempty"`
-		OverrideLorentz         *uint64 `toml:",omitempty"`
 		OverrideVerkle          *uint64 `toml:",omitempty"`
 		BlobExtraReserve        *uint64
 	}
@@ -208,9 +199,6 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	}
 	if dec.TrustDiscoveryURLs != nil {
 		c.TrustDiscoveryURLs = dec.TrustDiscoveryURLs
-	}
-	if dec.BscDiscoveryURLs != nil {
-		c.BscDiscoveryURLs = dec.BscDiscoveryURLs
 	}
 	if dec.NoPruning != nil {
 		c.NoPruning = *dec.NoPruning
@@ -332,14 +320,8 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	if dec.OverridePassedForkTime != nil {
 		c.OverridePassedForkTime = dec.OverridePassedForkTime
 	}
-	if dec.OverridePascal != nil {
-		c.OverridePascal = dec.OverridePascal
-	}
 	if dec.OverridePrague != nil {
 		c.OverridePrague = dec.OverridePrague
-	}
-	if dec.OverrideLorentz != nil {
-		c.OverrideLorentz = dec.OverrideLorentz
 	}
 	if dec.OverrideVerkle != nil {
 		c.OverrideVerkle = dec.OverrideVerkle

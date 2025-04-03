@@ -29,12 +29,16 @@ func (s MockStateDB) GetCode(addr common.Address) []byte {
 	return s.getContract(addr).code
 }
 
-func (s MockStateDB) SetCode(addr common.Address, code []byte) {
-	s.getContract(addr).code = code
+func (s MockStateDB) SetCode(addr common.Address, code []byte) (prev []byte) {
+	mc := s.getContract(addr)
+	prev, mc.code = mc.code, code
+	return prev
 }
 
-func (s MockStateDB) SetState(addr common.Address, key common.Hash, value common.Hash) {
-	s.getContract(addr).storage[key] = value
+func (s MockStateDB) SetState(addr common.Address, key, value common.Hash) (prev common.Hash) {
+	mc := s.getContract(addr)
+	prev, mc.storage[key] = mc.storage[key], value
+	return prev
 }
 
 func (s MockStateDB) getContract(addr common.Address) *MockContract {

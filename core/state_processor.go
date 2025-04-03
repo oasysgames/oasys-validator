@@ -108,7 +108,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	if cl, ok := engine.(*beacon.Beacon); ok {
 		engine = cl.InnerEngine()
 	}
-	pos, isPoS = engine.(consensus.PoS)
+	pos, isPoS := engine.(consensus.PoS)
 	commonTxs := make([]*types.Transaction, 0, txNum)
 
 	// initialise bloom processors
@@ -155,7 +155,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 
 	// Read requests if Prague is enabled.
 	var requests [][]byte
-	if p.config.IsPrague(block.Number(), block.Time()) && p.chain.config.Parlia == nil {
+	if p.config.IsPrague(block.Number(), block.Time()) && p.chain.config.Oasys == nil {
 		var allCommonLogs []*types.Log
 		for _, receipt := range receipts {
 			allCommonLogs = append(allCommonLogs, receipt.Logs...)
@@ -274,9 +274,9 @@ func ApplyTransaction(evm *vm.EVM, gp *GasPool, statedb *state.StateDB, header *
 // ProcessBeaconBlockRoot applies the EIP-4788 system call to the beacon block root
 // contract. This method is exported to be used in tests.
 func ProcessBeaconBlockRoot(beaconRoot common.Hash, evm *vm.EVM) {
-	// Return immediately if beaconRoot equals the zero hash when using the Parlia engine.
+	// Return immediately if beaconRoot equals the zero hash when using the Oasys engine.
 	if beaconRoot == (common.Hash{}) {
-		if chainConfig := evm.ChainConfig(); chainConfig != nil && chainConfig.Parlia != nil {
+		if chainConfig := evm.ChainConfig(); chainConfig != nil && chainConfig.Oasys != nil {
 			return
 		}
 	}

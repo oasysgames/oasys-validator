@@ -259,6 +259,10 @@ var (
 			Period: 15,
 			Epoch:  5760,
 		},
+		BlobScheduleConfig: &BlobScheduleConfig{
+			Cancun: DefaultCancunBlobConfig,
+			Prague: DefaultPragueBlobConfigOasys,
+		},
 	}
 
 	OasysTestnetChainConfig = &ChainConfig{
@@ -280,6 +284,10 @@ var (
 		Oasys: &OasysConfig{
 			Period: 15,
 			Epoch:  5760,
+		},
+		BlobScheduleConfig: &BlobScheduleConfig{
+			Cancun: DefaultCancunBlobConfig,
+			Prague: DefaultPragueBlobConfigOasys,
 		},
 	}
 
@@ -417,17 +425,16 @@ var (
 		Prague: DefaultPragueBlobConfig,
 	}
 
-	DefaultPragueBlobConfigBSC = DefaultCancunBlobConfig
-	// for bsc, only DefaultCancunBlobConfig is used, so we can define MaxBlobsPerBlockForBSC more directly
-	MaxBlobsPerBlockForBSC = DefaultCancunBlobConfig.Max
+	DefaultPragueBlobConfigOasys = DefaultCancunBlobConfig // TODO
+	// for oasys, only DefaultCancunBlobConfig is used, so we can define MaxBlobsPerBlockForOasys more directly
+	MaxBlobsPerBlockForOasys = DefaultCancunBlobConfig.Max
 )
 
 // NetworkNames are user friendly names to use in the chain spec banner.
 var NetworkNames = map[string]string{
-	MainnetChainConfig.ChainID.String(): "mainnet",
-	BSCChainConfig.ChainID.String():     "bsc",
-	ChapelChainConfig.ChainID.String():  "chapel",
-	RialtoChainConfig.ChainID.String():  "rialto",
+	MainnetChainConfig.ChainID.String():      "ethereum",
+	OasysMainnetChainConfig.ChainID.String(): "mainnet",
+	OasysTestnetChainConfig.ChainID.String(): "testnet",
 }
 
 // ChainConfig is the core config which determines the blockchain settings.
@@ -454,8 +461,6 @@ type ChainConfig struct {
 	IstanbulBlock       *big.Int `json:"istanbulBlock,omitempty"`       // Istanbul switch block (nil = no fork, 0 = already on istanbul)
 	MuirGlacierBlock    *big.Int `json:"muirGlacierBlock,omitempty"`    // Eip-2384 (bomb delay) switch block (nil = no fork, 0 = already activated)
 	BerlinBlock         *big.Int `json:"berlinBlock,omitempty"`         // Berlin switch block (nil = no fork, 0 = already on berlin)
-	YoloV3Block         *big.Int `json:"yoloV3Block,omitempty"`         // YOLO v3: Gas repricings TODO @holiman add EIP references
-	CatalystBlock       *big.Int `json:"catalystBlock,omitempty"`       // Catalyst switch block (nil = no fork, 0 = already on catalyst)
 	LondonBlock         *big.Int `json:"londonBlock,omitempty"`         // London switch block (nil = no fork, 0 = already on london)
 	ArrowGlacierBlock   *big.Int `json:"arrowGlacierBlock,omitempty"`   // Eip-4345 (bomb delay) switch block (nil = no fork, 0 = already activated)
 	GrayGlacierBlock    *big.Int `json:"grayGlacierBlock,omitempty"`    // Eip-5133 (bomb delay) switch block (nil = no fork, 0 = already activated)
@@ -463,25 +468,19 @@ type ChainConfig struct {
 
 	// Fork scheduling was switched from blocks to timestamps here
 
-	ShanghaiTime   *uint64 `json:"shanghaiTime,omitempty"`   // Shanghai switch time (nil = no fork, 0 = already on shanghai)
-	KeplerTime     *uint64 `json:"keplerTime,omitempty"`     // Kepler switch time (nil = no fork, 0 = already activated)
-	FeynmanTime    *uint64 `json:"feynmanTime,omitempty"`    // Feynman switch time (nil = no fork, 0 = already activated)
-	FeynmanFixTime *uint64 `json:"feynmanFixTime,omitempty"` // FeynmanFix switch time (nil = no fork, 0 = already activated)
-	CancunTime     *uint64 `json:"cancunTime,omitempty"`     // Cancun switch time (nil = no fork, 0 = already on cancun)
-	HaberTime      *uint64 `json:"haberTime,omitempty"`      // Haber switch time (nil = no fork, 0 = already on haber)
-	HaberFixTime   *uint64 `json:"haberFixTime,omitempty"`   // HaberFix switch time (nil = no fork, 0 = already on haberFix)
-	BohrTime       *uint64 `json:"bohrTime,omitempty"`       // Bohr switch time (nil = no fork, 0 = already on bohr)
-	PascalTime     *uint64 `json:"pascalTime,omitempty"`     // Pascal switch time (nil = no fork, 0 = already on pascal)
-	PragueTime     *uint64 `json:"pragueTime,omitempty"`     // Prague switch time (nil = no fork, 0 = already on prague)
-	OsakaTime      *uint64 `json:"osakaTime,omitempty"`      // Osaka switch time (nil = no fork, 0 = already on osaka)
-	LorentzTime    *uint64 `json:"lorentzTime,omitempty"`    // Lorentz switch time (nil = no fork, 0 = already on lorentz)
-	VerkleTime     *uint64 `json:"verkleTime,omitempty"`     // Verkle switch time (nil = no fork, 0 = already on verkle)
+	ShanghaiTime *uint64 `json:"shanghaiTime,omitempty"` // Shanghai switch time (nil = no fork, 0 = already on shanghai)
+	CancunTime   *uint64 `json:"cancunTime,omitempty"`   // Cancun switch time (nil = no fork, 0 = already on cancun)
+	PragueTime   *uint64 `json:"pragueTime,omitempty"`   // Prague switch time (nil = no fork, 0 = already on prague)
+	OsakaTime    *uint64 `json:"osakaTime,omitempty"`    // Osaka switch time (nil = no fork, 0 = already on osaka)
+	VerkleTime   *uint64 `json:"verkleTime,omitempty"`   // Verkle switch time (nil = no fork, 0 = already on verkle)
 
 	// TerminalTotalDifficulty is the amount of total difficulty reached by
 	// the network that triggers the consensus upgrade.
 	TerminalTotalDifficulty *big.Int `json:"terminalTotalDifficulty,omitempty"`
 
-	// prysm still use it, can't remove it
+	// TerminalTotalDifficultyPassed is a flag specifying that the network already
+	// passed the terminal total difficulty. Its purpose is to disable legacy sync
+	// even without having seen the TTD locally (safer long term).
 	TerminalTotalDifficultyPassed bool `json:"terminalTotalDifficultyPassed,omitempty"`
 
 	DepositContractAddress common.Address `json:"depositContractAddress,omitempty"`
@@ -498,20 +497,6 @@ type ChainConfig struct {
 	// always occurs after the genesis block, making this flag irrelevant in
 	// those cases.
 	EnableVerkleAtGenesis bool `json:"enableVerkleAtGenesis,omitempty"`
-
-	RamanujanBlock  *big.Int `json:"ramanujanBlock,omitempty"`  // ramanujanBlock switch block (nil = no fork, 0 = already activated)
-	NielsBlock      *big.Int `json:"nielsBlock,omitempty"`      // nielsBlock switch block (nil = no fork, 0 = already activated)
-	MirrorSyncBlock *big.Int `json:"mirrorSyncBlock,omitempty"` // mirrorSyncBlock switch block (nil = no fork, 0 = already activated)
-	BrunoBlock      *big.Int `json:"brunoBlock,omitempty"`      // brunoBlock switch block (nil = no fork, 0 = already activated)
-	EulerBlock      *big.Int `json:"eulerBlock,omitempty"`      // eulerBlock switch block (nil = no fork, 0 = already activated)
-	GibbsBlock      *big.Int `json:"gibbsBlock,omitempty"`      // gibbsBlock switch block (nil = no fork, 0 = already activated)
-	NanoBlock       *big.Int `json:"nanoBlock,omitempty"`       // nanoBlock switch block (nil = no fork, 0 = already activated)
-	MoranBlock      *big.Int `json:"moranBlock,omitempty"`      // moranBlock switch block (nil = no fork, 0 = already activated)
-	PlanckBlock     *big.Int `json:"planckBlock,omitempty"`     // planckBlock switch block (nil = no fork, 0 = already activated)
-	LubanBlock      *big.Int `json:"lubanBlock,omitempty"`      // lubanBlock switch block (nil = no fork, 0 = already activated)
-	PlatoBlock      *big.Int `json:"platoBlock,omitempty"`      // platoBlock switch block (nil = no fork, 0 = already activated)
-	HertzBlock      *big.Int `json:"hertzBlock,omitempty"`      // hertzBlock switch block (nil = no fork, 0 = already activated)
-	HertzfixBlock   *big.Int `json:"hertzfixBlock,omitempty"`   // hertzfixBlock switch block (nil = no fork, 0 = already activated)
 
 	// Various consensus engines
 	Ethash             *EthashConfig       `json:"ethash,omitempty"`
@@ -537,17 +522,6 @@ type CliqueConfig struct {
 // String implements the stringer interface, returning the consensus engine details.
 func (c CliqueConfig) String() string {
 	return fmt.Sprintf("clique(period: %d, epoch: %d)", c.Period, c.Epoch)
-}
-
-// ParliaConfig is the consensus engine configs for proof-of-staked-authority based sealing.
-type ParliaConfig struct {
-	Period uint64 `json:"period"` // Number of seconds between blocks to enforce
-	Epoch  uint64 `json:"epoch"`  // Epoch length to update validatorSet
-}
-
-// String implements the stringer interface, returning the consensus engine details.
-func (b *ParliaConfig) String() string {
-	return "parlia"
 }
 
 // OasysConfig is the consensus engine configs for proof-of-stake based sealing.
@@ -647,8 +621,8 @@ func (c *ChainConfig) String() string {
 		engine = c.Ethash
 	case c.Clique != nil:
 		engine = c.Clique
-	case c.Parlia != nil:
-		engine = c.Parlia
+	case c.Oasys != nil:
+		engine = c.Oasys
 	default:
 		engine = "unknown"
 	}
@@ -658,44 +632,9 @@ func (c *ChainConfig) String() string {
 		ShanghaiTime = big.NewInt(0).SetUint64(*c.ShanghaiTime)
 	}
 
-	var KeplerTime *big.Int
-	if c.KeplerTime != nil {
-		KeplerTime = big.NewInt(0).SetUint64(*c.KeplerTime)
-	}
-
-	var FeynmanTime *big.Int
-	if c.FeynmanTime != nil {
-		FeynmanTime = big.NewInt(0).SetUint64(*c.FeynmanTime)
-	}
-
-	var FeynmanFixTime *big.Int
-	if c.FeynmanFixTime != nil {
-		FeynmanFixTime = big.NewInt(0).SetUint64(*c.FeynmanFixTime)
-	}
-
 	var CancunTime *big.Int
 	if c.CancunTime != nil {
 		CancunTime = big.NewInt(0).SetUint64(*c.CancunTime)
-	}
-
-	var HaberTime *big.Int
-	if c.HaberTime != nil {
-		HaberTime = big.NewInt(0).SetUint64(*c.HaberTime)
-	}
-
-	var HaberFixTime *big.Int
-	if c.HaberFixTime != nil {
-		HaberFixTime = big.NewInt(0).SetUint64(*c.HaberFixTime)
-	}
-
-	var BohrTime *big.Int
-	if c.BohrTime != nil {
-		BohrTime = big.NewInt(0).SetUint64(*c.BohrTime)
-	}
-
-	var PascalTime *big.Int
-	if c.PascalTime != nil {
-		PascalTime = big.NewInt(0).SetUint64(*c.PascalTime)
 	}
 
 	var PragueTime *big.Int
@@ -703,12 +642,7 @@ func (c *ChainConfig) String() string {
 		PragueTime = big.NewInt(0).SetUint64(*c.PragueTime)
 	}
 
-	var LorentzTime *big.Int
-	if c.LorentzTime != nil {
-		LorentzTime = big.NewInt(0).SetUint64(*c.LorentzTime)
-	}
-
-	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Ramanujan: %v, Niels: %v, MirrorSync: %v, Bruno: %v, Berlin: %v, YOLO v3: %v, CatalystBlock: %v, London: %v, ArrowGlacier: %v, MergeFork:%v, Euler: %v, Gibbs: %v, Nano: %v, Moran: %v, Planck: %v,Luban: %v, Plato: %v, Hertz: %v, Hertzfix: %v ShanghaiTime: %v, KeplerTime: %v, FeynmanTime: %v, FeynmanFixTime: %v, CancunTime: %v, HaberTime: %v, HaberFixTime: %v, BohrTime: %v, PascalTime: %v, PragueTime: %v, LorentzTime: %v, Engine: %v}",
+	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, ArrowGlacier: %v, MergeFork:%v, ShanghaiTime: %v, CancunTime: %v, PragueTime: %v, Engine: %v}",
 		c.ChainID,
 		c.HomesteadBlock,
 		c.DAOForkBlock,
@@ -721,36 +655,13 @@ func (c *ChainConfig) String() string {
 		c.PetersburgBlock,
 		c.IstanbulBlock,
 		c.MuirGlacierBlock,
-		c.RamanujanBlock,
-		c.NielsBlock,
-		c.MirrorSyncBlock,
-		c.BrunoBlock,
 		c.BerlinBlock,
-		c.YoloV3Block,
-		c.CatalystBlock,
 		c.LondonBlock,
 		c.ArrowGlacierBlock,
 		c.MergeNetsplitBlock,
-		c.EulerBlock,
-		c.GibbsBlock,
-		c.NanoBlock,
-		c.MoranBlock,
-		c.PlanckBlock,
-		c.LubanBlock,
-		c.PlatoBlock,
-		c.HertzBlock,
-		c.HertzfixBlock,
 		ShanghaiTime,
-		KeplerTime,
-		FeynmanTime,
-		FeynmanFixTime,
 		CancunTime,
-		HaberTime,
-		HaberFixTime,
-		BohrTime,
-		PascalTime,
 		PragueTime,
-		LorentzTime,
 		engine,
 	)
 }
@@ -802,94 +713,6 @@ func (c *ChainConfig) IsByzantium(num *big.Int) bool {
 // IsConstantinople returns whether num is either equal to the Constantinople fork block or greater.
 func (c *ChainConfig) IsConstantinople(num *big.Int) bool {
 	return isBlockForked(c.ConstantinopleBlock, num)
-}
-
-// IsRamanujan returns whether num is either equal to the IsRamanujan fork block or greater.
-func (c *ChainConfig) IsRamanujan(num *big.Int) bool {
-	return isBlockForked(c.RamanujanBlock, num)
-}
-
-// IsOnRamanujan returns whether num is equal to the Ramanujan fork block
-func (c *ChainConfig) IsOnRamanujan(num *big.Int) bool {
-	return configBlockEqual(c.RamanujanBlock, num)
-}
-
-// IsNiels returns whether num is either equal to the Niels fork block or greater.
-func (c *ChainConfig) IsNiels(num *big.Int) bool {
-	return isBlockForked(c.NielsBlock, num)
-}
-
-// IsOnNiels returns whether num is equal to the IsNiels fork block
-func (c *ChainConfig) IsOnNiels(num *big.Int) bool {
-	return configBlockEqual(c.NielsBlock, num)
-}
-
-// IsMirrorSync returns whether num is either equal to the MirrorSync fork block or greater.
-func (c *ChainConfig) IsMirrorSync(num *big.Int) bool {
-	return isBlockForked(c.MirrorSyncBlock, num)
-}
-
-// IsOnMirrorSync returns whether num is equal to the MirrorSync fork block
-func (c *ChainConfig) IsOnMirrorSync(num *big.Int) bool {
-	return configBlockEqual(c.MirrorSyncBlock, num)
-}
-
-// IsBruno returns whether num is either equal to the Burn fork block or greater.
-func (c *ChainConfig) IsBruno(num *big.Int) bool {
-	return isBlockForked(c.BrunoBlock, num)
-}
-
-// IsOnBruno returns whether num is equal to the Burn fork block
-func (c *ChainConfig) IsOnBruno(num *big.Int) bool {
-	return configBlockEqual(c.BrunoBlock, num)
-}
-
-// IsEuler returns whether num is either equal to the euler fork block or greater.
-func (c *ChainConfig) IsEuler(num *big.Int) bool {
-	return isBlockForked(c.EulerBlock, num)
-}
-
-// IsOnEuler returns whether num is equal to the euler fork block
-func (c *ChainConfig) IsOnEuler(num *big.Int) bool {
-	return configBlockEqual(c.EulerBlock, num)
-}
-
-// IsLuban returns whether num is either equal to the first fast finality fork block or greater.
-func (c *ChainConfig) IsLuban(num *big.Int) bool {
-	return isBlockForked(c.LubanBlock, num)
-}
-
-// IsOnLuban returns whether num is equal to the first fast finality fork block.
-func (c *ChainConfig) IsOnLuban(num *big.Int) bool {
-	return configBlockEqual(c.LubanBlock, num)
-}
-
-// IsPlato returns whether num is either equal to the second fast finality fork block or greater.
-func (c *ChainConfig) IsPlato(num *big.Int) bool {
-	return isBlockForked(c.PlatoBlock, num)
-}
-
-// IsOnPlato returns whether num is equal to the second fast finality fork block.
-func (c *ChainConfig) IsOnPlato(num *big.Int) bool {
-	return configBlockEqual(c.PlatoBlock, num)
-}
-
-// IsHertz returns whether num is either equal to the block of enabling Berlin EIPs or greater.
-func (c *ChainConfig) IsHertz(num *big.Int) bool {
-	return isBlockForked(c.HertzBlock, num)
-}
-
-// IsOnHertz returns whether num is equal to the fork block of enabling Berlin EIPs.
-func (c *ChainConfig) IsOnHertz(num *big.Int) bool {
-	return configBlockEqual(c.HertzBlock, num)
-}
-
-func (c *ChainConfig) IsHertzfix(num *big.Int) bool {
-	return isBlockForked(c.HertzfixBlock, num)
-}
-
-func (c *ChainConfig) IsOnHertzfix(num *big.Int) bool {
-	return configBlockEqual(c.HertzfixBlock, num)
 }
 
 // IsMuirGlacier returns whether num is either equal to the Muir Glacier (EIP-2384) fork block or greater.
@@ -1009,40 +832,6 @@ func (c *ChainConfig) IsTerminalPoWBlock(parentTotalDiff *big.Int, totalDiff *bi
 	return parentTotalDiff.Cmp(c.TerminalTotalDifficulty) < 0 && totalDiff.Cmp(c.TerminalTotalDifficulty) >= 0
 }
 
-// IsGibbs returns whether num is either equal to the gibbs fork block or greater.
-func (c *ChainConfig) IsGibbs(num *big.Int) bool {
-	return isBlockForked(c.GibbsBlock, num)
-}
-
-// IsOnGibbs returns whether num is equal to the gibbs fork block
-func (c *ChainConfig) IsOnGibbs(num *big.Int) bool {
-	return configBlockEqual(c.GibbsBlock, num)
-}
-
-func (c *ChainConfig) IsNano(num *big.Int) bool {
-	return isBlockForked(c.NanoBlock, num)
-}
-
-func (c *ChainConfig) IsOnNano(num *big.Int) bool {
-	return configBlockEqual(c.NanoBlock, num)
-}
-
-func (c *ChainConfig) IsMoran(num *big.Int) bool {
-	return isBlockForked(c.MoranBlock, num)
-}
-
-func (c *ChainConfig) IsOnMoran(num *big.Int) bool {
-	return configBlockEqual(c.MoranBlock, num)
-}
-
-func (c *ChainConfig) IsPlanck(num *big.Int) bool {
-	return isBlockForked(c.PlanckBlock, num)
-}
-
-func (c *ChainConfig) IsOnPlanck(num *big.Int) bool {
-	return configBlockEqual(c.PlanckBlock, num)
-}
-
 // IsShanghai returns whether time is either equal to the Shanghai fork time or greater.
 func (c *ChainConfig) IsShanghai(num *big.Int, time uint64) bool {
 	shanghaiTime := c.ShanghaiTime
@@ -1052,57 +841,6 @@ func (c *ChainConfig) IsShanghai(num *big.Int, time uint64) bool {
 		shanghaiTime = OasysTestnetChainConfig.ShanghaiTime
 	}
 	return c.IsLondon(num) && isTimestampForked(shanghaiTime, time)
-}
-
-// IsOnShanghai returns whether currentBlockTime is either equal to the shanghai fork time or greater firstly.
-func (c *ChainConfig) IsOnShanghai(currentBlockNumber *big.Int, lastBlockTime uint64, currentBlockTime uint64) bool {
-	lastBlockNumber := new(big.Int)
-	if currentBlockNumber.Cmp(big.NewInt(1)) >= 0 {
-		lastBlockNumber.Sub(currentBlockNumber, big.NewInt(1))
-	}
-	return !c.IsShanghai(lastBlockNumber, lastBlockTime) && c.IsShanghai(currentBlockNumber, currentBlockTime)
-}
-
-// IsKepler returns whether time is either equal to the kepler fork time or greater.
-func (c *ChainConfig) IsKepler(num *big.Int, time uint64) bool {
-	return c.IsLondon(num) && isTimestampForked(c.KeplerTime, time)
-}
-
-// IsOnKepler returns whether currentBlockTime is either equal to the kepler fork time or greater firstly.
-func (c *ChainConfig) IsOnKepler(currentBlockNumber *big.Int, lastBlockTime uint64, currentBlockTime uint64) bool {
-	lastBlockNumber := new(big.Int)
-	if currentBlockNumber.Cmp(big.NewInt(1)) >= 0 {
-		lastBlockNumber.Sub(currentBlockNumber, big.NewInt(1))
-	}
-	return !c.IsKepler(lastBlockNumber, lastBlockTime) && c.IsKepler(currentBlockNumber, currentBlockTime)
-}
-
-// IsFeynman returns whether time is either equal to the Feynman fork time or greater.
-func (c *ChainConfig) IsFeynman(num *big.Int, time uint64) bool {
-	return c.IsLondon(num) && isTimestampForked(c.FeynmanTime, time)
-}
-
-// IsOnFeynman returns whether currentBlockTime is either equal to the Feynman fork time or greater firstly.
-func (c *ChainConfig) IsOnFeynman(currentBlockNumber *big.Int, lastBlockTime uint64, currentBlockTime uint64) bool {
-	lastBlockNumber := new(big.Int)
-	if currentBlockNumber.Cmp(big.NewInt(1)) >= 0 {
-		lastBlockNumber.Sub(currentBlockNumber, big.NewInt(1))
-	}
-	return !c.IsFeynman(lastBlockNumber, lastBlockTime) && c.IsFeynman(currentBlockNumber, currentBlockTime)
-}
-
-// IsFeynmanFix returns whether time is either equal to the FeynmanFix fork time or greater.
-func (c *ChainConfig) IsFeynmanFix(num *big.Int, time uint64) bool {
-	return c.IsLondon(num) && isTimestampForked(c.FeynmanFixTime, time)
-}
-
-// IsOnFeynmanFix returns whether currentBlockTime is either equal to the FeynmanFix fork time or greater firstly.
-func (c *ChainConfig) IsOnFeynmanFix(currentBlockNumber *big.Int, lastBlockTime uint64, currentBlockTime uint64) bool {
-	lastBlockNumber := new(big.Int)
-	if currentBlockNumber.Cmp(big.NewInt(1)) >= 0 {
-		lastBlockNumber.Sub(currentBlockNumber, big.NewInt(1))
-	}
-	return !c.IsFeynmanFix(lastBlockNumber, lastBlockTime) && c.IsFeynmanFix(currentBlockNumber, currentBlockTime)
 }
 
 // IsCancun returns whether time is either equal to the Cancun fork time or greater.
@@ -1116,79 +854,15 @@ func (c *ChainConfig) IsCancun(num *big.Int, time uint64) bool {
 	return c.IsLondon(num) && isTimestampForked(cancunTime, time)
 }
 
-// IsHaber returns whether time is either equal to the Haber fork time or greater.
-func (c *ChainConfig) IsHaber(num *big.Int, time uint64) bool {
-	return c.IsLondon(num) && isTimestampForked(c.HaberTime, time)
-}
-
-// IsHaberFix returns whether time is either equal to the HaberFix fork time or greater.
-func (c *ChainConfig) IsHaberFix(num *big.Int, time uint64) bool {
-	return c.IsLondon(num) && isTimestampForked(c.HaberFixTime, time)
-}
-
-// IsOnHaberFix returns whether currentBlockTime is either equal to the HaberFix fork time or greater firstly.
-func (c *ChainConfig) IsOnHaberFix(currentBlockNumber *big.Int, lastBlockTime uint64, currentBlockTime uint64) bool {
-	lastBlockNumber := new(big.Int)
-	if currentBlockNumber.Cmp(big.NewInt(1)) >= 0 {
-		lastBlockNumber.Sub(currentBlockNumber, big.NewInt(1))
-	}
-	return !c.IsHaberFix(lastBlockNumber, lastBlockTime) && c.IsHaberFix(currentBlockNumber, currentBlockTime)
-}
-
-// IsBohr returns whether time is either equal to the Bohr fork time or greater.
-func (c *ChainConfig) IsBohr(num *big.Int, time uint64) bool {
-	return c.IsLondon(num) && isTimestampForked(c.BohrTime, time)
-}
-
-// IsOnBohr returns whether currentBlockTime is either equal to the Bohr fork time or greater firstly.
-func (c *ChainConfig) IsOnBohr(currentBlockNumber *big.Int, lastBlockTime uint64, currentBlockTime uint64) bool {
-	lastBlockNumber := new(big.Int)
-	if currentBlockNumber.Cmp(big.NewInt(1)) >= 0 {
-		lastBlockNumber.Sub(currentBlockNumber, big.NewInt(1))
-	}
-	return !c.IsBohr(lastBlockNumber, lastBlockTime) && c.IsBohr(currentBlockNumber, currentBlockTime)
-}
-
-// IsPascal returns whether time is either equal to the Pascal fork time or greater.
-func (c *ChainConfig) IsPascal(num *big.Int, time uint64) bool {
-	return c.IsLondon(num) && isTimestampForked(c.PascalTime, time)
-}
-
-// IsOnPascal returns whether currentBlockTime is either equal to the Pascal fork time or greater firstly.
-func (c *ChainConfig) IsOnPascal(currentBlockNumber *big.Int, lastBlockTime uint64, currentBlockTime uint64) bool {
-	lastBlockNumber := new(big.Int)
-	if currentBlockNumber.Cmp(big.NewInt(1)) >= 0 {
-		lastBlockNumber.Sub(currentBlockNumber, big.NewInt(1))
-	}
-	return !c.IsPascal(lastBlockNumber, lastBlockTime) && c.IsPascal(currentBlockNumber, currentBlockTime)
-}
-
 // IsPrague returns whether time is either equal to the Prague fork time or greater.
 func (c *ChainConfig) IsPrague(num *big.Int, time uint64) bool {
-	return c.IsLondon(num) && isTimestampForked(c.PragueTime, time)
-}
-
-// IsOnPrague returns whether currentBlockTime is either equal to the Prague fork time or greater firstly.
-func (c *ChainConfig) IsOnPrague(currentBlockNumber *big.Int, lastBlockTime uint64, currentBlockTime uint64) bool {
-	lastBlockNumber := new(big.Int)
-	if currentBlockNumber.Cmp(big.NewInt(1)) >= 0 {
-		lastBlockNumber.Sub(currentBlockNumber, big.NewInt(1))
+	pragueTime := c.PragueTime
+	if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
+		pragueTime = OasysMainnetChainConfig.PragueTime
+	} else if c.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0 {
+		pragueTime = OasysTestnetChainConfig.PragueTime
 	}
-	return !c.IsPrague(lastBlockNumber, lastBlockTime) && c.IsPrague(currentBlockNumber, currentBlockTime)
-}
-
-// IsLorentz returns whether time is either equal to the Lorentz fork time or greater.
-func (c *ChainConfig) IsLorentz(num *big.Int, time uint64) bool {
-	return c.IsLondon(num) && isTimestampForked(c.LorentzTime, time)
-}
-
-// IsOnLorentz returns whether currentBlockTime is either equal to the Lorentz fork time or greater firstly.
-func (c *ChainConfig) IsOnLorentz(currentBlockNumber *big.Int, lastBlockTime uint64, currentBlockTime uint64) bool {
-	lastBlockNumber := new(big.Int)
-	if currentBlockNumber.Cmp(big.NewInt(1)) >= 0 {
-		lastBlockNumber.Sub(currentBlockNumber, big.NewInt(1))
-	}
-	return !c.IsLorentz(lastBlockNumber, lastBlockTime) && c.IsLorentz(currentBlockNumber, currentBlockTime)
+	return c.IsLondon(num) && isTimestampForked(pragueTime, time)
 }
 
 // IsOsaka returns whether time is either equal to the Osaka fork time or greater.
@@ -1199,6 +873,16 @@ func (c *ChainConfig) IsOsaka(num *big.Int, time uint64) bool {
 // IsVerkle returns whether time is either equal to the Verkle fork time or greater.
 func (c *ChainConfig) IsVerkle(num *big.Int, time uint64) bool {
 	return c.IsLondon(num) && isTimestampForked(c.VerkleTime, time)
+}
+
+// TODO: Should be deleted
+func (c *ChainConfig) IsNano(num *big.Int) bool {
+	return false
+}
+
+// TODO: Should be deleted
+func (c *ChainConfig) IsHertzfix(num *big.Int) bool {
+	return false
 }
 
 // IsVerkleGenesis checks whether the verkle fork is activated at the genesis block.
@@ -1411,79 +1095,19 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headNumber *big.Int, 
 		return newBlockCompatError("Gray Glacier fork block", c.GrayGlacierBlock, newcfg.GrayGlacierBlock)
 	}
 	if isForkBlockIncompatible(c.MergeNetsplitBlock, newcfg.MergeNetsplitBlock, headNumber) {
-		return newBlockCompatError("Merge Start fork block", c.MergeNetsplitBlock, newcfg.MergeNetsplitBlock)
-	}
-	if isForkBlockIncompatible(c.RamanujanBlock, newcfg.RamanujanBlock, headNumber) {
-		return newBlockCompatError("ramanujan fork block", c.RamanujanBlock, newcfg.RamanujanBlock)
-	}
-	if isForkBlockIncompatible(c.MirrorSyncBlock, newcfg.MirrorSyncBlock, headNumber) {
-		return newBlockCompatError("mirrorSync fork block", c.MirrorSyncBlock, newcfg.MirrorSyncBlock)
-	}
-	if isForkBlockIncompatible(c.BrunoBlock, newcfg.BrunoBlock, headNumber) {
-		return newBlockCompatError("bruno fork block", c.BrunoBlock, newcfg.BrunoBlock)
-	}
-	if isForkBlockIncompatible(c.EulerBlock, newcfg.EulerBlock, headNumber) {
-		return newBlockCompatError("euler fork block", c.EulerBlock, newcfg.EulerBlock)
-	}
-	if isForkBlockIncompatible(c.GibbsBlock, newcfg.GibbsBlock, headNumber) {
-		return newBlockCompatError("gibbs fork block", c.GibbsBlock, newcfg.GibbsBlock)
-	}
-	if isForkBlockIncompatible(c.NanoBlock, newcfg.NanoBlock, headNumber) {
-		return newBlockCompatError("nano fork block", c.NanoBlock, newcfg.NanoBlock)
-	}
-	if isForkBlockIncompatible(c.MoranBlock, newcfg.MoranBlock, headNumber) {
-		return newBlockCompatError("moran fork block", c.MoranBlock, newcfg.MoranBlock)
-	}
-	if isForkBlockIncompatible(c.PlanckBlock, newcfg.PlanckBlock, headNumber) {
-		return newBlockCompatError("planck fork block", c.PlanckBlock, newcfg.PlanckBlock)
-	}
-	if isForkBlockIncompatible(c.LubanBlock, newcfg.LubanBlock, headNumber) {
-		return newBlockCompatError("luban fork block", c.LubanBlock, newcfg.LubanBlock)
-	}
-	if isForkBlockIncompatible(c.PlatoBlock, newcfg.PlatoBlock, headNumber) {
-		return newBlockCompatError("plato fork block", c.PlatoBlock, newcfg.PlatoBlock)
-	}
-	if isForkBlockIncompatible(c.HertzBlock, newcfg.HertzBlock, headNumber) {
-		return newBlockCompatError("hertz fork block", c.HertzBlock, newcfg.HertzBlock)
-	}
-	if isForkBlockIncompatible(c.HertzfixBlock, newcfg.HertzfixBlock, headNumber) {
-		return newBlockCompatError("hertzfix fork block", c.HertzfixBlock, newcfg.HertzfixBlock)
+		return newBlockCompatError("Merge netsplit fork block", c.MergeNetsplitBlock, newcfg.MergeNetsplitBlock)
 	}
 	if isForkTimestampIncompatible(c.ShanghaiTime, newcfg.ShanghaiTime, headTimestamp) {
 		return newTimestampCompatError("Shanghai fork timestamp", c.ShanghaiTime, newcfg.ShanghaiTime)
 	}
-	if isForkTimestampIncompatible(c.KeplerTime, newcfg.KeplerTime, headTimestamp) {
-		return newTimestampCompatError("Kepler fork timestamp", c.KeplerTime, newcfg.KeplerTime)
-	}
-	if isForkTimestampIncompatible(c.FeynmanTime, newcfg.FeynmanTime, headTimestamp) {
-		return newTimestampCompatError("Feynman fork timestamp", c.FeynmanTime, newcfg.FeynmanTime)
-	}
-	if isForkTimestampIncompatible(c.FeynmanFixTime, newcfg.FeynmanFixTime, headTimestamp) {
-		return newTimestampCompatError("FeynmanFix fork timestamp", c.FeynmanFixTime, newcfg.FeynmanFixTime)
-	}
 	if isForkTimestampIncompatible(c.CancunTime, newcfg.CancunTime, headTimestamp) {
 		return newTimestampCompatError("Cancun fork timestamp", c.CancunTime, newcfg.CancunTime)
-	}
-	if isForkTimestampIncompatible(c.HaberTime, newcfg.HaberTime, headTimestamp) {
-		return newTimestampCompatError("Haber fork timestamp", c.HaberTime, newcfg.HaberTime)
-	}
-	if isForkTimestampIncompatible(c.HaberFixTime, newcfg.HaberFixTime, headTimestamp) {
-		return newTimestampCompatError("HaberFix fork timestamp", c.HaberFixTime, newcfg.HaberFixTime)
-	}
-	if isForkTimestampIncompatible(c.BohrTime, newcfg.BohrTime, headTimestamp) {
-		return newTimestampCompatError("Bohr fork timestamp", c.BohrTime, newcfg.BohrTime)
-	}
-	if isForkTimestampIncompatible(c.PascalTime, newcfg.PascalTime, headTimestamp) {
-		return newTimestampCompatError("Pascal fork timestamp", c.PascalTime, newcfg.PascalTime)
 	}
 	if isForkTimestampIncompatible(c.PragueTime, newcfg.PragueTime, headTimestamp) {
 		return newTimestampCompatError("Prague fork timestamp", c.PragueTime, newcfg.PragueTime)
 	}
 	if isForkTimestampIncompatible(c.OsakaTime, newcfg.OsakaTime, headTimestamp) {
 		return newTimestampCompatError("Osaka fork timestamp", c.OsakaTime, newcfg.OsakaTime)
-	}
-	if isForkTimestampIncompatible(c.LorentzTime, newcfg.LorentzTime, headTimestamp) {
-		return newTimestampCompatError("Lorentz fork timestamp", c.LorentzTime, newcfg.LorentzTime)
 	}
 	if isForkTimestampIncompatible(c.VerkleTime, newcfg.VerkleTime, headTimestamp) {
 		return newTimestampCompatError("Verkle fork timestamp", c.VerkleTime, newcfg.VerkleTime)
