@@ -875,16 +875,6 @@ func (c *ChainConfig) IsVerkle(num *big.Int, time uint64) bool {
 	return c.IsLondon(num) && isTimestampForked(c.VerkleTime, time)
 }
 
-// TODO: Should be deleted
-func (c *ChainConfig) IsNano(num *big.Int) bool {
-	return false
-}
-
-// TODO: Should be deleted
-func (c *ChainConfig) IsHertzfix(num *big.Int) bool {
-	return false
-}
-
 // IsVerkleGenesis checks whether the verkle fork is activated at the genesis block.
 //
 // Verkle mode is considered enabled if the verkle fork time is configured,
@@ -1285,16 +1275,7 @@ type Rules struct {
 	IsEIP2929, IsEIP4762                                    bool
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
 	IsBerlin, IsLondon                                      bool
-	IsMerge                                                 bool
-	IsNano                                                  bool
-	IsMoran                                                 bool
-	IsPlanck                                                bool
-	IsLuban                                                 bool
-	IsPlato                                                 bool
-	IsHertz                                                 bool
-	IsHertzfix                                              bool
-	IsShanghai, IsKepler, IsFeynman, IsCancun, IsHaber      bool
-	IsBohr, IsPascal, IsPrague, IsLorentz, IsOsaka          bool
+	IsMerge, IsShanghai, IsCancun, IsPrague, IsOsaka        bool
 	IsVerkle                                                bool
 }
 

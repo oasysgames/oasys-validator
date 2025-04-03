@@ -18,7 +18,6 @@ package core
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -429,16 +428,7 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 		contractCreation = msg.To == nil
 		floorDataGas     uint64
 	)
-	if st.evm.ChainConfig().IsNano(st.evm.Context.BlockNumber) {
-		for _, blackListAddr := range types.NanoBlackList {
-			if blackListAddr == msg.From {
-				return nil, errors.New("block blacklist account")
-			}
-			if msg.To != nil && *msg.To == blackListAddr {
-				return nil, errors.New("block blacklist account")
-			}
-		}
-	}
+
 	// Check clauses 4-5, subtract intrinsic gas if everything is correct
 	gas, err := IntrinsicGas(msg.Data, msg.AccessList, msg.SetCodeAuthorizations, contractCreation, rules.IsHomestead, rules.IsIstanbul, rules.IsShanghai)
 	if err != nil {
@@ -587,11 +577,6 @@ func (st *stateTransition) validateAuthorization(auth *types.SetCodeAuthorizatio
 	authority, err = auth.Authority()
 	if err != nil {
 		return authority, fmt.Errorf("%w: %v", ErrAuthorizationInvalidSignature, err)
-	}
-	for _, blackListAddr := range types.NanoBlackList {
-		if blackListAddr == authority {
-			return authority, errors.New("block blacklist account")
-		}
 	}
 	// Check the authority account
 	//  1) doesn't have code or has exisiting delegation
