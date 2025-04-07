@@ -412,7 +412,7 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		}
 
 		// Deploy oasys built-in contracts
-		contracts.Deploy(config, statedb, b.header.Number.Uint64())
+		contracts.Deploy(config, statedb, b.header.Number, parent.Time(), b.header.Time)
 
 		if config.IsPrague(b.header.Number, b.header.Time) || config.IsVerkle(b.header.Number, b.header.Time) {
 			// EIP-2935

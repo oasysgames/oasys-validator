@@ -79,7 +79,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		return nil, errors.New("could not get parent block")
 	}
 	// Deploy oasys built-in contracts
-	contracts.Deploy(p.config, statedb, block.Number().Uint64())
+	contracts.Deploy(p.config, statedb, blockNumber, lastBlock.Time, block.Time())
 
 	var (
 		context vm.BlockContext
