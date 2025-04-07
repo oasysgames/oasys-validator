@@ -271,22 +271,11 @@ func (api *API) traceChain(start, end *types.Block, config *TraceConfig, closed 
 			// Fetch and execute the block trace taskCh
 			for task := range taskCh {
 				var (
-					signer         = types.MakeSigner(api.backend.ChainConfig(), task.block.Number(), task.block.Time())
-					blockCtx       = core.NewEVMBlockContext(task.block.Header(), api.chainContext(ctx), nil)
-					beforeSystemTx = true
+					signer   = types.MakeSigner(api.backend.ChainConfig(), task.block.Number(), task.block.Time())
+					blockCtx = core.NewEVMBlockContext(task.block.Header(), api.chainContext(ctx), nil)
 				)
 				// Trace all the transactions contained within
 				for i, tx := range task.block.Transactions() {
-					// upgrade build-in system contract before system txs
-					if beforeSystemTx {
-						if pos, ok := api.backend.Engine().(consensus.PoS); ok {
-							if isSystem, _ := pos.IsSystemTransaction(tx, task.block.Header()); isSystem {
-								contracts.Deploy(api.backend.ChainConfig(), task.statedb, task.block.NumberU64())
-								beforeSystemTx = false
-							}
-						}
-					}
-
 					msg, _ := core.TransactionToMessage(tx, signer, task.block.BaseFee())
 					txctx := &Context{
 						BlockHash:   task.block.Hash(),
@@ -294,7 +283,7 @@ func (api *API) traceChain(start, end *types.Block, config *TraceConfig, closed 
 						TxIndex:     i,
 						TxHash:      tx.Hash(),
 					}
-					res, err := api.traceTx(ctx, tx, msg, txctx, blockCtx, task.statedb, config, !beforeSystemTx)
+					res, err := api.traceTx(ctx, tx, msg, txctx, blockCtx, task.statedb, config)
 					if err != nil {
 						task.results[i] = &txTraceResult{TxHash: tx.Hash(), Error: err.Error()}
 						log.Warn("Tracing failed", "hash", tx.Hash(), "block", task.block.NumberU64(), "err", err)
@@ -394,8 +383,8 @@ func (api *API) traceChain(start, end *types.Block, config *TraceConfig, closed 
 				break
 			}
 
-			// upgrade build-in system contract before normal txs
-			contracts.Deploy(api.backend.ChainConfig(), statedb, next.NumberU64())
+			// Deploy oasys built-in contracts
+			contracts.Deploy(api.backend.ChainConfig(), statedb, next.Number(), block.Time(), next.Time())
 
 			// Insert block's parent beacon block root in the state
 			// as per EIP-4788.
@@ -550,8 +539,8 @@ func (api *API) IntermediateRoots(ctx context.Context, hash common.Hash, config 
 	}
 	defer release()
 
-	// upgrade build-in system contract before normal txs
-	contracts.Deploy(api.backend.ChainConfig(), statedb, block.NumberU64())
+	// Deploy oasys built-in contracts
+	contracts.Deploy(api.backend.ChainConfig(), statedb, block.Number(), parent.Time(), block.Time())
 
 	var (
 		roots              []common.Hash
@@ -559,7 +548,6 @@ func (api *API) IntermediateRoots(ctx context.Context, hash common.Hash, config 
 		chainConfig        = api.backend.ChainConfig()
 		vmctx              = core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), nil)
 		deleteEmptyObjects = chainConfig.IsEIP158(block.Number())
-		beforeSystemTx     = true
 	)
 	evm := vm.NewEVM(vmctx, statedb, chainConfig, vm.Config{})
 	if beaconRoot := block.BeaconRoot(); beaconRoot != nil {
@@ -571,14 +559,6 @@ func (api *API) IntermediateRoots(ctx context.Context, hash common.Hash, config 
 	for i, tx := range block.Transactions() {
 		if err := ctx.Err(); err != nil {
 			return nil, err
-		}
-		if pos, ok := api.backend.Engine().(consensus.PoS); ok {
-			if isSystem, _ := pos.IsSystemTransaction(tx, block.Header()); isSystem {
-				if beforeSystemTx {
-					contracts.Deploy(api.backend.ChainConfig(), statedb, block.NumberU64())
-					beforeSystemTx = false
-				}
-			}
 		}
 
 		msg, _ := core.TransactionToMessage(tx, signer, block.BaseFee())
@@ -635,8 +615,8 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 	}
 	defer release()
 
-	// upgrade build-in system contract before normal txs
-	contracts.Deploy(api.backend.ChainConfig(), statedb, block.NumberU64())
+	// Deploy oasys built-in contracts
+	contracts.Deploy(api.backend.ChainConfig(), statedb, block.Number(), parent.Time(), block.Time())
 	blockCtx := core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), nil)
 	evm := vm.NewEVM(blockCtx, statedb, api.backend.ChainConfig(), vm.Config{})
 	if beaconRoot := block.BeaconRoot(); beaconRoot != nil {
@@ -657,23 +637,12 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 
 	// Native tracers have low overhead
 	var (
-		txs            = block.Transactions()
-		blockHash      = block.Hash()
-		signer         = types.MakeSigner(api.backend.ChainConfig(), block.Number(), block.Time())
-		results        = make([]*txTraceResult, len(txs))
-		beforeSystemTx = true
+		txs       = block.Transactions()
+		blockHash = block.Hash()
+		signer    = types.MakeSigner(api.backend.ChainConfig(), block.Number(), block.Time())
+		results   = make([]*txTraceResult, len(txs))
 	)
 	for i, tx := range txs {
-		// upgrade build-in system contract before system txs
-		if beforeSystemTx {
-			if pos, ok := api.backend.Engine().(consensus.PoS); ok {
-				if isSystem, _ := pos.IsSystemTransaction(tx, block.Header()); isSystem {
-					contracts.Deploy(api.backend.ChainConfig(), statedb, block.NumberU64())
-					beforeSystemTx = false
-				}
-			}
-		}
-
 		// Generate the next state snapshot fast without tracing
 		msg, _ := core.TransactionToMessage(tx, signer, block.BaseFee())
 		txctx := &Context{
@@ -682,7 +651,7 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 			TxIndex:     i,
 			TxHash:      tx.Hash(),
 		}
-		res, err := api.traceTx(ctx, tx, msg, txctx, blockCtx, statedb, config, !beforeSystemTx)
+		res, err := api.traceTx(ctx, tx, msg, txctx, blockCtx, statedb, config)
 		if err != nil {
 			return nil, err
 		}
@@ -726,7 +695,7 @@ func (api *API) traceBlockParallel(ctx context.Context, block *types.Block, stat
 				// concurrent use.
 				// See: https://github.com/ethereum/go-ethereum/issues/29114
 				blockCtx := core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), nil)
-				res, err := api.traceTx(ctx, txs[task.index], msg, txctx, blockCtx, task.statedb, config, task.isSystemTx)
+				res, err := api.traceTx(ctx, txs[task.index], msg, txctx, blockCtx, task.statedb, config)
 				if err != nil {
 					results[task.index] = &txTraceResult{TxHash: txs[task.index].Hash(), Error: err.Error()}
 					continue
@@ -746,16 +715,6 @@ func (api *API) traceBlockParallel(ctx context.Context, block *types.Block, stat
 
 txloop:
 	for i, tx := range txs {
-		// upgrade build-in system contract before system txs
-		if beforeSystemTx {
-			if pos, ok := api.backend.Engine().(consensus.PoS); ok {
-				if isSystem, _ := pos.IsSystemTransaction(tx, block.Header()); isSystem {
-					contracts.Deploy(api.backend.ChainConfig(), statedb, block.NumberU64())
-					beforeSystemTx = false
-				}
-			}
-		}
-
 		// Send the trace task over for execution
 		task := &txTraceTask{statedb: statedb.Copy(), index: i, isSystemTx: !beforeSystemTx}
 		select {
@@ -814,8 +773,8 @@ func (api *API) standardTraceBlockToFile(ctx context.Context, block *types.Block
 	}
 	defer release()
 
-	// upgrade build-in system contract before normal txs
-	contracts.Deploy(api.backend.ChainConfig(), statedb, block.NumberU64())
+	// Deploy oasys built-in contracts
+	contracts.Deploy(api.backend.ChainConfig(), statedb, block.Number(), parent.Time(), block.Time())
 
 	// Retrieve the tracing configurations, or use default values
 	var (
@@ -829,12 +788,11 @@ func (api *API) standardTraceBlockToFile(ctx context.Context, block *types.Block
 
 	// Execute transaction, either tracing all or just the requested one
 	var (
-		dumps          []string
-		signer         = types.MakeSigner(api.backend.ChainConfig(), block.Number(), block.Time())
-		chainConfig    = api.backend.ChainConfig()
-		vmctx          = core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), nil)
-		canon          = true
-		beforeSystemTx = true
+		dumps       []string
+		signer      = types.MakeSigner(api.backend.ChainConfig(), block.Number(), block.Time())
+		chainConfig = api.backend.ChainConfig()
+		vmctx       = core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), nil)
+		canon       = true
 	)
 	// Check if there are any overrides: the caller may wish to enable a future
 	// fork when executing this block. Note, such overrides are only applicable to the
@@ -853,16 +811,6 @@ func (api *API) standardTraceBlockToFile(ctx context.Context, block *types.Block
 		core.ProcessParentBlockHash(block.ParentHash(), evm)
 	}
 	for i, tx := range block.Transactions() {
-		// upgrade build-in system contract before system txs
-		if beforeSystemTx {
-			if pos, ok := api.backend.Engine().(consensus.PoS); ok {
-				if isSystem, _ := pos.IsSystemTransaction(tx, block.Header()); isSystem {
-					contracts.Deploy(api.backend.ChainConfig(), statedb, block.NumberU64())
-					beforeSystemTx = false
-				}
-			}
-		}
-
 		// Prepare the transaction for un-traced execution
 		var (
 			msg, _ = core.TransactionToMessage(tx, signer, block.BaseFee())
@@ -966,20 +914,13 @@ func (api *API) TraceTransaction(ctx context.Context, hash common.Hash, config *
 		return nil, err
 	}
 
-	var isSystemTx bool
-	if pos, ok := api.backend.Engine().(consensus.PoS); ok {
-		if isSystem, _ := pos.IsSystemTransaction(tx, block.Header()); isSystem {
-			isSystemTx = true
-		}
-	}
-
 	txctx := &Context{
 		BlockHash:   blockHash,
 		BlockNumber: block.Number(),
 		TxIndex:     int(index),
 		TxHash:      hash,
 	}
-	return api.traceTx(ctx, tx, msg, txctx, vmctx, statedb, config, isSystemTx)
+	return api.traceTx(ctx, tx, msg, txctx, vmctx, statedb, config)
 }
 
 // TraceCall lets you trace a given eth_call. It collects the structured logs
@@ -1031,9 +972,13 @@ func (api *API) TraceCall(ctx context.Context, args ethapi.TransactionArgs, bloc
 	}
 	defer release()
 
-	// upgrade build-in system contract before tracing if Feynman is not enabled
+	// Deploy oasys built-in contracts
 	if block.NumberU64() > 0 {
-		contracts.Deploy(api.backend.ChainConfig(), statedb, block.NumberU64())
+		parent, err := api.blockByNumberAndHash(ctx, rpc.BlockNumber(block.NumberU64()-1), block.ParentHash())
+		if err != nil {
+			return nil, err
+		}
+		contracts.Deploy(api.backend.ChainConfig(), statedb, block.Number(), parent.Time(), block.Time())
 	}
 
 	vmctx := core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), nil)
@@ -1067,13 +1012,13 @@ func (api *API) TraceCall(ctx context.Context, args ethapi.TransactionArgs, bloc
 	if config != nil {
 		traceConfig = &config.TraceConfig
 	}
-	return api.traceTx(ctx, tx, msg, new(Context), vmctx, statedb, traceConfig, false)
+	return api.traceTx(ctx, tx, msg, new(Context), vmctx, statedb, traceConfig)
 }
 
 // traceTx configures a new tracer according to the provided configuration, and
 // executes the given message in the provided environment. The return value will
 // be tracer dependent.
-func (api *API) traceTx(ctx context.Context, tx *types.Transaction, message *core.Message, txctx *Context, vmctx vm.BlockContext, statedb *state.StateDB, config *TraceConfig, isSystemTx bool) (interface{}, error) {
+func (api *API) traceTx(ctx context.Context, tx *types.Transaction, message *core.Message, txctx *Context, vmctx vm.BlockContext, statedb *state.StateDB, config *TraceConfig) (interface{}, error) {
 	var (
 		tracer  *Tracer
 		err     error
@@ -1117,20 +1062,11 @@ func (api *API) traceTx(ctx context.Context, tx *types.Transaction, message *cor
 	}()
 	defer cancel()
 
-	var intrinsicGas uint64 = 0
-	// Run the transaction with tracing enabled.
-	if isSystemTx {
-		intrinsicGas, _ = core.IntrinsicGas(message.Data, message.AccessList, message.SetCodeAuthorizations, false, true, true, false)
-	}
-
 	// Call Prepare to clear out the statedb access list
 	statedb.SetTxContext(txctx.TxHash, txctx.TxIndex)
 	_, err = core.ApplyTransactionWithEVM(message, new(core.GasPool).AddGas(message.GasLimit), statedb, vmctx.BlockNumber, txctx.BlockHash, tx, &usedGas, evm)
 	if err != nil {
 		return nil, fmt.Errorf("tracing failed: %w", err)
-	}
-	if tracer.OnSystemTxFixIntrinsicGas != nil {
-		tracer.OnSystemTxFixIntrinsicGas(intrinsicGas)
 	}
 	return tracer.GetResult()
 }

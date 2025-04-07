@@ -1037,8 +1037,8 @@ func (w *worker) prepareWork(genParams *generateParams, witness bool) (*environm
 		return nil, err
 	}
 
-	// Handle upgrade build-in system contract code
-	contracts.Deploy(w.chainConfig, env.state, header.Number.Uint64())
+	// Deploy oasys built-in contracts
+	contracts.Deploy(w.chainConfig, env.state, header.Number, parent.Time, header.Time)
 
 	if header.ParentBeaconRoot != nil {
 		core.ProcessBeaconBlockRoot(*header.ParentBeaconRoot, env.evm)

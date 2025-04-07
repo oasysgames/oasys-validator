@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/consensus"
 	contracts "github.com/ethereum/go-ethereum/contracts/oasys"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
@@ -239,8 +238,8 @@ func (eth *Ethereum) stateAtTransaction(ctx context.Context, block *types.Block,
 	if err != nil {
 		return nil, vm.BlockContext{}, nil, nil, err
 	}
-	// upgrade build-in system contract before normal txs
-	contracts.Deploy(eth.blockchain.Config(), statedb, block.Number().Uint64())
+	// Deploy oasys built-in contracts
+	contracts.Deploy(eth.blockchain.Config(), statedb, block.Number(), parent.Time(), block.Time())
 	// Insert parent beacon block root in the state as per EIP-4788.
 	context := core.NewEVMBlockContext(block.Header(), eth.blockchain, nil)
 	evm := vm.NewEVM(context, statedb, eth.blockchain.Config(), vm.Config{})
@@ -255,21 +254,8 @@ func (eth *Ethereum) stateAtTransaction(ctx context.Context, block *types.Block,
 		return nil, vm.BlockContext{}, statedb, release, nil
 	}
 	// Recompute transactions up to the target index.
-	var (
-		signer         = types.MakeSigner(eth.blockchain.Config(), block.Number(), block.Time())
-		beforeSystemTx = true
-	)
+	signer := types.MakeSigner(eth.blockchain.Config(), block.Number(), block.Time())
 	for idx, tx := range block.Transactions() {
-		// upgrade build-in system contract before system txs
-		if beforeSystemTx {
-			if pos, ok := eth.Engine().(consensus.PoS); ok {
-				if isSystem, _ := pos.IsSystemTransaction(tx, block.Header()); isSystem {
-					contracts.Deploy(eth.blockchain.Config(), statedb, block.Number().Uint64())
-					beforeSystemTx = false
-				}
-			}
-		}
-
 		if idx == txIndex {
 			return tx, context, statedb, release, nil
 		}
