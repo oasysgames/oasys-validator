@@ -64,7 +64,7 @@ var (
 			utils.OverridePassedForkTime,
 			utils.OverridePrague,
 			utils.OverrideVerkle,
-			utils.MultiDataBaseFlag,
+			// utils.MultiDataBaseFlag,
 		}, utils.DatabaseFlags),
 		Description: `
 The init command initializes a new genesis block and definition for the network.
