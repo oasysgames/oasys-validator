@@ -307,7 +307,7 @@ func applyMetricConfig(ctx *cli.Context, cfg *gethConfig) {
 		cfg.Metrics.Enabled = ctx.Bool(utils.MetricsEnabledFlag.Name)
 	}
 	if ctx.IsSet(utils.MetricsEnabledExpensiveFlag.Name) {
-		log.Warn("Expensive metrics will remain in BSC and may be removed in the future", "flag", utils.MetricsEnabledExpensiveFlag.Name)
+		log.Warn("Expensive metrics are collected by default, please remove this flag", "flag", utils.MetricsEnabledExpensiveFlag.Name)
 		cfg.Metrics.EnabledExpensive = ctx.Bool(utils.MetricsEnabledExpensiveFlag.Name)
 	}
 	if ctx.IsSet(utils.MetricsHTTPFlag.Name) {

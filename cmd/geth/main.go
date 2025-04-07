@@ -26,8 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/params"
-
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/cmd/utils"
@@ -463,17 +461,12 @@ func startNode(ctx *cli.Context, stack *node.Node, backend ethapi.Backend, isCon
 	}
 
 	// Start auxiliary services if enabled
-	ethBackend, ok := backend.(*eth.EthAPIBackend)
-	gasCeil := ethBackend.Miner().GasCeil()
-	if gasCeil > params.SystemTxsGasSoftLimit {
-		ethBackend.TxPool().SetMaxGas(gasCeil - params.SystemTxsGasSoftLimit)
-	}
 	if ctx.Bool(utils.MiningEnabledFlag.Name) {
 		// Mining only makes sense if a full Ethereum node is running
 		if ctx.String(utils.SyncModeFlag.Name) == "light" {
 			utils.Fatalf("Light clients do not support mining")
 		}
-
+		ethBackend, ok := backend.(*eth.EthAPIBackend)
 		if !ok {
 			utils.Fatalf("Ethereum service not running")
 		}
