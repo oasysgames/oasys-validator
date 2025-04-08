@@ -203,8 +203,7 @@ func (args *TransactionArgs) setFeeDefaults(ctx context.Context, b Backend, head
 	// Sanity check the EIP-1559 fee parameters if present.
 	if args.GasPrice == nil && eip1559ParamsSet {
 		if args.MaxFeePerGas.ToInt().Sign() == 0 {
-			// return errors.New("maxFeePerGas must be non-zero")
-			log.Warn("EIP-1559 Tx with zero maxFeePerGas") // BSC accepts zero gas price.
+			return errors.New("maxFeePerGas must be non-zero")
 		}
 		if args.MaxFeePerGas.ToInt().Cmp(args.MaxPriorityFeePerGas.ToInt()) < 0 {
 			return fmt.Errorf("maxFeePerGas (%v) < maxPriorityFeePerGas (%v)", args.MaxFeePerGas, args.MaxPriorityFeePerGas)
@@ -217,8 +216,7 @@ func (args *TransactionArgs) setFeeDefaults(ctx context.Context, b Backend, head
 	if args.GasPrice != nil && !eip1559ParamsSet {
 		// Zero gas-price is not allowed after London fork
 		if args.GasPrice.ToInt().Sign() == 0 && isLondon {
-			// return errors.New("gasPrice must be non-zero after london fork")
-			log.Warn("non EIP-1559 Tx with zero gasPrice") // BSC accepts zero gas price.
+			return errors.New("gasPrice must be non-zero after london fork")
 		}
 		return nil // No need to set anything, user already set GasPrice
 	}
@@ -381,7 +379,7 @@ func (args *TransactionArgs) CallDefaults(globalGasCap uint64, baseFee *big.Int,
 		args.Gas = (*hexutil.Uint64)(&gas)
 	} else {
 		if globalGasCap > 0 && globalGasCap < uint64(*args.Gas) {
-			log.Debug("Caller gas above allowance, capping", "requested", args.Gas, "cap", globalGasCap)
+			log.Warn("Caller gas above allowance, capping", "requested", args.Gas, "cap", globalGasCap)
 			args.Gas = (*hexutil.Uint64)(&globalGasCap)
 		}
 	}
