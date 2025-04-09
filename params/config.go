@@ -262,7 +262,7 @@ var (
 		},
 		BlobScheduleConfig: &BlobScheduleConfig{
 			Cancun: DefaultCancunBlobConfig,
-			Prague: DefaultPragueBlobConfigOasys,
+			Prague: DefaultPragueBlobConfig,
 		},
 	}
 
@@ -289,7 +289,7 @@ var (
 		},
 		BlobScheduleConfig: &BlobScheduleConfig{
 			Cancun: DefaultCancunBlobConfig,
-			Prague: DefaultPragueBlobConfigOasys,
+			Prague: DefaultPragueBlobConfig,
 		},
 	}
 
@@ -426,10 +426,6 @@ var (
 		Cancun: DefaultCancunBlobConfig,
 		Prague: DefaultPragueBlobConfig,
 	}
-
-	DefaultPragueBlobConfigOasys = DefaultCancunBlobConfig // TODO
-	// for oasys, only DefaultCancunBlobConfig is used, so we can define MaxBlobsPerBlockForOasys more directly
-	MaxBlobsPerBlockForOasys = DefaultCancunBlobConfig.Max
 )
 
 // NetworkNames are user friendly names to use in the chain spec banner.

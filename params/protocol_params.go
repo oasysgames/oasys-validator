@@ -23,28 +23,24 @@ import (
 )
 
 const (
-	GasLimitBoundDivisor uint64 = 256                // The bound divisor of the gas limit, used in update calculations.
+	GasLimitBoundDivisor uint64 = 1024               // The bound divisor of the gas limit, used in update calculations.
 	MinGasLimit          uint64 = 5000               // Minimum the gas limit may ever be.
 	MaxGasLimit          uint64 = 0x7fffffffffffffff // Maximum the gas limit (2^63-1).
 	GenesisGasLimit      uint64 = 4712388            // Gas limit of the Genesis block.
-	PayBidTxGasLimit     uint64 = 25000              // Gas limit of the PayBidTx in the types.BidArgs.
 
 	MaxMessageSize uint32 = 10 * 1024 * 1024 // MaxMessageSize is the maximum cap on the size of a eth protocol message.
 
-	MaximumExtraDataSize  uint64 = 32       // Maximum size extra data may be after Genesis.
-	ForkIDSize            uint64 = 4        // The length of fork id
-	ExpByteGas            uint64 = 10       // Times ceil(log256(exponent)) for the EXP instruction.
-	SloadGas              uint64 = 50       // Multiplied by the number of 32-byte words that are copied (round up) for any *COPY operation and added.
-	CallValueTransferGas  uint64 = 9000     // Paid for CALL when the value transfer is non-zero.
-	CallNewAccountGas     uint64 = 25000    // Paid for CALL when the destination address didn't exist prior.
-	TxGas                 uint64 = 21000    // Per transaction not creating a contract. NOTE: Not payable on data of calls between transactions.
-	SystemTxsGasHardLimit uint64 = 20000000 // Maximum gas reserved for system transactions (Parlia consensus only)
-	SystemTxsGasSoftLimit uint64 = 1000000  // Maximum gas reserved for system transactions, excluding validator update transactions (Parlia consensus only)
-	TxGasContractCreation uint64 = 53000    // Per transaction that creates a contract. NOTE: Not payable on data of calls between transactions.
-	TxDataZeroGas         uint64 = 4        // Per byte of data attached to a transaction that equals zero. NOTE: Not payable on data of calls between transactions.
-	QuadCoeffDiv          uint64 = 512      // Divisor for the quadratic particle of the memory cost equation.
-	LogDataGas            uint64 = 8        // Per byte in a LOG* operation's data.
-	CallStipend           uint64 = 2300     // Free gas given at beginning of call.
+	MaximumExtraDataSize  uint64 = 32    // Maximum size extra data may be after Genesis.
+	ExpByteGas            uint64 = 10    // Times ceil(log256(exponent)) for the EXP instruction.
+	SloadGas              uint64 = 50    // Multiplied by the number of 32-byte words that are copied (round up) for any *COPY operation and added.
+	CallValueTransferGas  uint64 = 9000  // Paid for CALL when the value transfer is non-zero.
+	CallNewAccountGas     uint64 = 25000 // Paid for CALL when the destination address didn't exist prior.
+	TxGas                 uint64 = 21000 // Per transaction not creating a contract. NOTE: Not payable on data of calls between transactions.
+	TxGasContractCreation uint64 = 53000 // Per transaction that creates a contract. NOTE: Not payable on data of calls between transactions.
+	TxDataZeroGas         uint64 = 4     // Per byte of data attached to a transaction that equals zero. NOTE: Not payable on data of calls between transactions.
+	QuadCoeffDiv          uint64 = 512   // Divisor for the quadratic particle of the memory cost equation.
+	LogDataGas            uint64 = 8     // Per byte in a LOG* operation's data.
+	CallStipend           uint64 = 2300  // Free gas given at beginning of call.
 
 	Keccak256Gas     uint64 = 30 // Once per KECCAK256 operation.
 	Keccak256WordGas uint64 = 6  // Once per word of the KECCAK256 operation's data.
@@ -137,27 +133,19 @@ const (
 	DefaultBaseFeeChangeDenominator = 8          // Bounds the amount the base fee can change between blocks.
 	DefaultElasticityMultiplier     = 2          // Bounds the maximum gas limit an EIP-1559 block may have.
 	InitialBaseFee                  = 1000000000 // Initial base fee for EIP-1559 blocks.
-	InitialBaseFeeForBSC            = 0          // Initial base fee for EIP-1559 blocks on bsc Mainnet
 
 	MaxCodeSize     = 24576           // Maximum bytecode to permit for a contract
 	MaxInitCodeSize = 2 * MaxCodeSize // Maximum initcode to permit in a creation transaction and create instructions
 
 	// Precompiled contract gas prices
 
-	TendermintHeaderValidateGas   uint64 = 3000 // Gas for validate tendermiint consensus state
-	IAVLMerkleProofValidateGas    uint64 = 3000 // Gas for validate merkle proof
-	CometBFTLightBlockValidateGas uint64 = 3000 // Gas for validate cometBFT light block
-
-	EcrecoverGas                uint64 = 3000  // Elliptic curve sender recovery gas price
-	Sha256BaseGas               uint64 = 60    // Base price for a SHA256 operation
-	Sha256PerWordGas            uint64 = 12    // Per-word price for a SHA256 operation
-	Ripemd160BaseGas            uint64 = 600   // Base price for a RIPEMD160 operation
-	Ripemd160PerWordGas         uint64 = 120   // Per-word price for a RIPEMD160 operation
-	IdentityBaseGas             uint64 = 15    // Base price for a data copy operation
-	IdentityPerWordGas          uint64 = 3     // Per-work price for a data copy operation
-	BlsSignatureVerifyBaseGas   uint64 = 1000  // base price for a BLS signature verify operation
-	BlsSignatureVerifyPerKeyGas uint64 = 3500  // Per-key price for a BLS signature verify operation
-	DoubleSignEvidenceVerifyGas uint64 = 10000 // Gas for verify double sign evidence
+	EcrecoverGas        uint64 = 3000 // Elliptic curve sender recovery gas price
+	Sha256BaseGas       uint64 = 60   // Base price for a SHA256 operation
+	Sha256PerWordGas    uint64 = 12   // Per-word price for a SHA256 operation
+	Ripemd160BaseGas    uint64 = 600  // Base price for a RIPEMD160 operation
+	Ripemd160PerWordGas uint64 = 120  // Per-word price for a RIPEMD160 operation
+	IdentityBaseGas     uint64 = 15   // Base price for a data copy operation
+	IdentityPerWordGas  uint64 = 3    // Per-work price for a data copy operation
 
 	Bn256AddGasByzantium             uint64 = 500    // Byzantium gas needed for an elliptic curve addition
 	Bn256AddGasIstanbul              uint64 = 150    // Gas needed for an elliptic curve addition
@@ -176,8 +164,6 @@ const (
 	Bls12381PairingPerPairGas uint64 = 32600 // Per-point pair gas price for BLS12-381 elliptic curve pairing check
 	Bls12381MapG1Gas          uint64 = 5500  // Gas price for BLS12-381 mapping field element to G1 operation
 	Bls12381MapG2Gas          uint64 = 23800 // Gas price for BLS12-381 mapping field element to G2 operation
-
-	P256VerifyGas uint64 = 3450 // secp256r1 elliptic curve signature verifier gas price
 
 	// The Refund Quotient is the cap on how much of the used gas can be refunded. Before EIP-3529,
 	// up to half the consumed gas could be refunded. Redefined as 1/5th in EIP-3529
@@ -204,14 +190,6 @@ var (
 
 	// it adds more time for expired blobs for some request cases, like expiry blob when remote peer is syncing, default 1 day.
 	DefaultExtraReserveForBlobRequests uint64 = 1 * (24 * 3600) / 3 / divisionFactorForOasys
-
-	BreatheBlockInterval uint64 = 86400 // Controls the interval for updateValidatorSetV2
-
-	// used for testing:
-	//     [1,9] except 2 --> used as turn length directly
-	//                  2 --> use random values to test switching turn length
-	// 0 and other values --> get turn length from contract
-	FixedTurnLength uint64 = 0
 )
 
 var Bls12381G1MultiExpDiscountTable = [128]uint64{1000, 949, 848, 797, 764, 750, 738, 728, 719, 712, 705, 698, 692, 687, 682, 677, 673, 669, 665, 661, 658, 654, 651, 648, 645, 642, 640, 637, 635, 632, 630, 627, 625, 623, 621, 619, 617, 615, 613, 611, 609, 608, 606, 604, 603, 601, 599, 598, 596, 595, 593, 592, 591, 589, 588, 586, 585, 584, 582, 581, 580, 579, 577, 576, 575, 574, 573, 572, 570, 569, 568, 567, 566, 565, 564, 563, 562, 561, 560, 559, 558, 557, 556, 555, 554, 553, 552, 551, 550, 549, 548, 547, 547, 546, 545, 544, 543, 542, 541, 540, 540, 539, 538, 537, 536, 536, 535, 534, 533, 532, 532, 531, 530, 529, 528, 528, 527, 526, 525, 525, 524, 523, 522, 522, 521, 520, 520, 519}

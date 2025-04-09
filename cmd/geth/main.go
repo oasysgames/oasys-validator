@@ -26,8 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/params"
-
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/cmd/utils"
@@ -66,10 +64,10 @@ var (
 		utils.KeyStoreDirFlag,
 		utils.ExternalSignerFlag,
 		utils.NoUSBFlag, // deprecated
-		utils.DirectBroadcastFlag,
-		utils.DisableSnapProtocolFlag,
-		utils.EnableTrustProtocolFlag,
-		utils.RangeLimitFlag,
+		// utils.DirectBroadcastFlag,
+		// utils.DisableSnapProtocolFlag,
+		// utils.EnableTrustProtocolFlag,
+		// utils.RangeLimitFlag,
 		utils.USBFlag,
 		utils.SmartCardDaemonPathFlag,
 		utils.OverridePassedForkTime,
@@ -78,8 +76,6 @@ var (
 		utils.OverrideFullImmutabilityThreshold,
 		utils.OverrideMinBlocksForBlobRequests,
 		utils.OverrideDefaultExtraReserveForBlobRequests,
-		utils.OverrideBreatheBlockInterval,
-		utils.OverrideFixedTurnLength,
 		utils.EnablePersonal, // deprecated
 		utils.TxPoolLocalsFlag,
 		utils.TxPoolNoLocalsFlag,
@@ -98,7 +94,7 @@ var (
 		utils.BlobPoolDataCapFlag,
 		utils.BlobPoolPriceBumpFlag,
 		utils.SyncModeFlag,
-		utils.TriesVerifyModeFlag,
+		// utils.TriesVerifyModeFlag,
 		// utils.SyncTargetFlag,
 		utils.ExitWhenSyncedFlag,
 		utils.GCModeFlag,
@@ -128,9 +124,9 @@ var (
 		utils.CacheSnapshotFlag,
 		// utils.CacheNoPrefetchFlag,
 		utils.CachePreimagesFlag,
-		utils.MultiDataBaseFlag,
-		utils.PersistDiffFlag,
-		utils.DiffBlockFlag,
+		// utils.MultiDataBaseFlag,
+		// utils.PersistDiffFlag,
+		// utils.DiffBlockFlag,
 		utils.PruneAncientDataFlag,
 		utils.CacheLogSizeFlag,
 		utils.FDLimitFlag,
@@ -147,14 +143,14 @@ var (
 		utils.MinerExtraDataFlag,
 		utils.MinerRecommitIntervalFlag,
 		utils.MinerNewPayloadTimeoutFlag, // deprecated
-		utils.MinerDelayLeftoverFlag,
+		// utils.MinerDelayLeftoverFlag,
 		// utils.MinerNewPayloadTimeout,
 		utils.NATFlag,
 		utils.NoDiscoverFlag,
 		utils.PeerFilterPatternsFlag,
 		utils.DiscoveryV4Flag,
 		utils.DiscoveryV5Flag,
-		utils.InstanceFlag,
+		// utils.InstanceFlag,
 		utils.LegacyDiscoveryV5Flag, // deprecated
 		utils.NetrestrictFlag,
 		utils.NodeKeyFileFlag,
@@ -174,8 +170,8 @@ var (
 		utils.GpoMaxGasPriceFlag,
 		utils.GpoIgnoreGasPriceFlag,
 		configFileFlag,
-		utils.BlockAmountReserved,
-		utils.CheckSnapshotWithMPT,
+		// utils.BlockAmountReserved,
+		// utils.CheckSnapshotWithMPT,
 		utils.EnableDoubleSignMonitorFlag,
 		utils.VotingEnabledFlag,
 		utils.DisableVoteAttestationFlag,
@@ -261,7 +257,7 @@ func init() {
 	app.Commands = []*cli.Command{
 		// See chaincmd.go:
 		initCommand,
-		initNetworkCommand,
+		// initNetworkCommand,
 		importCommand,
 		exportCommand,
 		importHistoryCommand,
@@ -463,17 +459,12 @@ func startNode(ctx *cli.Context, stack *node.Node, backend ethapi.Backend, isCon
 	}
 
 	// Start auxiliary services if enabled
-	ethBackend, ok := backend.(*eth.EthAPIBackend)
-	gasCeil := ethBackend.Miner().GasCeil()
-	if gasCeil > params.SystemTxsGasSoftLimit {
-		ethBackend.TxPool().SetMaxGas(gasCeil - params.SystemTxsGasSoftLimit)
-	}
 	if ctx.Bool(utils.MiningEnabledFlag.Name) {
 		// Mining only makes sense if a full Ethereum node is running
 		if ctx.String(utils.SyncModeFlag.Name) == "light" {
 			utils.Fatalf("Light clients do not support mining")
 		}
-
+		ethBackend, ok := backend.(*eth.EthAPIBackend)
 		if !ok {
 			utils.Fatalf("Ethereum service not running")
 		}

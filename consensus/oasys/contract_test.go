@@ -20,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
+	"github.com/ethereum/go-ethereum/internal/ethapi/override"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/tests"
@@ -452,7 +453,7 @@ type testBlockchainAPI struct {
 	count  map[common.Address]int
 }
 
-func (p *testBlockchainAPI) Call(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash *rpc.BlockNumberOrHash, overrides *ethapi.StateOverride, blockOverrides *ethapi.BlockOverrides) (hexutil.Bytes, error) {
+func (p *testBlockchainAPI) Call(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash *rpc.BlockNumberOrHash, overrides *override.StateOverride, blockOverrides *override.BlockOverrides) (hexutil.Bytes, error) {
 	if p.count == nil {
 		p.count = map[common.Address]int{}
 	}
@@ -476,7 +477,7 @@ func makeKeyStore() (*keystore.KeyStore, func(), error) {
 	cleanup := func() {
 		os.RemoveAll(d)
 	}
-	return keystore.NewPlaintextKeyStore(d), cleanup, nil
+	return keystore.NewKeyStore(d, 2, 1), cleanup, nil
 }
 
 func makeWallets(count int) ([]*accounts.Wallet, []*accounts.Account, error) {

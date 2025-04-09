@@ -1576,12 +1576,12 @@ func (api *TransactionAPI) GetBlockTransactionCountByHash(ctx context.Context, b
 }
 
 // GetTransactionsByBlockNumber returns all the transactions for the given block number.
-func (api *TransactionAPI) GetTransactionsByBlockNumber(ctx context.Context, blockNr rpc.BlockNumber) []*RPCTransaction {
-	if block, _ := api.b.BlockByNumber(ctx, blockNr); block != nil {
-		return newRPCTransactionsFromBlockIndex(block, api.b.ChainConfig())
-	}
-	return nil
-}
+// func (api *TransactionAPI) GetTransactionsByBlockNumber(ctx context.Context, blockNr rpc.BlockNumber) []*RPCTransaction {
+// 	if block, _ := api.b.BlockByNumber(ctx, blockNr); block != nil {
+// 		return newRPCTransactionsFromBlockIndex(block, api.b.ChainConfig())
+// 	}
+// 	return nil
+// }
 
 // GetTransactionByBlockNumberAndIndex returns the transaction for the given block number and index.
 func (api *TransactionAPI) GetTransactionByBlockNumberAndIndex(ctx context.Context, blockNr rpc.BlockNumber, index hexutil.Uint) *RPCTransaction {
@@ -1672,119 +1672,119 @@ func (api *TransactionAPI) GetRawTransactionByHash(ctx context.Context, hash com
 }
 
 // GetTransactionReceipt returns the transaction receipt for the given transaction hash.
-func (api *TransactionAPI) GetTransactionReceiptsByBlockNumber(ctx context.Context, blockNr rpc.BlockNumber) ([]map[string]interface{}, error) {
-	blockNumber := uint64(blockNr.Int64())
-	blockHash := rawdb.ReadCanonicalHash(api.b.ChainDb(), blockNumber)
+// func (api *TransactionAPI) GetTransactionReceiptsByBlockNumber(ctx context.Context, blockNr rpc.BlockNumber) ([]map[string]interface{}, error) {
+// 	blockNumber := uint64(blockNr.Int64())
+// 	blockHash := rawdb.ReadCanonicalHash(api.b.ChainDb(), blockNumber)
 
-	receipts, err := api.b.GetReceipts(ctx, blockHash)
-	if err != nil {
-		return nil, err
-	}
-	if receipts == nil {
-		return nil, fmt.Errorf("block %d receipts not found", blockNumber)
-	}
-	block, err := api.b.BlockByHash(ctx, blockHash)
-	if err != nil {
-		return nil, err
-	}
-	if block == nil {
-		return nil, fmt.Errorf("block %d not found", blockNumber)
-	}
-	txs := block.Transactions()
-	if len(txs) != len(receipts) {
-		return nil, errors.New("txs length doesn't equal to receipts' length")
-	}
+// 	receipts, err := api.b.GetReceipts(ctx, blockHash)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if receipts == nil {
+// 		return nil, fmt.Errorf("block %d receipts not found", blockNumber)
+// 	}
+// 	block, err := api.b.BlockByHash(ctx, blockHash)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if block == nil {
+// 		return nil, fmt.Errorf("block %d not found", blockNumber)
+// 	}
+// 	txs := block.Transactions()
+// 	if len(txs) != len(receipts) {
+// 		return nil, errors.New("txs length doesn't equal to receipts' length")
+// 	}
 
-	txReceipts := make([]map[string]interface{}, 0, len(txs))
-	for idx, receipt := range receipts {
-		tx := txs[idx]
-		signer := types.MakeSigner(api.b.ChainConfig(), block.Number(), block.Time())
-		from, _ := types.Sender(signer, tx)
+// 	txReceipts := make([]map[string]interface{}, 0, len(txs))
+// 	for idx, receipt := range receipts {
+// 		tx := txs[idx]
+// 		signer := types.MakeSigner(api.b.ChainConfig(), block.Number(), block.Time())
+// 		from, _ := types.Sender(signer, tx)
 
-		fields := map[string]interface{}{
-			"blockHash":         blockHash,
-			"blockNumber":       hexutil.Uint64(blockNumber),
-			"transactionHash":   tx.Hash(),
-			"transactionIndex":  hexutil.Uint64(idx),
-			"from":              from,
-			"to":                tx.To(),
-			"gasUsed":           hexutil.Uint64(receipt.GasUsed),
-			"cumulativeGasUsed": hexutil.Uint64(receipt.CumulativeGasUsed),
-			"contractAddress":   nil,
-			"logs":              receipt.Logs,
-			"logsBloom":         receipt.Bloom,
-			"type":              hexutil.Uint(tx.Type()),
-			"effectiveGasPrice": (*hexutil.Big)(receipt.EffectiveGasPrice),
-		}
+// 		fields := map[string]interface{}{
+// 			"blockHash":         blockHash,
+// 			"blockNumber":       hexutil.Uint64(blockNumber),
+// 			"transactionHash":   tx.Hash(),
+// 			"transactionIndex":  hexutil.Uint64(idx),
+// 			"from":              from,
+// 			"to":                tx.To(),
+// 			"gasUsed":           hexutil.Uint64(receipt.GasUsed),
+// 			"cumulativeGasUsed": hexutil.Uint64(receipt.CumulativeGasUsed),
+// 			"contractAddress":   nil,
+// 			"logs":              receipt.Logs,
+// 			"logsBloom":         receipt.Bloom,
+// 			"type":              hexutil.Uint(tx.Type()),
+// 			"effectiveGasPrice": (*hexutil.Big)(receipt.EffectiveGasPrice),
+// 		}
 
-		// Assign receipt status or post state.
-		if len(receipt.PostState) > 0 {
-			fields["root"] = hexutil.Bytes(receipt.PostState)
-		} else {
-			fields["status"] = hexutil.Uint(receipt.Status)
-		}
-		if receipt.Logs == nil {
-			fields["logs"] = []*types.Log{}
-		}
-		// If the ContractAddress is 20 0x0 bytes, assume it is not a contract creation
-		if receipt.ContractAddress != (common.Address{}) {
-			fields["contractAddress"] = receipt.ContractAddress
-		}
+// 		// Assign receipt status or post state.
+// 		if len(receipt.PostState) > 0 {
+// 			fields["root"] = hexutil.Bytes(receipt.PostState)
+// 		} else {
+// 			fields["status"] = hexutil.Uint(receipt.Status)
+// 		}
+// 		if receipt.Logs == nil {
+// 			fields["logs"] = []*types.Log{}
+// 		}
+// 		// If the ContractAddress is 20 0x0 bytes, assume it is not a contract creation
+// 		if receipt.ContractAddress != (common.Address{}) {
+// 			fields["contractAddress"] = receipt.ContractAddress
+// 		}
 
-		txReceipts = append(txReceipts, fields)
-	}
+// 		txReceipts = append(txReceipts, fields)
+// 	}
 
-	return txReceipts, nil
-}
+// 	return txReceipts, nil
+// }
 
 // GetTransactionDataAndReceipt returns the original transaction data and transaction receipt for the given transaction hash.
-func (api *TransactionAPI) GetTransactionDataAndReceipt(ctx context.Context, hash common.Hash) (map[string]interface{}, error) {
-	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(api.b.ChainDb(), hash)
-	if tx == nil {
-		return nil, nil
-	}
-	receipts, err := api.b.GetReceipts(ctx, blockHash)
-	if err != nil {
-		return nil, err
-	}
-	if len(receipts) <= int(index) {
-		return nil, nil
-	}
-	receipt := receipts[index]
+// func (api *TransactionAPI) GetTransactionDataAndReceipt(ctx context.Context, hash common.Hash) (map[string]interface{}, error) {
+// 	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(api.b.ChainDb(), hash)
+// 	if tx == nil {
+// 		return nil, nil
+// 	}
+// 	receipts, err := api.b.GetReceipts(ctx, blockHash)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if len(receipts) <= int(index) {
+// 		return nil, nil
+// 	}
+// 	receipt := receipts[index]
 
-	// Derive the sender.
-	header, err := api.b.HeaderByHash(ctx, blockHash)
-	if err != nil {
-		return nil, err
-	}
-	signer := types.MakeSigner(api.b.ChainConfig(), header.Number, header.Time)
-	fields := marshalReceipt(receipt, blockHash, blockNumber, signer, tx, int(index))
+// 	// Derive the sender.
+// 	header, err := api.b.HeaderByHash(ctx, blockHash)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	signer := types.MakeSigner(api.b.ChainConfig(), header.Number, header.Time)
+// 	fields := marshalReceipt(receipt, blockHash, blockNumber, signer, tx, int(index))
 
-	// TODO use nil basefee before landon fork is enabled
-	rpcTransaction := newRPCTransaction(tx, blockHash, blockNumber, header.Time, index, nil, api.b.ChainConfig())
-	txData := map[string]interface{}{
-		"blockHash":        rpcTransaction.BlockHash.String(),
-		"blockNumber":      rpcTransaction.BlockNumber.String(),
-		"from":             rpcTransaction.From.String(),
-		"gas":              rpcTransaction.Gas.String(),
-		"gasPrice":         rpcTransaction.GasPrice.String(),
-		"hash":             rpcTransaction.Hash.String(),
-		"input":            rpcTransaction.Input.String(),
-		"nonce":            rpcTransaction.Nonce.String(),
-		"to":               rpcTransaction.To.String(),
-		"transactionIndex": rpcTransaction.TransactionIndex.String(),
-		"value":            rpcTransaction.Value.String(),
-		"v":                rpcTransaction.V.String(),
-		"r":                rpcTransaction.R.String(),
-		"s":                rpcTransaction.S.String(),
-	}
+// 	// TODO use nil basefee before landon fork is enabled
+// 	rpcTransaction := newRPCTransaction(tx, blockHash, blockNumber, header.Time, index, nil, api.b.ChainConfig())
+// 	txData := map[string]interface{}{
+// 		"blockHash":        rpcTransaction.BlockHash.String(),
+// 		"blockNumber":      rpcTransaction.BlockNumber.String(),
+// 		"from":             rpcTransaction.From.String(),
+// 		"gas":              rpcTransaction.Gas.String(),
+// 		"gasPrice":         rpcTransaction.GasPrice.String(),
+// 		"hash":             rpcTransaction.Hash.String(),
+// 		"input":            rpcTransaction.Input.String(),
+// 		"nonce":            rpcTransaction.Nonce.String(),
+// 		"to":               rpcTransaction.To.String(),
+// 		"transactionIndex": rpcTransaction.TransactionIndex.String(),
+// 		"value":            rpcTransaction.Value.String(),
+// 		"v":                rpcTransaction.V.String(),
+// 		"r":                rpcTransaction.R.String(),
+// 		"s":                rpcTransaction.S.String(),
+// 	}
 
-	result := map[string]interface{}{
-		"txData":  txData,
-		"receipt": fields,
-	}
-	return result, nil
-}
+// 	result := map[string]interface{}{
+// 		"txData":  txData,
+// 		"receipt": fields,
+// 	}
+// 	return result, nil
+// }
 
 // GetTransactionReceipt returns the transaction receipt for the given transaction hash.
 func (api *TransactionAPI) GetTransactionReceipt(ctx context.Context, hash common.Hash) (map[string]interface{}, error) {
@@ -2013,21 +2013,21 @@ func (api *TransactionAPI) SendRawTransaction(ctx context.Context, input hexutil
 
 // SendRawTransactionConditional will add the signed transaction to the transaction pool.
 // The sender/bundler is responsible for signing the transaction
-func (api *TransactionAPI) SendRawTransactionConditional(ctx context.Context, input hexutil.Bytes, opts types.TransactionOpts) (common.Hash, error) {
-	tx := new(types.Transaction)
-	if err := tx.UnmarshalBinary(input); err != nil {
-		return common.Hash{}, err
-	}
-	header := api.b.CurrentHeader()
-	state, _, err := api.b.StateAndHeaderByNumber(ctx, rpc.BlockNumber(header.Number.Int64()))
-	if state == nil || err != nil {
-		return common.Hash{}, err
-	}
-	if err := TxOptsCheck(opts, header.Number.Uint64(), header.Time, state); err != nil {
-		return common.Hash{}, err
-	}
-	return SubmitTransaction(ctx, api.b, tx)
-}
+// func (api *TransactionAPI) SendRawTransactionConditional(ctx context.Context, input hexutil.Bytes, opts types.TransactionOpts) (common.Hash, error) {
+// 	tx := new(types.Transaction)
+// 	if err := tx.UnmarshalBinary(input); err != nil {
+// 		return common.Hash{}, err
+// 	}
+// 	header := api.b.CurrentHeader()
+// 	state, _, err := api.b.StateAndHeaderByNumber(ctx, rpc.BlockNumber(header.Number.Int64()))
+// 	if state == nil || err != nil {
+// 		return common.Hash{}, err
+// 	}
+// 	if err := TxOptsCheck(opts, header.Number.Uint64(), header.Time, state); err != nil {
+// 		return common.Hash{}, err
+// 	}
+// 	return SubmitTransaction(ctx, api.b, tx)
+// }
 
 // Sign calculates an ECDSA signature for:
 // keccak256("\x19Ethereum Signed Message:\n" + len(message) + message).
@@ -2340,13 +2340,13 @@ func (api *NetAPI) Version() string {
 
 // NodeInfo retrieves all the information we know about the host node at the
 // protocol granularity. This is the same as the `admin_nodeInfo` method.
-func (api *NetAPI) NodeInfo() (*p2p.NodeInfo, error) {
-	server := api.net
-	if server == nil {
-		return nil, errors.New("server not found")
-	}
-	return api.net.NodeInfo(), nil
-}
+// func (api *NetAPI) NodeInfo() (*p2p.NodeInfo, error) {
+// 	server := api.net
+// 	if server == nil {
+// 		return nil, errors.New("server not found")
+// 	}
+// 	return api.net.NodeInfo(), nil
+// }
 
 // checkTxFee is an internal function used to check whether the fee of
 // the given transaction is _reasonable_(under the cap).

@@ -58,8 +58,6 @@ const (
 var (
 	epochLength = uint64(30000) // Default number of blocks after which to checkpoint and reset the pending votes
 
-	uncleHash = types.CalcUncleHash(nil) // Always Keccak256(RLP([])) as uncles are meaningless outside of PoW.
-
 	diffInTurn = big.NewInt(2) // Block difficulty for in-turn signatures
 	diffNoTurn = big.NewInt(1) // Block difficulty for out-of-turn signatures
 
@@ -301,7 +299,7 @@ func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 		return errInvalidMixDigest
 	}
 	// Ensure that the block doesn't contain any uncles which are meaningless in PoS
-	if header.UncleHash != uncleHash {
+	if header.UncleHash != types.EmptyUncleHash {
 		return errInvalidUncleHash
 	}
 	// Ensure that the block's difficulty is meaningful (may not be correct at this point)
@@ -354,6 +352,17 @@ func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 		}
 		if err := eip4844.VerifyEIP4844Header(chain.Config(), parent, header); err != nil {
 			return err
+		}
+	}
+
+	prague := chain.Config().IsPrague(header.Number, header.Time)
+	if !prague {
+		if header.RequestsHash != nil {
+			return fmt.Errorf("invalid RequestsHash, have %#x, expected nil", header.RequestsHash)
+		}
+	} else {
+		if header.RequestsHash == nil {
+			return errors.New("header has nil RequestsHash after Prague")
 		}
 	}
 
@@ -1118,7 +1127,7 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 	}
 
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
-	header.UncleHash = types.CalcUncleHash(nil)
+	header.UncleHash = types.EmptyUncleHash
 	return types.NewBlock(header, body, receipts, trie.NewStackTrie(nil)), receipts, nil
 }
 

@@ -711,22 +711,23 @@ func getNextEnvironmentValue(ethAPI blockchainAPI, hash common.Hash) (*params.En
 }
 
 func (c *Oasys) applyTransaction(
-	msg callmsg,
+	msg *core.Message,
 	state vm.StateDB,
 	header *types.Header,
-	cx core.ChainContext,
+	chainContext core.ChainContext,
 	txs *[]*types.Transaction,
 	receipts *[]*types.Receipt,
 	systemTxs *[]*types.Transaction,
 	usedGas *uint64,
 	mining bool,
-) (err error) {
-	nonce := state.GetNonce(msg.From())
-	expectedTx := types.NewTransaction(nonce, *msg.To(), msg.Value(), msg.Gas(), msg.GasPrice(), msg.Data())
+) (applyErr error) {
+	nonce := state.GetNonce(msg.From)
+	expectedTx := types.NewTransaction(nonce, *msg.To, msg.Value, msg.GasLimit, msg.GasPrice, msg.Data)
 	expectedHash := c.txSigner.Hash(expectedTx)
 
-	if msg.From() == c.signer && mining {
-		expectedTx, err = c.txSignFn(accounts.Account{Address: msg.From()}, expectedTx, c.chainConfig.ChainID)
+	if msg.From == c.signer && mining {
+		var err error
+		expectedTx, err = c.txSignFn(accounts.Account{Address: msg.From}, expectedTx, c.chainConfig.ChainID)
 		if err != nil {
 			return err
 		}
@@ -749,7 +750,15 @@ func (c *Oasys) applyTransaction(
 		*systemTxs = (*systemTxs)[1:]
 	}
 	state.SetTxContext(expectedTx.Hash(), len(*txs))
-	gasUsed, err := applyMessage(msg, state, header, c.chainConfig, cx)
+
+	// Create a new context to be used in the EVM environment
+	context := core.NewEVMBlockContext(header, chainContext, nil)
+	// Create a new environment which holds all relevant information
+	// about the transaction and calling mechanisms.
+	evm := vm.NewEVM(context, state, c.chainConfig, vm.Config{})
+	evm.SetTxContext(core.NewEVMTxContext(msg))
+
+	gasUsed, err := applyMessage(msg, evm, state, header, c.chainConfig, chainContext)
 	if err != nil {
 		return err
 	}
@@ -765,47 +774,54 @@ func (c *Oasys) applyTransaction(
 	receipt.TxHash = expectedTx.Hash()
 	receipt.GasUsed = gasUsed
 
+	// Set the receipt logs and create a bloom for filtering
 	receipt.Logs = state.GetLogs(expectedTx.Hash(), header.Number.Uint64(), common.Hash{})
 	receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
 	receipt.BlockHash = common.Hash{}
 	receipt.BlockNumber = header.Number
 	receipt.TransactionIndex = uint(state.TxIndex())
 	*receipts = append(*receipts, receipt)
-	state.SetNonce(msg.From(), nonce+1, tracing.NonceChangeEoACall)
 	return nil
 }
 
-func getMessage(from, toAddress common.Address, data []byte, value *big.Int) callmsg {
-	return callmsg{
-		ethereum.CallMsg{
-			From:     from,
-			Gas:      math.MaxUint64 / 2,
-			GasPrice: common.Big0,
-			Value:    value,
-			To:       &toAddress,
-			Data:     data,
-		},
+func getMessage(from, toAddress common.Address, data []byte, value *big.Int) *core.Message {
+	return &core.Message{
+		From:     from,
+		GasLimit: math.MaxUint64 / 2,
+		GasPrice: big.NewInt(0),
+		Value:    value,
+		To:       &toAddress,
+		Data:     data,
 	}
 }
 
 func applyMessage(
-	msg callmsg,
+	msg *core.Message,
+	evm *vm.EVM,
 	state vm.StateDB,
 	header *types.Header,
 	chainConfig *params.ChainConfig,
-	chain core.ChainContext,
+	chainContext core.ChainContext,
 ) (uint64, error) {
-	context := core.NewEVMBlockContext(header, chain, nil)
-	vmenv := vm.NewEVM(context, state, chainConfig, vm.Config{})
-	ret, returnGas, err := vmenv.Call(
-		vm.AccountRef(msg.From()),
-		*msg.To(),
-		msg.Data(),
-		msg.Gas(),
-		uint256.MustFromBig(msg.Value()),
+	// Apply the transaction to the current state (included in the env)
+	if chainConfig.IsCancun(header.Number, header.Time) {
+		rules := evm.ChainConfig().Rules(evm.Context.BlockNumber, evm.Context.Random != nil, evm.Context.Time)
+		state.Prepare(rules, msg.From, evm.Context.Coinbase, msg.To, vm.ActivePrecompiles(rules), msg.AccessList)
+	} else {
+		state.ClearAccessList()
+	}
+	// Increment the nonce for the next transaction
+	state.SetNonce(msg.From, state.GetNonce(msg.From)+1, tracing.NonceChangeEoACall)
+
+	ret, returnGas, err := evm.Call(
+		vm.AccountRef(msg.From),
+		*msg.To,
+		msg.Data,
+		msg.GasLimit,
+		uint256.MustFromBig(msg.Value),
 	)
 	if err != nil {
 		log.Error("failed apply message", "msg", string(ret), "err", err)
 	}
-	return msg.Gas() - returnGas, err
+	return msg.GasLimit - returnGas, err
 }
