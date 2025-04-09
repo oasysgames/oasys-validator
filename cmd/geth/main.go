@@ -76,8 +76,6 @@ var (
 		utils.OverrideFullImmutabilityThreshold,
 		utils.OverrideMinBlocksForBlobRequests,
 		utils.OverrideDefaultExtraReserveForBlobRequests,
-		// utils.OverrideBreatheBlockInterval,
-		// utils.OverrideFixedTurnLength,
 		utils.EnablePersonal, // deprecated
 		utils.TxPoolLocalsFlag,
 		utils.TxPoolNoLocalsFlag,
