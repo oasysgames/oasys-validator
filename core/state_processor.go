@@ -23,7 +23,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/consensus/beacon"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	contracts "github.com/ethereum/go-ethereum/contracts/oasys"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -104,11 +103,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	}
 
 	// Iterate over and process the individual transactions
-	engine := p.chain.engine
-	if cl, ok := engine.(*beacon.Beacon); ok {
-		engine = cl.InnerEngine()
-	}
-	pos, isPoS := engine.(consensus.PoS)
+	pos, isPoS := p.chain.engine.(consensus.PoS)
 	commonTxs := make([]*types.Transaction, 0, txNum)
 
 	// initialise bloom processors
