@@ -186,7 +186,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	// Fail if the address is not allowed to call
 	// Skip the check if this call is readonly (eth_call)
 	readOnly := evm.Config.NoBaseFee
-	if !readOnly && IsDeniedToCall(evm.StateDB, addr) {
+	if !readOnly && evm.chainConfig.Oasys != nil && IsDeniedToCall(evm.StateDB, addr) {
 		return nil, 0, ErrUnauthorizedCall
 	}
 	// Capture the tracer start/end events in debug mode
@@ -460,7 +460,7 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	// because this check targets raw transactions from EOA, and `CREATE2`
 	// within internal transactions is excluded.
 	// Need to check after nonce increment to evict failed tx from the pool.
-	if evm.depth == 0 && typ == CREATE && !IsAllowedToCreate(evm.StateDB, caller.Address()) {
+	if evm.depth == 0 && typ == CREATE && evm.chainConfig.Oasys != nil && !IsAllowedToCreate(evm.StateDB, caller.Address()) {
 		return nil, common.Address{}, 0, ErrUnauthorizedCreate
 	}
 	// Charge the contract creation init gas in verkle mode
