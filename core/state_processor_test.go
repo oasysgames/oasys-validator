@@ -414,7 +414,7 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 		header.BlobGasUsed = &used
 
 		beaconRoot := common.HexToHash("0xbeac00")
-		if config.Parlia == nil {
+		if config.Oasys == nil {
 			header.ParentBeaconRoot = &beaconRoot
 		}
 	}
