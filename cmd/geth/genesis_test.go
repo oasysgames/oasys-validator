@@ -42,7 +42,6 @@ var customGenesisTests = []struct {
 			"parentHash" : "0x0000000000000000000000000000000000000000000000000000000000000000",
 			"timestamp"  : "0x00",
 			"config": {
-				"chainId": 1,
 				"terminalTotalDifficulty": 0
 			}
 		}`,
@@ -62,7 +61,6 @@ var customGenesisTests = []struct {
 			"parentHash" : "0x0000000000000000000000000000000000000000000000000000000000000000",
 			"timestamp"  : "0x00",
 			"config"     : {
-				"chainId": 1,
 				"homesteadBlock"                : 42,
 				"daoForkBlock"                  : 141,
 				"daoForkSupport"                : true,
@@ -117,7 +115,6 @@ func TestCustomBackend(t *testing.T) {
 			"parentHash" : "0x0000000000000000000000000000000000000000000000000000000000000000",
 			"timestamp"  : "0x00",
 			"config": {
-				"chainId": 1,
 				"terminalTotalDifficulty": 0
 			}
 		}`

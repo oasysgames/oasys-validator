@@ -752,7 +752,7 @@ func (c *ChainConfig) IsGrayGlacier(num *big.Int) bool {
 
 // OasysPublicationBlock returns the hard fork of Oasys.
 func (c *ChainConfig) OasysPublicationBlock() *big.Int {
-	if c.Oasys == nil {
+	if c.ChainID == nil || c.Oasys == nil {
 		return nil
 	}
 	if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
@@ -771,7 +771,7 @@ func (c *ChainConfig) IsForkedOasysPublication(num *big.Int) bool {
 
 // OasysExtendDifficultyBlock returns the hard fork of Oasys.
 func (c *ChainConfig) OasysExtendDifficultyBlock() *big.Int {
-	if c.Oasys == nil {
+	if c.ChainID == nil || c.Oasys == nil {
 		return nil
 	}
 	if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
@@ -790,7 +790,7 @@ func (c *ChainConfig) IsForkedOasysExtendDifficulty(num *big.Int) bool {
 
 // OasysShortenedBlockTimeBlock returns the hard fork of Oasys.
 func (c *ChainConfig) OasysShortenedBlockTimeStartEpoch() *big.Int {
-	if c.Oasys == nil {
+	if c.ChainID == nil || c.Oasys == nil {
 		return nil
 	}
 	if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
@@ -805,7 +805,7 @@ func (c *ChainConfig) OasysShortenedBlockTimeStartEpoch() *big.Int {
 // OasysFastFinalityEnabledBlock returns the hard fork of Oasys.
 // TODO: Set correct block number for mainnet and testnet.
 func (c *ChainConfig) OasysFastFinalityEnabledBlock() *big.Int {
-	if c.Oasys == nil {
+	if c.ChainID == nil || c.Oasys == nil {
 		return nil
 	}
 	if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
@@ -833,10 +833,12 @@ func (c *ChainConfig) IsTerminalPoWBlock(parentTotalDiff *big.Int, totalDiff *bi
 // IsShanghai returns whether time is either equal to the Shanghai fork time or greater.
 func (c *ChainConfig) IsShanghai(num *big.Int, time uint64) bool {
 	shanghaiTime := c.ShanghaiTime
-	if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
-		shanghaiTime = OasysMainnetChainConfig.ShanghaiTime
-	} else if c.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0 {
-		shanghaiTime = OasysTestnetChainConfig.ShanghaiTime
+	if c.ChainID != nil {
+		if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
+			shanghaiTime = OasysMainnetChainConfig.ShanghaiTime
+		} else if c.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0 {
+			shanghaiTime = OasysTestnetChainConfig.ShanghaiTime
+		}
 	}
 	return c.IsLondon(num) && isTimestampForked(shanghaiTime, time)
 }
@@ -844,10 +846,12 @@ func (c *ChainConfig) IsShanghai(num *big.Int, time uint64) bool {
 // IsCancun returns whether time is either equal to the Cancun fork time or greater.
 func (c *ChainConfig) IsCancun(num *big.Int, time uint64) bool {
 	cancunTime := c.CancunTime
-	if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
-		cancunTime = OasysMainnetChainConfig.CancunTime
-	} else if c.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0 {
-		cancunTime = OasysTestnetChainConfig.CancunTime
+	if c.ChainID != nil {
+		if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
+			cancunTime = OasysMainnetChainConfig.CancunTime
+		} else if c.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0 {
+			cancunTime = OasysTestnetChainConfig.CancunTime
+		}
 	}
 	return c.IsLondon(num) && isTimestampForked(cancunTime, time)
 }
@@ -855,10 +859,12 @@ func (c *ChainConfig) IsCancun(num *big.Int, time uint64) bool {
 // IsPrague returns whether time is either equal to the Prague fork time or greater.
 func (c *ChainConfig) IsPrague(num *big.Int, time uint64) bool {
 	pragueTime := c.PragueTime
-	if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
-		pragueTime = OasysMainnetChainConfig.PragueTime
-	} else if c.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0 {
-		pragueTime = OasysTestnetChainConfig.PragueTime
+	if c.ChainID != nil {
+		if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
+			pragueTime = OasysMainnetChainConfig.PragueTime
+		} else if c.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0 {
+			pragueTime = OasysTestnetChainConfig.PragueTime
+		}
 	}
 	return c.IsLondon(num) && isTimestampForked(pragueTime, time)
 }
