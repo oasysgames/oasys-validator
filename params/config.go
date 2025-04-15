@@ -430,9 +430,9 @@ var (
 
 // NetworkNames are user friendly names to use in the chain spec banner.
 var NetworkNames = map[string]string{
-	MainnetChainConfig.ChainID.String():      "ethereum",
-	OasysMainnetChainConfig.ChainID.String(): "mainnet",
-	OasysTestnetChainConfig.ChainID.String(): "testnet",
+	MainnetChainConfig.ChainID.String():      "mainnet",
+	OasysMainnetChainConfig.ChainID.String(): "oasys-mainnet",
+	OasysTestnetChainConfig.ChainID.String(): "oasys-testnet",
 }
 
 // ChainConfig is the core config which determines the blockchain settings.
