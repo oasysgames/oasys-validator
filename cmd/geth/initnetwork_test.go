@@ -28,12 +28,14 @@ func setup(t *testing.T) {
 }
 
 func TestInitNetworkLocalhost(t *testing.T) {
+	t.Skip("Commands not supported in Oasys")
 	setup(t)
 	ipStr := ""
 	testInitNetwork(t, size, basePort, ipStr, configPath, genesisPath)
 }
 
 func TestInitNetworkRemoteHosts(t *testing.T) {
+	t.Skip("Commands not supported in Oasys")
 	setup(t)
 	ipStr := "192.168.24.103,172.15.67.89,10.0.17.36,203.113.45.76"
 	testInitNetwork(t, size, basePort, ipStr, configPath, genesisPath)

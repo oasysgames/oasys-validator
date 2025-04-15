@@ -42,6 +42,7 @@ var customGenesisTests = []struct {
 			"parentHash" : "0x0000000000000000000000000000000000000000000000000000000000000000",
 			"timestamp"  : "0x00",
 			"config": {
+				"chainId": 1,
 				"terminalTotalDifficulty": 0
 			}
 		}`,
@@ -61,6 +62,7 @@ var customGenesisTests = []struct {
 			"parentHash" : "0x0000000000000000000000000000000000000000000000000000000000000000",
 			"timestamp"  : "0x00",
 			"config"     : {
+				"chainId": 1,
 				"homesteadBlock"                : 42,
 				"daoForkBlock"                  : 141,
 				"daoForkSupport"                : true,
@@ -115,6 +117,7 @@ func TestCustomBackend(t *testing.T) {
 			"parentHash" : "0x0000000000000000000000000000000000000000000000000000000000000000",
 			"timestamp"  : "0x00",
 			"config": {
+				"chainId": 1,
 				"terminalTotalDifficulty": 0
 			}
 		}`
@@ -188,7 +191,7 @@ func TestCustomBackend(t *testing.T) {
 			initExpect: `Fatal: Invalid choice for db.engine 'mssql', allowed 'leveldb' or 'pebble'`,
 			// Since the init fails, this will return the (default) mainnet genesis
 			// block nonce
-			execExpect: `0x0000000000000000`,
+			execExpect: `0x0000000000000001`,
 		},
 	} {
 		if err := testfunc(t, tt); err != nil {
