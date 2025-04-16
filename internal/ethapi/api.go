@@ -1919,20 +1919,22 @@ func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 
 	// Validate the contract creator or destination contract.
 	to := tx.To()
-	state, _, err := b.StateAndHeaderByNumber(ctx, rpc.BlockNumber(head.Number.Int64()))
-	if err != nil {
-		return common.Hash{}, err
-	}
-	if state == nil {
-		return common.Hash{}, errors.New("state not found")
-	}
-	// Fail if the caller is not allowed to create
-	if to == nil && !vm.IsAllowedToCreate(state, from) {
-		return common.Hash{}, fmt.Errorf("the deployer address is not allowed. please submit application form. from: %s", from)
-	}
-	// Fail if the address is not allowed to call
-	if to != nil && vm.IsDeniedToCall(state, *to) {
-		return common.Hash{}, fmt.Errorf("the calling contract is in denlylist. to: %s", to.Hex())
+	if b.ChainConfig().Oasys != nil {
+		state, _, err := b.StateAndHeaderByNumber(ctx, rpc.BlockNumber(head.Number.Int64()))
+		if err != nil {
+			return common.Hash{}, err
+		}
+		if state == nil {
+			return common.Hash{}, errors.New("state not found")
+		}
+		// Fail if the caller is not allowed to create
+		if to == nil && !vm.IsAllowedToCreate(state, from) {
+			return common.Hash{}, fmt.Errorf("the deployer address is not allowed. please submit application form. from: %s", from)
+		}
+		// Fail if the address is not allowed to call
+		if to != nil && vm.IsDeniedToCall(state, *to) {
+			return common.Hash{}, fmt.Errorf("the calling contract is in denlylist. to: %s", to.Hex())
+		}
 	}
 
 	if err := b.SendTx(ctx, tx); err != nil {
@@ -2013,21 +2015,21 @@ func (api *TransactionAPI) SendRawTransaction(ctx context.Context, input hexutil
 
 // SendRawTransactionConditional will add the signed transaction to the transaction pool.
 // The sender/bundler is responsible for signing the transaction
-// func (api *TransactionAPI) SendRawTransactionConditional(ctx context.Context, input hexutil.Bytes, opts types.TransactionOpts) (common.Hash, error) {
-// 	tx := new(types.Transaction)
-// 	if err := tx.UnmarshalBinary(input); err != nil {
-// 		return common.Hash{}, err
-// 	}
-// 	header := api.b.CurrentHeader()
-// 	state, _, err := api.b.StateAndHeaderByNumber(ctx, rpc.BlockNumber(header.Number.Int64()))
-// 	if state == nil || err != nil {
-// 		return common.Hash{}, err
-// 	}
-// 	if err := TxOptsCheck(opts, header.Number.Uint64(), header.Time, state); err != nil {
-// 		return common.Hash{}, err
-// 	}
-// 	return SubmitTransaction(ctx, api.b, tx)
-// }
+func (api *TransactionAPI) SendRawTransactionConditional(ctx context.Context, input hexutil.Bytes, opts types.TransactionOpts) (common.Hash, error) {
+	tx := new(types.Transaction)
+	if err := tx.UnmarshalBinary(input); err != nil {
+		return common.Hash{}, err
+	}
+	header := api.b.CurrentHeader()
+	state, _, err := api.b.StateAndHeaderByNumber(ctx, rpc.BlockNumber(header.Number.Int64()))
+	if state == nil || err != nil {
+		return common.Hash{}, err
+	}
+	if err := TxOptsCheck(opts, header.Number.Uint64(), header.Time, state); err != nil {
+		return common.Hash{}, err
+	}
+	return SubmitTransaction(ctx, api.b, tx)
+}
 
 // Sign calculates an ECDSA signature for:
 // keccak256("\x19Ethereum Signed Message:\n" + len(message) + message).
