@@ -33,6 +33,7 @@ import (
 
 var (
 	incompleteNodeURL = regexp.MustCompile("(?i)^(?:enode://)?([0-9a-f]+)$")
+	lookupIPFunc      = net.LookupIP
 )
 
 // MustParseV4 parses a node URL. It panics if the URL is not valid.
@@ -133,11 +134,13 @@ func parseComplete(rawurl string) (*Node, error) {
 	// - removed in https://github.com/ethereum/go-ethereum/pull/30822 in favor of on-demand runtime dialling
 	// - reported to have removed bootnodes DNS resolution at https://github.com/ethereum/go-ethereum/issues/31208
 	// - possibly broke DNS resolution for other methods of adding peers
+	var resolved bool
 	if ip == nil {
-		ips, err := net.LookupIP(u.Hostname())
+		ips, err := lookupIPFunc(u.Hostname())
 		if err != nil {
 			return nil, err
 		}
+		resolved = true
 		ip = ips[0]
 	}
 	// Ensure the IP is 4 bytes long for IPv4 addresses.
@@ -159,7 +162,7 @@ func parseComplete(rawurl string) (*Node, error) {
 
 	// Create the node.
 	node := NewV4(id, ip, int(tcpPort), int(udpPort))
-	if ip == nil && u.Hostname() != "" {
+	if resolved {
 		node = node.WithHostname(u.Hostname())
 	}
 	return node, nil
