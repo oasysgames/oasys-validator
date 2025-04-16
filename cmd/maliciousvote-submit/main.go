@@ -11,7 +11,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/systemcontracts"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -103,7 +102,7 @@ func submitMaliciousVotes(c *cli.Context) error {
 
 	ops, _ := bind.NewKeyedTransactorWithChainID(sender, big.NewInt(int64(chainId)))
 	//ops.GasLimit = 800000
-	slashIndicator, _ := NewSlashIndicator(common.HexToAddress(systemcontracts.SlashContract), client)
+	slashIndicator, _ := NewSlashIndicator(common.HexToAddress("0x0"), client)
 	tx, err := slashIndicator.SubmitFinalityViolationEvidence(ops, evidence)
 	if err != nil {
 		log.Crit("submitMaliciousVotes:", "error", err)
