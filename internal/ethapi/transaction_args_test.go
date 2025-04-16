@@ -87,8 +87,8 @@ func TestSetFeeDefaults(t *testing.T) {
 			"legacy tx post-London with zero price",
 			"london",
 			&TransactionArgs{GasPrice: zero},
-			&TransactionArgs{GasPrice: zero},
-			nil, // errors.New("gasPrice must be non-zero after london fork"),
+			nil,
+			errors.New("gasPrice must be non-zero after london fork"),
 		},
 
 		// Access list txs
@@ -182,8 +182,8 @@ func TestSetFeeDefaults(t *testing.T) {
 			"dynamic fee tx post-London, explicit gas price",
 			"london",
 			&TransactionArgs{MaxFeePerGas: zero, MaxPriorityFeePerGas: zero},
-			&TransactionArgs{MaxFeePerGas: zero, MaxPriorityFeePerGas: zero},
-			nil, // errors.New("maxFeePerGas must be non-zero"),
+			nil,
+			errors.New("maxFeePerGas must be non-zero"),
 		},
 
 		// Misc
@@ -375,9 +375,6 @@ func (b *backendMock) GetBlobSidecars(ctx context.Context, hash common.Hash) (ty
 func (b *backendMock) GetLogs(ctx context.Context, blockHash common.Hash, number uint64) ([][]*types.Log, error) {
 	return nil, nil
 }
-func (b *backendMock) GetBlobSidecars(ctx context.Context, hash common.Hash) (types.BlobSidecars, error) {
-	return nil, nil
-}
 func (b *backendMock) GetTd(ctx context.Context, hash common.Hash) *big.Int { return nil }
 func (b *backendMock) GetEVM(ctx context.Context, state *state.StateDB, header *types.Header, vmConfig *vm.Config, blockCtx *vm.BlockContext) *vm.EVM {
 	return nil
@@ -393,12 +390,6 @@ func (b *backendMock) SubscribeNewVoteEvent(ch chan<- core.NewVoteEvent) event.S
 	return nil
 }
 func (b *backendMock) SendTx(ctx context.Context, signedTx *types.Transaction) error { return nil }
-func (b *backendMock) SubscribeFinalizedHeaderEvent(ch chan<- core.FinalizedHeaderEvent) event.Subscription {
-	return nil
-}
-func (b *backendMock) SubscribeNewVoteEvent(ch chan<- core.NewVoteEvent) event.Subscription {
-	return nil
-}
 func (b *backendMock) GetTransaction(ctx context.Context, txHash common.Hash) (bool, *types.Transaction, common.Hash, uint64, uint64, error) {
 	return false, nil, [32]byte{}, 0, 0, nil
 }
@@ -423,22 +414,3 @@ func (b *backendMock) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent)
 }
 
 func (b *backendMock) Engine() consensus.Engine { return nil }
-
-func (b *backendMock) CurrentValidators() ([]common.Address, error) { return []common.Address{}, nil }
-
-func (b *backendMock) MevRunning() bool                       { return false }
-func (b *backendMock) HasBuilder(builder common.Address) bool { return false }
-func (b *backendMock) MevParams() *types.MevParams {
-	return &types.MevParams{}
-}
-func (b *backendMock) StartMev()                                                  {}
-func (b *backendMock) StopMev()                                                   {}
-func (b *backendMock) AddBuilder(builder common.Address, builderUrl string) error { return nil }
-func (b *backendMock) RemoveBuilder(builder common.Address) error                 { return nil }
-func (b *backendMock) SendBid(ctx context.Context, bid *types.BidArgs) (common.Hash, error) {
-	panic("implement me")
-}
-func (b *backendMock) MinerInTurn() bool { return false }
-func (b *backendMock) BestBidGasFee(parentHash common.Hash) *big.Int {
-	panic("implement me")
-}
