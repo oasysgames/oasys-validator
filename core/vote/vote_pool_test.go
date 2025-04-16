@@ -60,12 +60,12 @@ var (
 	timeThreshold = 30
 )
 
-type mockPOSA struct {
-	consensus.PoSA
+type mockPOS struct {
+	consensus.PoS
 }
 
-type mockInvalidPOSA struct {
-	consensus.PoSA
+type mockInvalidPOS struct {
+	consensus.PoS
 }
 
 // testBackend is a mock implementation of the live Ethereum message handler.
@@ -79,7 +79,7 @@ func newTestBackend() *testBackend {
 func (b *testBackend) IsMining() bool           { return true }
 func (b *testBackend) EventMux() *event.TypeMux { return b.eventMux }
 
-func (mp *mockPOSA) GetJustifiedNumberAndHash(chain consensus.ChainHeaderReader, headers []*types.Header) (uint64, common.Hash, error) {
+func (mp *mockPOS) GetJustifiedNumberAndHash(chain consensus.ChainHeaderReader, headers []*types.Header) (uint64, common.Hash, error) {
 	parentHeader := chain.GetHeaderByHash(headers[len(headers)-1].ParentHash)
 	if parentHeader == nil {
 		return 0, common.Hash{}, errors.New("unexpected error")
@@ -87,23 +87,23 @@ func (mp *mockPOSA) GetJustifiedNumberAndHash(chain consensus.ChainHeaderReader,
 	return parentHeader.Number.Uint64(), parentHeader.Hash(), nil
 }
 
-func (mip *mockInvalidPOSA) GetJustifiedNumberAndHash(chain consensus.ChainHeaderReader, headers []*types.Header) (uint64, common.Hash, error) {
+func (mip *mockInvalidPOS) GetJustifiedNumberAndHash(chain consensus.ChainHeaderReader, headers []*types.Header) (uint64, common.Hash, error) {
 	return 0, common.Hash{}, errors.New("not supported")
 }
 
-func (mp *mockPOSA) VerifyVote(chain consensus.ChainHeaderReader, vote *types.VoteEnvelope) error {
+func (mp *mockPOS) VerifyVote(chain consensus.ChainHeaderReader, vote *types.VoteEnvelope) error {
 	return nil
 }
 
-func (mip *mockInvalidPOSA) VerifyVote(chain consensus.ChainHeaderReader, vote *types.VoteEnvelope) error {
+func (mip *mockInvalidPOS) VerifyVote(chain consensus.ChainHeaderReader, vote *types.VoteEnvelope) error {
 	return nil
 }
 
-func (mp *mockPOSA) IsActiveValidatorAt(chain consensus.ChainHeaderReader, header *types.Header, checkVoteKeyFn func(bLSPublicKey *types.BLSPublicKey) bool) bool {
+func (mp *mockPOS) IsActiveValidatorAt(chain consensus.ChainHeaderReader, header *types.Header, checkVoteKeyFn func(bLSPublicKey *types.BLSPublicKey) bool) bool {
 	return true
 }
 
-func (mip *mockInvalidPOSA) IsActiveValidatorAt(chain consensus.ChainHeaderReader, header *types.Header, checkVoteKeyFn func(bLSPublicKey *types.BLSPublicKey) bool) bool {
+func (mip *mockInvalidPOS) IsActiveValidatorAt(chain consensus.ChainHeaderReader, header *types.Header, checkVoteKeyFn func(bLSPublicKey *types.BLSPublicKey) bool) bool {
 	return true
 }
 
@@ -153,11 +153,11 @@ func testVotePool(t *testing.T, isValidRules bool) {
 	db := rawdb.NewMemoryDatabase()
 	chain, _ := core.NewBlockChain(db, nil, genesis, nil, ethash.NewFullFaker(), vm.Config{}, nil, nil)
 
-	var mockEngine consensus.PoSA
+	var mockEngine consensus.PoS
 	if isValidRules {
-		mockEngine = &mockPOSA{}
+		mockEngine = &mockPOS{}
 	} else {
-		mockEngine = &mockInvalidPOSA{}
+		mockEngine = &mockInvalidPOS{}
 	}
 
 	// Create vote pool
@@ -176,7 +176,7 @@ func testVotePool(t *testing.T, isValidRules bool) {
 	file.Close()
 	os.Remove(journal)
 
-	voteManager, err := NewVoteManager(newTestBackend(), chain, votePool, journal, walletPasswordDir, walletDir, mockEngine)
+	voteManager, err := NewVoteManager(newTestBackend(), chain, votePool, journal, walletPasswordDir, walletDir, "", mockEngine)
 	if err != nil {
 		t.Fatalf("failed to create vote managers")
 	}
