@@ -98,17 +98,6 @@ func testForkIDSplit(t *testing.T, protocol uint) {
 			PetersburgBlock:     big.NewInt(4),
 			IstanbulBlock:       big.NewInt(4),
 			MuirGlacierBlock:    big.NewInt(4),
-			RamanujanBlock:      big.NewInt(4),
-			NielsBlock:          big.NewInt(4),
-			MirrorSyncBlock:     big.NewInt(4),
-			BrunoBlock:          big.NewInt(4),
-			EulerBlock:          big.NewInt(5),
-			GibbsBlock:          big.NewInt(5),
-			NanoBlock:           big.NewInt(5),
-			MoranBlock:          big.NewInt(5),
-			LubanBlock:          big.NewInt(6),
-			PlatoBlock:          big.NewInt(6),
-			HertzBlock:          big.NewInt(7),
 		}
 		dbNoFork  = rawdb.NewMemoryDatabase()
 		dbProFork = rawdb.NewMemoryDatabase()
