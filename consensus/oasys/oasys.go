@@ -1126,9 +1126,25 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 		return nil, nil, errors.New("gas consumption of system txs exceed the gas limit")
 	}
 
-	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 	header.UncleHash = types.EmptyUncleHash
-	return types.NewBlock(header, body, receipts, trie.NewStackTrie(nil)), receipts, nil
+	var (
+		wg       sync.WaitGroup
+		rootHash common.Hash
+		blk      *types.Block
+	)
+	wg.Add(2)
+	go func() {
+		rootHash = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
+		wg.Done()
+	}()
+	go func() {
+		blk = types.NewBlock(header, body, receipts, trie.NewStackTrie(nil))
+		wg.Done()
+	}()
+	wg.Wait()
+	blk.SetRoot(rootHash)
+	// Assemble and return the final block for sealing
+	return blk, receipts, nil
 }
 
 func (c *Oasys) IsActiveValidatorAt(chain consensus.ChainHeaderReader, header *types.Header, checkVoteKeyFn func(bLSPublicKey *types.BLSPublicKey) bool) bool {
@@ -1259,7 +1275,7 @@ func (c *Oasys) Seal(chain consensus.ChainHeaderReader, block *types.Block, resu
 	}
 
 	// Sweet, the protocol permits us to sign the block, wait for our time
-	delay := time.Until(time.Unix(int64(header.Time), 0))
+	delay := getSealingDelay(header)
 
 	// Wait until sealing is terminated or delay timeout.
 	log.Trace("Waiting for slot to sign and propagate", "delay", common.PrettyDuration(delay))
@@ -1636,6 +1652,49 @@ func (c *Oasys) scheduler(chain consensus.ChainHeaderReader, header *types.Heade
 	return created, nil
 }
 
+// Argument leftOver is the time reserved for block finalize(calculate root, distribute income...)
 func (c *Oasys) Delay(chain consensus.ChainReader, header *types.Header, leftOver *time.Duration) *time.Duration {
-	return nil
+	number := header.Number.Uint64()
+	snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
+	if err != nil {
+		log.Warn("Unexpected error when getting snapshot in Delay",
+			"error", err, "blockNumber", number, "blockHash", header.Hash())
+		return nil
+	}
+
+	fromHeader := true // ok from header as the validators are assembled in `Prepare` phase
+	env, err := c.environment(chain, header, snap, fromHeader)
+	if err != nil {
+		log.Warn("Unexpected error when getting environment in Delay",
+			"error", err, "blockNumber", number, "blockHash", header.Hash())
+		return nil
+	}
+
+	delay := getSealingDelay(header)
+
+	blockPeriod := time.Duration(env.BlockPeriod.Int64()) * time.Second
+	if *leftOver >= blockPeriod {
+		// ignore invalid leftOver
+		log.Error("Delay invalid argument", "leftOver", leftOver.String(), "Period", env.BlockPeriod)
+	} else if *leftOver >= delay {
+		delay = time.Duration(0)
+		return &delay
+	} else {
+		delay = delay - *leftOver
+	}
+
+	// Returning the seal delay as is would cause mining processes to wait for a long time,
+	// potentially causing the txpool to grow large and making `worker.fillTransactions(...)`
+	// take longer, which could lead to chain delays.
+	// Therefore, we ensure the wait time does not exceed 2/3 of the ideal block cycle.
+	if timeForMining := blockPeriod * 2 / 3; delay > timeForMining {
+		delay = timeForMining
+	}
+	return &delay
+}
+
+// Returns the waiting time for sealing a block after finalization.
+// This can potentially be a maximum of `BlockPeriod + len(validators)`.
+func getSealingDelay(header *types.Header) time.Duration {
+	return time.Until(time.Unix(int64(header.Time), 0))
 }
