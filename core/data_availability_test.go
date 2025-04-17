@@ -22,7 +22,7 @@ var (
 )
 
 func TestIsDataAvailable(t *testing.T) {
-	hr := NewMockDAHeaderReader(params.ParliaTestChainConfig)
+	hr := NewMockDAHeaderReader(params.OasysTestChainConfig)
 	tests := []struct {
 		block       *types.Block
 		chasingHead uint64
@@ -106,10 +106,16 @@ func TestIsDataAvailable(t *testing.T) {
 					Commitments: []kzg4844.Commitment{emptyBlobCommit, emptyBlobCommit, emptyBlobCommit, emptyBlobCommit},
 					Proofs:      []kzg4844.Proof{emptyBlobProof, emptyBlobProof, emptyBlobProof, emptyBlobProof},
 				}),
+				createMockDATx(hr.Config(), &types.BlobTxSidecar{
+					Blobs:       []kzg4844.Blob{emptyBlob, emptyBlob},
+					Commitments: []kzg4844.Commitment{emptyBlobCommit, emptyBlobCommit},
+					Proofs:      []kzg4844.Proof{emptyBlobProof, emptyBlobProof},
+				}),
 			}}),
 			chasingHead: params.MinBlocksForBlobRequests + 1,
 			withSidecar: true,
-			err:         true,
+			err:         true, // Should error because total blobs exceed Prague's limit (9)
+
 		},
 		{
 			block: types.NewBlockWithHeader(&types.Header{
@@ -144,7 +150,7 @@ func TestIsDataAvailable(t *testing.T) {
 }
 
 func TestCheckDataAvailableInBatch(t *testing.T) {
-	hr := NewMockDAHeaderReader(params.ParliaTestChainConfig)
+	hr := NewMockDAHeaderReader(params.OasysTestChainConfig)
 	tests := []struct {
 		chain types.Blocks
 		err   bool
@@ -228,9 +234,14 @@ func TestCheckDataAvailableInBatch(t *testing.T) {
 						Commitments: []kzg4844.Commitment{emptyBlobCommit, emptyBlobCommit, emptyBlobCommit, emptyBlobCommit},
 						Proofs:      []kzg4844.Proof{emptyBlobProof, emptyBlobProof, emptyBlobProof, emptyBlobProof},
 					}),
+					createMockDATx(hr.Config(), &types.BlobTxSidecar{
+						Blobs:       []kzg4844.Blob{emptyBlob, emptyBlob},
+						Commitments: []kzg4844.Commitment{emptyBlobCommit, emptyBlobCommit},
+						Proofs:      []kzg4844.Proof{emptyBlobProof, emptyBlobProof},
+					}),
 				}}),
 			},
-			err:   true,
+			err:   true, // Should error because total blobs exceed Prague's limit (9)
 			index: 0,
 		},
 	}
@@ -251,7 +262,7 @@ func TestCheckDataAvailableInBatch(t *testing.T) {
 }
 
 func BenchmarkEmptySidecarDAChecking(b *testing.B) {
-	hr := NewMockDAHeaderReader(params.ParliaTestChainConfig)
+	hr := NewMockDAHeaderReader(params.OasysTestChainConfig)
 	block := types.NewBlockWithHeader(&types.Header{
 		Number: big.NewInt(1),
 	}).WithBody(types.Body{Transactions: types.Transactions{
@@ -270,7 +281,7 @@ func BenchmarkEmptySidecarDAChecking(b *testing.B) {
 }
 
 func BenchmarkRandomSidecarDAChecking(b *testing.B) {
-	hr := NewMockDAHeaderReader(params.ParliaTestChainConfig)
+	hr := NewMockDAHeaderReader(params.OasysTestChainConfig)
 	const count = 10
 	blocks := make([]*types.Block, count)
 	for i := 0; i < len(blocks); i++ {
@@ -366,6 +377,10 @@ func (r *mockDAHeaderReader) GetHighestVerifiedHeader() *types.Header {
 }
 
 func (r *mockDAHeaderReader) GetVerifiedBlockByHash(hash common.Hash) *types.Header {
+	panic("not supported")
+}
+
+func (r *mockDAHeaderReader) GetCanonicalHash(number uint64) common.Hash {
 	panic("not supported")
 }
 

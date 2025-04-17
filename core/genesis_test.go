@@ -73,35 +73,35 @@ func testSetupGenesis(t *testing.T, scheme string) {
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, *params.ConfigCompatError, error) {
 				return SetupGenesisBlock(db, triedb.NewDatabase(db, newDbConfig(scheme)), nil)
 			},
-			wantHash:   params.BSCGenesisHash,
-			wantConfig: params.BSCChainConfig,
+			wantHash:   params.OasysMainnetGenesisHash,
+			wantConfig: params.OasysMainnetChainConfig,
 		},
 		{
-			name: "mainnet block in DB, genesis == nil",
+			name: "oasys mainnet block in DB, genesis == nil",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, *params.ConfigCompatError, error) {
-				DefaultBSCGenesisBlock().MustCommit(db, triedb.NewDatabase(db, newDbConfig(scheme)))
+				DefaultOasysMainnetGenesisBlock().MustCommit(db, triedb.NewDatabase(db, newDbConfig(scheme)))
 				return SetupGenesisBlock(db, triedb.NewDatabase(db, newDbConfig(scheme)), nil)
 			},
-			wantHash:   params.BSCGenesisHash,
-			wantConfig: params.BSCChainConfig,
+			wantHash:   params.OasysMainnetGenesisHash,
+			wantConfig: params.OasysMainnetChainConfig,
 		},
 		{
-			name: "chapel block in DB, genesis == nil",
+			name: "oasys testnet block in DB, genesis == nil",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, *params.ConfigCompatError, error) {
-				DefaultChapelGenesisBlock().MustCommit(db, triedb.NewDatabase(db, newDbConfig(scheme)))
+				DefaultOasysTestnetGenesisBlock().MustCommit(db, triedb.NewDatabase(db, newDbConfig(scheme)))
 				return SetupGenesisBlock(db, triedb.NewDatabase(db, newDbConfig(scheme)), nil)
 			},
-			wantHash:   params.ChapelGenesisHash,
-			wantConfig: params.ChapelChainConfig,
+			wantHash:   params.OasysTestnetGenesisHash,
+			wantConfig: params.OasysTestnetChainConfig,
 		},
 		{
-			name: "chapel block in DB, genesis == chapel",
+			name: "oasys testnet block in DB, genesis == oasys testnet",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, *params.ConfigCompatError, error) {
-				DefaultChapelGenesisBlock().MustCommit(db, triedb.NewDatabase(db, newDbConfig(scheme)))
-				return SetupGenesisBlock(db, triedb.NewDatabase(db, newDbConfig(scheme)), DefaultChapelGenesisBlock())
+				DefaultOasysTestnetGenesisBlock().MustCommit(db, triedb.NewDatabase(db, newDbConfig(scheme)))
+				return SetupGenesisBlock(db, triedb.NewDatabase(db, newDbConfig(scheme)), DefaultOasysTestnetGenesisBlock())
 			},
-			wantHash:   params.ChapelGenesisHash,
-			wantConfig: params.ChapelChainConfig,
+			wantHash:   params.OasysTestnetGenesisHash,
+			wantConfig: params.OasysTestnetChainConfig,
 		},
 		{
 			name: "custom block in DB, genesis == nil",
@@ -114,13 +114,13 @@ func testSetupGenesis(t *testing.T, scheme string) {
 			wantConfig: customg.Config,
 		},
 		{
-			name: "custom block in DB, genesis == chapel",
+			name: "custom block in DB, genesis == oasys testnet",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, *params.ConfigCompatError, error) {
 				tdb := triedb.NewDatabase(db, newDbConfig(scheme))
 				customg.Commit(db, tdb)
-				return SetupGenesisBlock(db, tdb, DefaultChapelGenesisBlock())
+				return SetupGenesisBlock(db, tdb, DefaultOasysTestnetGenesisBlock())
 			},
-			wantErr: &GenesisMismatchError{Stored: customghash, New: params.ChapelGenesisHash},
+			wantErr: &GenesisMismatchError{Stored: customghash, New: params.OasysTestnetGenesisHash},
 		},
 		{
 			name: "compatible config in DB",
@@ -268,26 +268,30 @@ func TestReadWriteGenesisAlloc(t *testing.T) {
 
 func TestConfigOrDefault(t *testing.T) {
 	defaultGenesis := DefaultGenesisBlock()
-	if defaultGenesis.Config.PlanckBlock != nil {
-		t.Errorf("initial config should have PlanckBlock = nil, but instead PlanckBlock = %v", defaultGenesis.Config.PlanckBlock)
+	if blk := defaultGenesis.Config.OasysPublicationBlock(); blk != nil {
+		t.Errorf("initial config should have OasysPublicationBlock = nil, but instead OasysPublicationBlock = %v", blk)
 	}
-	gHash := params.BSCGenesisHash
+	gHash := params.OasysMainnetGenesisHash
 	config := defaultGenesis.chainConfigOrDefault(gHash, nil)
 
-	if config.ChainID.Cmp(params.BSCChainConfig.ChainID) != 0 {
-		t.Errorf("ChainID of resulting config should be %v, but is %v instead", params.BSCChainConfig.ChainID, config.ChainID)
+	if config.ChainID.Cmp(params.OasysMainnetChainConfig.ChainID) != 0 {
+		t.Errorf("ChainID of resulting config should be %v, but is %v instead",
+			params.OasysMainnetChainConfig.ChainID, config.ChainID)
 	}
 
-	if config.HomesteadBlock.Cmp(params.BSCChainConfig.HomesteadBlock) != 0 {
-		t.Errorf("resulting config should have HomesteadBlock = %v, but instead is %v", params.BSCChainConfig, config.HomesteadBlock)
+	if config.HomesteadBlock.Cmp(params.OasysMainnetChainConfig.HomesteadBlock) != 0 {
+		t.Errorf("resulting config should have HomesteadBlock = %v, but instead is %v",
+			params.OasysMainnetChainConfig, config.HomesteadBlock)
 	}
 
-	if config.PlanckBlock == nil {
-		t.Errorf("resulting config should have PlanckBlock = %v , but instead is nil", params.BSCChainConfig.PlanckBlock)
+	if config.OasysPublicationBlock() == nil {
+		t.Errorf("resulting config should have OasysPublicationBlock = %v , but instead is nil",
+			params.OasysMainnetChainConfig.OasysPublicationBlock())
 	}
 
-	if config.PlanckBlock.Cmp(params.BSCChainConfig.PlanckBlock) != 0 {
-		t.Errorf("resulting config should have PlanckBlock = %v , but instead is %v", params.BSCChainConfig.PlanckBlock, config.PlanckBlock)
+	if config.OasysPublicationBlock().Cmp(params.OasysMainnetChainConfig.OasysPublicationBlock()) != 0 {
+		t.Errorf("resulting config should have OasysPublicationBlock = %v , but instead is %v",
+			params.OasysMainnetChainConfig.OasysPublicationBlock(), config.OasysPublicationBlock())
 	}
 }
 

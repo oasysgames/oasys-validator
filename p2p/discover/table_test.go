@@ -444,7 +444,7 @@ func TestTable_filterNode(t *testing.T) {
 		Tail   []rlp.RawValue `rlp:"tail"`
 	}
 
-	enrFilter, _ := ParseEthFilter("bsc")
+	enrFilter, _ := ParseEthFilter("oasys-mainnet")
 
 	// Check test ENR record
 	var r1 enr.Record
@@ -456,7 +456,7 @@ func TestTable_filterNode(t *testing.T) {
 
 	// Check wrong genesis ENR record
 	var r2 enr.Record
-	r2.Set(enr.WithEntry("eth", eth{ForkID: forkid.NewID(params.BSCChainConfig, core.DefaultChapelGenesisBlock().ToBlock(), uint64(0), uint64(0))}))
+	r2.Set(enr.WithEntry("eth", eth{ForkID: forkid.NewID(params.OasysMainnetChainConfig, core.DefaultOasysTestnetGenesisBlock().ToBlock(), uint64(0), uint64(0))}))
 	if enrFilter(&r2) {
 		t.Fatalf("filterNode doesn't work correctly for wrong genesis entry")
 	}
@@ -464,7 +464,7 @@ func TestTable_filterNode(t *testing.T) {
 
 	// Check correct genesis ENR record
 	var r3 enr.Record
-	r3.Set(enr.WithEntry("eth", eth{ForkID: forkid.NewID(params.BSCChainConfig, core.DefaultBSCGenesisBlock().ToBlock(), uint64(0), uint64(0))}))
+	r3.Set(enr.WithEntry("eth", eth{ForkID: forkid.NewID(params.OasysMainnetChainConfig, core.DefaultOasysMainnetGenesisBlock().ToBlock(), uint64(0), uint64(0))}))
 	if !enrFilter(&r3) {
 		t.Fatalf("filterNode doesn't work correctly for correct genesis entry")
 	}

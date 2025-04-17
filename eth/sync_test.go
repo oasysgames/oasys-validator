@@ -110,9 +110,10 @@ func TestSnapSyncWithBlobs(t *testing.T) {
 
 func testChainSyncWithBlobs(t *testing.T, mode downloader.SyncMode, preCancunBlks, postCancunBlks uint64) {
 	t.Parallel()
-	config := *params.ParliaTestChainConfig
+	config := *params.OasysTestChainConfig
 	cancunTime := (preCancunBlks + 1) * 10
 	config.CancunTime = &cancunTime
+	config.PragueTime = &cancunTime
 
 	// Create an empty handler
 	empty := newTestParliaHandlerAfterCancun(t, &config, mode, 0, 0)

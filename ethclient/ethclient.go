@@ -735,13 +735,13 @@ func (ec *Client) SendTransaction(ctx context.Context, tx *types.Transaction) er
 //
 // If the transaction was a contract creation use the TransactionReceipt method to get the
 // contract address after the transaction has been mined.
-// func (ec *Client) SendTransactionConditional(ctx context.Context, tx *types.Transaction, opts types.TransactionOpts) error {
-// 	data, err := tx.MarshalBinary()
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return ec.c.CallContext(ctx, nil, "eth_sendRawTransactionConditional", hexutil.Encode(data), opts)
-// }
+func (ec *Client) SendTransactionConditional(ctx context.Context, tx *types.Transaction, opts types.TransactionOpts) error {
+	data, err := tx.MarshalBinary()
+	if err != nil {
+		return err
+	}
+	return ec.c.CallContext(ctx, nil, "eth_sendRawTransactionConditional", hexutil.Encode(data), opts)
+}
 
 // RevertErrorData returns the 'revert reason' data of a contract call.
 //

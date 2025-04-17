@@ -3333,17 +3333,15 @@ func TestEIP2718TransitionWithTestChainConfig(t *testing.T) {
 }
 
 func preShanghaiConfig() *params.ChainConfig {
-	config := *params.ParliaTestChainConfig
+	config := *params.OasysTestChainConfig
 	config.ShanghaiTime = nil
-	config.KeplerTime = nil
-	config.FeynmanTime = nil
-	config.FeynmanFixTime = nil
 	config.CancunTime = nil
+	config.PragueTime = nil
 	return &config
 }
 
 // TestEIP2718TransitionWithParliaConfig tests EIP-2718 with Parlia Config.
-func TestEIP2718TransitionWithParliaConfig(t *testing.T) {
+func TestEIP2718TransitionWithOasysConfig(t *testing.T) {
 	testEIP2718TransitionWithConfig(t, rawdb.HashScheme, preShanghaiConfig())
 	testEIP2718TransitionWithConfig(t, rawdb.PathScheme, preShanghaiConfig())
 }
@@ -4225,14 +4223,16 @@ func (c *mockParlia) CalcDifficulty(chain consensus.ChainHeaderReader, time uint
 	return big.NewInt(1)
 }
 
-func TestParliaBlobFeeReward(t *testing.T) {
+func TestOasysBlobFeeReward(t *testing.T) {
+	coinbase := common.HexToAddress("0xbeef")
+
 	// Have N headers in the freezer
 	frdir := t.TempDir()
 	db, err := rawdb.NewDatabaseWithFreezer(rawdb.NewMemoryDatabase(), frdir, "", false, false, false, false, false)
 	if err != nil {
 		t.Fatalf("failed to create database with ancient backend")
 	}
-	config := params.ParliaTestChainConfig
+	config := params.OasysTestChainConfig
 	gspec := &Genesis{
 		Config: config,
 		Alloc:  types.GenesisAlloc{testAddr: {Balance: new(big.Int).SetUint64(10 * params.Ether)}},
@@ -4241,8 +4241,11 @@ func TestParliaBlobFeeReward(t *testing.T) {
 	chain, _ := NewBlockChain(db, nil, gspec, nil, engine, vm.Config{}, nil, nil)
 	signer := types.LatestSigner(config)
 
+	var baseFee *big.Int
 	_, bs, _ := GenerateChainWithGenesis(gspec, engine, 1, func(i int, gen *BlockGen) {
+		baseFee = gen.BaseFee()
 		tx, _ := makeMockTx(config, signer, testKey, gen.TxNonce(testAddr), gen.BaseFee().Uint64(), 0, false)
+		gen.SetCoinbase(coinbase)
 		gen.AddTxWithChain(chain, tx)
 		tx, sidecar := makeMockTx(config, signer, testKey, gen.TxNonce(testAddr), gen.BaseFee().Uint64(), eip4844.CalcBlobFee(config, gen.HeadBlock()).Uint64(), true)
 		gen.AddTxWithChain(chain, tx)
@@ -4252,6 +4255,7 @@ func TestParliaBlobFeeReward(t *testing.T) {
 			TxHash:        tx.Hash(),
 		})
 	})
+	require.NotZero(t, baseFee.Uint64())
 	if _, err := chain.InsertChain(bs); err != nil {
 		panic(err)
 	}
@@ -4262,17 +4266,20 @@ func TestParliaBlobFeeReward(t *testing.T) {
 	}
 	expect := new(big.Int)
 	for _, block := range bs {
+		require.Equal(t, baseFee.Uint64(), block.BaseFee().Uint64())
 		receipts := chain.GetReceiptsByHash(block.Hash())
 		for _, receipt := range receipts {
 			if receipt.BlobGasPrice != nil {
 				blob := receipt.BlobGasPrice.Mul(receipt.BlobGasPrice, new(big.Int).SetUint64(receipt.BlobGasUsed))
 				expect.Add(expect, blob)
 			}
-			plain := receipt.EffectiveGasPrice.Mul(receipt.EffectiveGasPrice, new(big.Int).SetUint64(receipt.GasUsed))
+			require.Equal(t, baseFee.Uint64()+10, receipt.EffectiveGasPrice.Uint64())
+			priorityFee := new(big.Int).Sub(receipt.EffectiveGasPrice, baseFee)
+			plain := receipt.EffectiveGasPrice.Mul(priorityFee, new(big.Int).SetUint64(receipt.GasUsed))
 			expect.Add(expect, plain)
 		}
 	}
-	actual := stateDB.GetBalance(params.SystemAddress)
+	actual := stateDB.GetBalance(coinbase)
 	require.Equal(t, expect.Uint64(), actual.Uint64())
 }
 

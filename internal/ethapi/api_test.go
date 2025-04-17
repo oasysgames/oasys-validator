@@ -610,12 +610,6 @@ func (b testBackend) SubscribeFinalizedHeaderEvent(ch chan<- core.FinalizedHeade
 func (b testBackend) SubscribeNewVoteEvent(ch chan<- core.NewVoteEvent) event.Subscription {
 	panic("implement me")
 }
-func (b testBackend) SubscribeFinalizedHeaderEvent(ch chan<- core.FinalizedHeaderEvent) event.Subscription {
-	panic("implement me")
-}
-func (b testBackend) SubscribeNewVoteEvent(ch chan<- core.NewVoteEvent) event.Subscription {
-	panic("implement me")
-}
 func (b testBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
 	panic("implement me")
 }
@@ -638,9 +632,8 @@ func (b testBackend) TxPoolContentFrom(addr common.Address) ([]*types.Transactio
 func (b testBackend) SubscribeNewTxsEvent(events chan<- core.NewTxsEvent) event.Subscription {
 	panic("implement me")
 }
-func (b testBackend) ChainConfig() *params.ChainConfig             { return b.chain.Config() }
-func (b testBackend) Engine() consensus.Engine                     { return b.chain.Engine() }
-func (b testBackend) CurrentValidators() ([]common.Address, error) { return []common.Address{}, nil }
+func (b testBackend) ChainConfig() *params.ChainConfig { return b.chain.Config() }
+func (b testBackend) Engine() consensus.Engine         { return b.chain.Engine() }
 func (b testBackend) GetLogs(ctx context.Context, blockHash common.Hash, number uint64) ([][]*types.Log, error) {
 	panic("implement me")
 }
@@ -655,24 +648,6 @@ func (b testBackend) SubscribePendingLogsEvent(ch chan<- []*types.Log) event.Sub
 }
 func (b testBackend) BloomStatus() (uint64, uint64) { panic("implement me") }
 func (b testBackend) ServiceFilter(ctx context.Context, session *bloombits.MatcherSession) {
-	panic("implement me")
-}
-
-func (b *testBackend) MevRunning() bool                       { return false }
-func (b *testBackend) HasBuilder(builder common.Address) bool { return false }
-func (b *testBackend) MevParams() *types.MevParams {
-	return &types.MevParams{}
-}
-func (b *testBackend) StartMev()                                                  {}
-func (b *testBackend) StopMev()                                                   {}
-func (b *testBackend) AddBuilder(builder common.Address, builderUrl string) error { return nil }
-func (b *testBackend) RemoveBuilder(builder common.Address) error                 { return nil }
-func (b *testBackend) SendBid(ctx context.Context, bid *types.BidArgs) (common.Hash, error) {
-	panic("implement me")
-}
-func (b *testBackend) MinerInTurn() bool { return false }
-func (b *testBackend) BestBidGasFee(parentHash common.Hash) *big.Int {
-	//TODO implement me
 	panic("implement me")
 }
 
