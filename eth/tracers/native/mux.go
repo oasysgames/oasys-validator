@@ -58,19 +58,18 @@ func newMuxTracer(ctx *tracers.Context, cfg json.RawMessage, chainConfig *params
 	t := &muxTracer{names: names, tracers: objects}
 	return &tracers.Tracer{
 		Hooks: &tracing.Hooks{
-			OnTxStart:                 t.OnTxStart,
-			OnTxEnd:                   t.OnTxEnd,
-			OnEnter:                   t.OnEnter,
-			OnExit:                    t.OnExit,
-			OnOpcode:                  t.OnOpcode,
-			OnFault:                   t.OnFault,
-			OnGasChange:               t.OnGasChange,
-			OnBalanceChange:           t.OnBalanceChange,
-			OnNonceChange:             t.OnNonceChange,
-			OnCodeChange:              t.OnCodeChange,
-			OnStorageChange:           t.OnStorageChange,
-			OnLog:                     t.OnLog,
-			OnSystemTxFixIntrinsicGas: t.OnSystemTxFixIntrinsicGas,
+			OnTxStart:       t.OnTxStart,
+			OnTxEnd:         t.OnTxEnd,
+			OnEnter:         t.OnEnter,
+			OnExit:          t.OnExit,
+			OnOpcode:        t.OnOpcode,
+			OnFault:         t.OnFault,
+			OnGasChange:     t.OnGasChange,
+			OnBalanceChange: t.OnBalanceChange,
+			OnNonceChange:   t.OnNonceChange,
+			OnCodeChange:    t.OnCodeChange,
+			OnStorageChange: t.OnStorageChange,
+			OnLog:           t.OnLog,
 		},
 		GetResult: t.GetResult,
 		Stop:      t.Stop,
@@ -169,14 +168,6 @@ func (t *muxTracer) OnLog(log *types.Log) {
 	for _, t := range t.tracers {
 		if t.OnLog != nil {
 			t.OnLog(log)
-		}
-	}
-}
-
-func (t *muxTracer) OnSystemTxFixIntrinsicGas(intrinsicGas uint64) {
-	for _, t := range t.tracers {
-		if t.OnSystemTxFixIntrinsicGas != nil {
-			t.OnSystemTxFixIntrinsicGas(intrinsicGas)
 		}
 	}
 }
