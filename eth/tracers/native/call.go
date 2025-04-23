@@ -133,12 +133,11 @@ func newCallTracer(ctx *tracers.Context, cfg json.RawMessage, chainConfig *param
 	}
 	return &tracers.Tracer{
 		Hooks: &tracing.Hooks{
-			OnTxStart:                 t.OnTxStart,
-			OnTxEnd:                   t.OnTxEnd,
-			OnEnter:                   t.OnEnter,
-			OnExit:                    t.OnExit,
-			OnLog:                     t.OnLog,
-			OnSystemTxFixIntrinsicGas: t.OnSystemTxFixIntrinsicGas,
+			OnTxStart: t.OnTxStart,
+			OnTxEnd:   t.OnTxEnd,
+			OnEnter:   t.OnEnter,
+			OnExit:    t.OnExit,
+			OnLog:     t.OnLog,
 		},
 		GetResult: t.GetResult,
 		Stop:      t.Stop,
@@ -232,10 +231,6 @@ func (t *callTracer) OnTxEnd(receipt *types.Receipt, err error) {
 		// Logs are not emitted when the call fails
 		clearFailedLogs(&t.callstack[0], false)
 	}
-}
-
-func (t *callTracer) OnSystemTxFixIntrinsicGas(intrinsicGas uint64) {
-	t.callstack[0].GasUsed -= intrinsicGas
 }
 
 func (t *callTracer) OnLog(log *types.Log) {

@@ -37,7 +37,7 @@ const (
 
 // Handshake executes the eth protocol handshake, negotiating version number,
 // network IDs, difficulties, head and genesis blocks.
-func (p *Peer) Handshake(network uint64, td *big.Int, head common.Hash, genesis common.Hash, forkID forkid.ID, forkFilter forkid.Filter, extension *UpgradeStatusExtension) error {
+func (p *Peer) Handshake(network uint64, td *big.Int, head common.Hash, genesis common.Hash, forkID forkid.ID, forkFilter forkid.Filter) error {
 	// Send out own handshake in a new thread
 	errc := make(chan error, 2)
 
@@ -107,23 +107,6 @@ func (p *Peer) readStatus(network uint64, status *StatusPacket, genesis common.H
 	}
 	if err := forkFilter(status.ForkID); err != nil {
 		return fmt.Errorf("%w: %v", errForkIDRejected, err)
-	}
-	return nil
-}
-
-func (p *Peer) readUpgradeStatus(status *UpgradeStatusPacket) error {
-	msg, err := p.rw.ReadMsg()
-	if err != nil {
-		return err
-	}
-	if msg.Code != UpgradeStatusMsg {
-		return fmt.Errorf("%w: upgrade status msg has code %x (!= %x)", errNoStatusMsg, msg.Code, UpgradeStatusMsg)
-	}
-	if msg.Size > maxMessageSize {
-		return fmt.Errorf("%w: %v > %v", errMsgTooLarge, msg.Size, maxMessageSize)
-	}
-	if err := msg.Decode(&status); err != nil {
-		return fmt.Errorf("%w: message %v: %v", errDecode, msg, err)
 	}
 	return nil
 }

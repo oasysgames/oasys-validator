@@ -242,13 +242,12 @@ func NewStructLogger(cfg *Config) *StructLogger {
 
 func (l *StructLogger) Hooks() *tracing.Hooks {
 	return &tracing.Hooks{
-		OnTxStart:                 l.OnTxStart,
-		OnTxEnd:                   l.OnTxEnd,
-		OnSystemCallStartV2:       l.OnSystemCallStart,
-		OnSystemCallEnd:           l.OnSystemCallEnd,
-		OnExit:                    l.OnExit,
-		OnOpcode:                  l.OnOpcode,
-		OnSystemTxFixIntrinsicGas: l.OnSystemTxFixIntrinsicGas,
+		OnTxStart:           l.OnTxStart,
+		OnTxEnd:             l.OnTxEnd,
+		OnSystemCallStartV2: l.OnSystemCallStart,
+		OnSystemCallEnd:     l.OnSystemCallEnd,
+		OnExit:              l.OnExit,
+		OnOpcode:            l.OnOpcode,
 	}
 }
 
@@ -391,10 +390,6 @@ func (l *StructLogger) OnTxEnd(receipt *types.Receipt, err error) {
 	if receipt != nil {
 		l.usedGas = receipt.GasUsed
 	}
-}
-
-func (l *StructLogger) OnSystemTxFixIntrinsicGas(intrinsicGas uint64) {
-	l.usedGas -= intrinsicGas
 }
 
 // Error returns the VM error captured by the trace.

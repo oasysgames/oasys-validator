@@ -162,42 +162,6 @@ type (
 	// beacon block root.
 	OnSystemCallEndHook = func()
 
-	// OnSystemTxFixIntrinsicGasHook is called when tracing a system transaction, which does not calculate intrinsic gas during execution.
-	// this hook will subtract intrinsic gas from the total gas used.
-	OnSystemTxFixIntrinsicGasHook = func(uint64)
-
-	// OnSystemTxStartHook is called when a system transaction is about to be executed within the Parlia consensus
-	// engine, like before upgrading system contracts, distribution of rewards, and other "chain" related transactions.
-	//
-	// This will be called in addition to the `OnTxStart` hook so the flow of event you will receive in your tracer will
-	// look kike this:
-	//
-	// - OnSystemTxStart
-	// - OnTxStart
-	// - OnTxEnd
-	// - OnSystemTxEnd
-	//
-	// This event flow enables transactions to be traced correctly with just OnTxStart/End being set but also
-	// enables special routing of those transactions by having OnSystemTxStart/End defined and keeping a special
-	// system state to do something different when OnTxEnd is called.
-	OnSystemTxStartHook func()
-
-	// OnSystemTxEnd is called when a system transaction is about to completed its execution within the Parlia consensus
-	// engine, like after upgrading system contracts, distribution of rewards, and other "chain" related transactions.
-	//
-	// This will be called in addition to the `OnTxStart` hook so the flow of event you will receive in your tracer will
-	// look kike this:
-	//
-	// - OnSystemTxStart
-	// - OnTxStart
-	// - OnTxEnd
-	// - OnSystemTxEnd
-	//
-	// This event flow enables transactions to be traced correctly with just OnTxStart/End being set but also
-	// enables special routing of those transactions by having OnSystemTxStart/End defined and keeping a special
-	// system state to do something different when OnTxEnd is called.
-	OnSystemTxEndHook func()
-
 	/*
 		- State events -
 	*/
@@ -243,11 +207,6 @@ type Hooks struct {
 	OnSystemCallStart   OnSystemCallStartHook
 	OnSystemCallStartV2 OnSystemCallStartHookV2
 	OnSystemCallEnd     OnSystemCallEndHook
-
-	OnSystemTxStart           OnSystemTxStartHook
-	OnSystemTxEnd             OnSystemTxEndHook
-	OnSystemTxFixIntrinsicGas OnSystemTxFixIntrinsicGasHook
-
 	// State events
 	OnBalanceChange BalanceChangeHook
 	OnNonceChange   NonceChangeHook
