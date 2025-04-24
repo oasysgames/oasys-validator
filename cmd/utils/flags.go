@@ -89,6 +89,11 @@ import (
 // The flags are defined here so their names and help texts
 // are the same for all commands.
 
+const (
+	// All flags for BSC specific features default to false
+	bscFeaturesDefault = false
+)
+
 var (
 	// General settings
 	DataDirFlag = &flags.DirectoryFlag{
@@ -101,26 +106,31 @@ var (
 		Name: "multidatabase",
 		Usage: "Enable a separated state and block database, it will be created within two subdirectory called state and block, " +
 			"Users can copy this state or block directory to another directory or disk, and then create a symbolic link to the state directory under the chaindata",
+		Value:    bscFeaturesDefault,
 		Category: flags.EthCategory,
 	}
 	DirectBroadcastFlag = &cli.BoolFlag{
 		Name:     "directbroadcast",
 		Usage:    "Enable directly broadcast mined block to all peers",
+		Value:    bscFeaturesDefault,
 		Category: flags.EthCategory,
 	}
 	DisableSnapProtocolFlag = &cli.BoolFlag{
 		Name:     "disablesnapprotocol",
 		Usage:    "Disable snap protocol",
+		Value:    bscFeaturesDefault,
 		Category: flags.EthCategory,
 	}
 	EnableTrustProtocolFlag = &cli.BoolFlag{
 		Name:     "enabletrustprotocol",
 		Usage:    "Enable trust protocol",
+		Value:    bscFeaturesDefault,
 		Category: flags.FastNodeCategory,
 	}
 	RangeLimitFlag = &cli.BoolFlag{
 		Name:     "rangelimit",
 		Usage:    "Enable 5000 blocks limit for range query",
+		Value:    bscFeaturesDefault,
 		Category: flags.APICategory,
 	}
 	DiffFlag = flags.DirectoryFlag{
@@ -218,7 +228,7 @@ var (
 	ForceFlag = &cli.BoolFlag{
 		Name:  "force",
 		Usage: "Force convert hbss trie node to pbss trie node. Ignore any metadata",
-		Value: false,
+		Value: bscFeaturesDefault,
 	}
 	// Dump command options.
 	IterativeOutputFlag = &cli.BoolFlag{
@@ -344,13 +354,13 @@ var (
 	PathDBSyncFlag = &cli.BoolFlag{
 		Name:     "pathdb.sync",
 		Usage:    "sync flush nodes cache to disk in path schema",
-		Value:    false,
+		Value:    bscFeaturesDefault,
 		Category: flags.StateCategory,
 	}
 	JournalFileFlag = &cli.BoolFlag{
 		Name:     "journalfile",
 		Usage:    "Enable using journal file to store the TrieJournal instead of KVDB in pbss (default = false)",
-		Value:    false,
+		Value:    bscFeaturesDefault,
 		Category: flags.StateCategory,
 	}
 	StateHistoryFlag = &cli.Uint64Flag{
@@ -557,6 +567,7 @@ var (
 	PersistDiffFlag = &cli.BoolFlag{
 		Name:     "persistdiff",
 		Usage:    "Enable persistence of the diff layer",
+		Value:    bscFeaturesDefault,
 		Category: flags.FastNodeCategory,
 	}
 	DiffBlockFlag = &cli.Uint64Flag{
@@ -568,6 +579,7 @@ var (
 	PruneAncientDataFlag = &cli.BoolFlag{
 		Name:     "pruneancient",
 		Usage:    "Prune ancient data, is an optional config and disabled by default. Only keep the latest 9w blocks' data,the older blocks' data will be permanently pruned. Notice:the geth/chaindata/ancient dir will be removed, if restart without the flag, the ancient data will start with the previous point that the oldest unpruned block number. Recommends to the user who don't care about the ancient data.",
+		Value:    bscFeaturesDefault,
 		Category: flags.BlockHistoryCategory,
 	}
 	CacheLogSizeFlag = &cli.IntFlag{
