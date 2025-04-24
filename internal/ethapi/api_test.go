@@ -3719,6 +3719,74 @@ func TestGetBlobSidecarByTxHash(t *testing.T) {
 	}
 }
 
+func TestEVMAccessControl(t *testing.T) {
+	t.Parallel()
+
+	chainConfig := *params.OasysTestChainConfig
+	chainConfig.TerminalTotalDifficulty = big.NewInt(0)
+
+	contractAddr := common.HexToAddress("0xdeaddeaddeaddeaddeaddeaddeaddeaddeaddead")
+	gspec := &core.Genesis{
+		Config: &chainConfig,
+		Alloc: types.GenesisAlloc{
+			// Set to denylist
+			common.HexToAddress("0x520000000000000000000000000000000000003F"): {
+				Storage: map[common.Hash]common.Hash{
+					crypto.Keccak256Hash(
+						common.HexToHash(contractAddr.Hex()).Bytes(), // mapping key
+						common.HexToHash("0x2").Bytes(),              // mapping slot
+					): common.HexToHash("0x1"), // mapping value
+				},
+			},
+		},
+	}
+	b := newTestBackend(t, 2, gspec, beacon.New(ethash.NewFaker()), func(i int, b *core.BlockGen) {
+		b.SetPoS()
+	})
+	api := NewTransactionAPI(b, nil)
+
+	t.Run("ContractCreation", func(t *testing.T) {
+		res, err := api.FillTransaction(context.Background(), TransactionArgs{
+			From:  &b.acc.Address,
+			To:    nil,                  // nil = deploy transaction
+			Gas:   newUint64(1_000_000), // prevent gas estimation
+			Input: &hexutil.Bytes{0x0, 0x0},
+		})
+		if err != nil {
+			t.Fatalf("failed to fill tx defaults: %v\n", err)
+		}
+		_, err = api.SendTransaction(context.Background(), argsFromTransaction(res.Tx, b.acc.Address))
+		if err == nil || !strings.Contains(err.Error(), "the deployer address is not allowed") {
+			t.Fatalf("tx should have failed: %v\n", err)
+		}
+	})
+
+	t.Run("ContractCall", func(t *testing.T) {
+		res, err := api.FillTransaction(context.Background(), TransactionArgs{
+			From: &b.acc.Address,
+			To:   &contractAddr,
+			Gas:  newUint64(1_000_000), // prevent gas estimation
+		})
+		if err != nil {
+			t.Fatalf("failed to fill tx defaults: %v\n", err)
+		}
+		_, err = api.SendTransaction(context.Background(), argsFromTransaction(res.Tx, b.acc.Address))
+		if err == nil || !strings.Contains(err.Error(), "the calling contract is in denlylist") {
+			t.Fatalf("tx should have failed: %v\n", err)
+		}
+	})
+
+	t.Run("EstimateGas", func(t *testing.T) {
+		_, err := NewBlockChainAPI(b).EstimateGas(context.Background(), TransactionArgs{
+			From: &b.acc.Address,
+			To:   &contractAddr,
+		}, nil, nil, nil)
+		if err == nil || !strings.Contains(err.Error(), "the calling contract is in denlylist") {
+			t.Fatalf("tx should have failed: %v\n", err)
+		}
+	})
+}
+
 func testRPCResponseWithFile(t *testing.T, testid int, result interface{}, rpc string, file string) {
 	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
