@@ -1217,7 +1217,9 @@ LOOP:
 
 		// Prevent double signing that might occur when the recommit timer
 		// in newWorkLoop fires immediately after sealing completion.
-		if len(workList) == 1 && w.isDoubleSign(workList[0].header, false) {
+		// NOTE: Do not place this block before `workList = append(workList, work)`
+		//       because the workList is being discarded in a deferred function.
+		if w.isDoubleSign(work.header, false) {
 			log.Debug("Prevent double signing due to recommit")
 			return
 		}
