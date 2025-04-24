@@ -77,30 +77,30 @@ The default pruning target is the HEAD-127 state.
 WARNING: it's only supported in hash mode(--state.scheme=hash)".
 `,
 			},
-			{
-				Name:     "prune-block",
-				Usage:    "Prune block data offline",
-				Action:   pruneBlock,
-				Category: "MISCELLANEOUS COMMANDS",
-				Flags: []cli.Flag{
-					utils.DataDirFlag,
-					utils.AncientFlag,
-					utils.BlockAmountReserved,
-					utils.TriesInMemoryFlag,
-					utils.CheckSnapshotWithMPT,
-				},
-				Description: `
-geth offline prune-block for block data in ancientdb.
-The amount of blocks expected for remaining after prune can be specified via block-amount-reserved in this command,
-will prune and only remain the specified amount of old block data in ancientdb.
-the brief workflow is to backup the number of this specified amount blocks backward in original ancientdb
-into new ancient_backup, then delete the original ancientdb dir and rename the ancient_backup to original one for replacement,
-finally assemble the statedb and new ancientDb together.
-The purpose of doing it is because the block data will be moved into the ancient store when it
-becomes old enough(exceed the Threshold 90000), the disk usage will be very large over time, and is occupied mainly by ancientDb,
-so it's very necessary to do block data prune, this feature will handle it.
-`,
-			},
+			// 			{
+			// 				Name:     "prune-block",
+			// 				Usage:    "Prune block data offline",
+			// 				Action:   pruneBlock,
+			// 				Category: "MISCELLANEOUS COMMANDS",
+			// 				Flags: []cli.Flag{
+			// 					utils.DataDirFlag,
+			// 					utils.AncientFlag,
+			// 					utils.BlockAmountReserved,
+			// 					utils.TriesInMemoryFlag,
+			// 					utils.CheckSnapshotWithMPT,
+			// 				},
+			// 				Description: `
+			// geth offline prune-block for block data in ancientdb.
+			// The amount of blocks expected for remaining after prune can be specified via block-amount-reserved in this command,
+			// will prune and only remain the specified amount of old block data in ancientdb.
+			// the brief workflow is to backup the number of this specified amount blocks backward in original ancientdb
+			// into new ancient_backup, then delete the original ancientdb dir and rename the ancient_backup to original one for replacement,
+			// finally assemble the statedb and new ancientDb together.
+			// The purpose of doing it is because the block data will be moved into the ancient store when it
+			// becomes old enough(exceed the Threshold 90000), the disk usage will be very large over time, and is occupied mainly by ancientDb,
+			// so it's very necessary to do block data prune, this feature will handle it.
+			// `,
+			// 			},
 			{
 				Name:      "verify-state",
 				Usage:     "Recalculate state hash based on the snapshot for verification",
@@ -114,29 +114,29 @@ snapshot and recalculate the root hash of state for verification.
 In other words, this command does the snapshot to trie conversion.
 `,
 			},
-			{
-				Name: "insecure-prune-all",
-				Usage: "Prune all trie state data except genesis block, it will break storage for fullnode, only suitable for fast node " +
-					"who do not need trie storage at all",
-				ArgsUsage: "<genesisPath>",
-				Action:    pruneAllState,
-				Category:  "MISCELLANEOUS COMMANDS",
-				Flags: []cli.Flag{
-					utils.DataDirFlag,
-					utils.AncientFlag,
-				},
-				Description: `
-will prune all historical trie state data except genesis block.
-All trie nodes will be deleted from the database. 
+			// 			{
+			// 				Name: "insecure-prune-all",
+			// 				Usage: "Prune all trie state data except genesis block, it will break storage for fullnode, only suitable for fast node " +
+			// 					"who do not need trie storage at all",
+			// 				ArgsUsage: "<genesisPath>",
+			// 				Action:    pruneAllState,
+			// 				Category:  "MISCELLANEOUS COMMANDS",
+			// 				Flags: []cli.Flag{
+			// 					utils.DataDirFlag,
+			// 					utils.AncientFlag,
+			// 				},
+			// 				Description: `
+			// will prune all historical trie state data except genesis block.
+			// All trie nodes will be deleted from the database.
 
-It expects the genesis file as argument.
+			// It expects the genesis file as argument.
 
-WARNING: It's necessary to delete the trie clean cache after the pruning.
-If you specify another directory for the trie clean cache via "--cache.trie.journal"
-during the use of Geth, please also specify it here for correct deletion. Otherwise
-the trie clean cache with default directory will be deleted.
-`,
-			},
+			// WARNING: It's necessary to delete the trie clean cache after the pruning.
+			// If you specify another directory for the trie clean cache via "--cache.trie.journal"
+			// during the use of Geth, please also specify it here for correct deletion. Otherwise
+			// the trie clean cache with default directory will be deleted.
+			// `,
+			// 			},
 			{
 				Name:      "check-dangling-storage",
 				Usage:     "Check that there is no 'dangling' snap storage",
