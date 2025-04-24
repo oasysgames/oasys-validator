@@ -24,10 +24,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
 	"github.com/holiman/uint256"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/lru"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
@@ -235,16 +235,17 @@ type worker struct {
 	// payload in proof-of-stake stage.
 	recommit time.Duration
 
+	// Store recently signed block numbers and parent hashes to prevent double signing.
+	recentMinedBlocks *lru.Cache[uint64, map[common.Hash]struct{}]
+
 	// Test hooks
-	newTaskHook       func(*task)                        // Method to call upon receiving a new sealing task.
-	skipSealHook      func(*task) bool                   // Method to decide whether skipping the sealing.
-	fullTaskHook      func()                             // Method to call before pushing the full sealing task.
-	resubmitHook      func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
-	recentMinedBlocks *lru.Cache
+	newTaskHook  func(*task)                        // Method to call upon receiving a new sealing task.
+	skipSealHook func(*task) bool                   // Method to decide whether skipping the sealing.
+	fullTaskHook func()                             // Method to call before pushing the full sealing task.
+	resubmitHook func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
 }
 
 func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend, mux *event.TypeMux, init bool) *worker {
-	recentMinedBlocks, _ := lru.New(recentMinedCacheLimit)
 	chainConfig := eth.BlockChain().Config()
 	worker := &worker{
 		prefetcher:         core.NewStatePrefetcher(chainConfig, eth.BlockChain().HeadChain()),
@@ -266,7 +267,7 @@ func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend,
 		startCh:            make(chan struct{}, 1),
 		exitCh:             make(chan struct{}),
 		resubmitIntervalCh: make(chan time.Duration),
-		recentMinedBlocks:  recentMinedBlocks,
+		recentMinedBlocks:  lru.NewCache[uint64, map[common.Hash]struct{}](recentMinedCacheLimit),
 	}
 	// Subscribe events for blockchain
 	worker.chainHeadSub = eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)
@@ -566,7 +567,8 @@ func (w *worker) resultLoop() {
 				continue
 			}
 			var (
-				sealhash = w.engine.SealHash(block.Header())
+				header   = block.Header()
+				sealhash = w.engine.SealHash(header)
 				hash     = block.Hash()
 			)
 			w.pendingMu.RLock()
@@ -603,28 +605,13 @@ func (w *worker) resultLoop() {
 				logs = append(logs, receipt.Logs...)
 			}
 
-			if prev, ok := w.recentMinedBlocks.Get(block.NumberU64()); ok {
-				doubleSign := false
-				prevParents, _ := prev.([]common.Hash)
-				for _, prevParent := range prevParents {
-					if prevParent == block.ParentHash() {
-						log.Error("Reject Double Sign!!", "block", block.NumberU64(),
-							"hash", block.Hash(),
-							"root", block.Root(),
-							"ParentHash", block.ParentHash())
-						doubleSign = true
-						break
-					}
-				}
-				if doubleSign {
-					continue
-				}
-				prevParents = append(prevParents, block.ParentHash())
-				w.recentMinedBlocks.Add(block.NumberU64(), prevParents)
-			} else {
-				// Add() will call removeOldest internally to remove the oldest element
-				// if the LRU Cache is full
-				w.recentMinedBlocks.Add(block.NumberU64(), []common.Hash{block.ParentHash()})
+			// Final safety to prevent double signing.
+			if w.isDoubleSign(header, true) {
+				log.Error("Reject Double Sign!!", "block", block.NumberU64(),
+					"hash", block.Hash(),
+					"root", block.Root(),
+					"ParentHash", block.ParentHash())
+				continue
 			}
 
 			// Commit block and state to database.
@@ -641,7 +628,7 @@ func (w *worker) resultLoop() {
 			}
 			writeBlockTimer.UpdateSince(start)
 			log.Info("Successfully sealed new block", "number", block.Number(), "sealhash", sealhash, "hash", hash,
-				"elapsed", common.PrettyDuration(time.Since(task.createdAt)))
+				"timestamp", block.Time(), "elapsed", common.PrettyDuration(time.Since(task.createdAt)))
 			w.mux.Post(core.NewMinedBlockEvent{Block: block})
 
 		case <-w.exitCh:
@@ -1228,10 +1215,18 @@ LOOP:
 		prevWork = work
 		workList = append(workList, work)
 
-		// Note: Oasys engine always returns nil, so it is always a single work
+		// Prevent double signing that might occur when the recommit timer
+		// in newWorkLoop fires immediately after sealing completion.
+		// NOTE: Do not place this block before `workList = append(workList, work)`
+		//       because the workList is being discarded in a deferred function.
+		if w.isDoubleSign(work.header, false) {
+			log.Debug("Prevent double signing due to recommit")
+			return
+		}
+
 		delay := w.engine.Delay(w.chain, work.header, &w.config.DelayLeftOver)
 		if delay == nil {
-			// log.Warn("commitWork delay is nil, something is wrong")
+			log.Warn("commitWork delay is nil, something is wrong")
 			stopTimer = nil
 		} else if *delay <= 0 {
 			log.Debug("Not enough time for commitWork")
@@ -1275,7 +1270,7 @@ LOOP:
 
 		if interruptCh == nil || stopTimer == nil {
 			// it is single commit work, no need to try several time.
-			// log.Info("commitWork interruptCh or stopTimer is nil")
+			log.Info("commitWork interruptCh or stopTimer is nil")
 			break
 		}
 
@@ -1329,12 +1324,23 @@ LOOP:
 			sub.Unsubscribe()
 		}
 	}
-	work := workList[0]
-	from := work.coinbase
+	// get the most profitable work
+	bestWork := workList[0]
+	bestBalance := new(uint256.Int)
+	for i, wk := range workList {
+		balance := wk.state.GetBalance(bestWork.header.Coinbase)
+		log.Debug("Get the most profitable work", "index", i, "balance", balance, "bestBalance", bestBalance)
+		if balance.Cmp(bestBalance) > 0 {
+			bestWork = wk
+			bestBalance = balance
+		}
+	}
+
+	from := bestWork.coinbase
 	metrics.GetOrRegisterCounter(fmt.Sprintf("block/from/%v", from), nil).Inc(1)
 
 	// Submit the generated block for consensus sealing.
-	if err := w.commit(work, w.fullTaskHook, true, start); err != nil {
+	if err := w.commit(bestWork, w.fullTaskHook, true, start); err != nil {
 		log.Warn("Failed to commit work", "in", "commitWork", "err", err)
 	}
 
@@ -1343,7 +1349,7 @@ LOOP:
 	if w.current != nil {
 		w.current.discard()
 	}
-	w.current = work
+	w.current = bestWork
 }
 
 // commit runs any post-transaction state modifications, assembles the final block
@@ -1381,7 +1387,7 @@ func (w *worker) commit(env *environment, interval func(), update bool, start ti
 
 		select {
 		case w.taskCh <- &task{receipts: receipts, state: env.state, block: block, createdAt: time.Now()}:
-			log.Info("Commit new sealing work", "number", block.Number(), "sealhash", w.engine.SealHash(block.Header()),
+			log.Info("Commit new sealing work", "number", block.Number(), "sealhash", w.engine.SealHash(block.Header()), "timestamp", block.Time(),
 				"txs", env.tcount, "blobs", env.blobs, "gas", block.GasUsed(), "elapsed", common.PrettyDuration(time.Since(start)))
 
 		case <-w.exitCh:
@@ -1408,6 +1414,25 @@ func (w *worker) getSealingBlock(params *generateParams) *newPayloadResult {
 	case <-w.exitCh:
 		return &newPayloadResult{err: errors.New("miner closed")}
 	}
+}
+
+// Determines if the specified block has been recently sealed based on the parent hash.
+// If store is true, it records the block as sealed.
+func (w *worker) isDoubleSign(header *types.Header, store bool) (doubleSign bool) {
+	number, parent := header.Number.Uint64(), header.ParentHash
+	prevParents, exists := w.recentMinedBlocks.Get(number)
+	if exists {
+		_, doubleSign = prevParents[parent]
+	}
+	if store {
+		if exists {
+			prevParents[parent] = struct{}{}
+		} else {
+			prevParents = map[common.Hash]struct{}{parent: struct{}{}}
+			w.recentMinedBlocks.Add(number, prevParents)
+		}
+	}
+	return doubleSign
 }
 
 // copyReceipts makes a deep copy of the given receipts.
