@@ -549,6 +549,9 @@ func (s *Ethereum) StartMining() error {
 				return fmt.Errorf("temporarily force validators to enable voting. Please proceed with registering your BLS key. For more details, refer to the technical documentation: %s, err: %v", techDocRef, err)
 			}
 		}
+		// If mining is started, we can disable the transaction rejection mechanism
+		// introduced to speed sync times.
+		s.handler.enableSyncedFeatures()
 
 		go s.miner.Start()
 	}
