@@ -254,7 +254,7 @@ var (
 		LondonBlock:         big.NewInt(0),
 		ShanghaiTime:        newUint64(1721910600), // Thu Jul 25 2024 21:30:00 GMT+0900
 		CancunTime:          newUint64(1734508800), // Wed Dec 18 2024 17:00:00 GMT+0900
-		PragueTime:          newUint64(9999999999), // TODO
+		// PragueTime:          newUint64(9999999999), // TODO
 
 		Oasys: &OasysConfig{
 			Period: 15,
@@ -262,7 +262,7 @@ var (
 		},
 		BlobScheduleConfig: &BlobScheduleConfig{
 			Cancun: DefaultCancunBlobConfig,
-			Prague: DefaultPragueBlobConfig,
+			// Prague: DefaultPragueBlobConfig, // TODO
 		},
 	}
 
@@ -281,7 +281,7 @@ var (
 		LondonBlock:         big.NewInt(0),
 		ShanghaiTime:        newUint64(1718600000), // Mon Jun 17 2024 13:53:20 GMT+0900
 		CancunTime:          newUint64(1733288400), // Wed Dec 04 2024 14:00:00 GMT+0900
-		PragueTime:          newUint64(9999999999), // TODO
+		// PragueTime:          newUint64(9999999999), // TODO
 
 		Oasys: &OasysConfig{
 			Period: 15,
@@ -289,7 +289,7 @@ var (
 		},
 		BlobScheduleConfig: &BlobScheduleConfig{
 			Cancun: DefaultCancunBlobConfig,
-			Prague: DefaultPragueBlobConfig,
+			// Prague: DefaultPragueBlobConfig, // TODO
 		},
 	}
 
