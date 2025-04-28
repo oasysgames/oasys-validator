@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/lru"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -53,7 +54,7 @@ type OracleBackend interface {
 	HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error)
 	BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error)
 	GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error)
-	PendingBlockAndReceipts() (*types.Block, types.Receipts)
+	Pending() (*types.Block, types.Receipts, *state.StateDB)
 	ChainConfig() *params.ChainConfig
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 }
@@ -119,16 +120,23 @@ func NewOracle(backend OracleBackend, params Config, startPrice *big.Int) *Oracl
 
 	cache := lru.NewCache[cacheKey, processedFees](2048)
 	headEvent := make(chan core.ChainHeadEvent, 1)
-	backend.SubscribeChainHeadEvent(headEvent)
-	go func() {
-		var lastHead common.Hash
-		for ev := range headEvent {
-			if ev.Block.ParentHash() != lastHead {
-				cache.Purge()
+	sub := backend.SubscribeChainHeadEvent(headEvent)
+	if sub != nil { // the gasprice testBackend doesn't support subscribing to head events
+		go func() {
+			var lastHead common.Hash
+			for {
+				select {
+				case ev := <-headEvent:
+					if ev.Header.ParentHash != lastHead {
+						cache.Purge()
+					}
+					lastHead = ev.Header.Hash()
+				case <-sub.Err():
+					return
+				}
 			}
-			lastHead = ev.Block.Hash()
-		}
-	}()
+		}()
+	}
 
 	return &Oracle{
 		backend:          backend,

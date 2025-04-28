@@ -45,6 +45,7 @@ var (
 const (
 	defaultDialTimeout = 10 * time.Second // used if context has no deadline
 	subscribeTimeout   = 10 * time.Second // overall timeout eth_subscribe, rpc_modules calls
+	unsubscribeTimeout = 10 * time.Second // timeout for *_unsubscribe calls
 )
 
 const (
@@ -70,7 +71,7 @@ type BatchElem struct {
 	// discarded.
 	Result interface{}
 	// Error is set if the server returns an error for this request, or if
-	// unmarshaling into Result fails. It is not set for I/O errors.
+	// unmarshalling into Result fails. It is not set for I/O errors.
 	Error error
 }
 
@@ -431,7 +432,7 @@ func (c *Client) BatchCallContext(ctx context.Context, b []BatchElem) error {
 	}
 
 	// Wait for all responses to come back.
-	for n := 0; n < len(batchresp) && err == nil; n++ {
+	for n := 0; n < len(batchresp); n++ {
 		resp := batchresp[n]
 		if resp == nil {
 			// Ignore null responses. These can happen for batches sent via HTTP.
@@ -645,9 +646,9 @@ func (c *Client) dispatch(codec ServerCodec) {
 		// Read path:
 		case op := <-c.readOp:
 			if op.batch {
-				conn.handler.handleBatch(op.msgs)
+				conn.handler.handleBatch(context.Background(), op.msgs)
 			} else {
-				conn.handler.handleMsg(op.msgs[0])
+				conn.handler.handleMsg(context.Background(), op.msgs[0])
 			}
 
 		case err := <-c.readErr:

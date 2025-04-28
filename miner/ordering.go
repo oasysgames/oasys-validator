@@ -126,12 +126,40 @@ func newTransactionsByPriceAndNonce(signer types.Signer, txs map[common.Address]
 	}
 }
 
+// Copy copys a new TransactionsPriceAndNonce with the same *transaction
+func (t *transactionsByPriceAndNonce) Copy() *transactionsByPriceAndNonce {
+	heads := make([]*txWithMinerFee, len(t.heads))
+	copy(heads, t.heads)
+	txs := make(map[common.Address][]*txpool.LazyTransaction, len(t.txs))
+	for acc, txsTmp := range t.txs {
+		txs[acc] = txsTmp
+	}
+	var baseFee uint256.Int
+	if t.baseFee != nil {
+		baseFee = *t.baseFee
+	}
+	return &transactionsByPriceAndNonce{
+		heads:   heads,
+		txs:     txs,
+		signer:  t.signer,
+		baseFee: &baseFee,
+	}
+}
+
 // Peek returns the next transaction by price.
 func (t *transactionsByPriceAndNonce) Peek() (*txpool.LazyTransaction, *uint256.Int) {
 	if len(t.heads) == 0 {
 		return nil, nil
 	}
 	return t.heads[0].tx, t.heads[0].fees
+}
+
+// Peek returns the next transaction by price.
+func (t *transactionsByPriceAndNonce) PeekWithUnwrap() *types.Transaction {
+	if len(t.heads) > 0 && t.heads[0].tx != nil && t.heads[0].tx.Resolve() != nil {
+		return t.heads[0].tx.Tx
+	}
+	return nil
 }
 
 // Shift replaces the current best head with the next one from the same account.
@@ -163,4 +191,52 @@ func (t *transactionsByPriceAndNonce) Empty() bool {
 // Clear removes the entire content of the heap.
 func (t *transactionsByPriceAndNonce) Clear() {
 	t.heads, t.txs = nil, nil
+}
+
+func (t *transactionsByPriceAndNonce) CurrentSize() int {
+	return len(t.heads)
+}
+
+// Forward moves current transaction to be the one which is one index after tx
+func (t *transactionsByPriceAndNonce) Forward(tx *types.Transaction) {
+	if tx == nil {
+		if len(t.heads) > 0 {
+			t.heads = t.heads[0:0]
+		}
+		return
+	}
+	//check whether target tx exists in t.heads
+	for _, head := range t.heads {
+		if head.tx != nil && head.tx.Resolve() != nil {
+			if tx == head.tx.Tx {
+				//shift t to the position one after tx
+				txTmp := t.PeekWithUnwrap()
+				for txTmp != tx {
+					t.Shift()
+					txTmp = t.PeekWithUnwrap()
+				}
+				t.Shift()
+				return
+			}
+		}
+	}
+	//get the sender address of tx
+	acc, _ := types.Sender(t.signer, tx)
+	//check whether target tx exists in t.txs
+	if txs, ok := t.txs[acc]; ok {
+		for _, txLazyTmp := range txs {
+			if txLazyTmp != nil && txLazyTmp.Resolve() != nil {
+				//found the same pointer in t.txs as tx and then shift t to the position one after tx
+				if tx == txLazyTmp.Tx {
+					txTmp := t.PeekWithUnwrap()
+					for txTmp != tx {
+						t.Shift()
+						txTmp = t.PeekWithUnwrap()
+					}
+					t.Shift()
+					return
+				}
+			}
+		}
+	}
 }

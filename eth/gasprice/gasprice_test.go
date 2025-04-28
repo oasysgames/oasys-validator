@@ -19,16 +19,17 @@ package gasprice
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/beacon"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -54,10 +55,18 @@ func (b *testBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumber
 		number = 0
 	}
 	if number == rpc.FinalizedBlockNumber {
-		return b.chain.CurrentFinalBlock(), nil
+		header := b.chain.CurrentFinalBlock()
+		if header == nil {
+			return nil, errors.New("finalized block not found")
+		}
+		number = rpc.BlockNumber(header.Number.Uint64())
 	}
 	if number == rpc.SafeBlockNumber {
-		return b.chain.CurrentSafeBlock(), nil
+		header := b.chain.CurrentSafeBlock()
+		if header == nil {
+			return nil, errors.New("safe block not found")
+		}
+		number = rpc.BlockNumber(header.Number.Uint64())
 	}
 	if number == rpc.LatestBlockNumber {
 		number = testHead
@@ -102,12 +111,16 @@ func (b *testBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.
 	return b.chain.GetReceiptsByHash(hash), nil
 }
 
-func (b *testBackend) PendingBlockAndReceipts() (*types.Block, types.Receipts) {
+func (b *testBackend) Pending() (*types.Block, types.Receipts, *state.StateDB) {
 	if b.pending {
 		block := b.chain.GetBlockByNumber(testHead + 1)
-		return block, b.chain.GetReceiptsByHash(block.Hash())
+		stateDb, err := b.chain.StateAt(block.Root())
+		if err != nil {
+			return nil, nil, nil
+		}
+		return block, b.chain.GetReceiptsByHash(block.Hash()), stateDb
 	}
-	return nil, nil
+	return nil, nil, nil
 }
 
 func (b *testBackend) ChainConfig() *params.ChainConfig {
@@ -140,19 +153,23 @@ func newTestBackend(t *testing.T, londonBlock *big.Int, cancunBlock *big.Int, pe
 
 		// Compute empty blob hash.
 		emptyBlob          = kzg4844.Blob{}
-		emptyBlobCommit, _ = kzg4844.BlobToCommitment(emptyBlob)
+		emptyBlobCommit, _ = kzg4844.BlobToCommitment(&emptyBlob)
 		emptyBlobVHash     = kzg4844.CalcBlobHashV1(sha256.New(), &emptyBlobCommit)
 	)
 	config.LondonBlock = londonBlock
 	config.ArrowGlacierBlock = londonBlock
 	config.GrayGlacierBlock = londonBlock
-	var engine consensus.Engine = beacon.New(ethash.NewFaker())
+
+	engine := beacon.New(ethash.NewFaker())
+	engine.TestingTTDBlock(testHead + 1)
+
 	td := params.GenesisDifficulty.Uint64()
 
 	if cancunBlock != nil {
 		ts := gspec.Timestamp + cancunBlock.Uint64()*10 // fixed 10 sec block time in blockgen
 		config.ShanghaiTime = &ts
 		config.CancunTime = &ts
+		config.BlobScheduleConfig = params.DefaultBlobSchedule
 		signer = types.LatestSigner(gspec.Config)
 	}
 
@@ -206,6 +223,7 @@ func newTestBackend(t *testing.T, londonBlock *big.Int, cancunBlock *big.Int, pe
 		}
 		td += b.Difficulty().Uint64()
 	})
+
 	// Construct testing chain
 	gspec.Config.TerminalTotalDifficulty = new(big.Int).SetUint64(td)
 	chain, err := core.NewBlockChain(db, &core.CacheConfig{TrieCleanNoPrefetch: true}, gspec, nil, engine, vm.Config{}, nil, nil)

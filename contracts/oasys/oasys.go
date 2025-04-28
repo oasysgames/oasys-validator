@@ -1,7 +1,11 @@
 package oasys
 
 import (
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/tracing"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -24,33 +28,45 @@ const (
 )
 
 var (
-	GenesisHash        common.Hash
-	defaultGenesisHash = common.Hash{}
+	GenesisHash,
+	defaultGenesisHash common.Hash
 )
 
-// StateDB is an interface of state.StateDB.
+// Interface that extracts necessary methods from vm.StateDB
 type StateDB interface {
 	GetCode(addr common.Address) []byte
-	SetCode(addr common.Address, code []byte)
-	SetState(addr common.Address, key common.Hash, value common.Hash)
+	SetCode(addr common.Address, code []byte) (prev []byte)
+	SetState(addr common.Address, key, value common.Hash) (prev common.Hash)
+	SetNonce(common.Address, uint64, tracing.NonceChangeReason)
 }
 
-// Deploy oasys built-in contracts.
-func Deploy(chainConfig *params.ChainConfig, state StateDB, block uint64) {
+// Deploy built-in contracts.
+func Deploy(chainConfig *params.ChainConfig, state StateDB,
+	blockNumber *big.Int, lastBlockTime, blockTime uint64) {
+	if lastBlockTime >= blockTime {
+		panic("lastBlockTime should be less than currentBlockTime")
+	}
 	if chainConfig == nil || chainConfig.Oasys == nil || state == nil {
 		return
 	}
 
+	// Deploy built-in contracts when the block number reaches the specified block height.
 	deploymentMap, ok := deploymentSets[GenesisHash]
 	if !ok {
 		deploymentMap = deploymentSets[defaultGenesisHash]
 	}
-
-	if deploymentSet, ok := deploymentMap[block]; ok {
+	if deploymentSet, ok := deploymentMap[blockNumber.Uint64()]; ok {
 		for _, deployments := range deploymentSet {
 			for _, d := range deployments {
-				d.deploy(chainConfig, state, block)
+				d.deploy(chainConfig, state, blockNumber)
 			}
 		}
+	}
+
+	// Deploy EIP-2935 block hash history contract
+	if chainConfig.IsOnPrague(blockNumber, lastBlockTime, blockTime) {
+		state.SetCode(params.HistoryStorageAddress, params.HistoryStorageCode)
+		state.SetNonce(params.HistoryStorageAddress, 1, tracing.NonceChangeNewContract)
+		log.Info("Set code for HistoryStorageAddress", "blockNumber", blockNumber, "blockTime", blockTime)
 	}
 }

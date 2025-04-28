@@ -19,10 +19,13 @@ package consensus
 
 import (
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 )
@@ -32,6 +35,9 @@ import (
 type ChainHeaderReader interface {
 	// Config retrieves the blockchain's chain configuration.
 	Config() *params.ChainConfig
+
+	// GenesisHeader retrieves the chain's genesis block header.
+	GenesisHeader() *types.Header
 
 	// CurrentHeader retrieves the current header from the local chain.
 	CurrentHeader() *types.Header
@@ -50,6 +56,9 @@ type ChainHeaderReader interface {
 
 	// GetCanonicalHash returns the canonical hash for a given block number
 	GetCanonicalHash(number uint64) common.Hash
+
+	// GetHighestVerifiedHeader retrieves the highest header verified.
+	GetHighestVerifiedHeader() *types.Header
 
 	// GetVerifiedBlockByHash retrieves the highest verified block.
 	GetVerifiedBlockByHash(hash common.Hash) *types.Header
@@ -92,6 +101,9 @@ type Engine interface {
 	// rules of a given engine.
 	VerifyUncles(chain ChainReader, block *types.Block) error
 
+	// VerifyRequests verifies the consistency between Requests and header.RequestsHash.
+	VerifyRequests(header *types.Header, Requests [][]byte) error
+
 	// Prepare initializes the consensus fields of a block header according to the
 	// rules of a particular engine. The changes are executed inline.
 	Prepare(chain ChainHeaderReader, header *types.Header) error
@@ -101,16 +113,15 @@ type Engine interface {
 	//
 	// Note: The state database might be updated to reflect any consensus rules
 	// that happen at finalization (e.g. block rewards).
-	Finalize(chain ChainHeaderReader, header *types.Header, state *state.StateDB, txs *[]*types.Transaction,
-		uncles []*types.Header, withdrawals []*types.Withdrawal, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64) error
+	Finalize(chain ChainHeaderReader, header *types.Header, state vm.StateDB, txs *[]*types.Transaction,
+		uncles []*types.Header, withdrawals []*types.Withdrawal, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64, tracer *tracing.Hooks) error
 
 	// FinalizeAndAssemble runs any post-transaction state modifications (e.g. block
 	// rewards or process withdrawals) and assembles the final block.
 	//
 	// Note: The block header and state database might be updated to reflect any
 	// consensus rules that happen at finalization (e.g. block rewards).
-	FinalizeAndAssemble(chain ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
-		uncles []*types.Header, receipts []*types.Receipt, withdrawals []*types.Withdrawal) (*types.Block, []*types.Receipt, error)
+	FinalizeAndAssemble(chain ChainHeaderReader, header *types.Header, state *state.StateDB, body *types.Body, receipts []*types.Receipt, tracer *tracing.Hooks) (*types.Block, []*types.Receipt, error)
 
 	// Seal generates a new sealing request for the given input block and pushes
 	// the result into the given channel.
@@ -129,16 +140,11 @@ type Engine interface {
 	// APIs returns the RPC APIs this consensus engine provides.
 	APIs(chain ChainHeaderReader) []rpc.API
 
+	// Delay returns the max duration the miner can commit txs
+	Delay(chain ChainReader, header *types.Header, leftOver *time.Duration) *time.Duration
+
 	// Close terminates any background threads maintained by the consensus engine.
 	Close() error
-}
-
-// PoW is a consensus engine based on proof-of-work.
-type PoW interface {
-	Engine
-
-	// Hashrate returns the current mining hashrate of a PoW consensus engine.
-	Hashrate() float64
 }
 
 type PoS interface {

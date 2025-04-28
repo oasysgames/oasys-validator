@@ -28,6 +28,9 @@ import (
 	"io"
 	"math/big"
 	"os"
+	"sync"
+
+	"github.com/VictoriaMetrics/fastcache"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -45,11 +48,27 @@ const RecoveryIDOffset = 64
 const DigestLength = 32
 
 var (
-	secp256k1N, _  = new(big.Int).SetString("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", 16)
+	secp256k1N     = S256().Params().N
 	secp256k1halfN = new(big.Int).Div(secp256k1N, big.NewInt(2))
+
+	keccakState256Cache = fastcache.New(100 * 1024 * 1024)
 )
 
 var errInvalidPubkey = errors.New("invalid secp256k1 public key")
+
+var keccakState256Pool = sync.Pool{
+	New: func() interface{} {
+		return sha3.NewLegacyKeccak256().(KeccakState)
+	}}
+
+// EllipticCurve contains curve operations.
+type EllipticCurve interface {
+	elliptic.Curve
+
+	// Point marshaling/unmarshaing.
+	Marshal(x, y *big.Int) []byte
+	Unmarshal(data []byte) (x, y *big.Int)
+}
 
 // KeccakState wraps sha3.state. In addition to the usual hash methods, it also supports
 // Read to get a variable amount of data from the hash state. Read is faster than Sum
@@ -66,31 +85,55 @@ func NewKeccakState() KeccakState {
 
 // HashData hashes the provided data using the KeccakState and returns a 32 byte hash
 func HashData(kh KeccakState, data []byte) (h common.Hash) {
+	if hash, ok := keccakState256Cache.HasGet(nil, data); ok {
+		return common.BytesToHash(hash)
+	}
 	kh.Reset()
 	kh.Write(data)
 	kh.Read(h[:])
+	keccakState256Cache.Set(data, h.Bytes())
 	return h
 }
 
 // Keccak256 calculates and returns the Keccak256 hash of the input data.
 func Keccak256(data ...[]byte) []byte {
+	if len(data) == 1 {
+		if hash, ok := keccakState256Cache.HasGet(nil, data[0]); ok {
+			return hash
+		}
+	}
 	b := make([]byte, 32)
-	d := NewKeccakState()
+	d := keccakState256Pool.Get().(KeccakState)
+	defer keccakState256Pool.Put(d)
+	d.Reset()
 	for _, b := range data {
 		d.Write(b)
 	}
 	d.Read(b)
+	if len(data) == 1 {
+		keccakState256Cache.Set(data[0], b)
+	}
 	return b
 }
 
 // Keccak256Hash calculates and returns the Keccak256 hash of the input data,
 // converting it to an internal Hash data structure.
 func Keccak256Hash(data ...[]byte) (h common.Hash) {
-	d := NewKeccakState()
+	if len(data) == 1 {
+		if hash, ok := keccakState256Cache.HasGet(nil, data[0]); ok {
+			return common.BytesToHash(hash)
+		}
+	}
+	d := keccakState256Pool.Get().(KeccakState)
+	defer keccakState256Pool.Put(d)
+	d.Reset()
 	for _, b := range data {
 		d.Write(b)
 	}
 	d.Read(h[:])
+	if len(data) == 1 {
+		keccakState256Cache.Set(data[0], h.Bytes())
+	}
 	return h
 }
 
@@ -148,7 +191,7 @@ func toECDSA(d []byte, strict bool) (*ecdsa.PrivateKey, error) {
 		return nil, errors.New("invalid private key, zero or negative")
 	}
 
-	priv.PublicKey.X, priv.PublicKey.Y = priv.PublicKey.Curve.ScalarBaseMult(d)
+	priv.PublicKey.X, priv.PublicKey.Y = S256().ScalarBaseMult(d)
 	if priv.PublicKey.X == nil {
 		return nil, errors.New("invalid private key")
 	}
@@ -165,8 +208,11 @@ func FromECDSA(priv *ecdsa.PrivateKey) []byte {
 
 // UnmarshalPubkey converts bytes to a secp256k1 public key.
 func UnmarshalPubkey(pub []byte) (*ecdsa.PublicKey, error) {
-	x, y := elliptic.Unmarshal(S256(), pub) //nolint:all //TODO
+	x, y := S256().Unmarshal(pub)
 	if x == nil {
+		return nil, errInvalidPubkey
+	}
+	if !S256().IsOnCurve(x, y) {
 		return nil, errInvalidPubkey
 	}
 	return &ecdsa.PublicKey{Curve: S256(), X: x, Y: y}, nil
@@ -176,7 +222,7 @@ func FromECDSAPub(pub *ecdsa.PublicKey) []byte {
 	if pub == nil || pub.X == nil || pub.Y == nil {
 		return nil
 	}
-	return elliptic.Marshal(S256(), pub.X, pub.Y) //nolint:all //TODO
+	return S256().Marshal(pub.X, pub.Y)
 }
 
 // HexToECDSA parses a secp256k1 private key.
@@ -278,7 +324,5 @@ func PubkeyToAddress(p ecdsa.PublicKey) common.Address {
 }
 
 func zeroBytes(bytes []byte) {
-	for i := range bytes {
-		bytes[i] = 0
-	}
+	clear(bytes)
 }

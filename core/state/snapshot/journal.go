@@ -33,7 +33,11 @@ import (
 	"github.com/ethereum/go-ethereum/triedb"
 )
 
-const journalVersion uint64 = 0
+const (
+	journalV0             uint64 = 0 // initial version
+	journalV1             uint64 = 1 // current version, with destruct flag (in diff layers) removed
+	journalCurrentVersion        = journalV1
+)
 
 // journalGenerator is a disk layer entry containing the generator progress marker.
 type journalGenerator struct {
@@ -109,8 +113,8 @@ func loadAndParseJournal(db ethdb.KeyValueStore, base *diskLayer) (snapshot, jou
 	// is not matched with disk layer; or the it's the legacy-format journal,
 	// etc.), we just discard all diffs and try to recover them later.
 	var current snapshot = base
-	err := iterateJournal(db, func(parent common.Hash, root common.Hash, destructSet map[common.Hash]struct{}, accountData map[common.Hash][]byte, storageData map[common.Hash]map[common.Hash][]byte) error {
-		current = newDiffLayer(current, root, destructSet, accountData, storageData)
+	err := iterateJournal(db, func(parent common.Hash, root common.Hash, accountData map[common.Hash][]byte, storageData map[common.Hash]map[common.Hash][]byte) error {
+		current = newDiffLayer(current, root, accountData, storageData)
 		return nil
 	})
 	if err != nil {
@@ -119,8 +123,26 @@ func loadAndParseJournal(db ethdb.KeyValueStore, base *diskLayer) (snapshot, jou
 	return current, generator, nil
 }
 
+func PreCheckSnapshot(db ethdb.KeyValueStore, root common.Hash) (bool, error) {
+	baseRoot := rawdb.ReadSnapshotRoot(db)
+	if baseRoot == (common.Hash{}) {
+		return false, errors.New("missing or corrupted snapshot")
+	}
+	if baseRoot == root {
+		return true, nil
+	}
+	var found bool
+	err := iterateJournal(db, func(parent common.Hash, current common.Hash, accountData map[common.Hash][]byte, storageData map[common.Hash]map[common.Hash][]byte) error {
+		if current == root {
+			found = true
+		}
+		return nil
+	})
+	return found, err
+}
+
 // loadSnapshot loads a pre-existing state snapshot backed by a key-value store.
-func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *triedb.Database, root common.Hash, cache int, recovery bool, noBuild bool) (snapshot, bool, error) {
+func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *triedb.Database, root common.Hash, cache int, recovery bool, noBuild bool, withoutTrie bool) (snapshot, bool, error) {
 	// If snapshotting is disabled (initial sync in progress), don't do anything,
 	// wait for the chain to permit us to do something meaningful
 	if rawdb.ReadSnapshotDisabled(diskdb) {
@@ -139,6 +161,7 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *triedb.Database, root comm
 		root:   baseRoot,
 	}
 	snapshot, generator, err := loadAndParseJournal(diskdb, base)
+
 	if err != nil {
 		log.Warn("Failed to load journal", "error", err)
 		return nil, false, err
@@ -152,6 +175,11 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *triedb.Database, root comm
 	// which is below the snapshot. In this case the snapshot can be recovered
 	// by re-executing blocks but right now it's unavailable.
 	if head := snapshot.Root(); head != root {
+		log.Warn("Snapshot is not continuous with chain", "snaproot", head, "chainroot", root)
+
+		if withoutTrie {
+			return snapshot, false, nil
+		}
 		// If it's legacy snapshot, or it's new-format snapshot but
 		// it's not in recovery mode, returns the error here for
 		// rebuilding the entire snapshot forcibly.
@@ -162,7 +190,6 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *triedb.Database, root comm
 		// the disk layer is always higher than chain head. It can
 		// be eventually recovered when the chain head beyonds the
 		// disk layer.
-		log.Warn("Snapshot is not continuous with chain", "snaproot", head, "chainroot", root)
 	}
 	// Load the disk layer status from the generator if it's not complete
 	if !generator.Done {
@@ -234,20 +261,17 @@ func (dl *diffLayer) Journal(buffer *bytes.Buffer) (common.Hash, error) {
 	if dl.Stale() {
 		return common.Hash{}, ErrSnapshotStale
 	}
+
 	// Everything below was journalled, persist this layer too
 	if err := rlp.Encode(buffer, dl.root); err != nil {
 		return common.Hash{}, err
 	}
-	destructs := make([]journalDestruct, 0, len(dl.destructSet))
-	for hash := range dl.destructSet {
-		destructs = append(destructs, journalDestruct{Hash: hash})
-	}
-	if err := rlp.Encode(buffer, destructs); err != nil {
-		return common.Hash{}, err
-	}
 	accounts := make([]journalAccount, 0, len(dl.accountData))
 	for hash, blob := range dl.accountData {
-		accounts = append(accounts, journalAccount{Hash: hash, Blob: blob})
+		accounts = append(accounts, journalAccount{
+			Hash: hash,
+			Blob: blob,
+		})
 	}
 	if err := rlp.Encode(buffer, accounts); err != nil {
 		return common.Hash{}, err
@@ -271,7 +295,7 @@ func (dl *diffLayer) Journal(buffer *bytes.Buffer) (common.Hash, error) {
 
 // journalCallback is a function which is invoked by iterateJournal, every
 // time a difflayer is loaded from disk.
-type journalCallback = func(parent common.Hash, root common.Hash, destructs map[common.Hash]struct{}, accounts map[common.Hash][]byte, storage map[common.Hash]map[common.Hash][]byte) error
+type journalCallback = func(parent common.Hash, root common.Hash, accounts map[common.Hash][]byte, storage map[common.Hash]map[common.Hash][]byte) error
 
 // iterateJournal iterates through the journalled difflayers, loading them from
 // the database, and invoking the callback for each loaded layer.
@@ -292,8 +316,8 @@ func iterateJournal(db ethdb.KeyValueReader, callback journalCallback) error {
 		log.Warn("Failed to resolve the journal version", "error", err)
 		return errors.New("failed to resolve journal version")
 	}
-	if version != journalVersion {
-		log.Warn("Discarded the snapshot journal with wrong version", "required", journalVersion, "got", version)
+	if version != journalV0 && version != journalCurrentVersion {
+		log.Warn("Discarded journal with wrong version", "required", journalCurrentVersion, "got", version)
 		return errors.New("wrong journal version")
 	}
 	// Secondly, resolve the disk layer root, ensure it's continuous
@@ -310,10 +334,8 @@ func iterateJournal(db ethdb.KeyValueReader, callback journalCallback) error {
 	for {
 		var (
 			root        common.Hash
-			destructs   []journalDestruct
 			accounts    []journalAccount
 			storage     []journalStorage
-			destructSet = make(map[common.Hash]struct{})
 			accountData = make(map[common.Hash][]byte)
 			storageData = make(map[common.Hash]map[common.Hash][]byte)
 		)
@@ -325,17 +347,41 @@ func iterateJournal(db ethdb.KeyValueReader, callback journalCallback) error {
 			}
 			return fmt.Errorf("load diff root: %v", err)
 		}
-		if err := r.Decode(&destructs); err != nil {
-			return fmt.Errorf("load diff destructs: %v", err)
+		// If a legacy journal is detected, decode the destruct set from the stream.
+		// The destruct set has been deprecated. If the journal contains non-empty
+		// destruct set, then it is deemed incompatible.
+		//
+		// Since self-destruction has been deprecated following the cancun fork,
+		// the destruct set is expected to be nil for layers above the fork block.
+		// However, an exception occurs during contract deployment: pre-funded accounts
+		// may self-destruct, causing accounts with non-zero balances to be removed
+		// from the state. For example,
+		// https://etherscan.io/tx/0xa087333d83f0cd63b96bdafb686462e1622ce25f40bd499e03efb1051f31fe49).
+		//
+		// For nodes with a fully synced state, the legacy journal is likely compatible
+		// with the updated definition, eliminating the need for regeneration. Unfortunately,
+		// nodes performing a full sync of historical chain segments or encountering
+		// pre-funded account deletions may face incompatibilities, leading to automatic
+		// snapshot regeneration.
+		//
+		// This approach minimizes snapshot regeneration for Geth nodes upgrading from a
+		// legacy version that are already synced. The workaround can be safely removed
+		// after the next hard fork.
+		if version == journalV0 {
+			var destructs []journalDestruct
+			if err := r.Decode(&destructs); err != nil {
+				return fmt.Errorf("load diff destructs: %v", err)
+			}
+			if len(destructs) > 0 {
+				log.Warn("Incompatible legacy journal detected", "version", journalV0)
+				return fmt.Errorf("incompatible legacy journal detected")
+			}
 		}
 		if err := r.Decode(&accounts); err != nil {
 			return fmt.Errorf("load diff accounts: %v", err)
 		}
 		if err := r.Decode(&storage); err != nil {
 			return fmt.Errorf("load diff storage: %v", err)
-		}
-		for _, entry := range destructs {
-			destructSet[entry.Hash] = struct{}{}
 		}
 		for _, entry := range accounts {
 			if len(entry.Blob) > 0 { // RLP loses nil-ness, but `[]byte{}` is not a valid item, so reinterpret that
@@ -355,7 +401,7 @@ func iterateJournal(db ethdb.KeyValueReader, callback journalCallback) error {
 			}
 			storageData[entry.Hash] = slots
 		}
-		if err := callback(parent, root, destructSet, accountData, storageData); err != nil {
+		if err := callback(parent, root, accountData, storageData); err != nil {
 			return err
 		}
 		parent = root

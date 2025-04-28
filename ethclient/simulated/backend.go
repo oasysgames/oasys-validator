@@ -17,6 +17,8 @@
 package simulated
 
 import (
+	"context"
+	"errors"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -25,7 +27,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/eth/catalyst"
-	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/ethereum/go-ethereum/eth/filters"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -34,6 +35,11 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 )
+
+// TransactionConditionalSender injects the conditional transaction into the pending pool for execution after verification.
+type TransactionConditionalSender interface {
+	SendTransactionConditional(ctx context.Context, tx *types.Transaction, opts types.TransactionOpts) error
+}
 
 // Client exposes the methods provided by the Ethereum RPC client.
 type Client interface {
@@ -51,6 +57,7 @@ type Client interface {
 	ethereum.TransactionReader
 	ethereum.TransactionSender
 	ethereum.ChainIDReader
+	TransactionConditionalSender
 }
 
 // simClient wraps ethclient. This exists to prevent extracting ethclient.Client
@@ -62,7 +69,7 @@ type simClient struct {
 // Backend is a simulated blockchain. You can use it to test your contracts or
 // other code that interacts with the Ethereum chain.
 type Backend struct {
-	eth    *eth.Ethereum
+	node   *node.Node
 	beacon *catalyst.SimulatedBeacon
 	client simClient
 }
@@ -84,7 +91,7 @@ func NewBackend(alloc types.GenesisAlloc, options ...func(nodeConf *node.Config,
 		GasLimit: ethconfig.Defaults.Miner.GasCeil,
 		Alloc:    alloc,
 	}
-	ethConf.SyncMode = downloader.FullSync
+	ethConf.SyncMode = ethconfig.FullSync
 	ethConf.TxPool.NoLocals = true
 
 	for _, option := range options {
@@ -129,7 +136,7 @@ func newWithNode(stack *node.Node, conf *eth.Config, blockPeriod uint64) (*Backe
 		return nil, err
 	}
 	return &Backend{
-		eth:    backend,
+		node:   stack,
 		beacon: beacon,
 		client: simClient{ethclient.NewClient(stack.Attach())},
 	}, nil
@@ -142,12 +149,16 @@ func (n *Backend) Close() error {
 		n.client.Close()
 		n.client = simClient{}
 	}
+	var err error
 	if n.beacon != nil {
-		err := n.beacon.Stop()
+		err = n.beacon.Stop()
 		n.beacon = nil
-		return err
 	}
-	return nil
+	if n.node != nil {
+		err = errors.Join(err, n.node.Close())
+		n.node = nil
+	}
+	return err
 }
 
 // Commit seals a block and moves the chain forward to a new empty block.

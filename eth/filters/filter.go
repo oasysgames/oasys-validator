@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"slices"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/bloombits"
@@ -38,11 +39,13 @@ type Filter struct {
 	begin, end int64        // Range interval if filtering multiple blocks
 
 	matcher *bloombits.Matcher
+
+	rangeLimit bool
 }
 
 // NewRangeFilter creates a new filter which uses a bloom filter on blocks to
 // figure out whether a particular block is interesting or not.
-func (sys *FilterSystem) NewRangeFilter(begin, end int64, addresses []common.Address, topics [][]common.Hash) *Filter {
+func (sys *FilterSystem) NewRangeFilter(begin, end int64, addresses []common.Address, topics [][]common.Hash, rangeLimit bool) *Filter {
 	// Flatten the address and topic filter clauses into a single bloombits filter
 	// system. Since the bloombits are not positional, nil topics are permitted,
 	// which get flattened into a nil byte slice.
@@ -69,6 +72,7 @@ func (sys *FilterSystem) NewRangeFilter(begin, end int64, addresses []common.Add
 	filter.matcher = bloombits.NewMatcher(size, filters)
 	filter.begin = begin
 	filter.end = end
+	filter.rangeLimit = rangeLimit
 
 	return filter
 }
@@ -107,19 +111,9 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 		return f.blockLogs(ctx, header)
 	}
 
-	var (
-		beginPending = f.begin == rpc.PendingBlockNumber.Int64()
-		endPending   = f.end == rpc.PendingBlockNumber.Int64()
-	)
-
-	// special case for pending logs
-	if beginPending && !endPending {
-		return nil, errInvalidBlockRange
-	}
-
-	// Short-cut if all we care about is pending logs
-	if beginPending && endPending {
-		return f.pendingLogs(), nil
+	// Disallow pending logs.
+	if f.begin == rpc.PendingBlockNumber.Int64() || f.end == rpc.PendingBlockNumber.Int64() {
+		return nil, errPendingLogsUnsupported
 	}
 
 	resolveSpecial := func(number int64) (int64, error) {
@@ -164,16 +158,7 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 		case log := <-logChan:
 			logs = append(logs, log)
 		case err := <-errChan:
-			if err != nil {
-				// if an error occurs during extraction, we do return the extracted data
-				return logs, err
-			}
-			// Append the pending ones
-			if endPending {
-				pendingLogs := f.pendingLogs()
-				logs = append(logs, pendingLogs...)
-			}
-			return logs, nil
+			return logs, err
 		}
 	}
 }
@@ -331,32 +316,6 @@ func (f *Filter) checkMatches(ctx context.Context, header *types.Header) ([]*typ
 	return logs, nil
 }
 
-// pendingLogs returns the logs matching the filter criteria within the pending block.
-func (f *Filter) pendingLogs() []*types.Log {
-	block, receipts := f.sys.backend.PendingBlockAndReceipts()
-	if block == nil || receipts == nil {
-		return nil
-	}
-	if bloomFilter(block.Bloom(), f.addresses, f.topics) {
-		var unfiltered []*types.Log
-		for _, r := range receipts {
-			unfiltered = append(unfiltered, r.Logs...)
-		}
-		return filterLogs(unfiltered, nil, nil, f.addresses, f.topics)
-	}
-	return nil
-}
-
-// includes returns true if the element is present in the list.
-func includes[T comparable](things []T, element T) bool {
-	for _, thing := range things {
-		if thing == element {
-			return true
-		}
-	}
-	return false
-}
-
 // filterLogs creates a slice of logs matching the given criteria.
 func filterLogs(logs []*types.Log, fromBlock, toBlock *big.Int, addresses []common.Address, topics [][]common.Hash) []*types.Log {
 	var check = func(log *types.Log) bool {
@@ -366,7 +325,7 @@ func filterLogs(logs []*types.Log, fromBlock, toBlock *big.Int, addresses []comm
 		if toBlock != nil && toBlock.Int64() >= 0 && toBlock.Uint64() < log.BlockNumber {
 			return false
 		}
-		if len(addresses) > 0 && !includes(addresses, log.Address) {
+		if len(addresses) > 0 && !slices.Contains(addresses, log.Address) {
 			return false
 		}
 		// If the to filtered topics is greater than the amount of topics in logs, skip.
@@ -377,7 +336,7 @@ func filterLogs(logs []*types.Log, fromBlock, toBlock *big.Int, addresses []comm
 			if len(sub) == 0 {
 				continue // empty rule set == wildcard
 			}
-			if !includes(sub, log.Topics[i]) {
+			if !slices.Contains(sub, log.Topics[i]) {
 				return false
 			}
 		}

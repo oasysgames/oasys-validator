@@ -17,10 +17,14 @@
 package eth
 
 import (
+	"bytes"
+	rand2 "crypto/rand"
+	"io"
 	"math"
 	"math/big"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
@@ -33,10 +37,14 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto/kzg4844"
+	"github.com/ethereum/go-ethereum/eth/protocols/bsc"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/holiman/uint256"
 )
 
 var (
@@ -63,7 +71,7 @@ func newTestBackend(blocks int) *testBackend {
 	return newTestBackendWithGenerator(blocks, false, nil)
 }
 
-// newTestBackend creates a chain with a number of explicitly defined blocks and
+// newTestBackendWithGenerator creates a chain with a number of explicitly defined blocks and
 // wraps it into a mock backend.
 func newTestBackendWithGenerator(blocks int, shanghai bool, generator func(int, *core.BlockGen)) *testBackend {
 	var (
@@ -72,30 +80,28 @@ func newTestBackendWithGenerator(blocks int, shanghai bool, generator func(int, 
 		config                  = params.TestChainConfig
 		engine consensus.Engine = ethash.NewFaker()
 	)
-
 	if shanghai {
 		config = &params.ChainConfig{
-			ChainID:                       big.NewInt(1),
-			HomesteadBlock:                big.NewInt(0),
-			DAOForkBlock:                  nil,
-			DAOForkSupport:                true,
-			EIP150Block:                   big.NewInt(0),
-			EIP155Block:                   big.NewInt(0),
-			EIP158Block:                   big.NewInt(0),
-			ByzantiumBlock:                big.NewInt(0),
-			ConstantinopleBlock:           big.NewInt(0),
-			PetersburgBlock:               big.NewInt(0),
-			IstanbulBlock:                 big.NewInt(0),
-			MuirGlacierBlock:              big.NewInt(0),
-			BerlinBlock:                   big.NewInt(0),
-			LondonBlock:                   big.NewInt(0),
-			ArrowGlacierBlock:             big.NewInt(0),
-			GrayGlacierBlock:              big.NewInt(0),
-			MergeNetsplitBlock:            big.NewInt(0),
-			ShanghaiTime:                  u64(0),
-			TerminalTotalDifficulty:       big.NewInt(0),
-			TerminalTotalDifficultyPassed: true,
-			Ethash:                        new(params.EthashConfig),
+			ChainID:                 big.NewInt(1),
+			HomesteadBlock:          big.NewInt(0),
+			DAOForkBlock:            nil,
+			DAOForkSupport:          true,
+			EIP150Block:             big.NewInt(0),
+			EIP155Block:             big.NewInt(0),
+			EIP158Block:             big.NewInt(0),
+			ByzantiumBlock:          big.NewInt(0),
+			ConstantinopleBlock:     big.NewInt(0),
+			PetersburgBlock:         big.NewInt(0),
+			IstanbulBlock:           big.NewInt(0),
+			MuirGlacierBlock:        big.NewInt(0),
+			BerlinBlock:             big.NewInt(0),
+			LondonBlock:             big.NewInt(0),
+			ArrowGlacierBlock:       big.NewInt(0),
+			GrayGlacierBlock:        big.NewInt(0),
+			MergeNetsplitBlock:      big.NewInt(0),
+			ShanghaiTime:            u64(0),
+			TerminalTotalDifficulty: big.NewInt(0),
+			Ethash:                  new(params.EthashConfig),
 		}
 		engine = beacon.NewFaker()
 	}
@@ -137,16 +143,18 @@ func (b *testBackend) TxPool() TxPool          { return b.txpool }
 
 func (b *testBackend) RunPeer(peer *Peer, handler Handler) error {
 	// Normally the backend would do peer maintenance and handshakes. All that
-	// is omitted and we will just give control back to the handler.
+	// is omitted, and we will just give control back to the handler.
 	return handler(peer)
 }
 func (b *testBackend) PeerInfo(enode.ID) interface{} { panic("not implemented") }
 
 func (b *testBackend) AcceptTxs() bool {
-	panic("data processing tests should be done in the handler package")
+	return true
+	//panic("data processing tests should be done in the handler package")
 }
 func (b *testBackend) Handle(*Peer, Packet) error {
-	panic("data processing tests should be done in the handler package")
+	return nil
+	//panic("data processing tests should be done in the handler package")
 }
 
 // Tests that block headers can be retrieved from a remote chain based on user queries.
@@ -289,7 +297,7 @@ func testGetBlockHeaders(t *testing.T, protocol uint) {
 				backend.chain.GetBlockByNumber(1).Hash(),
 			},
 		},
-		// Check that non existing headers aren't returned
+		// Check that non-existing headers aren't returned
 		{
 			&GetBlockHeadersRequest{Origin: HashOrNumber{Hash: unknown}, Amount: 1},
 			[]common.Hash{},
@@ -498,4 +506,225 @@ func testGetBlockReceipts(t *testing.T, protocol uint) {
 	}); err != nil {
 		t.Errorf("receipts mismatch: %v", err)
 	}
+}
+
+type decoder struct {
+	msg []byte
+}
+
+func (d decoder) Decode(val interface{}) error {
+	buffer := bytes.NewBuffer(d.msg)
+	s := rlp.NewStream(buffer, uint64(len(d.msg)))
+	return s.Decode(val)
+}
+
+func (d decoder) Time() time.Time {
+	return time.Now()
+}
+
+func setup() (*testBackend, *testPeer) {
+	// Generate some transactions etc.
+	acc1Key, _ := crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
+	acc2Key, _ := crypto.HexToECDSA("49a7b37aa6f6645917e7b807e9d1c00d4fa71f18343b0d4122a4d2df64dd6fee")
+	acc1Addr := crypto.PubkeyToAddress(acc1Key.PublicKey)
+	acc2Addr := crypto.PubkeyToAddress(acc2Key.PublicKey)
+	signer := types.HomesteadSigner{}
+	gen := func(n int, block *core.BlockGen) {
+		if n%2 == 0 {
+			w := &types.Withdrawal{
+				Address: common.Address{0xaa},
+				Amount:  42,
+			}
+			block.AddWithdrawal(w)
+		}
+		switch n {
+		case 0:
+			// In block 1, the test bank sends account #1 some ether.
+			tx, _ := types.SignTx(types.NewTransaction(block.TxNonce(testAddr), acc1Addr, big.NewInt(10_000_000_000_000_000), params.TxGas, block.BaseFee(), nil), signer, testKey)
+			block.AddTx(tx)
+		case 1:
+			// In block 2, the test bank sends some more ether to account #1.
+			// acc1Addr passes it on to account #2.
+			tx1, _ := types.SignTx(types.NewTransaction(block.TxNonce(testAddr), acc1Addr, big.NewInt(1_000_000_000_000_000), params.TxGas, block.BaseFee(), nil), signer, testKey)
+			tx2, _ := types.SignTx(types.NewTransaction(block.TxNonce(acc1Addr), acc2Addr, big.NewInt(1_000_000_000_000_000), params.TxGas, block.BaseFee(), nil), signer, acc1Key)
+			block.AddTx(tx1)
+			block.AddTx(tx2)
+		case 2:
+			// Block 3 is empty but was mined by account #2.
+			block.SetCoinbase(acc2Addr)
+			block.SetExtra([]byte("yeehaw"))
+		}
+	}
+	backend := newTestBackendWithGenerator(maxBodiesServe+15, true, gen)
+	peer, _ := newTestPeer("peer", ETH68, backend)
+	// Discard all messages
+	go func() {
+		for {
+			msg, err := peer.app.ReadMsg()
+			if err == nil {
+				msg.Discard()
+			}
+		}
+	}()
+	return backend, peer
+}
+
+func FuzzEthProtocolHandlers(f *testing.F) {
+	handlers := eth68
+	backend, peer := setup()
+	f.Fuzz(func(t *testing.T, code byte, msg []byte) {
+		handler := handlers[uint64(code)%protocolLengths[ETH68]]
+		if handler == nil {
+			return
+		}
+		handler(backend, decoder{msg: msg}, peer.Peer)
+	})
+}
+
+func TestHandleNewBlock(t *testing.T) {
+	t.Parallel()
+
+	gen := func(n int, g *core.BlockGen) {
+		if n%2 == 0 {
+			w := &types.Withdrawal{
+				Address: common.Address{0xaa},
+				Amount:  42,
+			}
+			g.AddWithdrawal(w)
+		}
+	}
+
+	backend := newTestBackendWithGenerator(maxBodiesServe+15, true, gen)
+	defer backend.close()
+
+	peer, _ := newTestPeer("peer", ETH68, backend)
+	defer peer.close()
+
+	v := new(uint32)
+	*v = 1
+	genBlobs := makeBlkBlobs(1, 2)
+	tx1 := types.NewTx(&types.BlobTx{
+		ChainID:    new(uint256.Int).SetUint64(1),
+		GasTipCap:  new(uint256.Int),
+		GasFeeCap:  new(uint256.Int),
+		Gas:        0,
+		Value:      new(uint256.Int),
+		Data:       nil,
+		BlobFeeCap: new(uint256.Int),
+		BlobHashes: []common.Hash{common.HexToHash("0x34ec6e64f9cda8fe0451a391e4798085a3ef51a65ed1bfb016e34fc1a2028f8f"), common.HexToHash("0xb9a412e875f29fac436acde234f954e91173c4cf79814f6dcf630d8a6345747f")},
+		Sidecar:    genBlobs[0],
+		V:          new(uint256.Int),
+		R:          new(uint256.Int),
+		S:          new(uint256.Int),
+	})
+	block := types.NewBlockWithHeader(&types.Header{
+		Number:      big.NewInt(0),
+		Extra:       []byte("test block"),
+		UncleHash:   types.EmptyUncleHash,
+		TxHash:      types.EmptyTxsHash,
+		ReceiptHash: types.EmptyReceiptsHash,
+	})
+	sidecars := types.BlobSidecars{types.NewBlobSidecarFromTx(tx1)}
+	for _, s := range sidecars {
+		s.BlockNumber = block.Number()
+		s.BlockHash = block.Hash()
+	}
+	dataNil := NewBlockPacket{
+		Block:    block,
+		TD:       big.NewInt(1),
+		Sidecars: nil,
+	}
+	dataNonNil := NewBlockPacket{
+		Block:    block,
+		TD:       big.NewInt(1),
+		Sidecars: sidecars,
+	}
+	sizeNonNil, rNonNil, _ := rlp.EncodeToReader(dataNonNil)
+	sizeNil, rNil, _ := rlp.EncodeToReader(dataNil)
+
+	// Define the test cases
+	testCases := []struct {
+		name string
+		msg  p2p.Msg
+		err  error
+	}{
+		{
+			name: "Valid block",
+			msg: p2p.Msg{
+				Code:    1,
+				Size:    uint32(sizeNonNil),
+				Payload: rNonNil,
+			},
+			err: nil,
+		},
+		{
+			name: "Nil sidecars",
+			msg: p2p.Msg{
+				Code:    2,
+				Size:    uint32(sizeNil),
+				Payload: rNil,
+			},
+			err: nil,
+		},
+	}
+
+	protos := []p2p.Protocol{
+		{
+			Name:    "eth",
+			Version: ETH68,
+		},
+		{
+			Name:    "bsc",
+			Version: bsc.Bsc1,
+		},
+	}
+	caps := []p2p.Cap{
+		{
+			Name:    "eth",
+			Version: ETH68,
+		},
+		{
+			Name:    "bsc",
+			Version: bsc.Bsc1,
+		},
+	}
+	// Create a source handler to send messages through and a sink peer to receive them
+	p2pEthSrc, p2pEthSink := p2p.MsgPipe()
+	defer p2pEthSrc.Close()
+	defer p2pEthSink.Close()
+
+	localEth := NewPeer(ETH68, p2p.NewPeerWithProtocols(enode.ID{1}, protos, "", caps), p2pEthSrc, nil)
+
+	// Run the tests
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := handleNewBlock(backend, tc.msg, localEth)
+			if err != tc.err {
+				t.Errorf("expected error %v, got %v", tc.err, err)
+			}
+		})
+	}
+}
+
+func makeBlkBlobs(n, nPerTx int) []*types.BlobTxSidecar {
+	if n <= 0 {
+		return nil
+	}
+	ret := make([]*types.BlobTxSidecar, n)
+	for i := 0; i < n; i++ {
+		blobs := make([]kzg4844.Blob, nPerTx)
+		commitments := make([]kzg4844.Commitment, nPerTx)
+		proofs := make([]kzg4844.Proof, nPerTx)
+		for i := 0; i < nPerTx; i++ {
+			io.ReadFull(rand2.Reader, blobs[i][:])
+			commitments[i], _ = kzg4844.BlobToCommitment(&blobs[i])
+			proofs[i], _ = kzg4844.ComputeBlobProof(&blobs[i], commitments[i])
+		}
+		ret[i] = &types.BlobTxSidecar{
+			Blobs:       blobs,
+			Commitments: commitments,
+			Proofs:      proofs,
+		}
+	}
+	return ret
 }
