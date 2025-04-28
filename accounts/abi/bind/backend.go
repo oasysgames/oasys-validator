@@ -98,6 +98,9 @@ type ContractTransactor interface {
 
 	// PendingNonceAt retrieves the current pending nonce associated with an account.
 	PendingNonceAt(ctx context.Context, account common.Address) (uint64, error)
+
+	// SendTransactionConditional injects the conditional transaction into the pending pool for execution after verification.
+	SendTransactionConditional(ctx context.Context, tx *types.Transaction, opts types.TransactionOpts) error
 }
 
 // DeployBackend wraps the operations needed by WaitMined and WaitDeployed.

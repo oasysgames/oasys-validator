@@ -1,5 +1,5 @@
 # Build Geth in a stock Go builder container
-FROM golang:1.21.13-bookworm as builder
+FROM golang:1.23.7-bookworm as builder
 
 # Support setting various labels on the final image
 ARG COMMIT=""
@@ -14,6 +14,10 @@ COPY go.sum /go-ethereum/
 RUN cd /go-ethereum && go mod download
 
 ADD . /go-ethereum
+
+# For blst
+ENV CGO_CFLAGS="-O -D__BLST_PORTABLE__"
+ENV CGO_CFLAGS_ALLOW="-O -D__BLST_PORTABLE__"
 RUN cd /go-ethereum && go run build/ci.go install -static ./cmd/geth
 
 # Binary extraction stage

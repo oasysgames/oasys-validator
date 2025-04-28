@@ -175,6 +175,8 @@ func (pool *VotePool) putVote(m map[common.Hash]*VoteBox, votesPq *votesPriority
 	targetHash := vote.Data.TargetHash
 	targetNumber := vote.Data.TargetNumber
 
+	log.Debug("The vote info to put is:", "voteBlockNumber", targetNumber, "voteBlockHash", targetHash)
+
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 	if _, ok := m[targetHash]; !ok {

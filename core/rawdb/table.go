@@ -27,6 +27,22 @@ type table struct {
 	prefix string
 }
 
+func (t *table) BlockStoreReader() ethdb.Reader {
+	return t
+}
+
+func (t *table) BlockStore() ethdb.Database {
+	return t
+}
+
+func (t *table) SetBlockStore(block ethdb.Database) {
+	panic("not implement")
+}
+
+func (t *table) HasSeparateBlockStore() bool {
+	panic("not implement")
+}
+
 // NewTable returns a database object that prefixes all keys with a given string.
 func NewTable(db ethdb.Database, prefix string) ethdb.Database {
 	return &table{
@@ -72,6 +88,16 @@ func (t *table) AncientRange(kind string, start, count, maxBytes uint64) ([][]by
 // database.
 func (t *table) Ancients() (uint64, error) {
 	return t.db.Ancients()
+}
+
+// ItemAmountInAncient returns the actual length of current ancientDB.
+func (t *table) ItemAmountInAncient() (uint64, error) {
+	return t.db.ItemAmountInAncient()
+}
+
+// AncientOffSet returns the offset of current ancientDB.
+func (t *table) AncientOffSet() uint64 {
+	return t.db.AncientOffSet()
 }
 
 // Tail is a noop passthrough that just forwards the request to the underlying
@@ -123,12 +149,6 @@ func (t *table) Sync() error {
 	return t.db.Sync()
 }
 
-// MigrateTable processes the entries in a given table in sequence
-// converting them to a new format if they're of an old format.
-func (t *table) MigrateTable(kind string, convert convertLegacyFn) error {
-	return t.db.MigrateTable(kind, convert)
-}
-
 // AncientDatadir returns the ancient datadir of the underlying database.
 func (t *table) AncientDatadir() (string, error) {
 	return t.db.AncientDatadir()
@@ -145,6 +165,12 @@ func (t *table) Delete(key []byte) error {
 	return t.db.Delete(append([]byte(t.prefix), key...))
 }
 
+// DeleteRange deletes all of the keys (and values) in the range [start,end)
+// (inclusive on start, exclusive on end).
+func (t *table) DeleteRange(start, end []byte) error {
+	return t.db.DeleteRange(append([]byte(t.prefix), start...), append([]byte(t.prefix), end...))
+}
+
 // NewIterator creates a binary-alphabetical iterator over a subset
 // of database content with a particular key prefix, starting at a particular
 // initial key (or after, if it does not exist).
@@ -157,9 +183,9 @@ func (t *table) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
 	}
 }
 
-// Stat returns a particular internal stat of the database.
-func (t *table) Stat(property string) (string, error) {
-	return t.db.Stat(property)
+// Stat returns the statistic data of the database.
+func (t *table) Stat() (string, error) {
+	return t.db.Stat()
 }
 
 // Compact flattens the underlying data store for the given key range. In essence,
@@ -205,16 +231,33 @@ func (t *table) NewBatch() ethdb.Batch {
 	return &tableBatch{t.db.NewBatch(), t.prefix}
 }
 
+func (t *table) DiffStore() ethdb.KeyValueStore {
+	return nil
+}
+
+func (t *table) SetDiffStore(diff ethdb.KeyValueStore) {
+	panic("not implement")
+}
+
+func (t *table) StateStore() ethdb.Database {
+	return nil
+}
+
+func (t *table) SetStateStore(state ethdb.Database) {
+	panic("not implement")
+}
+
+func (t *table) GetStateStore() ethdb.Database {
+	return nil
+}
+
+func (t *table) StateStoreReader() ethdb.Reader {
+	return nil
+}
+
 // NewBatchWithSize creates a write-only database batch with pre-allocated buffer.
 func (t *table) NewBatchWithSize(size int) ethdb.Batch {
 	return &tableBatch{t.db.NewBatchWithSize(size), t.prefix}
-}
-
-// NewSnapshot creates a database snapshot based on the current state.
-// The created snapshot will not be affected by all following mutations
-// happened on the database.
-func (t *table) NewSnapshot() (ethdb.Snapshot, error) {
-	return t.db.NewSnapshot()
 }
 
 func (t *table) SetupFreezerEnv(env *ethdb.FreezerEnv) error {

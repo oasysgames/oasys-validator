@@ -17,7 +17,11 @@
 package eth
 
 import (
+	"net"
+
 	"github.com/ethereum/go-ethereum/eth/protocols/bsc"
+	"github.com/ethereum/go-ethereum/eth/protocols/trust"
+
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/eth/protocols/snap"
 )
@@ -31,8 +35,9 @@ type ethPeerInfo struct {
 // ethPeer is a wrapper around eth.Peer to maintain a few extra metadata.
 type ethPeer struct {
 	*eth.Peer
-	snapExt *snapPeer // Satellite `snap` connection
-	bscExt  *bscPeer  // Satellite `bsc` connection
+	snapExt  *snapPeer // Satellite `snap` connection
+	trustExt *trustPeer
+	bscExt   *bscPeer // Satellite `bsc` connection
 }
 
 // info gathers and returns some `eth` protocol metadata known about a peer.
@@ -42,10 +47,23 @@ func (p *ethPeer) info() *ethPeerInfo {
 	}
 }
 
+func (p *ethPeer) remoteAddr() net.Addr {
+	if p.Peer != nil && p.Peer.Peer != nil {
+		return p.Peer.Peer.RemoteAddr()
+	}
+	return nil
+}
+
 // snapPeerInfo represents a short summary of the `snap` sub-protocol metadata known
 // about a connected peer.
 type snapPeerInfo struct {
 	Version uint `json:"version"` // Snapshot protocol version negotiated
+}
+
+// trustPeerInfo represents a short summary of the `trust` sub-protocol metadata known
+// about a connected peer.
+type trustPeerInfo struct {
+	Version uint `json:"version"` // Trust protocol version negotiated
 }
 
 // bscPeerInfo represents a short summary of the `bsc` sub-protocol metadata known
@@ -59,6 +77,11 @@ type snapPeer struct {
 	*snap.Peer
 }
 
+// trustPeer is a wrapper around trust.Peer to maintain a few extra metadata.
+type trustPeer struct {
+	*trust.Peer
+}
+
 // bscPeer is a wrapper around bsc.Peer to maintain a few extra metadata.
 type bscPeer struct {
 	*bsc.Peer
@@ -67,6 +90,13 @@ type bscPeer struct {
 // info gathers and returns some `snap` protocol metadata known about a peer.
 func (p *snapPeer) info() *snapPeerInfo {
 	return &snapPeerInfo{
+		Version: p.Version(),
+	}
+}
+
+// info gathers and returns some `trust` protocol metadata known about a peer.
+func (p *trustPeer) info() *trustPeerInfo {
+	return &trustPeerInfo{
 		Version: p.Version(),
 	}
 }

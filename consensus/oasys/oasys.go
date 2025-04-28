@@ -18,7 +18,9 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
 	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
@@ -55,8 +57,6 @@ const (
 // Oasys proof-of-stake protocol constants.
 var (
 	epochLength = uint64(30000) // Default number of blocks after which to checkpoint and reset the pending votes
-
-	uncleHash = types.CalcUncleHash(nil) // Always Keccak256(RLP([])) as uncles are meaningless outside of PoW.
 
 	diffInTurn = big.NewInt(2) // Block difficulty for in-turn signatures
 	diffNoTurn = big.NewInt(1) // Block difficulty for out-of-turn signatures
@@ -299,7 +299,7 @@ func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 		return errInvalidMixDigest
 	}
 	// Ensure that the block doesn't contain any uncles which are meaningless in PoS
-	if header.UncleHash != uncleHash {
+	if header.UncleHash != types.EmptyUncleHash {
 		return errInvalidUncleHash
 	}
 	// Ensure that the block's difficulty is meaningful (may not be correct at this point)
@@ -350,8 +350,19 @@ func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 		if header.ParentBeaconRoot == nil || *header.ParentBeaconRoot != (common.Hash{}) {
 			return errors.New("header is missing beaconRoot")
 		}
-		if err := eip4844.VerifyEIP4844Header(parent, header); err != nil {
+		if err := eip4844.VerifyEIP4844Header(chain.Config(), parent, header); err != nil {
 			return err
+		}
+	}
+
+	prague := chain.Config().IsPrague(header.Number, header.Time)
+	if !prague {
+		if header.RequestsHash != nil {
+			return fmt.Errorf("invalid RequestsHash, have %#x, expected nil", header.RequestsHash)
+		}
+	} else {
+		if header.RequestsHash == nil {
+			return errors.New("header has nil RequestsHash after Prague")
 		}
 	}
 
@@ -744,6 +755,10 @@ func (c *Oasys) VerifyUncles(chain consensus.ChainReader, block *types.Block) er
 	return nil
 }
 
+func (c *Oasys) VerifyRequests(header *types.Header, Requests [][]byte) error {
+	return nil
+}
+
 // verifySeal checks whether the signature contained in the header satisfies the
 // consensus protocol requirements. The method accepts an optional list of parent
 // headers that aren't yet part of the local blockchain to generate the snapshots
@@ -982,8 +997,8 @@ func (c *Oasys) Prepare(chain consensus.ChainHeaderReader, header *types.Header)
 
 // Finalize implements consensus.Engine, ensuring no uncles are set, nor block
 // rewards given.
-func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs *[]*types.Transaction,
-	uncles []*types.Header, withdrawals []*types.Withdrawal, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64) error {
+func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state vm.StateDB, txs *[]*types.Transaction,
+	uncles []*types.Header, withdrawals []*types.Withdrawal, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64, tracer *tracing.Hooks) error {
 	if len(withdrawals) > 0 {
 		return errors.New("oasys does not support withdrawals")
 	}
@@ -1052,16 +1067,16 @@ func (c *Oasys) Finalize(chain consensus.ChainHeaderReader, header *types.Header
 
 // FinalizeAndAssemble implements consensus.Engine, ensuring no uncles are set,
 // nor block rewards given, and returns the final block.
-func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
-	uncles []*types.Header, receipts []*types.Receipt, withdrawals []*types.Withdrawal) (*types.Block, []*types.Receipt, error) {
-	if txs == nil {
-		txs = make([]*types.Transaction, 0)
+func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB,
+	body *types.Body, receipts []*types.Receipt, tracer *tracing.Hooks) (*types.Block, []*types.Receipt, error) {
+	if body.Transactions == nil {
+		body.Transactions = make([]*types.Transaction, 0)
 	}
 	if receipts == nil {
 		receipts = make([]*types.Receipt, 0)
 	}
 
-	if len(withdrawals) > 0 {
+	if len(body.Withdrawals) > 0 {
 		return nil, receipts, errors.New("oasys does not support withdrawals")
 	}
 
@@ -1070,7 +1085,7 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 
 	cx := chainContext{Chain: chain, oasys: c}
 	if number == 1 {
-		err := c.initializeSystemContracts(state, header, cx, &txs, &receipts, nil, &header.GasUsed, true)
+		err := c.initializeSystemContracts(state, header, cx, &body.Transactions, &receipts, nil, &header.GasUsed, true)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to initialize system contracts, in: FinalizeAndAssemble, blockNumber: %d, blockHash: %s, err: %v", number, hash, err)
 		}
@@ -1101,7 +1116,7 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 
 	if number >= c.config.Epoch {
 		if expected := *scheduler.expect(number); expected != header.Coinbase {
-			if err := c.slash(expected, scheduler.schedules(), state, header, cx, &txs, &receipts, nil, &header.GasUsed, true); err != nil {
+			if err := c.slash(expected, scheduler.schedules(), state, header, cx, &body.Transactions, &receipts, nil, &header.GasUsed, true); err != nil {
 				log.Warn("failed to slash validator", "in", "FinalizeAndAssemble", "hash", hash, "number", number, "address", expected, "err", err)
 			}
 		}
@@ -1111,9 +1126,25 @@ func (c *Oasys) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *t
 		return nil, nil, errors.New("gas consumption of system txs exceed the gas limit")
 	}
 
-	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
-	header.UncleHash = types.CalcUncleHash(nil)
-	return types.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil)), receipts, nil
+	header.UncleHash = types.EmptyUncleHash
+	var (
+		wg       sync.WaitGroup
+		rootHash common.Hash
+		blk      *types.Block
+	)
+	wg.Add(2)
+	go func() {
+		rootHash = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
+		wg.Done()
+	}()
+	go func() {
+		blk = types.NewBlock(header, body, receipts, trie.NewStackTrie(nil))
+		wg.Done()
+	}()
+	wg.Wait()
+	blk.SetRoot(rootHash)
+	// Assemble and return the final block for sealing
+	return blk, receipts, nil
 }
 
 func (c *Oasys) IsActiveValidatorAt(chain consensus.ChainHeaderReader, header *types.Header, checkVoteKeyFn func(bLSPublicKey *types.BLSPublicKey) bool) bool {
@@ -1244,7 +1275,7 @@ func (c *Oasys) Seal(chain consensus.ChainHeaderReader, block *types.Block, resu
 	}
 
 	// Sweet, the protocol permits us to sign the block, wait for our time
-	delay := time.Until(time.Unix(int64(header.Time), 0))
+	delay := getSealingDelay(header)
 
 	// Wait until sealing is terminated or delay timeout.
 	log.Trace("Waiting for slot to sign and propagate", "delay", common.PrettyDuration(delay))
@@ -1529,7 +1560,7 @@ func OasysRLP(header *types.Header) []byte {
 	return b.Bytes()
 }
 
-func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash, number uint64, env *params.EnvironmentValue) error {
+func (c *Oasys) addBalanceToStakeManager(state vm.StateDB, hash common.Hash, number uint64, env *params.EnvironmentValue) error {
 	if !env.IsEpoch(number) || env.Epoch(number) < 3 || env.Epoch(number) > 60 {
 		return nil
 	}
@@ -1545,7 +1576,7 @@ func (c *Oasys) addBalanceToStakeManager(state *state.StateDB, hash common.Hash,
 		return nil
 	}
 
-	state.AddBalance(stakeManager.address, uint256.MustFromBig(rewards))
+	state.AddBalance(stakeManager.address, uint256.MustFromBig(rewards), tracing.BalanceChangeUnspecified)
 	log.Info("Balance added to stake manager", "hash", hash, "amount", rewards.String())
 	return nil
 }
@@ -1619,4 +1650,51 @@ func (c *Oasys) scheduler(chain consensus.ChainHeaderReader, header *types.Heade
 		newWeightedChooser(validators, stakes, seed))
 	schedulerCache.Add(seedHash, created)
 	return created, nil
+}
+
+// Argument leftOver is the time reserved for block finalize(calculate root, distribute income...)
+func (c *Oasys) Delay(chain consensus.ChainReader, header *types.Header, leftOver *time.Duration) *time.Duration {
+	number := header.Number.Uint64()
+	snap, err := c.snapshot(chain, number-1, header.ParentHash, nil)
+	if err != nil {
+		log.Warn("Unexpected error when getting snapshot in Delay",
+			"error", err, "blockNumber", number, "blockHash", header.Hash())
+		return nil
+	}
+
+	fromHeader := true // ok from header as the validators are assembled in `Prepare` phase
+	env, err := c.environment(chain, header, snap, fromHeader)
+	if err != nil {
+		log.Warn("Unexpected error when getting environment in Delay",
+			"error", err, "blockNumber", number, "blockHash", header.Hash())
+		return nil
+	}
+
+	delay := getSealingDelay(header)
+
+	blockPeriod := time.Duration(env.BlockPeriod.Int64()) * time.Second
+	if *leftOver >= blockPeriod {
+		// ignore invalid leftOver
+		log.Error("Delay invalid argument", "leftOver", leftOver.String(), "Period", env.BlockPeriod)
+	} else if *leftOver >= delay {
+		delay = time.Duration(0)
+		return &delay
+	} else {
+		delay = delay - *leftOver
+	}
+
+	// Returning the seal delay as is would cause mining processes to wait for a long time,
+	// potentially causing the txpool to grow large and making `worker.fillTransactions(...)`
+	// take longer, which could lead to chain delays.
+	// Therefore, we ensure the wait time does not exceed 2/3 of the ideal block cycle.
+	if timeForMining := blockPeriod * 2 / 3; delay > timeForMining {
+		delay = timeForMining
+	}
+	return &delay
+}
+
+// Returns the waiting time for sealing a block after finalization.
+// This can potentially be a maximum of `BlockPeriod + len(validators)`.
+func getSealingDelay(header *types.Header) time.Duration {
+	return time.Until(time.Unix(int64(header.Time), 0))
 }

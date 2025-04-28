@@ -10,13 +10,20 @@ core/                           @karalabe @holiman @rjl493456442
 eth/                            @karalabe @holiman @rjl493456442
 eth/catalyst/                   @gballet
 eth/tracers/                    @s1na
+ethclient/                      @fjl
+ethdb/                          @rjl493456442
+event/                          @fjl
+trie/                           @rjl493456442
+triedb/                         @rjl493456442
+core/tracing/                   @s1na
 graphql/                        @s1na
-les/                            @zsfelfoldi @rjl493456442
-light/                          @zsfelfoldi @rjl493456442
+internal/ethapi/                @fjl @s1na @lightclient
+internal/era/                   @lightclient
+metrics/                        @holiman
+miner/                          @MariusVanDerWijden @holiman @fjl @rjl493456442
 node/                           @fjl
 p2p/                            @fjl @zsfelfoldi
+rlp/                            @fjl
+params/                         @fjl @holiman @karalabe @gballet @rjl493456442 @zsfelfoldi
 rpc/                            @fjl @holiman
-p2p/simulations                 @fjl
-p2p/protocols                   @fjl
-p2p/testing                     @fjl
 signer/                         @holiman

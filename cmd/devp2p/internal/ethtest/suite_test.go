@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
 
-package ethtest
+package ethtest // TOFIX
 
 import (
 	crand "crypto/rand"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -34,12 +34,12 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 )
 
-func makeJWTSecret() (string, [32]byte, error) {
+func makeJWTSecret(t *testing.T) (string, [32]byte, error) {
 	var secret [32]byte
 	if _, err := crand.Read(secret[:]); err != nil {
 		return "", secret, fmt.Errorf("failed to create jwt secret: %v", err)
 	}
-	jwtPath := path.Join(os.TempDir(), "jwt_secret")
+	jwtPath := filepath.Join(t.TempDir(), "jwt_secret")
 	if err := os.WriteFile(jwtPath, []byte(hexutil.Encode(secret[:])), 0600); err != nil {
 		return "", secret, fmt.Errorf("failed to prepare jwt secret file: %v", err)
 	}
@@ -47,7 +47,7 @@ func makeJWTSecret() (string, [32]byte, error) {
 }
 
 func TestEthSuite(t *testing.T) {
-	jwtPath, secret, err := makeJWTSecret()
+	jwtPath, secret, err := makeJWTSecret(t)
 	if err != nil {
 		t.Fatalf("could not make jwt secret: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestEthSuite(t *testing.T) {
 }
 
 func TestSnapSuite(t *testing.T) {
-	jwtPath, secret, err := makeJWTSecret()
+	jwtPath, secret, err := makeJWTSecret(t)
 	if err != nil {
 		t.Fatalf("could not make jwt secret: %v", err)
 	}
@@ -105,10 +105,11 @@ func runGeth(dir string, jwtPath string) (*node.Node, error) {
 		AuthAddr: "127.0.0.1",
 		AuthPort: 0,
 		P2P: p2p.Config{
-			ListenAddr:  "127.0.0.1:0",
-			NoDiscovery: true,
-			MaxPeers:    10, // in case a test requires multiple connections, can be changed in the future
-			NoDial:      true,
+			ListenAddr:    "127.0.0.1:0",
+			NoDiscovery:   true,
+			MaxPeers:      10, // in case a test requires multiple connections, can be changed in the future
+			MaxPeersPerIP: 10,
+			NoDial:        true,
 		},
 		JWTSecret: jwtPath,
 	})
@@ -141,6 +142,7 @@ func setupGeth(stack *node.Node, dir string) error {
 		TrieDirtyCache: 16,
 		TrieTimeout:    60 * time.Minute,
 		SnapshotCache:  10,
+		TriesInMemory:  128,
 	})
 	if err != nil {
 		return err

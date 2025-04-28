@@ -79,7 +79,7 @@ func fuzz(input []byte) int {
 
 	f := fetcher.NewTxFetcherForTests(
 		func(common.Hash) bool { return false },
-		func(txs []*types.Transaction) []error {
+		func(peer string, txs []*types.Transaction) []error {
 			return make([]error, len(txs))
 		},
 		func(string, []common.Hash) error { return nil },

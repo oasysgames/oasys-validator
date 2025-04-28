@@ -56,14 +56,6 @@ const (
 	maxQueuedBlockAnns = 4
 )
 
-// max is a helper function which returns the larger of the two given integers.
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
 // Peer is a collection of relevant information we have about a `eth` peer.
 type Peer struct {
 	id string // Unique ID for the peer, cached
@@ -72,8 +64,9 @@ type Peer struct {
 	rw        p2p.MsgReadWriter // Input/output streams for snap
 	version   uint              // Protocol version negotiated
 
-	head common.Hash // Latest advertised head block hash
-	td   *big.Int    // Latest advertised head block total difficulty
+	lagging bool        // lagging peer is still connected, but won't be used to sync.
+	head    common.Hash // Latest advertised head block hash
+	td      *big.Int    // Latest advertised head block total difficulty
 
 	justifiedBlock *uint64 // Latest advertised justified block
 
@@ -90,8 +83,9 @@ type Peer struct {
 	reqCancel   chan *cancel   // Dispatch channel to cancel pending requests and untrack them
 	resDispatch chan *response // Dispatch channel to fulfil pending requests and untrack them
 
-	term chan struct{} // Termination channel to stop the broadcasters
-	lock sync.RWMutex  // Mutex protecting the internal fields
+	term   chan struct{} // Termination channel to stop the broadcasters
+	txTerm chan struct{} // Termination channel to stop the tx broadcasters
+	lock   sync.RWMutex  // Mutex protecting the internal fields
 }
 
 // NewPeer creates a wrapper for a network connection and negotiated  protocol
@@ -113,13 +107,13 @@ func NewPeer(version uint, p *p2p.Peer, rw p2p.MsgReadWriter, txpool TxPool) *Pe
 		resDispatch:     make(chan *response),
 		txpool:          txpool,
 		term:            make(chan struct{}),
+		txTerm:          make(chan struct{}),
 	}
 	// Start up all the broadcasters
 	go peer.broadcastBlocks()
 	go peer.broadcastTransactions()
 	go peer.announceTransactions()
 	go peer.dispatcher()
-
 	return peer
 }
 
@@ -128,6 +122,17 @@ func NewPeer(version uint, p *p2p.Peer, rw p2p.MsgReadWriter, txpool TxPool) *Pe
 // clean it up!
 func (p *Peer) Close() {
 	close(p.term)
+
+	p.CloseTxBroadcast()
+}
+
+// CloseTxBroadcast signals the tx broadcast goroutine to terminate.
+func (p *Peer) CloseTxBroadcast() {
+	select {
+	case <-p.txTerm:
+	default:
+		close(p.txTerm)
+	}
 }
 
 // ID retrieves the peer's unique identifier.
@@ -138,6 +143,14 @@ func (p *Peer) ID() string {
 // Version retrieves the peer's negotiated `eth` protocol version.
 func (p *Peer) Version() uint {
 	return p.version
+}
+
+func (p *Peer) Lagging() bool {
+	return p.lagging
+}
+
+func (p *Peer) MarkLagging() {
+	p.lagging = true
 }
 
 // Head retrieves the current head hash and total difficulty of the peer.
@@ -153,7 +166,7 @@ func (p *Peer) Head() (hash common.Hash, td *big.Int) {
 func (p *Peer) SetHead(hash common.Hash, td *big.Int) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-
+	p.lagging = false
 	copy(p.head[:], hash[:])
 	p.td.Set(td)
 }
@@ -223,6 +236,8 @@ func (p *Peer) AsyncSendTransactions(hashes []common.Hash) {
 	case p.txBroadcast <- hashes:
 		// Mark all the transactions as known, but ensure we don't overflow our limits
 		p.knownTxs.Add(hashes...)
+	case <-p.txTerm:
+		p.Log().Debug("Dropping transaction propagation", "count", len(hashes))
 	case <-p.term:
 		p.Log().Debug("Dropping transaction propagation", "count", len(hashes))
 	}
@@ -249,6 +264,8 @@ func (p *Peer) AsyncSendPooledTransactionHashes(hashes []common.Hash) {
 	case p.txAnnounce <- hashes:
 		// Mark all the transactions as known, but ensure we don't overflow our limits
 		p.knownTxs.Add(hashes...)
+	case <-p.txTerm:
+		p.Log().Debug("Dropping transaction announcement", "count", len(hashes))
 	case <-p.term:
 		p.Log().Debug("Dropping transaction announcement", "count", len(hashes))
 	}

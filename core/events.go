@@ -17,12 +17,14 @@
 package core
 
 import (
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-// NewTxsEvent is posted when a batch of transactions enter the transaction pool.
+// NewTxsEvent is posted when a batch of transactions enters the transaction pool.
 type NewTxsEvent struct{ Txs []*types.Transaction }
+
+// ReannoTxsEvent is posted when a batch of local pending transactions exceed a specified duration.
+type ReannoTxsEvent struct{ Txs []*types.Transaction }
 
 // NewMinedBlockEvent is posted when a block has been imported.
 type NewMinedBlockEvent struct{ Block *types.Block }
@@ -37,15 +39,11 @@ type NewVoteEvent struct{ Vote *types.VoteEnvelope }
 type FinalizedHeaderEvent struct{ Header *types.Header }
 
 type ChainEvent struct {
-	Block *types.Block
-	Hash  common.Hash
-	Logs  []*types.Log
+	Header *types.Header
 }
 
-type ChainSideEvent struct {
-	Block *types.Block
+type ChainHeadEvent struct {
+	Header *types.Header
 }
-
-type ChainHeadEvent struct{ Block *types.Block }
 
 type HighestVerifiedBlockEvent struct{ Header *types.Header }

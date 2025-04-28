@@ -41,6 +41,9 @@ func handleGetBlockHeaders(backend Backend, msg Decoder, peer *Peer) error {
 // ServiceGetBlockHeadersQuery assembles the response to a header query. It is
 // exposed to allow external packages to test protocol behavior.
 func ServiceGetBlockHeadersQuery(chain *core.BlockChain, query *GetBlockHeadersRequest, peer *Peer) []rlp.RawValue {
+	if query.Amount == 0 {
+		return nil
+	}
 	if query.Skip == 0 {
 		// The fast path: when the request is for a contiguous segment of headers.
 		return serviceContiguousBlockHeaderQuery(chain, query)
@@ -189,7 +192,7 @@ func serviceContiguousBlockHeaderQuery(chain *core.BlockChain, query *GetBlockHe
 		return headers
 	}
 	{ // Last mode: deliver ancestors of H
-		for i := uint64(1); header != nil && i < count; i++ {
+		for i := uint64(1); i < count; i++ {
 			header = chain.GetHeaderByHash(header.ParentHash)
 			if header == nil {
 				break
@@ -307,10 +310,12 @@ func handleNewBlock(backend Backend, msg Decoder, peer *Peer) error {
 	if err := msg.Decode(ann); err != nil {
 		return fmt.Errorf("%w: message %v: %v", errDecode, msg, err)
 	}
+
 	// Now that we have our packet, perform operations using the interface methods
 	if err := ann.sanityCheck(); err != nil {
 		return err
 	}
+
 	if hash := types.CalcUncleHash(ann.Block.Uncles()); hash != ann.Block.UncleHash() {
 		log.Warn("Propagated block has invalid uncles", "have", hash, "exp", ann.Block.UncleHash())
 		return nil // TODO(karalabe): return error eventually, but wait a few releases

@@ -1,5 +1,6 @@
 // Hook go-metrics into expvar
 // on any /debug/metrics request, load all vars from the registry into expvar, and execute regular expvar handler
+
 package exp
 
 import (
@@ -95,6 +96,20 @@ func (exp *exp) getFloat(name string) *expvar.Float {
 	return v
 }
 
+func (exp *exp) getMap(name string) *expvar.Map {
+	var v *expvar.Map
+	exp.expvarLock.Lock()
+	p := expvar.Get(name)
+	if p != nil {
+		v = p.(*expvar.Map)
+	} else {
+		v = new(expvar.Map)
+		expvar.Publish(name, v)
+	}
+	exp.expvarLock.Unlock()
+	return v
+}
+
 func (exp *exp) getInfo(name string) *expvar.String {
 	var v *expvar.String
 	exp.expvarLock.Lock()
@@ -146,7 +161,7 @@ func (exp *exp) publishHistogram(name string, metric metrics.Histogram) {
 	exp.getFloat(name + ".999-percentile").Set(ps[4])
 }
 
-func (exp *exp) publishMeter(name string, metric metrics.Meter) {
+func (exp *exp) publishMeter(name string, metric *metrics.Meter) {
 	m := metric.Snapshot()
 	exp.getInt(name + ".count").Set(m.Count())
 	exp.getFloat(name + ".one-minute").Set(m.Rate1())
@@ -155,7 +170,7 @@ func (exp *exp) publishMeter(name string, metric metrics.Meter) {
 	exp.getFloat(name + ".mean").Set(m.RateMean())
 }
 
-func (exp *exp) publishTimer(name string, metric metrics.Timer) {
+func (exp *exp) publishTimer(name string, metric *metrics.Timer) {
 	t := metric.Snapshot()
 	ps := t.Percentiles([]float64{0.5, 0.75, 0.95, 0.99, 0.999})
 	exp.getInt(name + ".count").Set(t.Count())
@@ -174,7 +189,7 @@ func (exp *exp) publishTimer(name string, metric metrics.Timer) {
 	exp.getFloat(name + ".mean-rate").Set(t.RateMean())
 }
 
-func (exp *exp) publishResettingTimer(name string, metric metrics.ResettingTimer) {
+func (exp *exp) publishResettingTimer(name string, metric *metrics.ResettingTimer) {
 	t := metric.Snapshot()
 	ps := t.Percentiles([]float64{0.50, 0.75, 0.95, 0.99})
 	exp.getInt(name + ".count").Set(int64(t.Count()))
@@ -185,27 +200,83 @@ func (exp *exp) publishResettingTimer(name string, metric metrics.ResettingTimer
 	exp.getFloat(name + ".99-percentile").Set(ps[3])
 }
 
+func (exp *exp) publishLabel(name string, metric *metrics.Label) {
+	labels := metric.Value()
+	for k, v := range labels {
+		exp.getMap(name).Set(k, exp.interfaceToExpVal(v))
+	}
+}
+
+func (exp *exp) interfaceToExpVal(v interface{}) expvar.Var {
+	switch i := v.(type) {
+	case string:
+		newV := new(expvar.String)
+		newV.Set(i)
+		return newV
+	case int64:
+		newV := new(expvar.Int)
+		newV.Set(i)
+		return newV
+	case int32:
+		newV := new(expvar.Int)
+		newV.Set(int64(i))
+		return newV
+	case int16:
+		newV := new(expvar.Int)
+		newV.Set(int64(i))
+		return newV
+	case int8:
+		newV := new(expvar.Int)
+		newV.Set(int64(i))
+		return newV
+	case int:
+		newV := new(expvar.Int)
+		newV.Set(int64(i))
+		return newV
+	case float32:
+		newV := new(expvar.Float)
+		newV.Set(float64(i))
+		return newV
+	case float64:
+		newV := new(expvar.Float)
+		newV.Set(i)
+		return newV
+	case map[string]interface{}:
+		newV := new(expvar.Map)
+		for k, v := range i {
+			newV.Set(k, exp.interfaceToExpVal(v))
+		}
+		return newV
+	default:
+		newV := new(expvar.String)
+		newV.Set(fmt.Sprint(v))
+		return newV
+	}
+}
+
 func (exp *exp) syncToExpvar() {
 	exp.registry.Each(func(name string, i interface{}) {
 		switch i := i.(type) {
-		case metrics.Counter:
+		case *metrics.Counter:
 			exp.publishCounter(name, i.Snapshot())
-		case metrics.CounterFloat64:
+		case *metrics.CounterFloat64:
 			exp.publishCounterFloat64(name, i.Snapshot())
-		case metrics.Gauge:
+		case *metrics.Gauge:
 			exp.publishGauge(name, i.Snapshot())
-		case metrics.GaugeFloat64:
+		case *metrics.GaugeFloat64:
 			exp.publishGaugeFloat64(name, i.Snapshot())
-		case metrics.GaugeInfo:
+		case *metrics.GaugeInfo:
 			exp.publishGaugeInfo(name, i.Snapshot())
 		case metrics.Histogram:
 			exp.publishHistogram(name, i)
-		case metrics.Meter:
+		case *metrics.Meter:
 			exp.publishMeter(name, i)
-		case metrics.Timer:
+		case *metrics.Timer:
 			exp.publishTimer(name, i)
-		case metrics.ResettingTimer:
+		case *metrics.ResettingTimer:
 			exp.publishResettingTimer(name, i)
+		case *metrics.Label:
+			exp.publishLabel(name, i)
 		default:
 			panic(fmt.Sprintf("unsupported type for '%s': %T", name, i))
 		}

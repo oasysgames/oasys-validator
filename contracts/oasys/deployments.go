@@ -1,8 +1,10 @@
 package oasys
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -77,7 +79,7 @@ type deployment struct {
 }
 
 // Deploy the contract.
-func (d *deployment) deploy(cfg *params.ChainConfig, state StateDB, block uint64) {
+func (d *deployment) deploy(cfg *params.ChainConfig, state StateDB, block *big.Int) {
 	d.deployCode(state)
 	d.deployStorage(cfg, state)
 	log.Info("Deploy contract", "block", block,
@@ -86,7 +88,11 @@ func (d *deployment) deploy(cfg *params.ChainConfig, state StateDB, block uint64
 
 func (d *deployment) deployCode(state StateDB) {
 	if d.code != nil {
-		state.SetCode(common.HexToAddress(d.contract.address), d.code)
+		addr := common.HexToAddress(d.contract.address)
+		if bytes.Equal(d.code, state.GetCode(addr)) {
+			panic(fmt.Sprintf("contract %s already deployed", d.contract.name))
+		}
+		state.SetCode(addr, d.code)
 	}
 }
 

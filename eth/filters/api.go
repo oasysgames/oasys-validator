@@ -35,10 +35,11 @@ import (
 )
 
 var (
-	errInvalidTopic      = errors.New("invalid topic(s)")
-	errFilterNotFound    = errors.New("filter not found")
-	errInvalidBlockRange = errors.New("invalid block range params")
-	errExceedMaxTopics   = errors.New("exceed max topics")
+	errInvalidTopic           = errors.New("invalid topic(s)")
+	errFilterNotFound         = errors.New("filter not found")
+	errInvalidBlockRange      = errors.New("invalid block range params")
+	errPendingLogsUnsupported = errors.New("pending logs are not supported")
+	errExceedMaxTopics        = errors.New("exceed max topics")
 )
 
 // The maximum number of topic criteria allowed, vm.LOG4 - vm.LOG0
@@ -63,20 +64,22 @@ type filter struct {
 // FilterAPI offers support to create and manage filters. This will allow external clients to retrieve various
 // information related to the Ethereum protocol such as blocks, transactions and logs.
 type FilterAPI struct {
-	sys       *FilterSystem
-	events    *EventSystem
-	filtersMu sync.Mutex
-	filters   map[rpc.ID]*filter
-	timeout   time.Duration
+	sys        *FilterSystem
+	events     *EventSystem
+	filtersMu  sync.Mutex
+	filters    map[rpc.ID]*filter
+	timeout    time.Duration
+	rangeLimit bool
 }
 
 // NewFilterAPI returns a new FilterAPI instance.
-func NewFilterAPI(system *FilterSystem, lightMode bool) *FilterAPI {
+func NewFilterAPI(system *FilterSystem, rangeLimit bool) *FilterAPI {
 	api := &FilterAPI{
-		sys:     system,
-		events:  NewEventSystem(system, lightMode),
-		filters: make(map[rpc.ID]*filter),
-		timeout: system.cfg.Timeout,
+		sys:        system,
+		events:     NewEventSystem(system),
+		filters:    make(map[rpc.ID]*filter),
+		timeout:    system.cfg.Timeout,
+		rangeLimit: rangeLimit,
 	}
 	go api.timeoutLoop(system.cfg.Timeout)
 
@@ -90,7 +93,11 @@ func (api *FilterAPI) timeoutLoop(timeout time.Duration) {
 	ticker := time.NewTicker(timeout)
 	defer ticker.Stop()
 	for {
-		<-ticker.C
+		select {
+		case <-ticker.C:
+		case <-api.events.chainSub.Err():
+			return
+		}
 		api.filtersMu.Lock()
 		for id, f := range api.filters {
 			select {
@@ -123,12 +130,11 @@ func (api *FilterAPI) NewPendingTransactionFilter(fullTx *bool) rpc.ID {
 		pendingTxs   = make(chan []*types.Transaction)
 		pendingTxSub = api.events.SubscribePendingTxs(pendingTxs)
 	)
-
 	api.filtersMu.Lock()
 	api.filters[pendingTxSub.ID] = &filter{typ: PendingTransactionsSubscription, fullTx: fullTx != nil && *fullTx, deadline: time.NewTimer(api.timeout), txs: make([]*types.Transaction, 0), s: pendingTxSub}
 	api.filtersMu.Unlock()
 
-	go func() {
+	gopool.Submit(func() {
 		for {
 			select {
 			case pTx := <-pendingTxs:
@@ -144,7 +150,7 @@ func (api *FilterAPI) NewPendingTransactionFilter(fullTx *bool) rpc.ID {
 				return
 			}
 		}
-	}()
+	})
 
 	return pendingTxSub.ID
 }
@@ -160,7 +166,7 @@ func (api *FilterAPI) NewPendingTransactions(ctx context.Context, fullTx *bool) 
 
 	rpcSub := notifier.CreateSubscription()
 
-	go func() {
+	gopool.Submit(func() {
 		txs := make(chan []*types.Transaction, 128)
 		pendingTxSub := api.events.SubscribePendingTxs(txs)
 		defer pendingTxSub.Unsubscribe()
@@ -183,11 +189,9 @@ func (api *FilterAPI) NewPendingTransactions(ctx context.Context, fullTx *bool) 
 				}
 			case <-rpcSub.Err():
 				return
-			case <-notifier.Closed():
-				return
 			}
 		}
-	}()
+	})
 
 	return rpcSub, nil
 }
@@ -244,9 +248,6 @@ func (api *FilterAPI) NewVotes(ctx context.Context) (*rpc.Subscription, error) {
 			case <-rpcSub.Err():
 				voteSub.Unsubscribe()
 				return
-			case <-notifier.Closed():
-				voteSub.Unsubscribe()
-				return
 			}
 		}
 	})
@@ -266,7 +267,7 @@ func (api *FilterAPI) NewBlockFilter() rpc.ID {
 	api.filters[headerSub.ID] = &filter{typ: BlocksSubscription, deadline: time.NewTimer(api.timeout), hashes: make([]common.Hash, 0), s: headerSub}
 	api.filtersMu.Unlock()
 
-	go func() {
+	gopool.Submit(func() {
 		for {
 			select {
 			case h := <-headers:
@@ -282,7 +283,7 @@ func (api *FilterAPI) NewBlockFilter() rpc.ID {
 				return
 			}
 		}
-	}()
+	})
 
 	return headerSub.ID
 }
@@ -296,7 +297,7 @@ func (api *FilterAPI) NewHeads(ctx context.Context) (*rpc.Subscription, error) {
 
 	rpcSub := notifier.CreateSubscription()
 
-	go func() {
+	gopool.Submit(func() {
 		headers := make(chan *types.Header)
 		headersSub := api.events.SubscribeNewHeads(headers)
 		defer headersSub.Unsubscribe()
@@ -307,11 +308,9 @@ func (api *FilterAPI) NewHeads(ctx context.Context) (*rpc.Subscription, error) {
 				notifier.Notify(rpcSub.ID, h)
 			case <-rpcSub.Err():
 				return
-			case <-notifier.Closed():
-				return
 			}
 		}
-	}()
+	})
 
 	return rpcSub, nil
 }
@@ -368,9 +367,6 @@ func (api *FilterAPI) NewFinalizedHeaders(ctx context.Context) (*rpc.Subscriptio
 			case <-rpcSub.Err():
 				headersSub.Unsubscribe()
 				return
-			case <-notifier.Closed():
-				headersSub.Unsubscribe()
-				return
 			}
 		}
 	})
@@ -395,22 +391,19 @@ func (api *FilterAPI) Logs(ctx context.Context, crit FilterCriteria) (*rpc.Subsc
 		return nil, err
 	}
 
-	go func() {
+	gopool.Submit(func() {
 		defer logsSub.Unsubscribe()
 		for {
 			select {
 			case logs := <-matchedLogs:
 				for _, log := range logs {
-					log := log
 					notifier.Notify(rpcSub.ID, &log)
 				}
 			case <-rpcSub.Err(): // client send an unsubscribe request
 				return
-			case <-notifier.Closed(): // connection dropped
-				return
 			}
 		}
-	}()
+	})
 
 	return rpcSub, nil
 }
@@ -441,7 +434,7 @@ func (api *FilterAPI) NewFilter(crit FilterCriteria) (rpc.ID, error) {
 	api.filters[logsSub.ID] = &filter{typ: LogsSubscription, crit: crit, deadline: time.NewTimer(api.timeout), logs: make([]*types.Log, 0), s: logsSub}
 	api.filtersMu.Unlock()
 
-	go func() {
+	gopool.Submit(func() {
 		for {
 			select {
 			case l := <-logs:
@@ -457,7 +450,7 @@ func (api *FilterAPI) NewFilter(crit FilterCriteria) (rpc.ID, error) {
 				return
 			}
 		}
-	}()
+	})
 
 	return logsSub.ID, nil
 }
@@ -485,7 +478,7 @@ func (api *FilterAPI) GetLogs(ctx context.Context, crit FilterCriteria) ([]*type
 			return nil, errInvalidBlockRange
 		}
 		// Construct the range filter
-		filter = api.sys.NewRangeFilter(begin, end, crit.Addresses, crit.Topics)
+		filter = api.sys.NewRangeFilter(begin, end, crit.Addresses, crit.Topics, api.rangeLimit)
 	}
 	// Run the filter and return all the logs
 	logs, err := filter.Logs(ctx)
@@ -536,7 +529,7 @@ func (api *FilterAPI) GetFilterLogs(ctx context.Context, id rpc.ID) ([]*types.Lo
 			end = f.crit.ToBlock.Int64()
 		}
 		// Construct the range filter
-		filter = api.sys.NewRangeFilter(begin, end, f.crit.Addresses, f.crit.Topics)
+		filter = api.sys.NewRangeFilter(begin, end, f.crit.Addresses, f.crit.Topics, api.rangeLimit)
 	}
 	// Run the filter and return all the logs
 	logs, err := filter.Logs(ctx)
@@ -587,7 +580,7 @@ func (api *FilterAPI) GetFilterChanges(id rpc.ID) (interface{}, error) {
 				f.txs = nil
 				return hashes, nil
 			}
-		case LogsSubscription, MinedAndPendingLogsSubscription:
+		case LogsSubscription:
 			logs := f.logs
 			f.logs = nil
 			return returnLogs(logs), nil

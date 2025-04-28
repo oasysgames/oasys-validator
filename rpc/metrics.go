@@ -31,7 +31,7 @@ var (
 	// serveTimeHistName is the prefix of the per-request serving time histograms.
 	serveTimeHistName = "rpc/duration"
 
-	rpcServingTimer = metrics.NewRegisteredTimer("rpc/duration/all", nil)
+	RpcServingTimer = metrics.NewRegisteredTimer("rpc/duration/all", nil)
 )
 
 // updateServeTimeHistogram tracks the serving time of a remote RPC call.
@@ -47,4 +47,9 @@ func updateServeTimeHistogram(method string, success bool, elapsed time.Duration
 		)
 	}
 	metrics.GetOrRegisterHistogramLazy(h, nil, sampler).Update(elapsed.Nanoseconds())
+}
+
+func newRPCRequestGauge(method string) *metrics.Gauge {
+	m := fmt.Sprintf("rpc/count/%s", method)
+	return metrics.GetOrRegisterGauge(m, nil)
 }

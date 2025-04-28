@@ -9,37 +9,48 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/params"
 )
 
-type MockContract struct {
+type mockContract struct {
 	address common.Address
 	code    []byte
+	nonce   uint64
 	storage map[common.Hash]common.Hash
 }
 
-func (c *MockContract) codeHash() string {
+func (c *mockContract) codeHash() string {
 	hash := md5.Sum(c.code)
 	return hex.EncodeToString(hash[:])
 }
 
-type MockStateDB map[common.Address]*MockContract
+type mockStateDB map[common.Address]*mockContract
 
-func (s MockStateDB) GetCode(addr common.Address) []byte {
+func (s mockStateDB) GetCode(addr common.Address) []byte {
 	return s.getContract(addr).code
 }
 
-func (s MockStateDB) SetCode(addr common.Address, code []byte) {
-	s.getContract(addr).code = code
+func (s mockStateDB) SetCode(addr common.Address, code []byte) (prev []byte) {
+	mc := s.getContract(addr)
+	prev, mc.code = mc.code, code
+	return prev
 }
 
-func (s MockStateDB) SetState(addr common.Address, key common.Hash, value common.Hash) {
-	s.getContract(addr).storage[key] = value
+func (s mockStateDB) SetState(addr common.Address, key, value common.Hash) (prev common.Hash) {
+	mc := s.getContract(addr)
+	prev, mc.storage[key] = mc.storage[key], value
+	return prev
 }
 
-func (s MockStateDB) getContract(addr common.Address) *MockContract {
+func (s mockStateDB) SetNonce(addr common.Address, nonce uint64, _ tracing.NonceChangeReason) {
+	mc := s.getContract(addr)
+	mc.nonce = nonce
+}
+
+func (s mockStateDB) getContract(addr common.Address) *mockContract {
 	if _, ok := s[addr]; !ok {
-		s[addr] = &MockContract{
+		s[addr] = &mockContract{
 			address: addr,
 			code:    []byte(""),
 			storage: make(map[common.Hash]common.Hash),
@@ -51,6 +62,7 @@ func (s MockStateDB) getContract(addr common.Address) *MockContract {
 type wantContract struct {
 	name     string
 	codeHash string
+	nonce    uint64
 	storage  map[string]string
 }
 
@@ -1155,9 +1167,21 @@ func _deployments13(genesisHash common.Hash, contracts wantContracts) {
 	}
 }
 
+func _deployEIP2935(genesisHash common.Hash, contracts wantContracts) {
+	contracts["0x0000F90827F1C53a10cb7A02335B175320002935"] = &wantContract{
+		name:     "EIP2935Proxy",
+		codeHash: "eaa60f3ae93f56de25492b34efc7d2ed",
+		nonce:    1,
+	}
+}
+
 func TestDeploy(t *testing.T) {
 	type wantDeployments []struct {
-		block  uint64
+		// Block height based deployment
+		blockNumber uint64
+		// Block time based deployment
+		blockTime uint64
+
 		deploy []deployFn
 	}
 
@@ -1165,104 +1189,116 @@ func TestDeploy(t *testing.T) {
 		network         string
 		chainConfig     *params.ChainConfig
 		genesisHash     common.Hash
-		wants           wantContracts
 		wantDeployments wantDeployments
 	}{
 		{
 			"mainnet",
 			params.OasysMainnetChainConfig,
 			params.OasysMainnetGenesisHash,
-			wantContracts{},
 			wantDeployments{
-				{1, []deployFn{_deployments0}},
-				{235000, []deployFn{_deployments1}},
-				{309600, []deployFn{_deployments2, _deployments3, _deployments4}},
-				{419000, []deployFn{_deployments5}},
-				{557100, []deployFn{_deployments6}},
-				{971800, []deployFn{_deployments7}},
-				{1529980, []deployFn{_deployments9}},
-				{1892000, []deployFn{_deployments10}},
-				{4089588, []deployFn{_deployments11}},
-				{5095900, []deployFn{_deployments12}},
-				{5527429, []deployFn{_deployments13}},
+				{blockNumber: 1, deploy: []deployFn{_deployments0}},
+				{blockNumber: 235000, deploy: []deployFn{_deployments1}},
+				{blockNumber: 309600, deploy: []deployFn{_deployments2, _deployments3, _deployments4}},
+				{blockNumber: 419000, deploy: []deployFn{_deployments5}},
+				{blockNumber: 557100, deploy: []deployFn{_deployments6}},
+				{blockNumber: 971800, deploy: []deployFn{_deployments7}},
+				{blockNumber: 1529980, deploy: []deployFn{_deployments9}},
+				{blockNumber: 1892000, deploy: []deployFn{_deployments10}},
+				{blockNumber: 4089588, deploy: []deployFn{_deployments11}},
+				{blockNumber: 5095900, deploy: []deployFn{_deployments12}},
+				{blockNumber: 5527429, deploy: []deployFn{_deployments13}},
+				{blockNumber: 5527429 + 1, blockTime: 9999999999, deploy: []deployFn{_deployEIP2935}},
 			},
 		},
 		{
 			"testnet",
 			params.OasysTestnetChainConfig,
 			params.OasysTestnetGenesisHash,
-			wantContracts{},
 			wantDeployments{
-				{1, []deployFn{_deployments0}},
-				{189400, []deployFn{_deployments2}},
-				{200800, []deployFn{_deployments1}},
-				{269700, []deployFn{_deployments3}},
-				{293000, []deployFn{_deployments4}},
-				{385000, []deployFn{_deployments5}},
-				{546400, []deployFn{_deployments6}},
-				{955400, []deployFn{_deployments7, _deployments8}},
-				{1519840, []deployFn{_deployments9}},
-				{1880660, []deployFn{_deployments10}},
-				{4017600, []deployFn{_deployments11}},
-				{4958700, []deployFn{_deployments12}},
-				{5445775, []deployFn{_deployments13}},
+				{blockNumber: 1, deploy: []deployFn{_deployments0}},
+				{blockNumber: 189400, deploy: []deployFn{_deployments2}},
+				{blockNumber: 200800, deploy: []deployFn{_deployments1}},
+				{blockNumber: 269700, deploy: []deployFn{_deployments3}},
+				{blockNumber: 293000, deploy: []deployFn{_deployments4}},
+				{blockNumber: 385000, deploy: []deployFn{_deployments5}},
+				{blockNumber: 546400, deploy: []deployFn{_deployments6}},
+				{blockNumber: 955400, deploy: []deployFn{_deployments7, _deployments8}},
+				{blockNumber: 1519840, deploy: []deployFn{_deployments9}},
+				{blockNumber: 1880660, deploy: []deployFn{_deployments10}},
+				{blockNumber: 4017600, deploy: []deployFn{_deployments11}},
+				{blockNumber: 4958700, deploy: []deployFn{_deployments12}},
+				{blockNumber: 5445775, deploy: []deployFn{_deployments13}},
+				{blockNumber: 5445775 + 1, blockTime: 9999999999, deploy: []deployFn{_deployEIP2935}},
 			},
 		},
 		{
 			"others",
 			&params.ChainConfig{
-				ChainID: big.NewInt(12345),
+				ChainID:     big.NewInt(12345),
+				LondonBlock: new(big.Int), // London fork is also checked when determining Prague
+				PragueTime:  newUint64(9999999999),
 				Oasys: &params.OasysConfig{
 					Period: 15,
 					Epoch:  5760,
 				},
 			},
 			common.Hash{},
-			wantContracts{},
 			wantDeployments{
-				{2, []deployFn{
-					_deployments0,
-					_deployments1,
-					_deployments2,
-					_deployments3,
-					_deployments4,
-					_deployments5,
-					_deployments6,
-					_deployments7,
-					_deployments8,
-					_deployments9,
-					_deployments10,
-					// _deployments11,
-					_deployments12,
-					_deployments13,
-				}},
+				{
+					blockNumber: 2,
+					deploy: []deployFn{
+						_deployments0,
+						_deployments1,
+						_deployments2,
+						_deployments3,
+						_deployments4,
+						_deployments5,
+						_deployments6,
+						_deployments7,
+						_deployments8,
+						_deployments9,
+						_deployments10,
+						// _deployments11,
+						_deployments12,
+						_deployments13,
+					},
+				},
+				{blockNumber: 2 + 1, blockTime: 9999999999, deploy: []deployFn{_deployEIP2935}},
 			},
 		},
 	}
 
 	for _, tc := range testCases {
 		GenesisHash = tc.genesisHash
-		state := make(MockStateDB)
+		state := make(mockStateDB)
+		wants := make(wantContracts)
 
+		var blockTime uint64
 		for _, wantDeployment := range tc.wantDeployments {
-			testName := fmt.Sprintf("%s/block#%d", tc.network, wantDeployment.block)
+			testName := fmt.Sprintf("%s/block#%d", tc.network, wantDeployment.blockNumber)
+
+			if wantDeployment.blockTime > 0 {
+				blockTime = wantDeployment.blockTime
+			} else {
+				blockTime += 1
+			}
 
 			for _, deploy := range wantDeployment.deploy {
-				deploy(tc.genesisHash, tc.wants)
+				deploy(tc.genesisHash, wants)
 			}
-			Deploy(tc.chainConfig, state, wantDeployment.block)
+			Deploy(tc.chainConfig, state, new(big.Int).SetUint64(wantDeployment.blockNumber), blockTime-1, blockTime)
 
 			t.Run(testName, func(t *testing.T) {
-				if len(state) != len(tc.wants) {
+				if len(state) != len(wants) {
 					t.Errorf(
 						"contract count mismatch, got %v, want %v",
 						len(state),
-						len(tc.wants),
+						len(wants),
 					)
 				}
 			})
 
-			for addr, want := range tc.wants {
+			for addr, want := range wants {
 				t.Run(fmt.Sprintf("%s/%s", testName, want.name), func(t *testing.T) {
 					got := state.getContract(common.HexToAddress(addr))
 
@@ -1271,6 +1307,14 @@ func TestDeploy(t *testing.T) {
 							"code hash mismatch, got %v, want %v",
 							got.codeHash(),
 							want.codeHash,
+						)
+					}
+
+					if got.nonce != want.nonce {
+						t.Errorf(
+							"nonce mismatch, got %v, want %v",
+							got.nonce,
+							want.nonce,
 						)
 					}
 
@@ -1296,3 +1340,5 @@ func TestDeploy(t *testing.T) {
 		}
 	}
 }
+
+func newUint64(val uint64) *uint64 { return &val }

@@ -19,6 +19,7 @@ package eth
 import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/forkid"
+	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
 )
@@ -57,10 +58,29 @@ func StartENRUpdater(chain *core.BlockChain, ln *enode.LocalNode) {
 	}()
 }
 
+func StartENRFilter(chain *core.BlockChain, p2p *p2p.Server) {
+	forkFilter := forkid.NewFilter(chain)
+	p2p.SetFilter(forkFilter)
+}
+
 // currentENREntry constructs an `eth` ENR entry based on the current state of the chain.
 func currentENREntry(chain *core.BlockChain) *enrEntry {
 	head := chain.CurrentHeader()
 	return &enrEntry{
 		ForkID: forkid.NewID(chain.Config(), chain.Genesis(), head.Number.Uint64(), head.Time),
+	}
+}
+
+// NewNodeFilter returns a filtering function that returns whether the provided
+// enode advertises a forkid compatible with the current chain.
+func NewNodeFilter(chain *core.BlockChain) func(*enode.Node) bool {
+	filter := forkid.NewFilter(chain)
+	return func(n *enode.Node) bool {
+		var entry enrEntry
+		if err := n.Load(entry); err != nil {
+			return false
+		}
+		err := filter(entry.ForkID)
+		return err == nil
 	}
 }

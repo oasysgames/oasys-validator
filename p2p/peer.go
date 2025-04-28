@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"slices"
 	"sync"
 	"time"
 
@@ -31,7 +32,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/ethereum/go-ethereum/rlp"
-	"golang.org/x/exp/slices"
 )
 
 var (
@@ -116,8 +116,9 @@ type Peer struct {
 	disc     chan DiscReason
 
 	// events receives message send / receive events if set
-	events   *event.Feed
-	testPipe *MsgPipeRW // for testing
+	events         *event.Feed
+	testPipe       *MsgPipeRW // for testing
+	testRemoteAddr string     // for testing
 }
 
 // NewPeer returns a peer for testing purposes.
@@ -145,6 +146,16 @@ func NewPeerPipe(id enode.ID, name string, caps []Cap, pipe *MsgPipeRW) *Peer {
 	p := NewPeer(id, name, caps)
 	p.testPipe = pipe
 	return p
+}
+
+// NewPeerWithProtocols returns a peer for testing purposes.
+func NewPeerWithProtocols(id enode.ID, protocols []Protocol, name string, caps []Cap) *Peer {
+	pipe, _ := net.Pipe()
+	node := enode.SignNull(new(enr.Record), id)
+	conn := &conn{fd: pipe, transport: nil, node: node, caps: caps, name: name}
+	peer := newPeer(log.Root(), conn, protocols)
+	close(peer.closed) // ensures Disconnect doesn't block
+	return peer
 }
 
 // ID returns the node's public key.
@@ -193,7 +204,24 @@ func (p *Peer) RunningCap(protocol string, versions []uint) bool {
 
 // RemoteAddr returns the remote address of the network connection.
 func (p *Peer) RemoteAddr() net.Addr {
+	if len(p.testRemoteAddr) > 0 {
+		if addr, err := net.ResolveTCPAddr("tcp", p.testRemoteAddr); err == nil {
+			return addr
+		}
+		log.Warn("RemoteAddr", "invalid testRemoteAddr", p.testRemoteAddr)
+	}
+	if p.rw == nil {
+		return nil
+	}
 	return p.rw.fd.RemoteAddr()
+}
+
+func (p *Peer) UpdateTestRemoteAddr(addr string) { // test purpose only
+	p.testRemoteAddr = addr
+}
+
+func (p *Peer) UpdateTrustFlagTest() { // test purpose only
+	p.rw.set(trustedConn, true)
 }
 
 // LocalAddr returns the local address of the network connection.
@@ -223,6 +251,11 @@ func (p *Peer) String() string {
 // Inbound returns true if the peer is an inbound connection
 func (p *Peer) Inbound() bool {
 	return p.rw.is(inboundConn)
+}
+
+// VerifyNode returns true if the peer is a verification connection
+func (p *Peer) VerifyNode() bool {
+	return p.rw.is(verifyConn)
 }
 
 func newPeer(log log.Logger, conn *conn, protocols []Protocol) *Peer {
@@ -345,9 +378,7 @@ func (p *Peer) handle(msg Msg) error {
 	case msg.Code == discMsg:
 		// This is the last message. We don't need to discard or
 		// check errors because, the connection will be closed after it.
-		var m struct{ R DiscReason }
-		rlp.Decode(msg.Payload, &m)
-		return m.R
+		return decodeDisconnectMessage(msg.Payload)
 	case msg.Code < baseProtocolLength:
 		// ignore other base protocol messages
 		return msg.Discard()
@@ -357,7 +388,7 @@ func (p *Peer) handle(msg Msg) error {
 		if err != nil {
 			return fmt.Errorf("msg code out of range: %v", msg.Code)
 		}
-		if metrics.Enabled {
+		if metrics.Enabled() {
 			m := fmt.Sprintf("%s/%s/%d/%#02x", ingressMeterName, proto.Name, proto.Version, msg.Code-proto.offset)
 			metrics.GetOrRegisterMeter(m, nil).Mark(int64(msg.meterSize))
 			metrics.GetOrRegisterMeter(m+"/packets", nil).Mark(1)
@@ -370,6 +401,27 @@ func (p *Peer) handle(msg Msg) error {
 		}
 	}
 	return nil
+}
+
+// decodeDisconnectMessage decodes the payload of discMsg.
+func decodeDisconnectMessage(r io.Reader) (reason DiscReason) {
+	s := rlp.NewStream(r, 100)
+	k, _, err := s.Kind()
+	if err != nil {
+		return DiscInvalid
+	}
+	if k == rlp.List {
+		s.List()
+		err = s.Decode(&reason)
+	} else {
+		// Legacy path: some implementations, including geth, used to send the disconnect
+		// reason as a byte array by accident.
+		err = s.Decode(&reason)
+	}
+	if err != nil {
+		reason = DiscInvalid
+	}
+	return reason
 }
 
 func countMatchingProtocols(protocols []Protocol, caps []Cap) int {
@@ -412,7 +464,6 @@ outer:
 func (p *Peer) startProtocols(writeStart <-chan struct{}, writeErr chan<- error) {
 	p.wg.Add(len(p.running))
 	for _, proto := range p.running {
-		proto := proto
 		proto.closed = p.closed
 		proto.wstart = writeStart
 		proto.werr = writeErr

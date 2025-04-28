@@ -21,10 +21,11 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
+	"github.com/ethereum/go-ethereum/internal/ethapi/override"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -142,7 +143,7 @@ func (b *contract) parseABI() error {
 // Contracts deployed in the genesis block
 type genesisContract = contract
 
-func (g *genesisContract) verifyCode(state *state.StateDB) bool {
+func (g *genesisContract) verifyCode(state vm.StateDB) bool {
 	deployed := state.GetCode(g.address)
 	expect := common.FromHex(g.artifact.DeployedBytecode)
 	return bytes.Equal(deployed, expect)
@@ -163,6 +164,10 @@ func (c chainContext) Engine() consensus.Engine {
 
 func (c chainContext) GetHeader(hash common.Hash, number uint64) *types.Header {
 	return c.Chain.GetHeader(hash, number)
+}
+
+func (c chainContext) Config() *params.ChainConfig {
+	return c.Chain.Config()
 }
 
 // nextValidators
@@ -280,7 +285,7 @@ func (c *Oasys) IsSystemTransaction(tx *types.Transaction, header *types.Header)
 
 // Transact the `Environment.initialize` and `StakeManager.initialize` method.
 func (c *Oasys) initializeSystemContracts(
-	state *state.StateDB,
+	state vm.StateDB,
 	header *types.Header,
 	cx core.ChainContext,
 	txs *[]*types.Transaction,
@@ -324,7 +329,7 @@ func (c *Oasys) initializeSystemContracts(
 func (c *Oasys) slash(
 	validator common.Address,
 	schedules []*common.Address,
-	state *state.StateDB,
+	state vm.StateDB,
 	header *types.Header,
 	cx core.ChainContext,
 	txs *[]*types.Transaction,
@@ -348,7 +353,7 @@ func (c *Oasys) slash(
 }
 
 type blockchainAPI interface {
-	Call(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash *rpc.BlockNumberOrHash, overrides *ethapi.StateOverride, blockOverrides *ethapi.BlockOverrides) (hexutil.Bytes, error)
+	Call(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash *rpc.BlockNumberOrHash, overrides *override.StateOverride, blockOverrides *override.BlockOverrides) (hexutil.Bytes, error)
 }
 
 // view functions
@@ -706,22 +711,23 @@ func getNextEnvironmentValue(ethAPI blockchainAPI, hash common.Hash) (*params.En
 }
 
 func (c *Oasys) applyTransaction(
-	msg callmsg,
-	state *state.StateDB,
+	msg *core.Message,
+	state vm.StateDB,
 	header *types.Header,
-	cx core.ChainContext,
+	chainContext core.ChainContext,
 	txs *[]*types.Transaction,
 	receipts *[]*types.Receipt,
 	systemTxs *[]*types.Transaction,
 	usedGas *uint64,
 	mining bool,
-) (err error) {
-	nonce := state.GetNonce(msg.From())
-	expectedTx := types.NewTransaction(nonce, *msg.To(), msg.Value(), msg.Gas(), msg.GasPrice(), msg.Data())
+) (applyErr error) {
+	nonce := state.GetNonce(msg.From)
+	expectedTx := types.NewTransaction(nonce, *msg.To, msg.Value, msg.GasLimit, msg.GasPrice, msg.Data)
 	expectedHash := c.txSigner.Hash(expectedTx)
 
-	if msg.From() == c.signer && mining {
-		expectedTx, err = c.txSignFn(accounts.Account{Address: msg.From()}, expectedTx, c.chainConfig.ChainID)
+	if msg.From == c.signer && mining {
+		var err error
+		expectedTx, err = c.txSignFn(accounts.Account{Address: msg.From}, expectedTx, c.chainConfig.ChainID)
 		if err != nil {
 			return err
 		}
@@ -744,7 +750,15 @@ func (c *Oasys) applyTransaction(
 		*systemTxs = (*systemTxs)[1:]
 	}
 	state.SetTxContext(expectedTx.Hash(), len(*txs))
-	gasUsed, err := applyMessage(msg, state, header, c.chainConfig, cx)
+
+	// Create a new context to be used in the EVM environment
+	context := core.NewEVMBlockContext(header, chainContext, nil)
+	// Create a new environment which holds all relevant information
+	// about the transaction and calling mechanisms.
+	evm := vm.NewEVM(context, state, c.chainConfig, vm.Config{})
+	evm.SetTxContext(core.NewEVMTxContext(msg))
+
+	gasUsed, err := applyMessage(msg, evm, state, header, c.chainConfig, chainContext)
 	if err != nil {
 		return err
 	}
@@ -760,47 +774,54 @@ func (c *Oasys) applyTransaction(
 	receipt.TxHash = expectedTx.Hash()
 	receipt.GasUsed = gasUsed
 
+	// Set the receipt logs and create a bloom for filtering
 	receipt.Logs = state.GetLogs(expectedTx.Hash(), header.Number.Uint64(), common.Hash{})
 	receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
 	receipt.BlockHash = common.Hash{}
 	receipt.BlockNumber = header.Number
 	receipt.TransactionIndex = uint(state.TxIndex())
 	*receipts = append(*receipts, receipt)
-	state.SetNonce(msg.From(), nonce+1)
 	return nil
 }
 
-func getMessage(from, toAddress common.Address, data []byte, value *big.Int) callmsg {
-	return callmsg{
-		ethereum.CallMsg{
-			From:     from,
-			Gas:      math.MaxUint64 / 2,
-			GasPrice: common.Big0,
-			Value:    value,
-			To:       &toAddress,
-			Data:     data,
-		},
+func getMessage(from, toAddress common.Address, data []byte, value *big.Int) *core.Message {
+	return &core.Message{
+		From:     from,
+		GasLimit: math.MaxUint64 / 2,
+		GasPrice: big.NewInt(0),
+		Value:    value,
+		To:       &toAddress,
+		Data:     data,
 	}
 }
 
 func applyMessage(
-	msg callmsg,
-	state *state.StateDB,
+	msg *core.Message,
+	evm *vm.EVM,
+	state vm.StateDB,
 	header *types.Header,
 	chainConfig *params.ChainConfig,
-	chain core.ChainContext,
+	chainContext core.ChainContext,
 ) (uint64, error) {
-	context := core.NewEVMBlockContext(header, chain, nil)
-	vmenv := vm.NewEVM(context, vm.TxContext{Origin: msg.From(), GasPrice: big.NewInt(0)}, state, chainConfig, vm.Config{})
-	ret, returnGas, err := vmenv.Call(
-		vm.AccountRef(msg.From()),
-		*msg.To(),
-		msg.Data(),
-		msg.Gas(),
-		uint256.MustFromBig(msg.Value()),
+	// Apply the transaction to the current state (included in the env)
+	if chainConfig.IsCancun(header.Number, header.Time) {
+		rules := evm.ChainConfig().Rules(evm.Context.BlockNumber, evm.Context.Random != nil, evm.Context.Time)
+		state.Prepare(rules, msg.From, evm.Context.Coinbase, msg.To, vm.ActivePrecompiles(rules), msg.AccessList)
+	} else {
+		state.ClearAccessList()
+	}
+	// Increment the nonce for the next transaction
+	state.SetNonce(msg.From, state.GetNonce(msg.From)+1, tracing.NonceChangeEoACall)
+
+	ret, returnGas, err := evm.Call(
+		vm.AccountRef(msg.From),
+		*msg.To,
+		msg.Data,
+		msg.GasLimit,
+		uint256.MustFromBig(msg.Value),
 	)
 	if err != nil {
 		log.Error("failed apply message", "msg", string(ret), "err", err)
 	}
-	return msg.Gas() - returnGas, err
+	return msg.GasLimit - returnGas, err
 }
