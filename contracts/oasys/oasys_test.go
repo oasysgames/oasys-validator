@@ -1175,6 +1175,30 @@ func _deployEIP2935(genesisHash common.Hash, contracts wantContracts) {
 	}
 }
 
+func _deployments14(genesisHash common.Hash, contracts wantContracts) {
+	// StakeManager
+	contracts["0x0000000000000000000000000000000000001001"].codeHash = "7e2cc30f8e9b63b792f33be484778ab1"
+	contracts["0x0000000000000000000000000000000000001001"].storage["0xac6afe890ce2acea6ecf06e20a2dc3d3631d0a0b158c5984fd508ae42b8c2ee3"] = "0x0000000000000000000000000000000000000000000000000000000000000001"
+
+	switch genesisHash {
+	case params.OasysMainnetGenesisHash:
+		contracts["0x5200000000000000000000000000000000000040"] = &wantContract{
+			name:     "SlashIndicator",
+			codeHash: "035b45de2221fbed16a132979c729c5e",
+		}
+	case params.OasysTestnetGenesisHash:
+		contracts["0x5200000000000000000000000000000000000040"] = &wantContract{
+			name:     "SlashIndicator",
+			codeHash: "0d55b7f8f29f3c74504e7de4de62cb86",
+		}
+	default:
+		contracts["0x5200000000000000000000000000000000000040"] = &wantContract{
+			name:     "SlashIndicator",
+			codeHash: "ef5eb9771fa3dc3a0a81a9df61696197",
+		}
+	}
+}
+
 func TestDeploy(t *testing.T) {
 	type wantDeployments []struct {
 		// Block height based deployment
@@ -1207,7 +1231,9 @@ func TestDeploy(t *testing.T) {
 				{blockNumber: 4089588, deploy: []deployFn{_deployments11}},
 				{blockNumber: 5095900, deploy: []deployFn{_deployments12}},
 				{blockNumber: 5527429, deploy: []deployFn{_deployments13}},
-				{blockNumber: 5527429 + 1, blockTime: 9999999999, deploy: []deployFn{_deployEIP2935}},
+				// TODO: Uncomment when `OasysMainnetChainConfig.PragueTime` is set
+				// {blockNumber: 5527429 + 1, blockTime: 9999999999, deploy: []deployFn{_deployEIP2935}},
+				{blockNumber: 9999999, deploy: []deployFn{_deployments14}},
 			},
 		},
 		{
@@ -1228,7 +1254,9 @@ func TestDeploy(t *testing.T) {
 				{blockNumber: 4017600, deploy: []deployFn{_deployments11}},
 				{blockNumber: 4958700, deploy: []deployFn{_deployments12}},
 				{blockNumber: 5445775, deploy: []deployFn{_deployments13}},
-				{blockNumber: 5445775 + 1, blockTime: 9999999999, deploy: []deployFn{_deployEIP2935}},
+				// TODO: Uncomment when `OasysTestnetChainConfig.PragueTime` is set
+				// {blockNumber: 5445775 + 1, blockTime: 9999999999, deploy: []deployFn{_deployEIP2935}},
+				{blockNumber: 9999999, deploy: []deployFn{_deployments14}},
 			},
 		},
 		{
@@ -1261,6 +1289,7 @@ func TestDeploy(t *testing.T) {
 						// _deployments11,
 						_deployments12,
 						_deployments13,
+						_deployments14,
 					},
 				},
 				{blockNumber: 2 + 1, blockTime: 9999999999, deploy: []deployFn{_deployEIP2935}},
