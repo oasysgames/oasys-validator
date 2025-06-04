@@ -276,6 +276,25 @@ func (api *API) traceChain(start, end *types.Block, config *TraceConfig, closed 
 				)
 				// Trace all the transactions contained within
 				for i, tx := range task.block.Transactions() {
+<<<<<<< HEAD
+=======
+					// upgrade built-in system contract before system txs if Feynman is enabled
+					if beforeSystemTx {
+						if posa, ok := api.backend.Engine().(consensus.PoSA); ok {
+							if isSystem, _ := posa.IsSystemTransaction(tx, task.block.Header()); isSystem {
+								balance := task.statedb.GetBalance(consensus.SystemAddress)
+								if balance.Cmp(common.U2560) > 0 {
+									task.statedb.SetBalance(consensus.SystemAddress, uint256.NewInt(0), tracing.BalanceChangeUnspecified)
+									task.statedb.AddBalance(blockCtx.Coinbase, balance, tracing.BalanceChangeUnspecified)
+								}
+
+								systemcontracts.TryUpdateBuildInSystemContract(api.backend.ChainConfig(), task.block.Number(), task.parent.Time(), task.block.Time(), task.statedb, false)
+								beforeSystemTx = false
+							}
+						}
+					}
+
+>>>>>>> v1.5.13
 					msg, _ := core.TransactionToMessage(tx, signer, task.block.BaseFee())
 					txctx := &Context{
 						BlockHash:   task.block.Hash(),
@@ -383,8 +402,13 @@ func (api *API) traceChain(start, end *types.Block, config *TraceConfig, closed 
 				break
 			}
 
+<<<<<<< HEAD
 			// Deploy oasys built-in contracts
 			contracts.Deploy(api.backend.ChainConfig(), statedb, next.Number(), block.Time(), next.Time())
+=======
+			// upgrade built-in system contract before normal txs if Feynman is not enabled
+			systemcontracts.TryUpdateBuildInSystemContract(api.backend.ChainConfig(), next.Number(), block.Time(), next.Time(), statedb, true)
+>>>>>>> v1.5.13
 
 			// Insert block's parent beacon block root in the state
 			// as per EIP-4788.
@@ -539,8 +563,13 @@ func (api *API) IntermediateRoots(ctx context.Context, hash common.Hash, config 
 	}
 	defer release()
 
+<<<<<<< HEAD
 	// Deploy oasys built-in contracts
 	contracts.Deploy(api.backend.ChainConfig(), statedb, block.Number(), parent.Time(), block.Time())
+=======
+	// upgrade built-in system contract before normal txs if Feynman is not enabled
+	systemcontracts.TryUpdateBuildInSystemContract(api.backend.ChainConfig(), block.Number(), parent.Time(), block.Time(), statedb, true)
+>>>>>>> v1.5.13
 
 	var (
 		roots              []common.Hash
@@ -615,8 +644,13 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 	}
 	defer release()
 
+<<<<<<< HEAD
 	// Deploy oasys built-in contracts
 	contracts.Deploy(api.backend.ChainConfig(), statedb, block.Number(), parent.Time(), block.Time())
+=======
+	// upgrade built-in system contract before normal txs if Feynman is not enabled
+	systemcontracts.TryUpdateBuildInSystemContract(api.backend.ChainConfig(), block.Number(), parent.Time(), block.Time(), statedb, true)
+>>>>>>> v1.5.13
 	blockCtx := core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), nil)
 	evm := vm.NewEVM(blockCtx, statedb, api.backend.ChainConfig(), vm.Config{})
 	if beaconRoot := block.BeaconRoot(); beaconRoot != nil {
@@ -643,6 +677,25 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 		results   = make([]*txTraceResult, len(txs))
 	)
 	for i, tx := range txs {
+<<<<<<< HEAD
+=======
+		// upgrade built-in system contract before system txs if Feynman is enabled
+		if beforeSystemTx {
+			if posa, ok := api.backend.Engine().(consensus.PoSA); ok {
+				if isSystem, _ := posa.IsSystemTransaction(tx, block.Header()); isSystem {
+					balance := statedb.GetBalance(consensus.SystemAddress)
+					if balance.Cmp(common.U2560) > 0 {
+						statedb.SetBalance(consensus.SystemAddress, uint256.NewInt(0), tracing.BalanceChangeUnspecified)
+						statedb.AddBalance(blockCtx.Coinbase, balance, tracing.BalanceChangeUnspecified)
+					}
+
+					systemcontracts.TryUpdateBuildInSystemContract(api.backend.ChainConfig(), block.Number(), parent.Time(), block.Time(), statedb, false)
+					beforeSystemTx = false
+				}
+			}
+		}
+
+>>>>>>> v1.5.13
 		// Generate the next state snapshot fast without tracing
 		msg, _ := core.TransactionToMessage(tx, signer, block.BaseFee())
 		txctx := &Context{
@@ -715,6 +768,25 @@ func (api *API) traceBlockParallel(ctx context.Context, block *types.Block, stat
 
 txloop:
 	for i, tx := range txs {
+<<<<<<< HEAD
+=======
+		// upgrade built-in system contract before system txs if Feynman is enabled
+		if beforeSystemTx {
+			if posa, ok := api.backend.Engine().(consensus.PoSA); ok {
+				if isSystem, _ := posa.IsSystemTransaction(tx, block.Header()); isSystem {
+					balance := statedb.GetBalance(consensus.SystemAddress)
+					if balance.Cmp(common.U2560) > 0 {
+						statedb.SetBalance(consensus.SystemAddress, uint256.NewInt(0), tracing.BalanceChangeUnspecified)
+						statedb.AddBalance(block.Header().Coinbase, balance, tracing.BalanceChangeUnspecified)
+					}
+
+					systemcontracts.TryUpdateBuildInSystemContract(api.backend.ChainConfig(), block.Number(), parent.Time(), block.Time(), statedb, false)
+					beforeSystemTx = false
+				}
+			}
+		}
+
+>>>>>>> v1.5.13
 		// Send the trace task over for execution
 		task := &txTraceTask{statedb: statedb.Copy(), index: i, isSystemTx: !beforeSystemTx}
 		select {
@@ -773,8 +845,13 @@ func (api *API) standardTraceBlockToFile(ctx context.Context, block *types.Block
 	}
 	defer release()
 
+<<<<<<< HEAD
 	// Deploy oasys built-in contracts
 	contracts.Deploy(api.backend.ChainConfig(), statedb, block.Number(), parent.Time(), block.Time())
+=======
+	// upgrade built-in system contract before normal txs if Feynman is not enabled
+	systemcontracts.TryUpdateBuildInSystemContract(api.backend.ChainConfig(), block.Number(), parent.Time(), block.Time(), statedb, true)
+>>>>>>> v1.5.13
 
 	// Retrieve the tracing configurations, or use default values
 	var (
@@ -811,6 +888,25 @@ func (api *API) standardTraceBlockToFile(ctx context.Context, block *types.Block
 		core.ProcessParentBlockHash(block.ParentHash(), evm)
 	}
 	for i, tx := range block.Transactions() {
+<<<<<<< HEAD
+=======
+		// upgrade built-in system contract before system txs if Feynman is enabled
+		if beforeSystemTx {
+			if posa, ok := api.backend.Engine().(consensus.PoSA); ok {
+				if isSystem, _ := posa.IsSystemTransaction(tx, block.Header()); isSystem {
+					balance := statedb.GetBalance(consensus.SystemAddress)
+					if balance.Cmp(common.U2560) > 0 {
+						statedb.SetBalance(consensus.SystemAddress, uint256.NewInt(0), tracing.BalanceChangeUnspecified)
+						statedb.AddBalance(vmctx.Coinbase, balance, tracing.BalanceChangeUnspecified)
+					}
+
+					systemcontracts.TryUpdateBuildInSystemContract(api.backend.ChainConfig(), block.Number(), parent.Time(), block.Time(), statedb, false)
+					beforeSystemTx = false
+				}
+			}
+		}
+
+>>>>>>> v1.5.13
 		// Prepare the transaction for un-traced execution
 		var (
 			msg, _ = core.TransactionToMessage(tx, signer, block.BaseFee())
@@ -972,7 +1068,11 @@ func (api *API) TraceCall(ctx context.Context, args ethapi.TransactionArgs, bloc
 	}
 	defer release()
 
+<<<<<<< HEAD
 	// Deploy oasys built-in contracts
+=======
+	// upgrade built-in system contract before tracing if Feynman is not enabled
+>>>>>>> v1.5.13
 	if block.NumberU64() > 0 {
 		parent, err := api.blockByNumberAndHash(ctx, rpc.BlockNumber(block.NumberU64()-1), block.ParentHash())
 		if err != nil {

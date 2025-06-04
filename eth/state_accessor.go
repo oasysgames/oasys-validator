@@ -238,8 +238,13 @@ func (eth *Ethereum) stateAtTransaction(ctx context.Context, block *types.Block,
 	if err != nil {
 		return nil, vm.BlockContext{}, nil, nil, err
 	}
+<<<<<<< HEAD
 	// Deploy oasys built-in contracts
 	contracts.Deploy(eth.blockchain.Config(), statedb, block.Number(), parent.Time(), block.Time())
+=======
+	// upgrade built-in system contract before normal txs if Feynman is not enabled
+	systemcontracts.TryUpdateBuildInSystemContract(eth.blockchain.Config(), block.Number(), parent.Time(), block.Time(), statedb, true)
+>>>>>>> v1.5.13
 	// Insert parent beacon block root in the state as per EIP-4788.
 	context := core.NewEVMBlockContext(block.Header(), eth.blockchain, nil)
 	evm := vm.NewEVM(context, statedb, eth.blockchain.Config(), vm.Config{})
@@ -256,6 +261,25 @@ func (eth *Ethereum) stateAtTransaction(ctx context.Context, block *types.Block,
 	// Recompute transactions up to the target index.
 	signer := types.MakeSigner(eth.blockchain.Config(), block.Number(), block.Time())
 	for idx, tx := range block.Transactions() {
+<<<<<<< HEAD
+=======
+		// upgrade built-in system contract before system txs if Feynman is enabled
+		if beforeSystemTx {
+			if posa, ok := eth.Engine().(consensus.PoSA); ok {
+				if isSystem, _ := posa.IsSystemTransaction(tx, block.Header()); isSystem {
+					balance := statedb.GetBalance(consensus.SystemAddress)
+					if balance.Cmp(common.U2560) > 0 {
+						statedb.SetBalance(consensus.SystemAddress, uint256.NewInt(0), tracing.BalanceChangeUnspecified)
+						statedb.AddBalance(block.Header().Coinbase, balance, tracing.BalanceChangeUnspecified)
+					}
+
+					systemcontracts.TryUpdateBuildInSystemContract(eth.blockchain.Config(), block.Number(), parent.Time(), block.Time(), statedb, false)
+					beforeSystemTx = false
+				}
+			}
+		}
+
+>>>>>>> v1.5.13
 		if idx == txIndex {
 			return tx, context, statedb, release, nil
 		}

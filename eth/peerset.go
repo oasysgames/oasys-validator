@@ -29,7 +29,10 @@ import (
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/eth/protocols/snap"
 	"github.com/ethereum/go-ethereum/eth/protocols/trust"
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 var (
@@ -68,11 +71,18 @@ const (
 	tryWaitTimeout       = 100 * time.Millisecond
 )
 
+var (
+	evnWhiteListPeerGuage        = metrics.NewRegisteredGauge("evn/peer/whiteList", nil)
+	evnOnchainValidatorPeerGuage = metrics.NewRegisteredGauge("evn/peer/onchainValidator", nil)
+)
+
 // peerSet represents the collection of active peers currently participating in
 // the `eth` protocol, with or without the `snap` extension.
 type peerSet struct {
 	peers     map[string]*ethPeer // Peers connected on the `eth` protocol
 	snapPeers int                 // Number of `snap` compatible peers for connection prioritization
+
+	validatorNodeIDsMap map[common.Address][]enode.ID
 
 	snapWait map[string]chan *snap.Peer // Peers connected on `eth` waiting for their snap extension
 	snapPend map[string]*snap.Peer      // Peers connected on the `snap` protocol, but not yet on `eth`
@@ -433,6 +443,70 @@ func (ps *peerSet) peer(id string) *ethPeer {
 	return ps.peers[id]
 }
 
+// enableEVNFeatures enables the given features for the given peers.
+func (ps *peerSet) enableEVNFeatures(validatorNodeIDsMap map[common.Address][]enode.ID, evnWhitelistMap map[enode.ID]struct{}) {
+	// clone current all peers, and update the validatorNodeIDsMap
+	ps.lock.Lock()
+	peers := make([]*ethPeer, 0, len(ps.peers))
+	for _, peer := range ps.peers {
+		peers = append(peers, peer)
+	}
+	ps.validatorNodeIDsMap = validatorNodeIDsMap
+	ps.lock.Unlock()
+
+	// convert to nodeID filter map, avoid too slow operation for slices.Contains
+	valNodeIDMap := make(map[enode.ID]struct{})
+	for _, nodeIDs := range validatorNodeIDsMap {
+		for _, nodeID := range nodeIDs {
+			valNodeIDMap[nodeID] = struct{}{}
+		}
+	}
+
+	var (
+		whiteListPeerCnt        int64 = 0
+		onchainValidatorPeerCnt int64 = 0
+	)
+	for _, peer := range peers {
+		nodeID := peer.NodeID()
+		_, isValidatorPeer := valNodeIDMap[nodeID]
+		_, isWhitelistPeer := evnWhitelistMap[nodeID]
+
+		if isValidatorPeer || isWhitelistPeer {
+			log.Debug("enable EVNPeerFlag & NoTxBroadcastFlag for", "peer", nodeID)
+			peer.EVNPeerFlag.Store(true)
+		} else {
+			peer.EVNPeerFlag.Store(false)
+		}
+
+		if isValidatorPeer {
+			onchainValidatorPeerCnt++
+		}
+		if isWhitelistPeer {
+			whiteListPeerCnt++
+		}
+	}
+	evnWhiteListPeerGuage.Update(whiteListPeerCnt)
+	evnOnchainValidatorPeerGuage.Update(onchainValidatorPeerCnt)
+	log.Info("enable EVN features", "total", len(peers), "whiteListPeerCnt", whiteListPeerCnt, "onchainValidatorPeerCnt", onchainValidatorPeerCnt)
+}
+
+// isProxyedValidator checks if the received block from the proxyed validator.
+func (ps *peerSet) isProxyedValidator(validator common.Address, proxyedAddressMap map[common.Address]struct{}) bool {
+	ps.lock.RLock()
+	defer ps.lock.RUnlock()
+
+	if len(proxyedAddressMap) == 0 {
+		return false
+	}
+	log.Debug("check whether received block from proxyed peer", "validator", validator, "proxyedAddressMap", proxyedAddressMap)
+
+	// check whether the validator is proxyed validator
+	if _, ok := proxyedAddressMap[validator]; !ok {
+		return false
+	}
+	return true
+}
+
 // headPeers retrieves a specified number list of peers.
 func (ps *peerSet) headPeers(num uint) []*ethPeer {
 	ps.lock.RLock()
@@ -464,6 +538,7 @@ func (ps *peerSet) peersWithoutBlock(hash common.Hash) []*ethPeer {
 			list = append(list, p)
 		}
 	}
+	log.Debug("get peers without block", "hash", hash, "total", len(ps.peers), "unknonw", len(list))
 	return list
 }
 
@@ -475,6 +550,11 @@ func (ps *peerSet) peersWithoutTransaction(hash common.Hash) []*ethPeer {
 
 	list := make([]*ethPeer, 0, len(ps.peers))
 	for _, p := range ps.peers {
+		// it can be optimized in the future, to make it more clear that only when both peers of a connection are EVN nodes, will enable no tx broadcast.
+		if p.EVNPeerFlag.Load() {
+			log.Debug("skip EVN peer with no tx forwarding feature", "peer", p.ID())
+			continue
+		}
 		if !p.KnownTransaction(hash) {
 			list = append(list, p)
 		}
