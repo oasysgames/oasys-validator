@@ -71,12 +71,7 @@ var (
 		utils.USBFlag,
 		utils.SmartCardDaemonPathFlag,
 		utils.OverridePassedForkTime,
-<<<<<<< HEAD
 		utils.OverridePrague,
-=======
-		utils.OverrideLorentz,
-		utils.OverrideMaxwell,
->>>>>>> v1.5.13
 		utils.OverrideVerkle,
 		utils.OverrideFullImmutabilityThreshold,
 		utils.OverrideMinBlocksForBlobRequests,

@@ -117,17 +117,11 @@ func TestIsDataAvailable(t *testing.T) {
 					Proofs:      []kzg4844.Proof{emptyBlobProof, emptyBlobProof},
 				}),
 			}}),
-<<<<<<< HEAD
-			chasingHead: params.MinBlocksForBlobRequests + 1,
-			withSidecar: true,
-			err:         true, // Should error because total blobs exceed Prague's limit (9)
-
-=======
 			chasingHeadNumber: params.MinBlocksForBlobRequests + 1,
 			chasingHeadTime:   params.MinTimeDurationForBlobRequests,
 			withSidecar:       true,
-			err:               true,
->>>>>>> v1.5.13
+			err:               true, // Should error because total blobs exceed Prague's limit (9)
+
 		},
 		{
 			block: types.NewBlockWithHeader(&types.Header{
