@@ -156,8 +156,4 @@ type PoS interface {
 	VerifyVote(chain ChainHeaderReader, vote *types.VoteEnvelope) error
 	DecodeVoteAttestation(header *types.Header) *types.VoteAttestation
 	IsActiveValidatorAt(chain ChainHeaderReader, header *types.Header, checkVoteKeyFn func(bLSPublicKey *types.BLSPublicKey) bool) bool
-<<<<<<< HEAD
-=======
-	NextProposalBlock(chain ChainHeaderReader, header *types.Header, proposer common.Address) (uint64, uint64, error)
->>>>>>> v1.5.13
 }

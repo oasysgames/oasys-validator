@@ -116,13 +116,8 @@ func (hc *HeaderChain) GetJustifiedNumber(header *types.Header) uint64 {
 }
 
 // getFinalizedNumber returns the highest finalized number before the specific block.
-<<<<<<< HEAD
 func (hc *HeaderChain) getFinalizedNumber(header *types.Header) uint64 {
 	if p, ok := hc.engine.(consensus.PoS); ok {
-=======
-func (hc *HeaderChain) GetFinalizedNumber(header *types.Header) uint64 {
-	if p, ok := hc.engine.(consensus.PoSA); ok {
->>>>>>> v1.5.13
 		if finalizedHeader := p.GetFinalizedHeader(hc, header); finalizedHeader != nil {
 			return finalizedHeader.Number.Uint64()
 		}

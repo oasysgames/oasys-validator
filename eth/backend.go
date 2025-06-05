@@ -206,28 +206,11 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	if config.OverridePassedForkTime != nil {
 		chainConfig.ShanghaiTime = config.OverridePassedForkTime
 		chainConfig.CancunTime = config.OverridePassedForkTime
-<<<<<<< HEAD
 		overrides.OverridePassedForkTime = config.OverridePassedForkTime
 	}
 	if config.OverridePrague != nil {
 		chainConfig.PragueTime = config.OverridePrague
 		overrides.OverridePrague = config.OverridePrague
-=======
-		chainConfig.HaberTime = config.OverridePassedForkTime
-		chainConfig.HaberFixTime = config.OverridePassedForkTime
-		chainConfig.BohrTime = config.OverridePassedForkTime
-		chainConfig.PascalTime = config.OverridePassedForkTime
-		chainConfig.PragueTime = config.OverridePassedForkTime
-		overrides.OverridePassedForkTime = config.OverridePassedForkTime
-	}
-	if config.OverrideLorentz != nil {
-		chainConfig.LorentzTime = config.OverrideLorentz
-		overrides.OverrideLorentz = config.OverrideLorentz
-	}
-	if config.OverrideMaxwell != nil {
-		chainConfig.MaxwellTime = config.OverrideMaxwell
-		overrides.OverrideMaxwell = config.OverrideMaxwell
->>>>>>> v1.5.13
 	}
 	if config.OverrideVerkle != nil {
 		chainConfig.VerkleTime = config.OverrideVerkle
@@ -725,16 +708,7 @@ func (s *Ethereum) StartMining() error {
 				log.Error("Etherbase account unavailable locally", "err", err)
 				return fmt.Errorf("signer missing: %v", err)
 			}
-<<<<<<< HEAD
 			cli.Authorize(eb, wallet.SignData)
-=======
-			parlia.Authorize(eb, wallet.SignData, wallet.SignTx)
-
-			// Start a goroutine to handle node ID registration after sync
-			go func() {
-				s.waitForSyncAndMaxwell(parlia)
-			}()
->>>>>>> v1.5.13
 		}
 		if oas != nil {
 			wallet, err := s.accountManager.Find(accounts.Account{Address: eb})
