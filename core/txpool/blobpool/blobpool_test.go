@@ -241,7 +241,7 @@ func makeUnsignedTx(nonce uint64, gasTipCap uint64, gasFeeCap uint64, blobFeeCap
 	return makeUnsignedTxWithTestBlob(nonce, gasTipCap, gasFeeCap, blobFeeCap, rnd.Intn(len(testBlobs)))
 }
 
-// makeUnsignedTx is a utility method to construct a random blob transaction
+// makeUnsignedTxWithTestBlob is a utility method to construct a random blob transaction
 // without signing it.
 func makeUnsignedTxWithTestBlob(nonce uint64, gasTipCap uint64, gasFeeCap uint64, blobFeeCap uint64, blobIdx int) *types.BlobTx {
 	return &types.BlobTx{
