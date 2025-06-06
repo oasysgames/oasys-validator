@@ -73,6 +73,7 @@ participating.
 
 It expects the genesis file as argument.`,
 	}
+	// this command is not used in Oasys
 	initNetworkCommand = &cli.Command{
 		Action:    initNetwork,
 		Name:      "init-network",
