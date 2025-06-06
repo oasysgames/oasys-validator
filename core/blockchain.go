@@ -725,7 +725,7 @@ func (bc *BlockChain) GetJustifiedNumber(header *types.Header) uint64 {
 }
 
 // getFinalizedNumber returns the highest finalized number before the specific block.
-func (bc *BlockChain) GetFinalizedNumber(header *types.Header) uint64 {
+func (bc *BlockChain) getFinalizedNumber(header *types.Header) uint64 {
 	if p, ok := bc.engine.(consensus.PoS); ok {
 		if finalizedHeader := p.GetFinalizedHeader(bc, header); finalizedHeader != nil {
 			return finalizedHeader.Number.Uint64()
