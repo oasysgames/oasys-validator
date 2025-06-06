@@ -39,7 +39,5 @@ const (
 	Shanghai
 	Cancun
 	Prague
-	Lorentz
-	Maxwell
 	Osaka
 )
