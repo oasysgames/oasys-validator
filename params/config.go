@@ -1165,10 +1165,6 @@ func (c *ChainConfig) LatestFork(time uint64) forks.Fork {
 	switch {
 	case c.IsOsaka(london, time):
 		return forks.Osaka
-	case c.IsMaxwell(london, time):
-		return forks.Maxwell
-	case c.IsLorentz(london, time):
-		return forks.Lorentz
 	case c.IsPrague(london, time):
 		return forks.Prague
 	case c.IsCancun(london, time):

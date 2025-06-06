@@ -28,7 +28,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/beacon"
-	"github.com/ethereum/go-ethereum/consensus/parlia"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/forkid"
 	"github.com/ethereum/go-ethereum/core/monitor"
@@ -402,9 +401,10 @@ func (h *handler) protoTracker() {
 			active--
 		case <-updateTicker.C:
 			if h.enableEVNFeatures {
+				panic("should not happen")
 				// add onchain validator p2p node list later, it will enable the direct broadcast + no tx broadcast feature
 				// here check & enable peer broadcast features periodically, and it's a simple way to handle the peer change and the list change scenarios.
-				h.peers.enableEVNFeatures(h.queryValidatorNodeIDsMap(), h.evnNodeIdsWhitelistMap)
+				// h.peers.enableEVNFeatures(h.queryValidatorNodeIDsMap(), h.evnNodeIdsWhitelistMap)
 			}
 		case <-h.quitSync:
 			// Wait for all active handlers to finish.
@@ -844,17 +844,17 @@ func (h *handler) BroadcastBlock(block *types.Block, propagate bool) {
 
 		// check if the block should be broadcast to more peers in EVN
 		var morePeers []*ethPeer
-		if h.needFullBroadcastInEVN(block) {
-			for i := len(transfer); i < len(peers); i++ {
-				if peers[i].EVNPeerFlag.Load() {
-					morePeers = append(morePeers, peers[i])
-				}
-			}
-			for _, peer := range morePeers {
-				log.Debug("broadcast block to extra peer", "hash", hash, "peer", peer.ID(), "EVNPeerFlag", peer.EVNPeerFlag.Load())
-				peer.AsyncSendNewBlock(block, td)
-			}
-		}
+		// if h.needFullBroadcastInEVN(block) {
+		// 	for i := len(transfer); i < len(peers); i++ {
+		// 		if peers[i].EVNPeerFlag.Load() {
+		// 			morePeers = append(morePeers, peers[i])
+		// 		}
+		// 	}
+		// 	for _, peer := range morePeers {
+		// 		log.Debug("broadcast block to extra peer", "hash", hash, "peer", peer.ID(), "EVNPeerFlag", peer.EVNPeerFlag.Load())
+		// 		peer.AsyncSendNewBlock(block, td)
+		// 	}
+		// }
 
 		log.Debug("Propagated block", "hash", hash, "recipients", len(transfer), "extra", len(morePeers), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
 		return
@@ -873,41 +873,43 @@ func (h *handler) BroadcastBlock(block *types.Block, propagate bool) {
 // if the block is mined by self or received from proxyed validator, just broadcast to all EVN peers
 // if not, skip it.
 func (h *handler) needFullBroadcastInEVN(block *types.Block) bool {
-	if !h.enableEVNFeatures {
-		return false
-	}
+	panic("should not happen")
+	// if !h.enableEVNFeatures {
+	// 	return false
+	// }
 
-	parlia, ok := h.chain.Engine().(*parlia.Parlia)
-	if !ok {
-		return false
-	}
-	coinbase := block.Coinbase()
-	// check whether the block is created by self
-	if parlia.ConsensusAddress() == coinbase {
-		log.Debug("full broadcast mined block to EVN", "coinbase", coinbase)
-		return true
-	}
+	// parlia, ok := h.chain.Engine().(*parlia.Parlia)
+	// if !ok {
+	// 	return false
+	// }
+	// coinbase := block.Coinbase()
+	// // check whether the block is created by self
+	// if parlia.ConsensusAddress() == coinbase {
+	// 	log.Debug("full broadcast mined block to EVN", "coinbase", coinbase)
+	// 	return true
+	// }
 
-	return h.peers.isProxyedValidator(coinbase, h.proxyedValidatorAddressMap)
+	// return h.peers.isProxyedValidator(coinbase, h.proxyedValidatorAddressMap)
 }
 
 func (h *handler) queryValidatorNodeIDsMap() map[common.Address][]enode.ID {
-	latest := h.chain.CurrentHeader()
-	if !h.chain.Config().IsMaxwell(latest.Number, latest.Time) {
-		return nil
-	}
+	panic("should not happen")
+	// latest := h.chain.CurrentHeader()
+	// if !h.chain.Config().IsMaxwell(latest.Number, latest.Time) {
+	// 	return nil
+	// }
 
-	log.Debug("queryValidatorNodeIDs after maxwell", "number", latest.Number, "time", latest.Time)
-	parlia, ok := h.chain.Engine().(*parlia.Parlia)
-	if !ok {
-		return nil
-	}
+	// log.Debug("queryValidatorNodeIDs after maxwell", "number", latest.Number, "time", latest.Time)
+	// parlia, ok := h.chain.Engine().(*parlia.Parlia)
+	// if !ok {
+	// 	return nil
+	// }
 
-	nodeIDsMap, err := parlia.GetNodeIDsMap()
-	if err != nil {
-		return nil
-	}
-	return nodeIDsMap
+	// nodeIDsMap, err := parlia.GetNodeIDsMap()
+	// if err != nil {
+	// 	return nil
+	// }
+	// return nodeIDsMap
 }
 
 // BroadcastTransactions will propagate a batch of transactions
