@@ -26,8 +26,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/metrics"
-
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -78,21 +76,6 @@ const (
 	ChainDBNamespace = "eth/db/chaindata/"
 	JournalFileName  = "trie.journal"
 	ChainData        = "chaindata"
-)
-
-const (
-	MaxBlockHandleDelayMs = 3000 // max delay for block handles, max 3000 ms
-)
-
-var (
-	sendBlockTimer        = metrics.NewRegisteredTimer("chain/delay/block/send", nil)
-	recvBlockTimer        = metrics.NewRegisteredTimer("chain/delay/block/recv", nil)
-	startInsertBlockTimer = metrics.NewRegisteredTimer("chain/delay/block/insert", nil)
-	startMiningTimer      = metrics.NewRegisteredTimer("chain/delay/block/mining", nil)
-	importedBlockTimer    = metrics.NewRegisteredTimer("chain/delay/block/imported", nil)
-	sendVoteTimer         = metrics.NewRegisteredTimer("chain/delay/vote/send", nil)
-	firstVoteTimer        = metrics.NewRegisteredTimer("chain/delay/vote/first", nil)
-	majorityVoteTimer     = metrics.NewRegisteredTimer("chain/delay/vote/majority", nil)
 )
 
 // Config contains the configuration options of the ETH protocol.
@@ -802,7 +785,6 @@ func (s *Ethereum) Start() error {
 	// Start the networking layer
 	s.handler.Start(s.p2pServer.MaxPeers, s.p2pServer.MaxPeersPerIP)
 
-	go s.reportRecentBlocksLoop()
 	return nil
 }
 
@@ -871,84 +853,4 @@ func (s *Ethereum) Stop() error {
 	// stop report loop
 	close(s.stopCh)
 	return nil
-}
-
-func (s *Ethereum) reportRecentBlocksLoop() {
-	reportCnt := uint64(2)
-	reportTicker := time.NewTicker(time.Second)
-	for {
-		select {
-		case <-reportTicker.C:
-			cur := s.blockchain.CurrentBlock()
-			if cur == nil || cur.Number.Uint64() <= reportCnt {
-				continue
-			}
-			num := cur.Number.Uint64()
-			stats := s.blockchain.GetBlockStats(cur.Hash())
-			sendBlockTime := stats.SendBlockTime.Load()
-			startImportBlockTime := stats.StartImportBlockTime.Load()
-			recvNewBlockTime := stats.RecvNewBlockTime.Load()
-			recvNewBlockHashTime := stats.RecvNewBlockHashTime.Load()
-			sendVoteTime := stats.SendVoteTime.Load()
-			firstVoteTime := stats.FirstRecvVoteTime.Load()
-			recvMajorityTime := stats.RecvMajorityVoteTime.Load()
-			startMiningTime := stats.StartMiningTime.Load()
-			importedBlockTime := stats.ImportedBlockTime.Load()
-
-			records := make(map[string]interface{})
-			records["BlockNum"] = num
-			records["SendBlockTime"] = common.FormatMilliTime(sendBlockTime)
-			records["StartImportBlockTime"] = common.FormatMilliTime(startImportBlockTime)
-			records["RecvNewBlockTime"] = common.FormatMilliTime(recvNewBlockTime)
-			records["RecvNewBlockHashTime"] = common.FormatMilliTime(recvNewBlockHashTime)
-			records["RecvNewBlockFrom"] = stats.RecvNewBlockFrom.Load()
-			records["RecvNewBlockHashFrom"] = stats.RecvNewBlockHashFrom.Load()
-
-			records["SendVoteTime"] = common.FormatMilliTime(sendVoteTime)
-			records["FirstRecvVoteTime"] = common.FormatMilliTime(firstVoteTime)
-			records["RecvMajorityVoteTime"] = common.FormatMilliTime(recvMajorityTime)
-
-			records["StartMiningTime"] = common.FormatMilliTime(startMiningTime)
-			records["ImportedBlockTime"] = common.FormatMilliTime(importedBlockTime)
-
-			records["Coinbase"] = cur.Coinbase.String()
-			blockMsTime := int64(cur.MilliTimestamp())
-			records["BlockTime"] = common.FormatMilliTime(blockMsTime)
-			metrics.GetOrRegisterLabel("report-blocks", nil).Mark(records)
-
-			if validTimeMetric(blockMsTime, sendBlockTime) {
-				sendBlockTimer.Update(time.Duration(sendBlockTime - blockMsTime))
-			}
-			if validTimeMetric(blockMsTime, recvNewBlockTime) {
-				recvBlockTimer.Update(time.Duration(recvNewBlockTime - blockMsTime))
-			}
-			if validTimeMetric(blockMsTime, startImportBlockTime) {
-				startInsertBlockTimer.Update(time.Duration(startImportBlockTime - blockMsTime))
-			}
-			if validTimeMetric(blockMsTime, sendVoteTime) {
-				sendVoteTimer.Update(time.Duration(sendVoteTime - blockMsTime))
-			}
-			if validTimeMetric(blockMsTime, firstVoteTime) {
-				firstVoteTimer.Update(time.Duration(firstVoteTime - blockMsTime))
-			}
-			if validTimeMetric(blockMsTime, recvMajorityTime) {
-				majorityVoteTimer.Update(time.Duration(recvMajorityTime - blockMsTime))
-			}
-			if validTimeMetric(blockMsTime, importedBlockTime) {
-				importedBlockTimer.Update(time.Duration(importedBlockTime - blockMsTime))
-			}
-			if validTimeMetric(startMiningTime, blockMsTime) {
-				startMiningTimer.Update(time.Duration(blockMsTime - startMiningTime))
-			}
-		case <-s.stopCh:
-			return
-		}
-	}
-}
-
-func validTimeMetric(startMs, endMs int64) bool {
-	if startMs >= endMs {
-		return false
-	}
-	return endMs-startMs <= MaxBlockHandleDelayMs
 }

@@ -1222,7 +1222,7 @@ LOOP:
 			break
 		} else {
 			log.Debug("commitWork stopTimer", "block", work.header.Number,
-				"header time", time.UnixMilli(int64(work.header.MilliTimestamp())),
+				"header time", time.Until(time.Unix(int64(work.header.Time), 0)),
 				"commit delay", *delay, "DelayLeftOver", w.config.DelayLeftOver)
 			stopTimer.Reset(*delay)
 		}
@@ -1266,7 +1266,7 @@ LOOP:
 		newTxsNum := 0
 		// stopTimer was the maximum delay for each fillTransactions
 		// but now it is used to wait until (head.Time - DelayLeftOver) is reached.
-		stopTimer.Reset(time.Until(time.UnixMilli(int64(work.header.MilliTimestamp()))) - *w.config.DelayLeftOver)
+		stopTimer.Reset(time.Until(time.Unix(int64(work.header.Time), 0)) - *w.config.DelayLeftOver)
 	LOOP_WAIT:
 		for {
 			select {
