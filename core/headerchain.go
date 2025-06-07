@@ -35,8 +35,8 @@ import (
 )
 
 const (
-	headerCacheLimit = 1280 // a buffer exceeding the EpochLength
-	tdCacheLimit     = 1280 // a buffer exceeding the EpochLength
+	headerCacheLimit = 512  // Smaller due to longer block time than BSC
+	tdCacheLimit     = 1024 // Same as above
 	numberCacheLimit = 2048
 )
 
