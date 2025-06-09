@@ -1184,17 +1184,17 @@ func _deployments14(genesisHash common.Hash, contracts wantContracts) {
 	case params.OasysMainnetGenesisHash:
 		contracts["0x5200000000000000000000000000000000000040"] = &wantContract{
 			name:     "SlashIndicator",
-			codeHash: "035b45de2221fbed16a132979c729c5e",
+			codeHash: "8abd8f98bfb52fe5d10557e4951818bf",
 		}
 	case params.OasysTestnetGenesisHash:
 		contracts["0x5200000000000000000000000000000000000040"] = &wantContract{
 			name:     "SlashIndicator",
-			codeHash: "0d55b7f8f29f3c74504e7de4de62cb86",
+			codeHash: "02d07c1ec7beca01c4772ae03f0afb01",
 		}
 	default:
 		contracts["0x5200000000000000000000000000000000000040"] = &wantContract{
 			name:     "SlashIndicator",
-			codeHash: "ef5eb9771fa3dc3a0a81a9df61696197",
+			codeHash: "bc0ee10dac3f5f4393b1967ce2a39284",
 		}
 	}
 }
