@@ -703,13 +703,6 @@ func (s *Ethereum) StartMining() error {
 				return fmt.Errorf("signer missing: %v", err)
 			}
 			oas.Authorize(eb, wallet.SignData, wallet.SignTx)
-
-			// Temporarily force miners to enable voting to prompt validators to encourage validators to register voting keys
-			if !s.config.Miner.VoteEnable {
-				err := errors.New("vote is not enabled, please enable vote")
-				techDocRef := "https://docs.oasys.games/docs/hub-validator/operate-validator/build-validator-node#enabling-fast-finality"
-				return fmt.Errorf("temporarily force validators to enable voting. Please proceed with registering your BLS key. For more details, refer to the technical documentation: %s, err: %v", techDocRef, err)
-			}
 		}
 		// If mining is started, we can disable the transaction rejection mechanism
 		// introduced to speed sync times.
