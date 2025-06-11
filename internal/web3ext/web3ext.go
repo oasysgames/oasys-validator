@@ -19,7 +19,7 @@ package web3ext
 
 var Modules = map[string]string{
 	"admin":  AdminJs,
-	"parlia": ParliaJs,
+	"clique": CliqueJs,
 	"debug":  DebugJs,
 	"eth":    EthJs,
 	"miner":  MinerJs,
@@ -29,46 +29,60 @@ var Modules = map[string]string{
 	"dev":    DevJs,
 }
 
-const ParliaJs = `
+const CliqueJs = `
 web3._extend({
-	property: 'parlia',
+	property: 'clique',
 	methods: [
 		new web3._extend.Method({
 			name: 'getSnapshot',
-			call: 'parlia_getSnapshot',
+			call: 'clique_getSnapshot',
 			params: 1,
 			inputFormatter: [web3._extend.formatters.inputBlockNumberFormatter]
 		}),
 		new web3._extend.Method({
 			name: 'getSnapshotAtHash',
-			call: 'parlia_getSnapshotAtHash',
+			call: 'clique_getSnapshotAtHash',
 			params: 1
 		}),
 		new web3._extend.Method({
-			name: 'getValidators',
-			call: 'parlia_getValidators',
+			name: 'getSigners',
+			call: 'clique_getSigners',
 			params: 1,
 			inputFormatter: [web3._extend.formatters.inputBlockNumberFormatter]
 		}),
 		new web3._extend.Method({
-			name: 'getValidatorsAtHash',
-			call: 'parlia_getValidatorsAtHash',
+			name: 'getSignersAtHash',
+			call: 'clique_getSignersAtHash',
 			params: 1
 		}),
 		new web3._extend.Method({
-			name: 'getJustifiedNumber',
-			call: 'parlia_getJustifiedNumber',
-			params: 1,
-			inputFormatter: [web3._extend.formatters.inputBlockNumberFormatter]
+			name: 'propose',
+			call: 'clique_propose',
+			params: 2
 		}),
 		new web3._extend.Method({
-			name: 'getFinalizedNumber',
-			call: 'parlia_getFinalizedNumber',
+			name: 'discard',
+			call: 'clique_discard',
+			params: 1
+		}),
+		new web3._extend.Method({
+			name: 'status',
+			call: 'clique_status',
+			params: 0
+		}),
+		new web3._extend.Method({
+			name: 'getSigner',
+			call: 'clique_getSigner',
 			params: 1,
-			inputFormatter: [web3._extend.formatters.inputBlockNumberFormatter]
+			inputFormatter: [null]
 		}),
 	],
-	properties: []
+	properties: [
+		new web3._extend.Property({
+			name: 'proposals',
+			getter: 'clique_proposals'
+		}),
+	]
 });
 `
 

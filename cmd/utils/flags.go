@@ -91,7 +91,9 @@ import (
 
 const (
 	// All flags for BSC specific features default to false
-	bscFeaturesDefault = false
+	bscFeaturesDefaultBool   = false
+	bscFeaturesDefaultInt    = 0
+	bscFeaturesDefaultString = ""
 )
 
 var (
@@ -106,31 +108,31 @@ var (
 		Name: "multidatabase",
 		Usage: "Enable a separated state and block database, it will be created within two subdirectory called state and block, " +
 			"Users can copy this state or block directory to another directory or disk, and then create a symbolic link to the state directory under the chaindata",
-		Value:    bscFeaturesDefault,
+		Value:    bscFeaturesDefaultBool,
 		Category: flags.EthCategory,
 	}
 	DirectBroadcastFlag = &cli.BoolFlag{
 		Name:     "directbroadcast",
 		Usage:    "Enable directly broadcast mined block to all peers",
-		Value:    bscFeaturesDefault,
+		Value:    bscFeaturesDefaultBool,
 		Category: flags.EthCategory,
 	}
 	DisableSnapProtocolFlag = &cli.BoolFlag{
 		Name:     "disablesnapprotocol",
 		Usage:    "Disable snap protocol",
-		Value:    bscFeaturesDefault,
+		Value:    bscFeaturesDefaultBool,
 		Category: flags.EthCategory,
 	}
 	EnableTrustProtocolFlag = &cli.BoolFlag{
 		Name:     "enabletrustprotocol",
 		Usage:    "Enable trust protocol",
-		Value:    bscFeaturesDefault,
+		Value:    bscFeaturesDefaultBool,
 		Category: flags.FastNodeCategory,
 	}
 	RangeLimitFlag = &cli.BoolFlag{
 		Name:     "rangelimit",
 		Usage:    "Enable 5000 blocks limit for range query",
-		Value:    bscFeaturesDefault,
+		Value:    bscFeaturesDefaultBool,
 		Category: flags.APICategory,
 	}
 	DiffFlag = flags.DirectoryFlag{
@@ -228,7 +230,7 @@ var (
 	ForceFlag = &cli.BoolFlag{
 		Name:  "force",
 		Usage: "Force convert hbss trie node to pbss trie node. Ignore any metadata",
-		Value: bscFeaturesDefault,
+		Value: bscFeaturesDefaultBool,
 	}
 	// Dump command options.
 	IterativeOutputFlag = &cli.BoolFlag{
@@ -354,13 +356,13 @@ var (
 	PathDBSyncFlag = &cli.BoolFlag{
 		Name:     "pathdb.sync",
 		Usage:    "sync flush nodes cache to disk in path schema",
-		Value:    bscFeaturesDefault,
+		Value:    bscFeaturesDefaultBool,
 		Category: flags.StateCategory,
 	}
 	JournalFileFlag = &cli.BoolFlag{
 		Name:     "journalfile",
 		Usage:    "Enable using journal file to store the TrieJournal instead of KVDB in pbss (default = false)",
-		Value:    bscFeaturesDefault,
+		Value:    bscFeaturesDefaultBool,
 		Category: flags.StateCategory,
 	}
 	StateHistoryFlag = &cli.Uint64Flag{
@@ -567,7 +569,7 @@ var (
 	PersistDiffFlag = &cli.BoolFlag{
 		Name:     "persistdiff",
 		Usage:    "Enable persistence of the diff layer",
-		Value:    bscFeaturesDefault,
+		Value:    bscFeaturesDefaultBool,
 		Category: flags.FastNodeCategory,
 	}
 	DiffBlockFlag = &cli.Uint64Flag{
@@ -579,7 +581,7 @@ var (
 	PruneAncientDataFlag = &cli.BoolFlag{
 		Name:     "pruneancient",
 		Usage:    "Prune ancient data, is an optional config and disabled by default. Only keep the latest 9w blocks' data,the older blocks' data will be permanently pruned. Notice:the geth/chaindata/ancient dir will be removed, if restart without the flag, the ancient data will start with the previous point that the oldest unpruned block number. Recommends to the user who don't care about the ancient data.",
-		Value:    bscFeaturesDefault,
+		Value:    bscFeaturesDefaultBool,
 		Category: flags.BlockHistoryCategory,
 	}
 	CacheLogSizeFlag = &cli.IntFlag{
@@ -1118,48 +1120,52 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 	InitSentryNodeSize = &cli.IntFlag{
 		Name:  "init.sentrynode-size",
 		Usage: "the size of the sentry node",
-		Value: 0,
+		Value: bscFeaturesDefaultInt,
 	}
 	InitSentryNodeIPs = &cli.StringFlag{
 		Name:  "init.sentrynode-ips",
 		Usage: "the ips of each sentry node in the network, example '192.168.0.1,192.168.0.2'",
-		Value: "",
+		Value: bscFeaturesDefaultString,
 	}
 	InitSentryNodePorts = &cli.StringFlag{
 		Name:  "init.sentrynode-ports",
 		Usage: "the ports of each sentry node in the network, example '30311,30312'",
-		Value: "",
+		Value: bscFeaturesDefaultString,
 	}
 	InitFullNodeSize = &cli.IntFlag{
 		Name:  "init.fullnode-size",
 		Usage: "the size of the full node",
-		Value: 0,
+		Value: bscFeaturesDefaultInt,
 	}
 	InitFullNodeIPs = &cli.StringFlag{
 		Name:  "init.fullnode-ips",
 		Usage: "the ips of each full node in the network, example '192.168.0.1,192.168.0.2'",
-		Value: "",
+		Value: bscFeaturesDefaultString,
 	}
 	InitFullNodePorts = &cli.StringFlag{
 		Name:  "init.fullnode-ports",
 		Usage: "the ports of each full node in the network, example '30311,30312'",
-		Value: "",
+		Value: bscFeaturesDefaultString,
 	}
 	InitEVNSentryWhitelist = &cli.BoolFlag{
 		Name:  "init.evn-sentry-whitelist",
 		Usage: "whether to add evn sentry NodeIDs in Node.P2P.EVNNodeIDsWhitelist",
+		Value: bscFeaturesDefaultBool,
 	}
 	InitEVNValidatorWhitelist = &cli.BoolFlag{
 		Name:  "init.evn-validator-whitelist",
 		Usage: "whether to add evn validator NodeIDs in Node.P2P.EVNNodeIDsWhitelist",
+		Value: bscFeaturesDefaultBool,
 	}
 	InitEVNSentryRegister = &cli.BoolFlag{
 		Name:  "init.evn-sentry-register",
 		Usage: "whether to add evn sentry NodeIDs in ETH.EVNNodeIDsToAdd",
+		Value: bscFeaturesDefaultBool,
 	}
 	InitEVNValidatorRegister = &cli.BoolFlag{
 		Name:  "init.evn-validator-register",
 		Usage: "whether to add evn validator NodeIDs in ETH.EVNNodeIDsToAdd",
+		Value: bscFeaturesDefaultBool,
 	}
 	MetricsInfluxDBOrganizationFlag = &cli.StringFlag{
 		Name:     "metrics.influxdb.organization",

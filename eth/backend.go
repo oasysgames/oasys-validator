@@ -26,8 +26,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/metrics"
-
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -78,21 +76,6 @@ const (
 	ChainDBNamespace = "eth/db/chaindata/"
 	JournalFileName  = "trie.journal"
 	ChainData        = "chaindata"
-)
-
-const (
-	MaxBlockHandleDelayMs = 3000 // max delay for block handles, max 3000 ms
-)
-
-var (
-	sendBlockTimer        = metrics.NewRegisteredTimer("chain/delay/block/send", nil)
-	recvBlockTimer        = metrics.NewRegisteredTimer("chain/delay/block/recv", nil)
-	startInsertBlockTimer = metrics.NewRegisteredTimer("chain/delay/block/insert", nil)
-	startMiningTimer      = metrics.NewRegisteredTimer("chain/delay/block/mining", nil)
-	importedBlockTimer    = metrics.NewRegisteredTimer("chain/delay/block/imported", nil)
-	sendVoteTimer         = metrics.NewRegisteredTimer("chain/delay/vote/send", nil)
-	firstVoteTimer        = metrics.NewRegisteredTimer("chain/delay/vote/first", nil)
-	majorityVoteTimer     = metrics.NewRegisteredTimer("chain/delay/vote/majority", nil)
 )
 
 // Config contains the configuration options of the ETH protocol.
@@ -516,6 +499,162 @@ func (s *Ethereum) SetEtherbase(etherbase common.Address) {
 	s.miner.SetEtherbase(etherbase)
 }
 
+// waitForSyncAndMaxwell waits for the node to be fully synced and Maxwell fork to be active
+func (s *Ethereum) waitForSyncAndMaxwell(oasys *oasys.Oasys) {
+	panic("should not happen")
+	// ticker := time.NewTicker(30 * time.Second)
+	// defer ticker.Stop()
+	// retryCount := 0
+	// for {
+	// 	select {
+	// 	case <-s.stopCh:
+	// 		return
+	// 	case <-ticker.C:
+	// 		if !s.Synced() {
+	// 			continue
+	// 		}
+	// 		// Check if Maxwell fork is active
+	// 		header := s.blockchain.CurrentHeader()
+	// 		if header == nil {
+	// 			continue
+	// 		}
+	// 		chainConfig := s.blockchain.Config()
+	// 		if !chainConfig.IsMaxwell(header.Number, header.Time) {
+	// 			continue
+	// 		}
+	// 		log.Info("Node is synced and Maxwell fork is active, proceeding with node ID registration")
+	// 		err := s.updateNodeID(parlia)
+	// 		if err == nil {
+	// 			return
+	// 		}
+	// 		retryCount++
+	// 		if retryCount > 3 {
+	// 			log.Error("Failed to update node ID exceed max retry count", "retryCount", retryCount, "err", err)
+	// 			return
+	// 		}
+	// 	}
+	// }
+}
+
+// updateNodeID registers the node ID with the StakeHub contract
+func (s *Ethereum) updateNodeID(oasys *oasys.Oasys) error {
+	panic("should not happen")
+	// nonce, err := s.APIBackend.GetPoolNonce(context.Background(), s.etherbase)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to get nonce: %v", err)
+	// }
+
+	// // Get currently registered node IDs
+	// registeredIDs, err := parlia.GetNodeIDs()
+	// if err != nil {
+	// 	log.Error("Failed to get registered node IDs", "err", err)
+	// 	return err
+	// }
+
+	// // Create a set of registered IDs for quick lookup
+	// registeredSet := make(map[enode.ID]struct{}, len(registeredIDs))
+	// for _, id := range registeredIDs {
+	// 	registeredSet[id] = struct{}{}
+	// }
+
+	// // Handle removals first
+	// if err := s.handleRemovals(parlia, nonce, registeredSet); err != nil {
+	// 	return err
+	// }
+	// nonce++
+
+	// // Handle additions
+	// return s.handleAdditions(parlia, nonce, registeredSet)
+}
+
+func (s *Ethereum) handleRemovals(oasys *oasys.Oasys, nonce uint64, registeredSet map[enode.ID]struct{}) error {
+	panic("should not happen")
+	// if len(s.config.EVNNodeIDsToRemove) == 0 {
+	// 	return nil
+	// }
+
+	// // Handle wildcard removal
+	// if len(s.config.EVNNodeIDsToRemove) == 1 {
+	// 	var zeroID enode.ID // This will be all zeros
+	// 	if s.config.EVNNodeIDsToRemove[0] == zeroID {
+	// 		trx, err := parlia.RemoveNodeIDs([]enode.ID{}, nonce)
+	// 		if err != nil {
+	// 			return fmt.Errorf("failed to create node ID removal transaction: %v", err)
+	// 		}
+	// 		if err := s.txPool.Add([]*types.Transaction{trx}, false); err != nil {
+	// 			return fmt.Errorf("failed to add node ID removal transaction to pool: %v", err)
+	// 		}
+	// 		log.Info("Submitted node ID removal transaction for all node IDs")
+	// 		return nil
+	// 	}
+	// }
+
+	// // Create a set of node IDs to add for quick lookup
+	// addSet := make(map[enode.ID]struct{}, len(s.config.EVNNodeIDsToAdd))
+	// for _, id := range s.config.EVNNodeIDsToAdd {
+	// 	addSet[id] = struct{}{}
+	// }
+
+	// // Filter out node IDs that are in the add set
+	// nodeIDsToRemove := make([]enode.ID, 0, len(s.config.EVNNodeIDsToRemove))
+	// for _, id := range s.config.EVNNodeIDsToRemove {
+	// 	if _, exists := registeredSet[id]; exists {
+	// 		if _, exists := addSet[id]; !exists {
+	// 			nodeIDsToRemove = append(nodeIDsToRemove, id)
+	// 		} else {
+	// 			log.Debug("Skipping node ID removal", "id", id, "reason", "also in EVNNodeIDsToAdd")
+	// 		}
+	// 	} else {
+	// 		log.Debug("Skipping node ID removal", "id", id, "reason", "not registered")
+	// 	}
+	// }
+
+	// if len(nodeIDsToRemove) == 0 {
+	// 	log.Debug("No node IDs to remove after filtering")
+	// 	return nil
+	// }
+
+	// trx, err := parlia.RemoveNodeIDs(nodeIDsToRemove, nonce)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to create node ID removal transaction: %v", err)
+	// }
+	// if errs := s.txPool.Add([]*types.Transaction{trx}, false); len(errs) > 0 && errs[0] != nil {
+	// 	return fmt.Errorf("failed to add node ID removal transaction to pool: %v", errs)
+	// }
+	// log.Info("Submitted node ID removal transaction", "nodeIDs", nodeIDsToRemove)
+	// return nil
+}
+
+func (s *Ethereum) handleAdditions(oasys *oasys.Oasys, nonce uint64, registeredSet map[enode.ID]struct{}) error {
+	panic("should not happen")
+	// if len(s.config.EVNNodeIDsToAdd) == 0 {
+	// 	return nil
+	// }
+
+	// // Filter out already registered IDs in a single pass
+	// nodeIDsToAdd := make([]enode.ID, 0, len(s.config.EVNNodeIDsToAdd))
+	// for _, id := range s.config.EVNNodeIDsToAdd {
+	// 	if _, exists := registeredSet[id]; !exists {
+	// 		nodeIDsToAdd = append(nodeIDsToAdd, id)
+	// 	}
+	// }
+
+	// if len(nodeIDsToAdd) == 0 {
+	// 	log.Info("No new node IDs to register after deduplication")
+	// 	return nil
+	// }
+
+	// trx, err := parlia.AddNodeIDs(nodeIDsToAdd, nonce)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to create node ID registration transaction: %v", err)
+	// }
+	// if errs := s.txPool.Add([]*types.Transaction{trx}, false); len(errs) > 0 && errs[0] != nil {
+	// 	return fmt.Errorf("failed to add node ID registration transaction to pool: %v", errs)
+	// }
+	// log.Info("Submitted node ID registration transaction", "nodeIDs", nodeIDsToAdd)
+	// return nil
+}
+
 // StartMining starts the miner with the given number of CPU threads. If mining
 // is already running, this method adjust the number of threads allowed to use
 // and updates the minimum price required by the transaction pool.
@@ -564,13 +703,6 @@ func (s *Ethereum) StartMining() error {
 				return fmt.Errorf("signer missing: %v", err)
 			}
 			oas.Authorize(eb, wallet.SignData, wallet.SignTx)
-
-			// Temporarily force miners to enable voting to prompt validators to encourage validators to register voting keys
-			if !s.config.Miner.VoteEnable {
-				err := errors.New("vote is not enabled, please enable vote")
-				techDocRef := "https://docs.oasys.games/docs/hub-validator/operate-validator/build-validator-node#enabling-fast-finality"
-				return fmt.Errorf("temporarily force validators to enable voting. Please proceed with registering your BLS key. For more details, refer to the technical documentation: %s, err: %v", techDocRef, err)
-			}
 		}
 		// If mining is started, we can disable the transaction rejection mechanism
 		// introduced to speed sync times.
@@ -646,7 +778,6 @@ func (s *Ethereum) Start() error {
 	// Start the networking layer
 	s.handler.Start(s.p2pServer.MaxPeers, s.p2pServer.MaxPeersPerIP)
 
-	go s.reportRecentBlocksLoop()
 	return nil
 }
 
@@ -715,84 +846,4 @@ func (s *Ethereum) Stop() error {
 	// stop report loop
 	close(s.stopCh)
 	return nil
-}
-
-func (s *Ethereum) reportRecentBlocksLoop() {
-	reportCnt := uint64(2)
-	reportTicker := time.NewTicker(time.Second)
-	for {
-		select {
-		case <-reportTicker.C:
-			cur := s.blockchain.CurrentBlock()
-			if cur == nil || cur.Number.Uint64() <= reportCnt {
-				continue
-			}
-			num := cur.Number.Uint64()
-			stats := s.blockchain.GetBlockStats(cur.Hash())
-			sendBlockTime := stats.SendBlockTime.Load()
-			startImportBlockTime := stats.StartImportBlockTime.Load()
-			recvNewBlockTime := stats.RecvNewBlockTime.Load()
-			recvNewBlockHashTime := stats.RecvNewBlockHashTime.Load()
-			sendVoteTime := stats.SendVoteTime.Load()
-			firstVoteTime := stats.FirstRecvVoteTime.Load()
-			recvMajorityTime := stats.RecvMajorityVoteTime.Load()
-			startMiningTime := stats.StartMiningTime.Load()
-			importedBlockTime := stats.ImportedBlockTime.Load()
-
-			records := make(map[string]interface{})
-			records["BlockNum"] = num
-			records["SendBlockTime"] = common.FormatMilliTime(sendBlockTime)
-			records["StartImportBlockTime"] = common.FormatMilliTime(startImportBlockTime)
-			records["RecvNewBlockTime"] = common.FormatMilliTime(recvNewBlockTime)
-			records["RecvNewBlockHashTime"] = common.FormatMilliTime(recvNewBlockHashTime)
-			records["RecvNewBlockFrom"] = stats.RecvNewBlockFrom.Load()
-			records["RecvNewBlockHashFrom"] = stats.RecvNewBlockHashFrom.Load()
-
-			records["SendVoteTime"] = common.FormatMilliTime(sendVoteTime)
-			records["FirstRecvVoteTime"] = common.FormatMilliTime(firstVoteTime)
-			records["RecvMajorityVoteTime"] = common.FormatMilliTime(recvMajorityTime)
-
-			records["StartMiningTime"] = common.FormatMilliTime(startMiningTime)
-			records["ImportedBlockTime"] = common.FormatMilliTime(importedBlockTime)
-
-			records["Coinbase"] = cur.Coinbase.String()
-			blockMsTime := int64(cur.MilliTimestamp())
-			records["BlockTime"] = common.FormatMilliTime(blockMsTime)
-			metrics.GetOrRegisterLabel("report-blocks", nil).Mark(records)
-
-			if validTimeMetric(blockMsTime, sendBlockTime) {
-				sendBlockTimer.Update(time.Duration(sendBlockTime - blockMsTime))
-			}
-			if validTimeMetric(blockMsTime, recvNewBlockTime) {
-				recvBlockTimer.Update(time.Duration(recvNewBlockTime - blockMsTime))
-			}
-			if validTimeMetric(blockMsTime, startImportBlockTime) {
-				startInsertBlockTimer.Update(time.Duration(startImportBlockTime - blockMsTime))
-			}
-			if validTimeMetric(blockMsTime, sendVoteTime) {
-				sendVoteTimer.Update(time.Duration(sendVoteTime - blockMsTime))
-			}
-			if validTimeMetric(blockMsTime, firstVoteTime) {
-				firstVoteTimer.Update(time.Duration(firstVoteTime - blockMsTime))
-			}
-			if validTimeMetric(blockMsTime, recvMajorityTime) {
-				majorityVoteTimer.Update(time.Duration(recvMajorityTime - blockMsTime))
-			}
-			if validTimeMetric(blockMsTime, importedBlockTime) {
-				importedBlockTimer.Update(time.Duration(importedBlockTime - blockMsTime))
-			}
-			if validTimeMetric(startMiningTime, blockMsTime) {
-				startMiningTimer.Update(time.Duration(blockMsTime - startMiningTime))
-			}
-		case <-s.stopCh:
-			return
-		}
-	}
-}
-
-func validTimeMetric(startMs, endMs int64) bool {
-	if startMs >= endMs {
-		return false
-	}
-	return endMs-startMs <= MaxBlockHandleDelayMs
 }

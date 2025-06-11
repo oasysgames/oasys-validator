@@ -92,6 +92,13 @@ func New(conf *Config) (*Node, error) {
 	// working directory don't affect the node.
 	confCopy := *conf
 	conf = &confCopy
+
+	// Forcibly disable BSC's EVN(BEP-563) and NewBlockFetchingMessages(BEP-564)
+	conf.EnableEVNFeatures = false
+	conf.EnableQuickBlockFetching = false
+	conf.P2P.EVNNodeIdsWhitelist = nil
+	conf.P2P.ProxyedValidatorAddresses = nil
+
 	if conf.DataDir != "" {
 		absdatadir, err := filepath.Abs(conf.DataDir)
 		if err != nil {

@@ -28,15 +28,8 @@ import (
 )
 
 var (
-	defaultDelayLeftOver         = 50 * time.Millisecond
-	defaultRecommit              = 6 * time.Second
-	defaultMaxWaitProposalInSecs = uint64(45)
-	// default configurations for MEV
-	defaultGreedyMergeTx         bool   = true
-	defaultValidatorCommission   uint64 = 100
-	defaultBidSimulationLeftOver        = 50 * time.Millisecond
-	defaultNoInterruptLeftOver          = 250 * time.Millisecond
-	defaultMaxBidsPerBuilder     uint32 = 2
+	defaultDelayLeftOver = 50 * time.Millisecond
+	defaultRecommit      = 6 * time.Second
 )
 
 // Config is the configuration parameters of mining.
