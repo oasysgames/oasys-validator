@@ -113,7 +113,7 @@ func (a *SetCodeAuthorization) sigHash() common.Hash {
 	})
 }
 
-// Authority recovers the the authorizing account of an authorization.
+// Authority recovers the authorizing account of an authorization.
 func (a *SetCodeAuthorization) Authority() (common.Address, error) {
 	sighash := a.sigHash()
 	if !crypto.ValidateSignatureValues(a.V, a.R.ToBig(), a.S.ToBig(), true) {
@@ -222,4 +222,21 @@ func (tx *SetCodeTx) encode(b *bytes.Buffer) error {
 
 func (tx *SetCodeTx) decode(input []byte) error {
 	return rlp.DecodeBytes(input, tx)
+}
+
+func (tx *SetCodeTx) sigHash(chainID *big.Int) common.Hash {
+	return prefixedRlpHash(
+		SetCodeTxType,
+		[]any{
+			chainID,
+			tx.Nonce,
+			tx.GasTipCap,
+			tx.GasFeeCap,
+			tx.Gas,
+			tx.To,
+			tx.Value,
+			tx.Data,
+			tx.AccessList,
+			tx.AuthList,
+		})
 }

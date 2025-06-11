@@ -20,6 +20,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -86,6 +87,14 @@ type Config struct {
 	// Trusted nodes are used as pre-configured connections which are always
 	// allowed to connect, even above the peer limit.
 	TrustedNodes []*enode.Node
+
+	// EVNNodeIdsWhitelist is a list of NodeIDs that should be directly broadcast block to
+	// the list is another choice for non-validator nodes to get block quickly
+	EVNNodeIdsWhitelist []enode.ID `toml:",omitempty"`
+
+	// ProxyedValidatorAddresses is a list of validator addresses that the local node proxies,
+	// it usually used for sentry nodes
+	ProxyedValidatorAddresses []common.Address `toml:",omitempty"`
 
 	// Connectivity can be restricted to certain IP networks.
 	// If this option is set to a non-nil value, only hosts which match one of the

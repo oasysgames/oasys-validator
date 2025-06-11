@@ -35,6 +35,7 @@ import (
 	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/miner/minerconfig"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -94,7 +95,8 @@ type Config struct {
 	// transactions) or is continuously under high pressure (e.g., mempool is always full), then you can consider
 	// to turn it on.
 	DisablePeerTxBroadcast bool
-
+	EVNNodeIDsToAdd        []enode.ID
+	EVNNodeIDsToRemove     []enode.ID
 	// This can be set to list of enrtree:// URLs which will be queried for
 	// nodes to connect to.
 	EthDiscoveryURLs   []string
@@ -211,4 +213,13 @@ func CreateConsensusEngine(config *params.ChainConfig, db ethdb.Database, ee *et
 		return beacon.New(clique.New(config.Clique, db)), nil
 	}
 	return beacon.New(ethash.NewFaker()), nil
+}
+
+func ApplyDefaultEthConfig(cfg *Config) {
+	if cfg == nil {
+		log.Warn("ApplyDefaultEthConfig cfg == nil")
+		return
+	}
+
+	minerconfig.ApplyDefaultMinerConfig(&cfg.Miner)
 }
