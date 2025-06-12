@@ -67,12 +67,6 @@ var (
 	bodyFilterInMeter    = metrics.NewRegisteredMeter("eth/fetcher/block/filter/bodies/in", nil)
 	bodyFilterOutMeter   = metrics.NewRegisteredMeter("eth/fetcher/block/filter/bodies/out", nil)
 
-	legacyBlockFetchingTimer        = metrics.NewRegisteredTimer("eth/fetcher/block/legacy/cost", nil)
-	quickBlockFetchingTimer         = metrics.NewRegisteredTimer("eth/fetcher/block/quick/cost", nil)
-	quickBlockFetchingErrMeter      = metrics.NewRegisteredMeter("eth/fetcher/block/quick/err", nil)
-	quickBlockFetchingFallbackMeter = metrics.NewRegisteredMeter("eth/fetcher/block/quick/fallback", nil)
-	quickBlockFetchingSuccessMeter  = metrics.NewRegisteredMeter("eth/fetcher/block/quick/success", nil)
-
 	blockInsertFailRecords      = mapset.NewSet[common.Hash]()
 	blockInsertFailRecordslimit = 1000
 	blockInsertFailGauge        = metrics.NewRegisteredGauge("chain/insert/failed", nil)
@@ -104,9 +98,6 @@ type chainInsertFn func(types.Blocks) (int, error)
 
 // peerDropFn is a callback type for dropping a peer detected as malicious.
 type peerDropFn func(id string)
-
-// fetchRangeBlocksFn is a callback type for fetching a range of blocks from a peer.
-type fetchRangeBlocksFn func(peer string, startHeight uint64, startHash common.Hash, count uint64) ([]*types.Block, error)
 
 // blockAnnounce is the hash notification of the availability of a new block in the
 // network.
@@ -147,14 +138,6 @@ type blockOrHeaderInject struct {
 	block  *types.Block  // Used for normal mode fetcher which imports full block.
 }
 
-type BlockFetchingEntry struct {
-	announce *blockAnnounce
-
-	// results
-	blocks []*types.Block
-	err    error
-}
-
 // number returns the block number of the injected object.
 func (inject *blockOrHeaderInject) number() uint64 {
 	if inject.header != nil {
@@ -178,9 +161,8 @@ type BlockFetcher struct {
 	notify chan *blockAnnounce
 	inject chan *blockOrHeaderInject
 
-	headerFilter         chan chan *headerFilterTask
-	bodyFilter           chan chan *bodyFilterTask
-	quickBlockFetchingCh chan *BlockFetchingEntry
+	headerFilter chan chan *headerFilterTask
+	bodyFilter   chan chan *bodyFilterTask
 
 	done chan common.Hash
 	quit chan struct{}
@@ -207,7 +189,6 @@ type BlockFetcher struct {
 	chainFinalizedHeight chainFinalizedHeightFn // Retrieves the current chain's finalized height
 	insertChain          chainInsertFn          // Injects a batch of blocks into the chain
 	dropPeer             peerDropFn             // Drops a peer for misbehaving
-	fetchRangeBlocks     fetchRangeBlocksFn     // Fetches a range of blocks from a peer
 
 	// Testing hooks
 	announceChangeHook func(common.Hash, bool)           // Method to call upon adding or deleting a hash from the blockAnnounce list
@@ -219,14 +200,12 @@ type BlockFetcher struct {
 
 // NewBlockFetcher creates a block fetcher to retrieve blocks based on hash announcements.
 func NewBlockFetcher(getBlock blockRetrievalFn, verifyHeader headerVerifierFn, broadcastBlock blockBroadcasterFn,
-	chainHeight chainHeightFn, chainFinalizedHeight chainFinalizedHeightFn, insertChain chainInsertFn, dropPeer peerDropFn,
-	fetchRangeBlocks fetchRangeBlocksFn) *BlockFetcher {
+	chainHeight chainHeightFn, chainFinalizedHeight chainFinalizedHeightFn, insertChain chainInsertFn, dropPeer peerDropFn) *BlockFetcher {
 	return &BlockFetcher{
 		notify:               make(chan *blockAnnounce),
 		inject:               make(chan *blockOrHeaderInject),
 		headerFilter:         make(chan chan *headerFilterTask),
 		bodyFilter:           make(chan chan *bodyFilterTask),
-		quickBlockFetchingCh: make(chan *BlockFetchingEntry),
 		done:                 make(chan common.Hash),
 		quit:                 make(chan struct{}),
 		requeue:              make(chan *blockOrHeaderInject),
@@ -245,7 +224,6 @@ func NewBlockFetcher(getBlock blockRetrievalFn, verifyHeader headerVerifierFn, b
 		chainFinalizedHeight: chainFinalizedHeight,
 		insertChain:          insertChain,
 		dropPeer:             dropPeer,
-		fetchRangeBlocks:     fetchRangeBlocks,
 	}
 }
 
@@ -351,21 +329,6 @@ func (f *BlockFetcher) FilterBodies(peer string, transactions [][]*types.Transac
 	}
 }
 
-func (f *BlockFetcher) asyncFetchRangeBlocks(announce *blockAnnounce) {
-	go func() {
-		if f.fetchRangeBlocks == nil {
-			return
-		}
-		log.Debug("Quick block fetching", "peer", announce.origin, "hash", announce.hash)
-		blocks, err := f.fetchRangeBlocks(announce.origin, announce.number, announce.hash, 1)
-		f.quickBlockFetchingCh <- &BlockFetchingEntry{
-			announce: announce,
-			blocks:   blocks,
-			err:      err,
-		}
-	}()
-}
-
 // Loop is the main fetcher loop, checking and processing various notification
 // events.
 func (f *BlockFetcher) loop() {
@@ -454,11 +417,6 @@ func (f *BlockFetcher) loop() {
 			if f.announceChangeHook != nil && len(f.announced[notification.hash]) == 1 {
 				f.announceChangeHook(notification.hash, true)
 			}
-			// if there enable range fetching, just request the first announce and wait for response,
-			// and if it gets timeout and wait for later header & body fetching.
-			if f.fetchRangeBlocks != nil && len(f.announced[notification.hash]) == 1 {
-				f.asyncFetchRangeBlocks(notification)
-			}
 			// schedule the first arrive announce hash
 			if len(f.announced) == 1 {
 				f.rescheduleFetch(fetchTimer)
@@ -519,9 +477,6 @@ func (f *BlockFetcher) loop() {
 				go func(peer string) {
 					if f.fetchingHook != nil {
 						f.fetchingHook(hashes)
-					}
-					if f.fetchRangeBlocks != nil {
-						quickBlockFetchingFallbackMeter.Mark(1)
 					}
 					for _, hash := range hashes {
 						headerFetchMeter.Mark(1)
@@ -763,33 +718,7 @@ func (f *BlockFetcher) loop() {
 			for _, block := range blocks {
 				if announce := f.completing[block.Hash()]; announce != nil {
 					f.enqueue(announce.origin, nil, block)
-					legacyBlockFetchingTimer.UpdateSince(announce.time)
 				}
-			}
-		case entry := <-f.quickBlockFetchingCh:
-			annHash := entry.announce.hash
-			// if there is error or timeout, and the shcedule have not started, just retry the fetch
-			if entry.err != nil {
-				quickBlockFetchingErrMeter.Mark(1)
-				log.Debug("Quick block fetching err", "hash", annHash, "err", entry.err)
-				if _, ok := f.fetching[annHash]; !ok && len(f.announced[annHash]) > 1 {
-					// Pick the last peer to retrieve from, but ignore the current one
-					next := f.announced[annHash][len(f.announced[annHash])-1]
-					if next.origin != entry.announce.origin {
-						f.asyncFetchRangeBlocks(next)
-					}
-				}
-				continue
-			}
-			quickBlockFetchingSuccessMeter.Mark(1)
-			for _, block := range entry.blocks {
-				hash := block.Hash()
-				f.forgetHash(hash)
-				if f.getBlock(hash) != nil {
-					continue
-				}
-				f.enqueue(entry.announce.origin, nil, block)
-				quickBlockFetchingTimer.UpdateSince(entry.announce.time)
 			}
 		}
 	}

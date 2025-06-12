@@ -3,8 +3,6 @@ package bsc
 import (
 	"time"
 
-	"errors"
-
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -184,33 +182,4 @@ func (k *knownCache) add(hashes ...common.Hash) {
 // contains returns whether the given item is in the set.
 func (k *knownCache) contains(hash common.Hash) bool {
 	return k.hashes.Contains(hash)
-}
-
-// RequestBlocksByRange send GetBlocksByRangeMsg by request start block hash
-func (p *Peer) RequestBlocksByRange(startHeight uint64, startHash common.Hash, count uint64) ([]*BlockData, error) {
-	requestID := p.dispatcher.GenRequestID()
-	res, err := p.dispatcher.DispatchRequest(&Request{
-		code:      GetBlocksByRangeMsg,
-		want:      BlocksByRangeMsg,
-		requestID: requestID,
-		data: &GetBlocksByRangePacket{
-			RequestId:        requestID,
-			StartBlockHeight: startHeight,
-			StartBlockHash:   startHash,
-			Count:            count,
-		},
-		timeout: 400 * time.Millisecond,
-	})
-	log.Debug("RequestBlocksByRange result", "requestID", requestID, "ret", res == nil, "err", err)
-	if err != nil {
-		return nil, err
-	}
-
-	// Type assertion to get response object
-	ret, ok := res.(*BlocksByRangePacket)
-	if !ok {
-		return nil, errors.New("unexpected response type")
-	}
-
-	return ret.Blocks, nil
 }
