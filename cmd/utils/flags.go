@@ -1117,56 +1117,7 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 		Usage: "the p2p port of the nodes in the network",
 		Value: 30311,
 	}
-	InitSentryNodeSize = &cli.IntFlag{
-		Name:  "init.sentrynode-size",
-		Usage: "the size of the sentry node",
-		Value: bscFeaturesDefaultInt,
-	}
-	InitSentryNodeIPs = &cli.StringFlag{
-		Name:  "init.sentrynode-ips",
-		Usage: "the ips of each sentry node in the network, example '192.168.0.1,192.168.0.2'",
-		Value: bscFeaturesDefaultString,
-	}
-	InitSentryNodePorts = &cli.StringFlag{
-		Name:  "init.sentrynode-ports",
-		Usage: "the ports of each sentry node in the network, example '30311,30312'",
-		Value: bscFeaturesDefaultString,
-	}
-	InitFullNodeSize = &cli.IntFlag{
-		Name:  "init.fullnode-size",
-		Usage: "the size of the full node",
-		Value: bscFeaturesDefaultInt,
-	}
-	InitFullNodeIPs = &cli.StringFlag{
-		Name:  "init.fullnode-ips",
-		Usage: "the ips of each full node in the network, example '192.168.0.1,192.168.0.2'",
-		Value: bscFeaturesDefaultString,
-	}
-	InitFullNodePorts = &cli.StringFlag{
-		Name:  "init.fullnode-ports",
-		Usage: "the ports of each full node in the network, example '30311,30312'",
-		Value: bscFeaturesDefaultString,
-	}
-	InitEVNSentryWhitelist = &cli.BoolFlag{
-		Name:  "init.evn-sentry-whitelist",
-		Usage: "whether to add evn sentry NodeIDs in Node.P2P.EVNNodeIDsWhitelist",
-		Value: bscFeaturesDefaultBool,
-	}
-	InitEVNValidatorWhitelist = &cli.BoolFlag{
-		Name:  "init.evn-validator-whitelist",
-		Usage: "whether to add evn validator NodeIDs in Node.P2P.EVNNodeIDsWhitelist",
-		Value: bscFeaturesDefaultBool,
-	}
-	InitEVNSentryRegister = &cli.BoolFlag{
-		Name:  "init.evn-sentry-register",
-		Usage: "whether to add evn sentry NodeIDs in ETH.EVNNodeIDsToAdd",
-		Value: bscFeaturesDefaultBool,
-	}
-	InitEVNValidatorRegister = &cli.BoolFlag{
-		Name:  "init.evn-validator-register",
-		Usage: "whether to add evn validator NodeIDs in ETH.EVNNodeIDsToAdd",
-		Value: bscFeaturesDefaultBool,
-	}
+
 	MetricsInfluxDBOrganizationFlag = &cli.StringFlag{
 		Name:     "metrics.influxdb.organization",
 		Usage:    "InfluxDB organization name (v2 only)",
