@@ -29,9 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/eth/protocols/snap"
 	"github.com/ethereum/go-ethereum/eth/protocols/trust"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 var (
@@ -75,8 +73,6 @@ const (
 type peerSet struct {
 	peers     map[string]*ethPeer // Peers connected on the `eth` protocol
 	snapPeers int                 // Number of `snap` compatible peers for connection prioritization
-
-	validatorNodeIDsMap map[common.Address][]enode.ID
 
 	snapWait map[string]chan *snap.Peer // Peers connected on `eth` waiting for their snap extension
 	snapPend map[string]*snap.Peer      // Peers connected on the `snap` protocol, but not yet on `eth`
@@ -468,7 +464,6 @@ func (ps *peerSet) peersWithoutBlock(hash common.Hash) []*ethPeer {
 			list = append(list, p)
 		}
 	}
-	log.Debug("get peers without block", "hash", hash, "total", len(ps.peers), "unknonw", len(list))
 	return list
 }
 

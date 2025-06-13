@@ -440,14 +440,9 @@ func initNetwork(ctx *cli.Context) error {
 		return err
 	}
 
-	configs, enodes, _, err := createConfigs(config, initDir, "node", ips, ports, []*enode.Node{}, false, false)
+	configs, _, _, err := createConfigs(config, initDir, "node", ips, ports, []*enode.Node{}, false, false)
 	if err != nil {
 		utils.Fatalf("Failed to create node configs: %v", err)
-	}
-
-	nodeIDs := make([]enode.ID, len(enodes))
-	for i := 0; i < len(enodes); i++ {
-		nodeIDs[i] = enodes[i].ID()
 	}
 
 	// write node configs
