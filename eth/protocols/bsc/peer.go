@@ -35,7 +35,6 @@ type Peer struct {
 	voteBroadcast chan []*types.VoteEnvelope // Channel used to queue votes propagation requests
 	periodBegin   time.Time                  // Begin time of the latest period for votes counting
 	periodCounter uint                       // Votes number in the latest period
-	dispatcher    *Dispatcher                // Message request-response dispatcher
 
 	*p2p.Peer                   // The embedded P2P package peer
 	rw        p2p.MsgReadWriter // Input/output streams for bsc
@@ -60,7 +59,6 @@ func NewPeer(version uint, p *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
 		logger:        log.New("peer", id[:8]),
 		term:          make(chan struct{}),
 	}
-	peer.dispatcher = NewDispatcher(peer)
 	go peer.broadcastVotes()
 	return peer
 }
