@@ -93,16 +93,8 @@ type Config struct {
 	// DirectBroadcast enable directly broadcast mined block to all peers
 	DirectBroadcast bool `toml:",omitempty"`
 
-	// EnableEVNFeatures enables the direct broadcast feature and disables the transaction broadcast feature.
-	// Used mainly for validators or sentry nodes, which can be recognized by the StakHub contract.
-	// Note: EVN = Enhanced Validator Network, Validator and sentry nodes need to set this flag to true.
-	EnableEVNFeatures bool `toml:",omitempty"`
-
 	// DisableSnapProtocol disable the snap protocol
 	DisableSnapProtocol bool `toml:",omitempty"`
-
-	// EnableQuickBlockFetching indicates whether to fetch new blocks using new messages.
-	EnableQuickBlockFetching bool `toml:",omitempty"`
 
 	// RangeLimit enable 5000 blocks limit when handle range query
 	RangeLimit bool `toml:",omitempty"`

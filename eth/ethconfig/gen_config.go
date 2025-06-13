@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/txpool/legacypool"
 	"github.com/ethereum/go-ethereum/eth/gasprice"
 	"github.com/ethereum/go-ethereum/miner/minerconfig"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 // MarshalTOML marshals as TOML.
@@ -21,8 +20,6 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		NetworkId               uint64
 		SyncMode                SyncMode
 		DisablePeerTxBroadcast  bool
-		EVNNodeIDsToAdd         []enode.ID
-		EVNNodeIDsToRemove      []enode.ID
 		EthDiscoveryURLs        []string
 		SnapDiscoveryURLs       []string
 		TrustDiscoveryURLs      []string
@@ -75,8 +72,6 @@ func (c Config) MarshalTOML() (interface{}, error) {
 	enc.NetworkId = c.NetworkId
 	enc.SyncMode = c.SyncMode
 	enc.DisablePeerTxBroadcast = c.DisablePeerTxBroadcast
-	enc.EVNNodeIDsToAdd = c.EVNNodeIDsToAdd
-	enc.EVNNodeIDsToRemove = c.EVNNodeIDsToRemove
 	enc.EthDiscoveryURLs = c.EthDiscoveryURLs
 	enc.SnapDiscoveryURLs = c.SnapDiscoveryURLs
 	enc.TrustDiscoveryURLs = c.TrustDiscoveryURLs
@@ -133,8 +128,6 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		NetworkId               *uint64
 		SyncMode                *SyncMode
 		DisablePeerTxBroadcast  *bool
-		EVNNodeIDsToAdd         []enode.ID
-		EVNNodeIDsToRemove      []enode.ID
 		EthDiscoveryURLs        []string
 		SnapDiscoveryURLs       []string
 		TrustDiscoveryURLs      []string
@@ -197,12 +190,6 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	}
 	if dec.DisablePeerTxBroadcast != nil {
 		c.DisablePeerTxBroadcast = *dec.DisablePeerTxBroadcast
-	}
-	if dec.EVNNodeIDsToAdd != nil {
-		c.EVNNodeIDsToAdd = dec.EVNNodeIDsToAdd
-	}
-	if dec.EVNNodeIDsToRemove != nil {
-		c.EVNNodeIDsToRemove = dec.EVNNodeIDsToRemove
 	}
 	if dec.EthDiscoveryURLs != nil {
 		c.EthDiscoveryURLs = dec.EthDiscoveryURLs
