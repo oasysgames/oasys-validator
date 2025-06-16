@@ -19,7 +19,6 @@ package fetcher
 import (
 	"errors"
 	"math/big"
-	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -32,7 +31,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/go-ethereum/triedb"
@@ -105,10 +103,7 @@ func newTester() *fetcherTester {
 		drops:   make(map[string]bool),
 	}
 	tester.fetcher = NewBlockFetcher(tester.getBlock, tester.verifyHeader, tester.broadcastBlock,
-		tester.chainHeight, tester.chainFinalizedHeight, tester.insertChain, tester.dropPeer,
-		func(peer string, startHeight uint64, startHash common.Hash, count uint64) ([]*types.Block, error) {
-			return nil, errors.New("not implemented")
-		})
+		tester.chainHeight, tester.chainFinalizedHeight, tester.insertChain, tester.dropPeer)
 	tester.fetcher.Start()
 
 	return tester
@@ -1015,223 +1010,4 @@ func (m *mockBodyRequester) requestBodies(hashes []common.Hash, ch chan *eth.Res
 		}
 	}()
 	return &eth.Request{}, nil
-}
-
-// TestBlockFetcherMultiplePeers tests block synchronization between multiple peers
-func TestBlockFetcherMultiplePeers(t *testing.T) {
-	// Setup test environment
-	log.SetDefault(log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stdout, log.LevelTrace, true)))
-
-	// Create test blocks
-	parent := types.NewBlock(&types.Header{
-		Number:     big.NewInt(1),
-		ParentHash: common.Hash{},
-	}, nil, nil, nil)
-	block := types.NewBlock(&types.Header{
-		Number:     big.NewInt(2),
-		ParentHash: parent.Hash(),
-	}, nil, nil, nil)
-
-	// Create block storage
-	blockStore := make(map[common.Hash]*types.Block)
-	blockStore[parent.Hash()] = parent
-
-	// Create fetcher
-	fetcher := NewBlockFetcher(
-		// getBlock
-		func(hash common.Hash) *types.Block {
-			return blockStore[hash]
-		},
-		// verifyHeader
-		func(header *types.Header) error {
-			return nil
-		},
-		// broadcastBlock
-		func(block *types.Block, propagate bool) {},
-		// chainHeight - returns the height of the highest block in the chain
-		func() uint64 {
-			var maxHeight uint64 = 0
-			for _, block := range blockStore {
-				height := block.NumberU64()
-				if height > maxHeight {
-					maxHeight = height
-				}
-			}
-			return maxHeight
-		},
-		// chainFinalizedHeight
-		func() uint64 { return 0 },
-		// insertChain
-		func(blocks types.Blocks) (int, error) {
-			for _, b := range blocks {
-				blockStore[b.Hash()] = b
-			}
-			return len(blocks), nil
-		},
-		// dropPeer
-		func(id string) {},
-		// fetchRangeBlocks
-		func(peer string, startHeight uint64, startHash common.Hash, count uint64) ([]*types.Block, error) {
-			return nil, errors.New("not implemented")
-		},
-	)
-
-	// Start fetcher
-	fetcher.Start()
-	defer fetcher.Stop()
-
-	// Test case 1: Normal download process
-	t.Run("normal download", func(t *testing.T) {
-		// Create request functions
-		headerRequester := func(hash common.Hash, sink chan *eth.Response) (*eth.Request, error) {
-			go func() {
-				// Return requested header
-				headers := []*types.Header{block.Header()}
-				res := &eth.Response{
-					Req:  &eth.Request{},
-					Res:  (*eth.BlockHeadersRequest)(&headers),
-					Done: make(chan error, 1),
-				}
-				sink <- res
-			}()
-			return &eth.Request{}, nil
-		}
-
-		bodyRequester := func(hashes []common.Hash, sink chan *eth.Response) (*eth.Request, error) {
-			go func() {
-				// Return requested body
-				bodies := make([]*eth.BlockBody, 0)
-				for _, hash := range hashes {
-					if hash == block.Hash() {
-						bodies = append(bodies, &eth.BlockBody{
-							Transactions: block.Transactions(),
-							Uncles:       block.Uncles(),
-						})
-					}
-				}
-				res := &eth.Response{
-					Req:  &eth.Request{},
-					Res:  (*eth.BlockBodiesResponse)(&bodies),
-					Done: make(chan error, 1),
-				}
-				sink <- res
-			}()
-			return &eth.Request{}, nil
-		}
-
-		// Peer1 sends block notification
-		err := fetcher.Notify("peer1", block.Hash(), block.NumberU64(), time.Now(),
-			headerRequester, bodyRequester)
-		if err != nil {
-			t.Fatalf("Notify failed: %v", err)
-		}
-
-		// Wait for the block to be processed
-		for i := 0; i < 20; i++ {
-			time.Sleep(50 * time.Millisecond)
-			if blockStore[block.Hash()] != nil {
-				break
-			}
-		}
-
-		// Verify if the block was downloaded correctly
-		if fetchedBlock := blockStore[block.Hash()]; fetchedBlock == nil {
-			t.Error("Block was not downloaded")
-		}
-	})
-
-	// Test case 2: Download timeout
-	t.Run("download timeout", func(t *testing.T) {
-		// Create a header requester with timeout
-		slowHeaderRequester := func(hash common.Hash, sink chan *eth.Response) (*eth.Request, error) {
-			go func() {
-				// Intentionally not returning any content, simulating timeout
-				time.Sleep(2 * fetchTimeout)
-			}()
-			return &eth.Request{}, nil
-		}
-
-		bodyRequester := func(hashes []common.Hash, sink chan *eth.Response) (*eth.Request, error) {
-			go func() {
-				// This won't be called
-			}()
-			return &eth.Request{}, nil
-		}
-
-		// Peer2 sends block notification
-		err := fetcher.Notify("peer2", block.Hash(), block.NumberU64(), time.Now(),
-			slowHeaderRequester, bodyRequester)
-		if err != nil {
-			t.Fatalf("Notify failed: %v", err)
-		}
-
-		// Wait for timeout
-		time.Sleep(fetchTimeout + 100*time.Millisecond)
-	})
-
-	// Test case 3: Simplified single block notification test
-	t.Run("single block announcement", func(t *testing.T) {
-		// Create a new block
-		newBlock := types.NewBlock(&types.Header{
-			Number:     big.NewInt(3),
-			ParentHash: block.Hash(), // Parent block is from the previous test
-		}, nil, nil, nil)
-
-		// Create request functions
-		headerRequester := func(hash common.Hash, sink chan *eth.Response) (*eth.Request, error) {
-			go func() {
-				// Return requested header
-				headers := []*types.Header{newBlock.Header()}
-				res := &eth.Response{
-					Req:  &eth.Request{},
-					Res:  (*eth.BlockHeadersRequest)(&headers),
-					Done: make(chan error, 1),
-				}
-				sink <- res
-			}()
-			return &eth.Request{}, nil
-		}
-
-		bodyRequester := func(hashes []common.Hash, sink chan *eth.Response) (*eth.Request, error) {
-			go func() {
-				// Return requested body
-				bodies := make([]*eth.BlockBody, 0)
-				for _, hash := range hashes {
-					if hash == newBlock.Hash() {
-						bodies = append(bodies, &eth.BlockBody{
-							Transactions: newBlock.Transactions(),
-							Uncles:       newBlock.Uncles(),
-						})
-					}
-				}
-				res := &eth.Response{
-					Req:  &eth.Request{},
-					Res:  (*eth.BlockBodiesResponse)(&bodies),
-					Done: make(chan error, 1),
-				}
-				sink <- res
-			}()
-			return &eth.Request{}, nil
-		}
-
-		// Send block notification
-		err := fetcher.Notify("peer1", newBlock.Hash(), newBlock.NumberU64(), time.Now(),
-			headerRequester, bodyRequester)
-		if err != nil {
-			t.Fatalf("Notify failed: %v", err)
-		}
-
-		// Wait for the block to be processed
-		for i := 0; i < 20; i++ {
-			time.Sleep(50 * time.Millisecond)
-			if blockStore[newBlock.Hash()] != nil {
-				break
-			}
-		}
-
-		// Verify if the block was downloaded correctly
-		if fetchedBlock := blockStore[newBlock.Hash()]; fetchedBlock == nil {
-			t.Error("New block was not downloaded")
-		}
-	})
 }
