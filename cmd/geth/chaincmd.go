@@ -84,16 +84,6 @@ It expects the genesis file as argument.`,
 			utils.InitNetworkPort,
 			utils.InitNetworkSize,
 			utils.InitNetworkIps,
-			utils.InitSentryNodeSize,
-			utils.InitSentryNodeIPs,
-			utils.InitSentryNodePorts,
-			utils.InitFullNodeSize,
-			utils.InitFullNodeIPs,
-			utils.InitFullNodePorts,
-			utils.InitEVNSentryWhitelist,
-			utils.InitEVNValidatorWhitelist,
-			utils.InitEVNSentryRegister,
-			utils.InitEVNValidatorRegister,
 			configFileFlag,
 		},
 		Category: "BLOCKCHAIN COMMANDS",
@@ -239,11 +229,6 @@ Therefore, you must specify the blockNumber or blockHash that locates in diffLay
 "geth" will print all available blockNumber and related block state root hash, and you can query block hash by block number.
 `,
 	}
-)
-
-const (
-	DefaultSentryP2PPort   = 30411
-	DefaultFullNodeP2PPort = 30511
 )
 
 // initGenesis will initialise the given JSON format genesis file and writes it as
@@ -454,147 +439,21 @@ func initNetwork(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	enableSentryNode := ctx.Int(utils.InitSentryNodeSize.Name) > 0
-	var (
-		sentryConfigs         []gethConfig
-		sentryEnodes          []*enode.Node
-		sentryNodeIDs         []enode.ID
-		connectOneExtraEnodes bool
-		staticConnect         bool
-	)
-	if enableSentryNode {
-		sentryConfigs, sentryEnodes, err = createSentryNodeConfigs(ctx, config, initDir)
-		if err != nil {
-			utils.Fatalf("Failed to create sentry node configs: %v", err)
-		}
-		sentryNodeIDs = make([]enode.ID, len(sentryEnodes))
-		for i := 0; i < len(sentryEnodes); i++ {
-			sentryNodeIDs[i] = sentryEnodes[i].ID()
-		}
-		connectOneExtraEnodes = true
-		staticConnect = true
-	}
 
-	configs, enodes, accounts, err := createConfigs(config, initDir, "node", ips, ports, sentryEnodes, connectOneExtraEnodes, staticConnect)
+	configs, _, _, err := createConfigs(config, initDir, "node", ips, ports, []*enode.Node{}, false, false)
 	if err != nil {
 		utils.Fatalf("Failed to create node configs: %v", err)
 	}
 
-	nodeIDs := make([]enode.ID, len(enodes))
-	for i := 0; i < len(enodes); i++ {
-		nodeIDs[i] = enodes[i].ID()
-	}
-	// add more feature configs
-	if enableSentryNode {
-		for i := 0; i < len(sentryConfigs); i++ {
-			sentryConfigs[i].Node.P2P.ProxyedValidatorAddresses = accounts[i]
-		}
-	}
-	if ctx.Bool(utils.InitEVNValidatorWhitelist.Name) {
-		for i := 0; i < size; i++ {
-			configs[i].Node.P2P.EVNNodeIdsWhitelist = nodeIDs
-		}
-	}
-	if ctx.Bool(utils.InitEVNValidatorRegister.Name) {
-		for i := 0; i < size; i++ {
-			configs[i].Eth.EVNNodeIDsToAdd = []enode.ID{nodeIDs[i]}
-		}
-	}
-	if enableSentryNode && ctx.Bool(utils.InitEVNSentryWhitelist.Name) {
-		for i := 0; i < len(sentryConfigs); i++ {
-			// whitelist all sentry nodes + proxyed validator NodeID
-			wlNodeIDs := []enode.ID{nodeIDs[i]}
-			wlNodeIDs = append(wlNodeIDs, sentryNodeIDs...)
-			sentryConfigs[i].Node.P2P.EVNNodeIdsWhitelist = wlNodeIDs
-		}
-	}
-	if enableSentryNode && ctx.Bool(utils.InitEVNSentryRegister.Name) {
-		for i := 0; i < size; i++ {
-			configs[i].Eth.EVNNodeIDsToAdd = append(configs[i].Eth.EVNNodeIDsToAdd, sentryNodeIDs[i])
-		}
-	}
-
-	// write node & sentry configs
+	// write node configs
 	for i, config := range configs {
 		err = writeConfig(inGenesisFile, config, path.Join(initDir, fmt.Sprintf("node%d", i)))
 		if err != nil {
 			return err
 		}
 	}
-	for i, config := range sentryConfigs {
-		err = writeConfig(inGenesisFile, config, path.Join(initDir, fmt.Sprintf("sentry%d", i)))
-		if err != nil {
-			return err
-		}
-	}
-
-	if ctx.Int(utils.InitFullNodeSize.Name) > 0 {
-		var extraEnodes []*enode.Node
-		if enableSentryNode {
-			extraEnodes = sentryEnodes
-		} else {
-			extraEnodes = enodes
-		}
-		_, _, err := createAndSaveFullNodeConfigs(ctx, inGenesisFile, config, initDir, extraEnodes)
-		if err != nil {
-			utils.Fatalf("Failed to create full node configs: %v", err)
-		}
-	}
 
 	return nil
-}
-
-func createSentryNodeConfigs(ctx *cli.Context, baseConfig gethConfig, initDir string) ([]gethConfig, []*enode.Node, error) {
-	size := ctx.Int(utils.InitSentryNodeSize.Name)
-	if size <= 0 {
-		utils.Fatalf("size should be greater than 0")
-	}
-	ipStr := ctx.String(utils.InitSentryNodeIPs.Name)
-	portStr := ctx.String(utils.InitSentryNodePorts.Name)
-	ips, err := parseIps(ipStr, size)
-	if err != nil {
-		utils.Fatalf("Failed to parse ips: %v", err)
-	}
-	ports, err := parsePorts(portStr, DefaultSentryP2PPort, size)
-	if err != nil {
-		utils.Fatalf("Failed to parse ports: %v", err)
-	}
-	configs, enodes, _, err := createConfigs(baseConfig, initDir, "sentry", ips, ports, nil, false, true)
-	if err != nil {
-		utils.Fatalf("Failed to create config: %v", err)
-	}
-	return configs, enodes, nil
-}
-
-func createAndSaveFullNodeConfigs(ctx *cli.Context, inGenesisFile *os.File, baseConfig gethConfig, initDir string, extraEnodes []*enode.Node) ([]gethConfig, []*enode.Node, error) {
-	size := ctx.Int(utils.InitFullNodeSize.Name)
-	if size <= 0 {
-		utils.Fatalf("size should be greater than 0")
-	}
-	ipStr := ctx.String(utils.InitFullNodeIPs.Name)
-	portStr := ctx.String(utils.InitFullNodePorts.Name)
-	ips, err := parseIps(ipStr, size)
-	if err != nil {
-		utils.Fatalf("Failed to parse ips: %v", err)
-	}
-	ports, err := parsePorts(portStr, DefaultFullNodeP2PPort, size)
-	if err != nil {
-		utils.Fatalf("Failed to parse ports: %v", err)
-	}
-
-	configs, enodes, _, err := createConfigs(baseConfig, initDir, "fullnode", ips, ports, extraEnodes, false, false)
-	if err != nil {
-		utils.Fatalf("Failed to create config: %v", err)
-	}
-
-	// write configs
-	for i := 0; i < len(configs); i++ {
-		err := writeConfig(inGenesisFile, configs[i], path.Join(initDir, fmt.Sprintf("fullnode%d", i)))
-		if err != nil {
-			utils.Fatalf("Failed to write config: %v", err)
-		}
-	}
-	return configs, enodes, nil
 }
 
 func createConfigs(base gethConfig, initDir string, prefix string, ips []string, ports []int, extraEnodes []*enode.Node, connectOneExtraEnodes bool, staticConnect bool) ([]gethConfig, []*enode.Node, [][]common.Address, error) {
