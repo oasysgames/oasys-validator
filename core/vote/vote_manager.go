@@ -15,9 +15,15 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
+	"github.com/ethereum/go-ethereum/params"
 )
 
-const blocksNumberSinceMining = 5 // the number of blocks need to wait before voting, counting from the validator begin to mine
+// Many validators maintain backup machines.
+// When switching from a primary node to a backup (e.g., due to failure),
+// the new node may cast votes for the same block height that the previous node already voted on.
+// To avoid double-voting issues, the node should wait for a few blocks
+// before participating in voting after it starts mining.
+const blocksNumberSinceMining = 20 * params.MaxwellBlockTimeReductionFactorForBSC
 
 var diffInTurn = big.NewInt(2) // Block difficulty for in-turn signatures
 var votesManagerCounter = metrics.NewRegisteredCounter("votesManager/local", nil)
@@ -198,6 +204,7 @@ func (voteManager *VoteManager) loop() {
 
 				log.Debug("vote manager produced vote", "votedBlockNumber", voteMessage.Data.TargetNumber, "votedBlockHash", voteMessage.Data.TargetHash, "voteMessageHash", voteMessage.Hash())
 				voteManager.pool.PutVote(voteMessage)
+				voteManager.chain.GetBlockStats(curHead.Hash()).SendVoteTime.Store(time.Now().UnixMilli())
 				votesManagerCounter.Inc(1)
 			}
 

@@ -417,6 +417,7 @@ func (f *BlockFetcher) loop() {
 			if f.announceChangeHook != nil && len(f.announced[notification.hash]) == 1 {
 				f.announceChangeHook(notification.hash, true)
 			}
+			// schedule the first arrive announce hash
 			if len(f.announced) == 1 {
 				f.rescheduleFetch(fetchTimer)
 			}
@@ -468,7 +469,7 @@ func (f *BlockFetcher) loop() {
 			}
 			// Send out all block header requests
 			for peer, hashes := range request {
-				log.Trace("Fetching scheduled headers", "peer", peer, "list", hashes)
+				log.Debug("Fetching scheduled headers", "peer", peer, "list", hashes)
 
 				// Create a closure of the fetch and schedule in on a new thread
 				fetchHeader := f.fetching[hashes[0]].fetchHeader
@@ -527,7 +528,7 @@ func (f *BlockFetcher) loop() {
 			}
 			// Send out all block body requests
 			for peer, hashes := range request {
-				log.Trace("Fetching scheduled bodies", "peer", peer, "list", hashes)
+				log.Debug("Fetching scheduled bodies", "peer", peer, "list", hashes)
 
 				// Create a closure of the fetch and schedule in on a new thread
 				if f.completingHook != nil {

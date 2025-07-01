@@ -120,6 +120,7 @@ type Ethereum struct {
 	shutdownTracker *shutdowncheck.ShutdownTracker // Tracks if and when the node has shutdown ungracefully
 
 	votePool *vote.VotePool
+	stopCh   chan struct{}
 }
 
 // New creates a new Ethereum object (including the initialisation of the common Ethereum object),
@@ -228,6 +229,7 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		p2pServer:         stack.Server(),
 		discmix:           enode.NewFairMix(0),
 		shutdownTracker:   shutdowncheck.NewShutdownTracker(chainDb),
+		stopCh:            make(chan struct{}),
 	}
 
 	eth.APIBackend = &EthAPIBackend{stack.Config().ExtRPCEnabled(), stack.Config().AllowUnprotectedTxs, eth, nil}
@@ -541,13 +543,6 @@ func (s *Ethereum) StartMining() error {
 				return fmt.Errorf("signer missing: %v", err)
 			}
 			oas.Authorize(eb, wallet.SignData, wallet.SignTx)
-
-			// Temporarily force miners to enable voting to prompt validators to encourage validators to register voting keys
-			if !s.config.Miner.VoteEnable {
-				err := errors.New("vote is not enabled, please enable vote")
-				techDocRef := "https://docs.oasys.games/docs/hub-validator/operate-validator/build-validator-node#enabling-fast-finality"
-				return fmt.Errorf("temporarily force validators to enable voting. Please proceed with registering your BLS key. For more details, refer to the technical documentation: %s, err: %v", techDocRef, err)
-			}
 		}
 		// If mining is started, we can disable the transaction rejection mechanism
 		// introduced to speed sync times.
@@ -622,6 +617,7 @@ func (s *Ethereum) Start() error {
 
 	// Start the networking layer
 	s.handler.Start(s.p2pServer.MaxPeers, s.p2pServer.MaxPeersPerIP)
+
 	return nil
 }
 
@@ -687,5 +683,7 @@ func (s *Ethereum) Stop() error {
 	s.chainDb.Close()
 	s.eventMux.Stop()
 
+	// stop report loop
+	close(s.stopCh)
 	return nil
 }

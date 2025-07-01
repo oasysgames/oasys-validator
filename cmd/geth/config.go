@@ -154,6 +154,9 @@ func loadBaseConfig(ctx *cli.Context) gethConfig {
 		if err := loadConfig(file, &cfg); err != nil {
 			utils.Fatalf("%v", err)
 		}
+		// some default options could be overwritten after `loadConfig()`
+		// apply the default value if the options are not specified in config.toml file.
+		ethconfig.ApplyDefaultEthConfig(&cfg.Eth)
 	}
 
 	scheme := cfg.Eth.StateScheme
@@ -214,6 +217,7 @@ func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend) {
 	}
 	if ctx.IsSet(utils.OverrideMinBlocksForBlobRequests.Name) {
 		params.MinBlocksForBlobRequests = ctx.Uint64(utils.OverrideMinBlocksForBlobRequests.Name)
+		params.MinTimeDurationForBlobRequests = uint64(float64(params.MinBlocksForBlobRequests) * params.SHORT_BLOCK_TIME_SECONDS)
 	}
 	if ctx.IsSet(utils.OverrideDefaultExtraReserveForBlobRequests.Name) {
 		params.DefaultExtraReserveForBlobRequests = ctx.Uint64(utils.OverrideDefaultExtraReserveForBlobRequests.Name)
