@@ -289,7 +289,7 @@ var (
 		},
 		BlobScheduleConfig: &BlobScheduleConfig{
 			Cancun: DefaultCancunBlobConfig,
-			// Prague: DefaultPragueBlobConfig, // TODO
+			Prague: DefaultPragueBlobConfig,
 		},
 	}
 
