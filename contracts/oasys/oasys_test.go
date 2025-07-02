@@ -1256,9 +1256,8 @@ func TestDeploy(t *testing.T) {
 				{blockNumber: 4017600, deploy: []deployFn{_deployments11}},
 				{blockNumber: 4958700, deploy: []deployFn{_deployments12}},
 				{blockNumber: 5445775, deploy: []deployFn{_deployments13}},
-				// TODO: Uncomment when `OasysTestnetChainConfig.PragueTime` is set
-				// {blockNumber: 5445775 + 1, blockTime: 9999999999, deploy: []deployFn{_deployEIP2935}},
-				{blockNumber: 9999999, deploy: []deployFn{_deployments14}},
+				{blockNumber: 8496170 - 1, blockTime: 1751590860, deploy: []deployFn{_deployEIP2935}},
+				{blockNumber: 8496170, deploy: []deployFn{_deployments14}},
 			},
 		},
 		{
