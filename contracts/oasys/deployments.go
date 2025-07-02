@@ -41,7 +41,7 @@ var deploymentSets = map[common.Hash]map[uint64]deploymentSet{
 		4017600: deploymentSet{deployments11},
 		4958700: deploymentSet{deployments12},
 		5445775: deploymentSet{deployments13},
-		9999999: deploymentSet{deployments14, deployments14_slash_indicator_testnet},
+		8496170: deploymentSet{deployments14, deployments14_slash_indicator_testnet}, // Fri Jul 04 2025 10:00:00 GMT+0900
 	},
 	defaultGenesisHash: {
 		2: deploymentSet{
