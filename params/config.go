@@ -281,7 +281,7 @@ var (
 		LondonBlock:         big.NewInt(0),
 		ShanghaiTime:        newUint64(1718600000), // Mon Jun 17 2024 13:53:20 GMT+0900
 		CancunTime:          newUint64(1733288400), // Wed Dec 04 2024 14:00:00 GMT+0900
-		// PragueTime:          newUint64(9999999999), // TODO
+		PragueTime:          newUint64(1751590860), // Fri Jul 04 2025 10:01:00 GMT+0900
 
 		Oasys: &OasysConfig{
 			Period: 15,

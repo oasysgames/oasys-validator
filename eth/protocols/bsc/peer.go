@@ -20,21 +20,13 @@ const (
 
 	// used to avoid of DDOS attack
 	// It's the max number of received votes per second from one peer
-	// 21 validators exist now, so 21 votes will be produced every one block interval
-	// so the limit is 7 = 21/3, here set it to 10 with a buffer.
+	// 28 validators exist now, so 28 votes will be produced every one block interval
+	// so the limit is 4.6 = 28/6, here set it to 10 with a buffer.
 	receiveRateLimitPerSecond = 10
 
 	// the time span of one period
 	secondsPerPeriod = float64(30)
 )
-
-// max is a helper function which returns the larger of the two given integers.
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
 
 // Peer is a collection of relevant information we have about a `bsc` peer.
 type Peer struct {

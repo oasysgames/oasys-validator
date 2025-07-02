@@ -22,6 +22,10 @@ var (
 		name:    "CandidateValidatorManager",
 		address: "0x520000000000000000000000000000000000002e",
 	}
+	slashIndicator = &contract{
+		name:    "SlashIndicator",
+		address: "0x5200000000000000000000000000000000000040",
+	}
 
 	// Governance
 	permissionedContractFactory = &contract{

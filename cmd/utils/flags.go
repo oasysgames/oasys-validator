@@ -91,7 +91,9 @@ import (
 
 const (
 	// All flags for BSC specific features default to false
-	bscFeaturesDefault = false
+	bscFeaturesDefaultBool   = false
+	bscFeaturesDefaultInt    = 0
+	bscFeaturesDefaultString = ""
 )
 
 var (
@@ -106,31 +108,31 @@ var (
 		Name: "multidatabase",
 		Usage: "Enable a separated state and block database, it will be created within two subdirectory called state and block, " +
 			"Users can copy this state or block directory to another directory or disk, and then create a symbolic link to the state directory under the chaindata",
-		Value:    bscFeaturesDefault,
+		Value:    bscFeaturesDefaultBool,
 		Category: flags.EthCategory,
 	}
 	DirectBroadcastFlag = &cli.BoolFlag{
 		Name:     "directbroadcast",
 		Usage:    "Enable directly broadcast mined block to all peers",
-		Value:    bscFeaturesDefault,
+		Value:    bscFeaturesDefaultBool,
 		Category: flags.EthCategory,
 	}
 	DisableSnapProtocolFlag = &cli.BoolFlag{
 		Name:     "disablesnapprotocol",
 		Usage:    "Disable snap protocol",
-		Value:    bscFeaturesDefault,
+		Value:    bscFeaturesDefaultBool,
 		Category: flags.EthCategory,
 	}
 	EnableTrustProtocolFlag = &cli.BoolFlag{
 		Name:     "enabletrustprotocol",
 		Usage:    "Enable trust protocol",
-		Value:    bscFeaturesDefault,
+		Value:    bscFeaturesDefaultBool,
 		Category: flags.FastNodeCategory,
 	}
 	RangeLimitFlag = &cli.BoolFlag{
 		Name:     "rangelimit",
 		Usage:    "Enable 5000 blocks limit for range query",
-		Value:    bscFeaturesDefault,
+		Value:    bscFeaturesDefaultBool,
 		Category: flags.APICategory,
 	}
 	DiffFlag = flags.DirectoryFlag{
@@ -228,7 +230,7 @@ var (
 	ForceFlag = &cli.BoolFlag{
 		Name:  "force",
 		Usage: "Force convert hbss trie node to pbss trie node. Ignore any metadata",
-		Value: bscFeaturesDefault,
+		Value: bscFeaturesDefaultBool,
 	}
 	// Dump command options.
 	IterativeOutputFlag = &cli.BoolFlag{
@@ -354,13 +356,13 @@ var (
 	PathDBSyncFlag = &cli.BoolFlag{
 		Name:     "pathdb.sync",
 		Usage:    "sync flush nodes cache to disk in path schema",
-		Value:    bscFeaturesDefault,
+		Value:    bscFeaturesDefaultBool,
 		Category: flags.StateCategory,
 	}
 	JournalFileFlag = &cli.BoolFlag{
 		Name:     "journalfile",
 		Usage:    "Enable using journal file to store the TrieJournal instead of KVDB in pbss (default = false)",
-		Value:    bscFeaturesDefault,
+		Value:    bscFeaturesDefaultBool,
 		Category: flags.StateCategory,
 	}
 	StateHistoryFlag = &cli.Uint64Flag{
@@ -567,7 +569,7 @@ var (
 	PersistDiffFlag = &cli.BoolFlag{
 		Name:     "persistdiff",
 		Usage:    "Enable persistence of the diff layer",
-		Value:    bscFeaturesDefault,
+		Value:    bscFeaturesDefaultBool,
 		Category: flags.FastNodeCategory,
 	}
 	DiffBlockFlag = &cli.Uint64Flag{
@@ -579,7 +581,7 @@ var (
 	PruneAncientDataFlag = &cli.BoolFlag{
 		Name:     "pruneancient",
 		Usage:    "Prune ancient data, is an optional config and disabled by default. Only keep the latest 9w blocks' data,the older blocks' data will be permanently pruned. Notice:the geth/chaindata/ancient dir will be removed, if restart without the flag, the ancient data will start with the previous point that the oldest unpruned block number. Recommends to the user who don't care about the ancient data.",
-		Value:    bscFeaturesDefault,
+		Value:    bscFeaturesDefaultBool,
 		Category: flags.BlockHistoryCategory,
 	}
 	CacheLogSizeFlag = &cli.IntFlag{
@@ -631,13 +633,13 @@ var (
 	MinerRecommitIntervalFlag = &cli.DurationFlag{
 		Name:     "miner.recommit",
 		Usage:    "Time interval to recreate the block being mined",
-		Value:    ethconfig.Defaults.Miner.Recommit,
+		Value:    *ethconfig.Defaults.Miner.Recommit,
 		Category: flags.MinerCategory,
 	}
 	MinerDelayLeftoverFlag = &cli.DurationFlag{
 		Name:     "miner.delayleftover",
 		Usage:    "Time reserved to finalize a block",
-		Value:    ethconfig.Defaults.Miner.DelayLeftOver,
+		Value:    *ethconfig.Defaults.Miner.DelayLeftOver,
 		Category: flags.MinerCategory,
 	}
 
@@ -1115,6 +1117,7 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 		Usage: "the p2p port of the nodes in the network",
 		Value: 30311,
 	}
+
 	MetricsInfluxDBOrganizationFlag = &cli.StringFlag{
 		Name:     "metrics.influxdb.organization",
 		Usage:    "InfluxDB organization name (v2 only)",
@@ -1861,17 +1864,20 @@ func setMiner(ctx *cli.Context, cfg *minerconfig.Config) {
 		cfg.GasPrice = flags.GlobalBig(ctx, MinerGasPriceFlag.Name)
 	}
 	if ctx.IsSet(MinerRecommitIntervalFlag.Name) {
-		cfg.Recommit = ctx.Duration(MinerRecommitIntervalFlag.Name)
+		recommitIntervalFlag := ctx.Duration(MinerRecommitIntervalFlag.Name)
+		cfg.Recommit = &recommitIntervalFlag
 	}
 	if ctx.IsSet(MinerDelayLeftoverFlag.Name) {
-		cfg.DelayLeftOver = ctx.Duration(MinerDelayLeftoverFlag.Name)
+		minerDelayLeftover := ctx.Duration(MinerDelayLeftoverFlag.Name)
+		cfg.DelayLeftOver = &minerDelayLeftover
 	}
 	if ctx.Bool(VotingEnabledFlag.Name) {
 		cfg.VoteEnable = true
 	}
 	if ctx.IsSet(MinerNewPayloadTimeoutFlag.Name) {
 		log.Warn("The flag --miner.newpayload-timeout is deprecated and will be removed, please use --miner.recommit")
-		cfg.Recommit = ctx.Duration(MinerNewPayloadTimeoutFlag.Name)
+		recommitIntervalFlag := ctx.Duration(MinerRecommitIntervalFlag.Name)
+		cfg.Recommit = &recommitIntervalFlag
 	}
 	if ctx.Bool(DisableVoteAttestationFlag.Name) {
 		cfg.DisableVoteAttestation = true

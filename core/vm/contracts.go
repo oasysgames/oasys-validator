@@ -17,6 +17,7 @@
 package vm
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
@@ -31,11 +32,16 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bls12-381/fr"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/tracing"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/blake2b"
 	"github.com/ethereum/go-ethereum/crypto/bn256"
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
+	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/prysmaticlabs/prysm/v5/crypto/bls"
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -135,6 +141,9 @@ var PrecompiledContractsPrague = PrecompiledContracts{
 	common.BytesToAddress([]byte{0x0f}): &bls12381Pairing{},
 	common.BytesToAddress([]byte{0x10}): &bls12381MapG1{},
 	common.BytesToAddress([]byte{0x11}): &bls12381MapG2{},
+
+	common.BytesToAddress([]byte{0x66}): &blsSignatureVerify{},
+	common.BytesToAddress([]byte{0x68}): &verifyDoubleSignEvidence{},
 }
 
 var PrecompiledContractsBLS = PrecompiledContractsPrague
@@ -1122,6 +1131,75 @@ func (c *bls12381MapG2) Run(input []byte) ([]byte, error) {
 	return encodePointG2(&r), nil
 }
 
+// blsSignatureVerify implements bls signature verification precompile.
+type blsSignatureVerify struct{}
+
+const (
+	msgHashLength         = uint64(32)
+	signatureLength       = uint64(96)
+	singleBlsPubkeyLength = uint64(48)
+)
+
+// RequiredGas returns the gas required to execute the pre-compiled contract.
+func (c *blsSignatureVerify) RequiredGas(input []byte) uint64 {
+	msgAndSigLength := msgHashLength + signatureLength
+	inputLen := uint64(len(input))
+	if inputLen <= msgAndSigLength ||
+		(inputLen-msgAndSigLength)%singleBlsPubkeyLength != 0 {
+		return params.BlsSignatureVerifyBaseGas
+	}
+	pubKeyNumber := (inputLen - msgAndSigLength) / singleBlsPubkeyLength
+	return params.BlsSignatureVerifyBaseGas + pubKeyNumber*params.BlsSignatureVerifyPerKeyGas
+}
+
+// Run input:
+// msg      | signature | [{bls pubkey}] |
+// 32 bytes | 96 bytes  | [{48 bytes}]   |
+func (c *blsSignatureVerify) Run(input []byte) ([]byte, error) {
+	msgAndSigLength := msgHashLength + signatureLength
+	inputLen := uint64(len(input))
+	if inputLen <= msgAndSigLength ||
+		(inputLen-msgAndSigLength)%singleBlsPubkeyLength != 0 {
+		log.Debug("blsSignatureVerify input size wrong", "inputLen", inputLen)
+		return nil, ErrExecutionReverted
+	}
+
+	var msg [32]byte
+	msgBytes := getData(input, 0, msgHashLength)
+	copy(msg[:], msgBytes)
+
+	signatureBytes := getData(input, msgHashLength, signatureLength)
+	sig, err := bls.SignatureFromBytes(signatureBytes)
+	if err != nil {
+		log.Debug("blsSignatureVerify invalid signature", "err", err)
+		return nil, ErrExecutionReverted
+	}
+
+	pubKeyNumber := (inputLen - msgAndSigLength) / singleBlsPubkeyLength
+	pubKeys := make([]bls.PublicKey, pubKeyNumber)
+	for i := uint64(0); i < pubKeyNumber; i++ {
+		pubKeyBytes := getData(input, msgAndSigLength+i*singleBlsPubkeyLength, singleBlsPubkeyLength)
+		pubKey, err := bls.PublicKeyFromBytes(pubKeyBytes)
+		if err != nil {
+			log.Debug("blsSignatureVerify invalid pubKey", "err", err)
+			return nil, ErrExecutionReverted
+		}
+		pubKeys[i] = pubKey
+	}
+
+	if pubKeyNumber > 1 {
+		if !sig.FastAggregateVerify(pubKeys, msg) {
+			return common.Big0.Bytes(), nil
+		}
+	} else {
+		if !sig.Verify(pubKeys[0], msgBytes) {
+			return common.Big0.Bytes(), nil
+		}
+	}
+
+	return big1.Bytes(), nil
+}
+
 // kzgPointEvaluation implements the EIP-4844 point evaluation precompile.
 type kzgPointEvaluation struct{}
 
@@ -1184,4 +1262,96 @@ func kZGToVersionedHash(kzg kzg4844.Commitment) common.Hash {
 	h[0] = blobCommitmentVersionKZG
 
 	return h
+}
+
+// verifyDoubleSignEvidence implements bsc header verification precompile.
+type verifyDoubleSignEvidence struct{}
+
+// RequiredGas returns the gas required to execute the pre-compiled contract.
+func (c *verifyDoubleSignEvidence) RequiredGas(input []byte) uint64 {
+	return params.DoubleSignEvidenceVerifyGas
+}
+
+type DoubleSignEvidence struct {
+	ChainId      *big.Int
+	HeaderBytes1 []byte
+	HeaderBytes2 []byte
+}
+
+const (
+	extraSeal = 65
+)
+
+var (
+	errInvalidEvidence = errors.New("invalid double sign evidence")
+)
+
+// Run input: rlp encoded DoubleSignEvidence
+// return:
+// signer address| evidence height|
+// 20 bytes      | 32 bytes       |
+func (c *verifyDoubleSignEvidence) Run(input []byte) ([]byte, error) {
+	evidence := &DoubleSignEvidence{}
+	err := rlp.DecodeBytes(input, evidence)
+	if err != nil {
+		return nil, ErrExecutionReverted
+	}
+
+	header1 := &types.Header{}
+	err = rlp.DecodeBytes(evidence.HeaderBytes1, header1)
+	if err != nil {
+		return nil, ErrExecutionReverted
+	}
+
+	header2 := &types.Header{}
+	err = rlp.DecodeBytes(evidence.HeaderBytes2, header2)
+	if err != nil {
+		return nil, ErrExecutionReverted
+	}
+
+	// basic check
+	if len(header1.Number.Bytes()) > 32 || len(header2.Number.Bytes()) > 32 { // block number should be less than 2^256
+		return nil, errInvalidEvidence
+	}
+	if header1.Number.Cmp(header2.Number) != 0 {
+		return nil, errInvalidEvidence
+	}
+	if header1.ParentHash != header2.ParentHash {
+		return nil, errInvalidEvidence
+	}
+
+	if len(header1.Extra) < extraSeal || len(header2.Extra) < extraSeal {
+		return nil, errInvalidEvidence
+	}
+	sig1 := header1.Extra[len(header1.Extra)-extraSeal:]
+	sig2 := header2.Extra[len(header2.Extra)-extraSeal:]
+	if bytes.Equal(sig1, sig2) {
+		return nil, errInvalidEvidence
+	}
+
+	// check sig
+	msgHash1 := types.SealHash(header1)
+	msgHash2 := types.SealHash(header2)
+	if bytes.Equal(msgHash1.Bytes(), msgHash2.Bytes()) {
+		return nil, errInvalidEvidence
+	}
+	pubkey1, err := secp256k1.RecoverPubkey(msgHash1.Bytes(), sig1)
+	if err != nil {
+		return nil, ErrExecutionReverted
+	}
+	pubkey2, err := secp256k1.RecoverPubkey(msgHash2.Bytes(), sig2)
+	if err != nil {
+		return nil, ErrExecutionReverted
+	}
+	if !bytes.Equal(pubkey1, pubkey2) {
+		return nil, errInvalidEvidence
+	}
+
+	returnBz := make([]byte, 52) // 20 + 32
+	signerAddr := crypto.Keccak256(pubkey1[1:])[12:]
+	evidenceHeightBz := header1.Number.Bytes()
+	copy(returnBz[:20], signerAddr)
+	copy(returnBz[52-len(evidenceHeightBz):], evidenceHeightBz)
+
+	return returnBz, nil
 }

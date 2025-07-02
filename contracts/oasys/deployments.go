@@ -25,6 +25,7 @@ var deploymentSets = map[common.Hash]map[uint64]deploymentSet{
 		4089588: deploymentSet{deployments11},
 		5095900: deploymentSet{deployments12},
 		5527429: deploymentSet{deployments13},
+		9999999: deploymentSet{deployments14, deployments14_slash_indicator_mainnet},
 	},
 	params.OasysTestnetGenesisHash: {
 		1:       deploymentSet{deployments0},
@@ -40,6 +41,7 @@ var deploymentSets = map[common.Hash]map[uint64]deploymentSet{
 		4017600: deploymentSet{deployments11},
 		4958700: deploymentSet{deployments12},
 		5445775: deploymentSet{deployments13},
+		8496170: deploymentSet{deployments14, deployments14_slash_indicator_testnet}, // Fri Jul 04 2025 10:00:00 GMT+0900
 	},
 	defaultGenesisHash: {
 		2: deploymentSet{
@@ -57,6 +59,7 @@ var deploymentSets = map[common.Hash]map[uint64]deploymentSet{
 			// deployments11, // Disable this feature as it changes the epoch, which can impact development.
 			deployments12,
 			deployments13,
+			deployments14, deployments14_slash_indicator_localnet,
 		},
 	},
 }

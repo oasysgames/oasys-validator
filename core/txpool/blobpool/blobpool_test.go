@@ -241,7 +241,7 @@ func makeUnsignedTx(nonce uint64, gasTipCap uint64, gasFeeCap uint64, blobFeeCap
 	return makeUnsignedTxWithTestBlob(nonce, gasTipCap, gasFeeCap, blobFeeCap, rnd.Intn(len(testBlobs)))
 }
 
-// makeUnsignedTx is a utility method to construct a random blob transaction
+// makeUnsignedTxWithTestBlob is a utility method to construct a random blob transaction
 // without signing it.
 func makeUnsignedTxWithTestBlob(nonce uint64, gasTipCap uint64, gasFeeCap uint64, blobFeeCap uint64, blobIdx int) *types.BlobTx {
 	return &types.BlobTx{
@@ -1067,7 +1067,7 @@ func TestChangingSlotterSize(t *testing.T) {
 
 	// Write the two safely sized txs to store. note: although the store is
 	// configured for a blob count of 6, it can also support around ~1mb of call
-	// data - all this to say that we aren't using the the absolute largest shelf
+	// data - all this to say that we aren't using the absolute largest shelf
 	// available.
 	store.Put(blob1)
 	store.Put(blob2)

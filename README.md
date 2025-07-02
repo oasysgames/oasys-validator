@@ -7,6 +7,7 @@ https://pkg.go.dev/badge/github.com/ethereum/go-ethereum
 )](https://pkg.go.dev/github.com/ethereum/go-ethereum?tab=doc)
 [![Go Report Card](https://goreportcard.com/badge/github.com/ethereum/go-ethereum)](https://goreportcard.com/report/github.com/ethereum/go-ethereum)
 [![Discord](https://img.shields.io/badge/discord-join%20chat-blue.svg)](https://discord.gg/oasysgames)
+[![Twitter](https://img.shields.io/twitter/follow/oasyschain)](https://x.com/oasyschain)
 
 Automated builds are available for stable releases and the unstable master branch. Binary
 archives are published at https://github.com/oasysgames/oasys-validator/releases.

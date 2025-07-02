@@ -23,18 +23,24 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
+)
+
+var (
+	defaultDelayLeftOver = 50 * time.Millisecond
+	defaultRecommit      = 6 * time.Second
 )
 
 // Config is the configuration parameters of mining.
 type Config struct {
 	Etherbase     common.Address `toml:",omitempty"` // Public address for block mining rewards
 	ExtraData     hexutil.Bytes  `toml:",omitempty"` // Block extra data set by the miner
-	DelayLeftOver time.Duration  // Time reserved to finalize a block(calculate root, distribute income...)
+	DelayLeftOver *time.Duration // Time reserved to finalize a block(calculate root, distribute income...)
 	GasFloor      uint64         // Target gas floor for mined blocks.
 	GasCeil       uint64         // Target gas ceiling for mined blocks.
 	GasPrice      *big.Int       // Minimum gas price for mining a transaction
-	Recommit      time.Duration  // The time interval for miner to re-create mining work.
+	Recommit      *time.Duration // The time interval for miner to re-create mining work.
 	VoteEnable    bool           // Whether to vote when mining
 
 	DisableVoteAttestation bool // Whether to skip assembling vote attestation
@@ -49,11 +55,28 @@ var DefaultConfig = Config{
 	// consensus-layer usually will wait a half slot of time(6s)
 	// for payload generation. It should be enough for Geth to
 	// run 3 rounds.
-	Recommit:      6 * time.Second,
-	DelayLeftOver: 50 * time.Millisecond,
+	Recommit:      &defaultRecommit,
+	DelayLeftOver: &defaultDelayLeftOver,
 }
 
 type BuilderConfig struct {
 	Address common.Address
 	URL     string
+}
+
+func ApplyDefaultMinerConfig(cfg *Config) {
+	if cfg == nil {
+		log.Warn("ApplyDefaultMinerConfig cfg == nil")
+		return
+	}
+
+	// check [Eth.Miner]
+	if cfg.DelayLeftOver == nil {
+		cfg.DelayLeftOver = &defaultDelayLeftOver
+		log.Info("ApplyDefaultMinerConfig", "DelayLeftOver", *cfg.DelayLeftOver)
+	}
+	if cfg.Recommit == nil {
+		cfg.Recommit = &defaultRecommit
+		log.Info("ApplyDefaultMinerConfig", "Recommit", *cfg.Recommit)
+	}
 }
