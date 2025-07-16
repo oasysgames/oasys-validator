@@ -254,7 +254,7 @@ var (
 		LondonBlock:         big.NewInt(0),
 		ShanghaiTime:        newUint64(1721910600), // Thu Jul 25 2024 21:30:00 GMT+0900
 		CancunTime:          newUint64(1734508800), // Wed Dec 18 2024 17:00:00 GMT+0900
-		// PragueTime:          newUint64(9999999999), // TODO
+		PragueTime:          newUint64(1753761660), // Tue Jul 29 2025 13:01:00 GMT+0900
 
 		Oasys: &OasysConfig{
 			Period: 15,
@@ -262,7 +262,7 @@ var (
 		},
 		BlobScheduleConfig: &BlobScheduleConfig{
 			Cancun: DefaultCancunBlobConfig,
-			// Prague: DefaultPragueBlobConfig, // TODO
+			Prague: DefaultPragueBlobConfig,
 		},
 	}
 
