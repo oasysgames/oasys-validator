@@ -131,7 +131,13 @@ func (oracle *Oracle) processBlock(bf *blockFees, percentiles []float64) {
 
 	sorter := make([]txGasAndReward, len(bf.block.Transactions()))
 	for i, tx := range bf.block.Transactions() {
-		reward, _ := tx.EffectiveGasTip(bf.block.BaseFee())
+		reward, err := tx.EffectiveGasTip(bf.block.BaseFee())
+		if errors.Is(err, types.ErrGasFeeCapTooLow) {
+			// Effective gas tip became negative in case of system transaction. So we set it to 0.
+			reward = new(big.Int)
+		} else if err != nil {
+			// Originally error is ignored.
+		}
 		sorter[i] = txGasAndReward{gasUsed: bf.receipts[i].GasUsed, reward: reward}
 	}
 	slices.SortStableFunc(sorter, func(a, b txGasAndReward) int {
