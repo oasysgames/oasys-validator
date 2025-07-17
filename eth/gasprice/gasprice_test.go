@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/beacon"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
@@ -245,6 +246,10 @@ func (b *testBackend) CurrentHeader() *types.Header {
 
 func (b *testBackend) GetBlockByNumber(number uint64) *types.Block {
 	return b.chain.GetBlockByNumber(number)
+}
+
+func (b *testBackend) Engine() consensus.Engine {
+	panic("should never happen")
 }
 
 func TestSuggestTipCap(t *testing.T) {

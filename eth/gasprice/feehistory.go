@@ -27,6 +27,7 @@ import (
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -134,7 +135,11 @@ func (oracle *Oracle) processBlock(bf *blockFees, percentiles []float64) {
 		reward, err := tx.EffectiveGasTip(bf.block.BaseFee())
 		if errors.Is(err, types.ErrGasFeeCapTooLow) {
 			// Effective gas tip became negative in case of system transaction. So we set it to 0.
-			reward = new(big.Int)
+			if pos, isPoS := oracle.backend.Engine().(consensus.PoS); isPoS {
+				if isSystemTx, _ := pos.IsSystemTransaction(tx, bf.block.Header()); isSystemTx {
+					reward = new(big.Int)
+				}
+			}
 		} else if err != nil {
 			// Originally error is ignored.
 		}
