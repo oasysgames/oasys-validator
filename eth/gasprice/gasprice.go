@@ -24,6 +24,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/lru"
+	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -57,6 +58,7 @@ type OracleBackend interface {
 	Pending() (*types.Block, types.Receipts, *state.StateDB)
 	ChainConfig() *params.ChainConfig
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
+	Engine() consensus.Engine
 }
 
 // Oracle recommends gas prices based on the content of recent
