@@ -25,7 +25,7 @@ var deploymentSets = map[common.Hash]map[uint64]deploymentSet{
 		4089588: deploymentSet{deployments11},
 		5095900: deploymentSet{deployments12},
 		5527429: deploymentSet{deployments13},
-		9999999: deploymentSet{deployments14, deployments14_slash_indicator_mainnet},
+		8728540: deploymentSet{deployments14, deployments14_slash_indicator_mainnet}, // Fri Jul 29 2025 13:00:00 GMT+0900
 	},
 	params.OasysTestnetGenesisHash: {
 		1:       deploymentSet{deployments0},
