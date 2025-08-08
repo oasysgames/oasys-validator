@@ -3340,7 +3340,7 @@ func preShanghaiConfig() *params.ChainConfig {
 	return &config
 }
 
-// TestEIP2718TransitionWithParliaConfig tests EIP-2718 with Parlia Config.
+// TestEIP2718TransitionWithOasysConfig tests EIP-2718 with Parlia Config.
 func TestEIP2718TransitionWithOasysConfig(t *testing.T) {
 	testEIP2718TransitionWithConfig(t, rawdb.HashScheme, preShanghaiConfig())
 	testEIP2718TransitionWithConfig(t, rawdb.PathScheme, preShanghaiConfig())
