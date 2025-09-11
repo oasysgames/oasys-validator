@@ -38,9 +38,14 @@ import (
 )
 
 const (
-	checkpointInterval = 1024 // Number of blocks after which to save the vote snapshot to the database
-	inmemorySnapshots  = 128  // Number of recent vote snapshots to keep in memory
-	inmemorySignatures = 4096 // Number of recent block signatures to keep in memory
+	// NOTE: Will be removed after `checkpointIntervalV2` below becomes the default. (Next, next hardfork)
+	checkpointIntervalLegacy = 1024 // Number of blocks after which to save the vote snapshot to the database
+
+	// Note: checkpointInterval must be able to divide by epoch period.
+	// 5760 / 1440 = 4, 14400(SHORT_BLOCK_TIME_EPOCH_PERIOD) / 1440 = 10
+	checkpointIntervalV2 = 1440 // Number of blocks after which to save the vote snapshot to the database
+	inmemorySnapshots    = 128  // Number of recent vote snapshots to keep in memory
+	inmemorySignatures   = 4096 // Number of recent block signatures to keep in memory
 
 	extraVanity = 32                     // Fixed number of extra-data prefix bytes reserved for signer vanity
 	extraSeal   = crypto.SignatureLength // Fixed number of extra-data suffix bytes reserved for signer seal
@@ -261,6 +266,11 @@ func (c *Oasys) VerifyHeaders(chain consensus.ChainHeaderReader, headers []*type
 func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header) error {
 	if header.Number == nil {
 		return errUnknownBlock
+	}
+	if !chain.Config().IsFastFinalityEnabled(header.Number) {
+		// Skip verification to bypass `header for hash not found` error which is caused by ethAPI.
+		// Asssume the headers before fast finality enabled block are all valid.
+		return nil
 	}
 	number := header.Number.Uint64()
 
@@ -672,7 +682,7 @@ func (c *Oasys) snapshot(chain consensus.ChainHeaderReader, number uint64, hash 
 			break
 		}
 		// If an on-disk checkpoint snapshot can be found, use that
-		if number%checkpointInterval == 0 {
+		if number%checkpointIntervalLegacy == 0 || number%checkpointIntervalV2 == 0 {
 			if s, err := loadSnapshot(c.chainConfig, c.signatures, c.ethAPI, c.db, hash); err == nil {
 				log.Trace("Loaded snapshot from disk", "number", number, "hash", hash)
 				snap = s
@@ -737,7 +747,7 @@ func (c *Oasys) snapshot(chain consensus.ChainHeaderReader, number uint64, hash 
 	c.recents.Add(snap.Hash, snap)
 
 	// If we've generated a new checkpoint snapshot, save to disk
-	if snap.Number%checkpointInterval == 0 && len(headers) > 0 {
+	if snap.Number%checkpointIntervalV2 == 0 && len(headers) > 0 {
 		if err = snap.store(c.db); err != nil {
 			return nil, err
 		}
