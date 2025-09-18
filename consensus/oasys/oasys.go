@@ -1448,10 +1448,10 @@ func (c *Oasys) getNextValidators(chain consensus.ChainHeaderReader, header *typ
 	if snap.Environment.IsEpoch(number) {
 		if fromHeader && c.chainConfig.IsFastFinalityEnabled(header.Number) {
 			if validators, err = getValidatorsFromHeader(header); err != nil {
-				log.Warn("failed to get validators from header", "in", "getNextValidators", "hash", header.Hash(), "number", number, "err", err)
+				err = fmt.Errorf("failed to get validators from header, blockNumber: %d, parentHash: %s, error: %v", number, header.ParentHash, err)
+				return
 			}
 		}
-		// If not fast finality or failed to get validators from header
 		if validators == nil {
 			if validators, err = getNextValidators(c.chainConfig, c.ethAPI, header.ParentHash, snap.Environment.Epoch(number), number); err != nil {
 				err = fmt.Errorf("failed to get next validators, blockNumber: %d, parentHash: %s, error: %v", number, header.ParentHash, err)
@@ -1600,7 +1600,8 @@ func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Hea
 	if snap.Environment.IsEpoch(number) {
 		if fromHeader && chain.Config().IsFastFinalityEnabled(header.Number) {
 			if env, err = getEnvironmentFromHeader(header); err != nil {
-				log.Warn("failed to get environment value from header", "in", "environment", "hash", header.Hash(), "number", number, "err", err)
+				err = fmt.Errorf("failed to get environment value from header, blockNumber: %d, parentHash: %s, error: %v", number, header.ParentHash, err)
+				return
 			}
 		}
 		// If not fast finality or failed to get environment from header

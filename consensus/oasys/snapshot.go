@@ -212,27 +212,24 @@ func (s *Snapshot) apply(headers []*types.Header, chain consensus.ChainHeaderRea
 
 		var exists bool
 		if number > 0 && snap.Environment.IsEpoch(number) {
-			var nextValidator *nextValidators
+			var (
+				nextEnv       *params.EnvironmentValue
+				nextValidator *nextValidators
+			)
 			if s.config.IsFastFinalityEnabled(header.Number) {
-				if nextValidator, err = getValidatorsFromHeader(header); err != nil {
-					log.Warn("failed to get validators from header", "in", "Snapshot.apply", "hash", header.Hash(), "number", number, "err", err)
+				if nextEnv, err = getEnvironmentFromHeader(header); err != nil {
+					return nil, fmt.Errorf("failed to get environment from header, blockNumber: %d, parentHash: %s, error: %v", number, header.ParentHash, err)
 				}
-			}
-			// If not fast finality or failed to get validators from header
-			if nextValidator == nil {
+				if nextValidator, err = getValidatorsFromHeader(header); err != nil {
+					return nil, fmt.Errorf("failed to get validators from header, blockNumber: %d, parentHash: %s, error: %v", number, header.ParentHash, err)
+				}
+			} else {
+				if nextEnv, err = getNextEnvironmentValue(s.ethAPI, header.ParentHash); err != nil {
+					return nil, fmt.Errorf("failed to get environment in Snapshot.apply, err: %w", err)
+				}
 				if nextValidator, err = getNextValidators(s.config, s.ethAPI, header.ParentHash, snap.Environment.Epoch(number), number); err != nil {
 					return nil, fmt.Errorf("failed to get validators, in Snapshot.apply, err: %w", err)
 				}
-			}
-			var nextEnv *params.EnvironmentValue
-			if s.config.IsFastFinalityEnabled(header.Number) {
-				nextEnv, err = getEnvironmentFromHeader(header)
-			} else {
-				nextEnv, err = getNextEnvironmentValue(s.ethAPI, header.ParentHash)
-			}
-			if err != nil {
-				log.Error("Failed to get environment value", "in", "Snapshot.apply", "hash", header.ParentHash, "number", number, "err", err)
-				return nil, err
 			}
 
 			snap.Environment = nextEnv.Copy()
