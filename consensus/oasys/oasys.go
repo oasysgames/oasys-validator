@@ -436,7 +436,7 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 }
 
 // getParent returns the parent of a given block.
-func (o *Oasys) getParent(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header) (*types.Header, error) {
+func (c *Oasys) getParent(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header) (*types.Header, error) {
 	var parent *types.Header
 	number := header.Number.Uint64()
 	if len(parents) > 0 {
@@ -452,8 +452,8 @@ func (o *Oasys) getParent(chain consensus.ChainHeaderReader, header *types.Heade
 }
 
 // verifyVoteAttestation checks whether the vote attestation in the header is valid.
-func (o *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header, env *params.EnvironmentValue) error {
-	attestation, err := getVoteAttestationFromHeader(header, o.chainConfig, o.config, env.IsEpoch(header.Number.Uint64()))
+func (c *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header, env *params.EnvironmentValue) error {
+	attestation, err := getVoteAttestationFromHeader(header, c.chainConfig, c.config, env.IsEpoch(header.Number.Uint64()))
 	if err != nil {
 		return err
 	}
@@ -468,7 +468,7 @@ func (o *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header 
 	}
 
 	// Get parent block
-	parent, err := o.getParent(chain, header, parents)
+	parent, err := c.getParent(chain, header, parents)
 	if err != nil {
 		return err
 	}
@@ -488,7 +488,7 @@ func (o *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header 
 	if len(parents) > 0 {
 		headers = parents
 	}
-	justifiedBlockNumber, justifiedBlockHash, err := o.GetJustifiedNumberAndHash(chain, headers)
+	justifiedBlockNumber, justifiedBlockHash, err := c.GetJustifiedNumberAndHash(chain, headers)
 	if err != nil {
 		return errors.New("unexpected error when getting the highest justified number and hash")
 	}
@@ -498,11 +498,11 @@ func (o *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header 
 	}
 
 	// The snapshot should be the targetNumber-1 block's snapshot.
-	snap, err := o.snapshot(chain, parent.Number.Uint64()-1, parent.ParentHash, nil)
+	snap, err := c.snapshot(chain, parent.Number.Uint64()-1, parent.ParentHash, nil)
 	if err != nil {
 		return err
 	}
-	validators, err := o.getNextValidators(chain, header, snap, true)
+	validators, err := c.getNextValidators(chain, header, snap, true)
 	if err != nil {
 		return fmt.Errorf("failed to get validators, in: verifyVoteAttestation, err: %v", err)
 	}
@@ -656,11 +656,11 @@ func getVoteAttestationFromHeader(header *types.Header, chainConfig *params.Chai
 // Decode vote atestation from the block header. It is a wrapper method that allows
 // calls from outside the consensus engine. The provided block header may depend on
 // an unknown ancestor, so it must not access the Environment or Snapshot.
-func (o *Oasys) DecodeVoteAttestation(header *types.Header) *types.VoteAttestation {
-	attestation, _ := getVoteAttestationFromHeader(header, o.chainConfig, o.config, false)
+func (c *Oasys) DecodeVoteAttestation(header *types.Header) *types.VoteAttestation {
+	attestation, _ := getVoteAttestationFromHeader(header, c.chainConfig, c.config, false)
 	if attestation == nil {
 		// Possible epoch block.
-		attestation, _ = getVoteAttestationFromHeader(header, o.chainConfig, o.config, true)
+		attestation, _ = getVoteAttestationFromHeader(header, c.chainConfig, c.config, true)
 	}
 	return attestation
 }
