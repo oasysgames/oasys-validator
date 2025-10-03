@@ -38,9 +38,14 @@ import (
 )
 
 const (
-	checkpointInterval = 1024 // Number of blocks after which to save the vote snapshot to the database
-	inmemorySnapshots  = 128  // Number of recent vote snapshots to keep in memory
-	inmemorySignatures = 4096 // Number of recent block signatures to keep in memory
+	// NOTE: Will be removed after `checkpointIntervalV2` below becomes the default. (Next, next hardfork)
+	checkpointIntervalLegacy = 1024 // Number of blocks after which to save the vote snapshot to the database
+
+	// Note: checkpointInterval must be able to divide by epoch period.
+	// 5760 / 1440 = 4, 14400(SHORT_BLOCK_TIME_EPOCH_PERIOD) / 1440 = 10
+	checkpointIntervalV2 = 1440 // Number of blocks after which to save the vote snapshot to the database
+	inmemorySnapshots    = 128  // Number of recent vote snapshots to keep in memory
+	inmemorySignatures   = 4096 // Number of recent block signatures to keep in memory
 
 	extraVanity = 32                     // Fixed number of extra-data prefix bytes reserved for signer vanity
 	extraSeal   = crypto.SignatureLength // Fixed number of extra-data suffix bytes reserved for signer seal
@@ -262,6 +267,11 @@ func (c *Oasys) verifyHeader(chain consensus.ChainHeaderReader, header *types.He
 	if header.Number == nil {
 		return errUnknownBlock
 	}
+	if !chain.Config().IsFastFinalityEnabled(header.Number) {
+		// Skip verification to bypass `header for hash not found` error which is caused by ethAPI.
+		// Asssume the headers before fast finality enabled block are all valid.
+		return nil
+	}
 	number := header.Number.Uint64()
 
 	// Don't waste time checking blocks from the future
@@ -426,7 +436,7 @@ func (c *Oasys) verifyCascadingFields(chain consensus.ChainHeaderReader, header 
 }
 
 // getParent returns the parent of a given block.
-func (o *Oasys) getParent(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header) (*types.Header, error) {
+func (c *Oasys) getParent(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header) (*types.Header, error) {
 	var parent *types.Header
 	number := header.Number.Uint64()
 	if len(parents) > 0 {
@@ -442,8 +452,8 @@ func (o *Oasys) getParent(chain consensus.ChainHeaderReader, header *types.Heade
 }
 
 // verifyVoteAttestation checks whether the vote attestation in the header is valid.
-func (o *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header, env *params.EnvironmentValue) error {
-	attestation, err := getVoteAttestationFromHeader(header, o.chainConfig, o.config, env.IsEpoch(header.Number.Uint64()))
+func (c *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header *types.Header, parents []*types.Header, env *params.EnvironmentValue) error {
+	attestation, err := getVoteAttestationFromHeader(header, c.chainConfig, c.config, env.IsEpoch(header.Number.Uint64()))
 	if err != nil {
 		return err
 	}
@@ -458,7 +468,7 @@ func (o *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header 
 	}
 
 	// Get parent block
-	parent, err := o.getParent(chain, header, parents)
+	parent, err := c.getParent(chain, header, parents)
 	if err != nil {
 		return err
 	}
@@ -478,7 +488,7 @@ func (o *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header 
 	if len(parents) > 0 {
 		headers = parents
 	}
-	justifiedBlockNumber, justifiedBlockHash, err := o.GetJustifiedNumberAndHash(chain, headers)
+	justifiedBlockNumber, justifiedBlockHash, err := c.GetJustifiedNumberAndHash(chain, headers)
 	if err != nil {
 		return errors.New("unexpected error when getting the highest justified number and hash")
 	}
@@ -488,11 +498,11 @@ func (o *Oasys) verifyVoteAttestation(chain consensus.ChainHeaderReader, header 
 	}
 
 	// The snapshot should be the targetNumber-1 block's snapshot.
-	snap, err := o.snapshot(chain, parent.Number.Uint64()-1, parent.ParentHash, nil)
+	snap, err := c.snapshot(chain, parent.Number.Uint64()-1, parent.ParentHash, nil)
 	if err != nil {
 		return err
 	}
-	validators, err := o.getNextValidators(chain, header, snap, true)
+	validators, err := c.getNextValidators(chain, header, snap, true)
 	if err != nil {
 		return fmt.Errorf("failed to get validators, in: verifyVoteAttestation, err: %v", err)
 	}
@@ -646,11 +656,11 @@ func getVoteAttestationFromHeader(header *types.Header, chainConfig *params.Chai
 // Decode vote atestation from the block header. It is a wrapper method that allows
 // calls from outside the consensus engine. The provided block header may depend on
 // an unknown ancestor, so it must not access the Environment or Snapshot.
-func (o *Oasys) DecodeVoteAttestation(header *types.Header) *types.VoteAttestation {
-	attestation, _ := getVoteAttestationFromHeader(header, o.chainConfig, o.config, false)
+func (c *Oasys) DecodeVoteAttestation(header *types.Header) *types.VoteAttestation {
+	attestation, _ := getVoteAttestationFromHeader(header, c.chainConfig, c.config, false)
 	if attestation == nil {
 		// Possible epoch block.
-		attestation, _ = getVoteAttestationFromHeader(header, o.chainConfig, o.config, true)
+		attestation, _ = getVoteAttestationFromHeader(header, c.chainConfig, c.config, true)
 	}
 	return attestation
 }
@@ -672,7 +682,7 @@ func (c *Oasys) snapshot(chain consensus.ChainHeaderReader, number uint64, hash 
 			break
 		}
 		// If an on-disk checkpoint snapshot can be found, use that
-		if number%checkpointInterval == 0 {
+		if number%checkpointIntervalLegacy == 0 || number%checkpointIntervalV2 == 0 {
 			if s, err := loadSnapshot(c.chainConfig, c.signatures, c.ethAPI, c.db, hash); err == nil {
 				log.Trace("Loaded snapshot from disk", "number", number, "hash", hash)
 				snap = s
@@ -737,7 +747,7 @@ func (c *Oasys) snapshot(chain consensus.ChainHeaderReader, number uint64, hash 
 	c.recents.Add(snap.Hash, snap)
 
 	// If we've generated a new checkpoint snapshot, save to disk
-	if snap.Number%checkpointInterval == 0 && len(headers) > 0 {
+	if snap.Number%checkpointIntervalV2 == 0 && len(headers) > 0 {
 		if err = snap.store(c.db); err != nil {
 			return nil, err
 		}
@@ -1438,10 +1448,10 @@ func (c *Oasys) getNextValidators(chain consensus.ChainHeaderReader, header *typ
 	if snap.Environment.IsEpoch(number) {
 		if fromHeader && c.chainConfig.IsFastFinalityEnabled(header.Number) {
 			if validators, err = getValidatorsFromHeader(header); err != nil {
-				log.Warn("failed to get validators from header", "in", "getNextValidators", "hash", header.Hash(), "number", number, "err", err)
+				err = fmt.Errorf("failed to get validators from header, blockNumber: %d, parentHash: %s, error: %v", number, header.ParentHash, err)
+				return
 			}
 		}
-		// If not fast finality or failed to get validators from header
 		if validators == nil {
 			if validators, err = getNextValidators(c.chainConfig, c.ethAPI, header.ParentHash, snap.Environment.Epoch(number), number); err != nil {
 				err = fmt.Errorf("failed to get next validators, blockNumber: %d, parentHash: %s, error: %v", number, header.ParentHash, err)
@@ -1590,7 +1600,8 @@ func (c *Oasys) environment(chain consensus.ChainHeaderReader, header *types.Hea
 	if snap.Environment.IsEpoch(number) {
 		if fromHeader && chain.Config().IsFastFinalityEnabled(header.Number) {
 			if env, err = getEnvironmentFromHeader(header); err != nil {
-				log.Warn("failed to get environment value from header", "in", "environment", "hash", header.Hash(), "number", number, "err", err)
+				err = fmt.Errorf("failed to get environment value from header, blockNumber: %d, parentHash: %s, error: %v", number, header.ParentHash, err)
+				return
 			}
 		}
 		// If not fast finality or failed to get environment from header
