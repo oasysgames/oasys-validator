@@ -127,7 +127,7 @@ var (
 		// utils.MultiDataBaseFlag,
 		// utils.PersistDiffFlag,
 		// utils.DiffBlockFlag,
-		// utils.PruneAncientDataFlag,
+		utils.PruneAncientDataFlag,
 		utils.CacheLogSizeFlag,
 		utils.FDLimitFlag,
 		utils.CryptoKZGFlag,
