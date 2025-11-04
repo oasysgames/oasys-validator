@@ -284,11 +284,7 @@ func (api *API) traceChain(start, end *types.Block, config *TraceConfig, closed 
 						TxIndex:     i,
 						TxHash:      tx.Hash(),
 					}
-<<<<<<< HEAD
-					res, err := api.traceTx(ctx, tx, msg, txctx, blockCtx, task.statedb, config)
-=======
 					res, err := api.traceTx(ctx, tx, msg, txctx, blockCtx, task.statedb, config, !beforeSystemTx, nil)
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 					if err != nil {
 						task.results[i] = &txTraceResult{TxHash: tx.Hash(), Error: err.Error()}
 						log.Warn("Tracing failed", "hash", tx.Hash(), "block", task.block.NumberU64(), "err", err)
@@ -656,11 +652,7 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 			TxIndex:     i,
 			TxHash:      tx.Hash(),
 		}
-<<<<<<< HEAD
-		res, err := api.traceTx(ctx, tx, msg, txctx, blockCtx, statedb, config)
-=======
 		res, err := api.traceTx(ctx, tx, msg, txctx, blockCtx, statedb, config, !beforeSystemTx, nil)
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 		if err != nil {
 			return nil, err
 		}
@@ -704,11 +696,7 @@ func (api *API) traceBlockParallel(ctx context.Context, block *types.Block, stat
 				// concurrent use.
 				// See: https://github.com/ethereum/go-ethereum/issues/29114
 				blockCtx := core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), nil)
-<<<<<<< HEAD
-				res, err := api.traceTx(ctx, txs[task.index], msg, txctx, blockCtx, task.statedb, config)
-=======
 				res, err := api.traceTx(ctx, txs[task.index], msg, txctx, blockCtx, task.statedb, config, task.isSystemTx, nil)
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 				if err != nil {
 					results[task.index] = &txTraceResult{TxHash: txs[task.index].Hash(), Error: err.Error()}
 					continue
@@ -939,11 +927,7 @@ func (api *API) TraceTransaction(ctx context.Context, hash common.Hash, config *
 		TxIndex:     int(index),
 		TxHash:      hash,
 	}
-<<<<<<< HEAD
-	return api.traceTx(ctx, tx, msg, txctx, vmctx, statedb, config)
-=======
 	return api.traceTx(ctx, tx, msg, txctx, vmctx, statedb, config, isSystemTx, nil)
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 }
 
 // TraceCall lets you trace a given eth_call. It collects the structured logs
@@ -1051,21 +1035,13 @@ func (api *API) TraceCall(ctx context.Context, args ethapi.TransactionArgs, bloc
 	if config != nil {
 		traceConfig = &config.TraceConfig
 	}
-<<<<<<< HEAD
-	return api.traceTx(ctx, tx, msg, new(Context), vmctx, statedb, traceConfig)
-=======
 	return api.traceTx(ctx, tx, msg, new(Context), blockContext, statedb, traceConfig, false, precompiles)
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 }
 
 // traceTx configures a new tracer according to the provided configuration, and
 // executes the given message in the provided environment. The return value will
 // be tracer dependent.
-<<<<<<< HEAD
-func (api *API) traceTx(ctx context.Context, tx *types.Transaction, message *core.Message, txctx *Context, vmctx vm.BlockContext, statedb *state.StateDB, config *TraceConfig) (interface{}, error) {
-=======
 func (api *API) traceTx(ctx context.Context, tx *types.Transaction, message *core.Message, txctx *Context, vmctx vm.BlockContext, statedb *state.StateDB, config *TraceConfig, isSystemTx bool, precompiles vm.PrecompiledContracts) (interface{}, error) {
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	var (
 		tracer  *Tracer
 		err     error

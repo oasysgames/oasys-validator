@@ -80,11 +80,7 @@ func testHandshake(t *testing.T, protocol uint) {
 		// Send the junk test with one peer, check the handshake failure
 		go p2p.Send(app, test.code, test.data)
 
-<<<<<<< HEAD
-		err := peer.Handshake(1, td, head.Hash(), genesis.Hash(), forkID, forkid.NewFilter(backend.chain))
-=======
 		err := peer.Handshake(1, backend.chain, BlockRangeUpdatePacket{}, td, nil)
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 		if err == nil {
 			t.Errorf("test %d: protocol returned nil error, want %q", i, test.want)
 		} else if !errors.Is(err, test.want) {

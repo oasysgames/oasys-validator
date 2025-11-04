@@ -61,17 +61,10 @@ const (
 type Peer struct {
 	id string // Unique ID for the peer, cached
 
-<<<<<<< HEAD
 	*p2p.Peer                   // The embedded P2P package peer
 	rw        p2p.MsgReadWriter // Input/output streams for snap
 	version   uint              // Protocol version negotiated
-=======
-	*p2p.Peer                         // The embedded P2P package peer
-	rw              p2p.MsgReadWriter // Input/output streams for snap
-	version         uint              // Protocol version negotiated
-	lastRange       atomic.Pointer[BlockRangeUpdatePacket]
-	statusExtension *UpgradeStatusExtension
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
+	lastRange atomic.Pointer[BlockRangeUpdatePacket]
 
 	lagging bool        // lagging peer is still connected, but won't be used to sync.
 	head    common.Hash // Latest advertised head block hash

@@ -95,37 +95,6 @@ type StatusPacket68 struct {
 	ForkID          forkid.ID
 }
 
-<<<<<<< HEAD
-=======
-type UpgradeStatusExtension struct {
-	DisablePeerTxBroadcast bool
-}
-
-func (e *UpgradeStatusExtension) Encode() (*rlp.RawValue, error) {
-	rawBytes, err := rlp.EncodeToBytes(e)
-	if err != nil {
-		return nil, err
-	}
-	raw := rlp.RawValue(rawBytes)
-	return &raw, nil
-}
-
-type UpgradeStatusPacket struct {
-	Extension *rlp.RawValue `rlp:"nil"`
-}
-
-func (p *UpgradeStatusPacket) GetExtension() (*UpgradeStatusExtension, error) {
-	extension := &UpgradeStatusExtension{}
-	if p.Extension == nil {
-		return extension, nil
-	}
-	err := rlp.DecodeBytes(*p.Extension, extension)
-	if err != nil {
-		return nil, err
-	}
-	return extension, nil
-}
-
 // StatusPacket69 is the network packet for the status message.
 type StatusPacket69 struct {
 	ProtocolVersion uint32
@@ -138,7 +107,6 @@ type StatusPacket69 struct {
 	LatestBlockHash common.Hash
 }
 
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 // NewBlockHashesPacket is the network packet for the block announcements.
 type NewBlockHashesPacket []struct {
 	Hash   common.Hash // Hash of one particular block being announced

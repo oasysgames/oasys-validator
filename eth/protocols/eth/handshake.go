@@ -38,10 +38,6 @@ const (
 
 // Handshake executes the eth protocol handshake, negotiating version number,
 // network IDs, difficulties, head and genesis blocks.
-<<<<<<< HEAD
-func (p *Peer) Handshake(network uint64, td *big.Int, head common.Hash, genesis common.Hash, forkID forkid.ID, forkFilter forkid.Filter) error {
-	// Send out own handshake in a new thread
-=======
 func (p *Peer) Handshake(networkID uint64, chain *core.BlockChain, rangeMsg BlockRangeUpdatePacket, td *big.Int, extension *UpgradeStatusExtension) error {
 	switch p.version {
 	case ETH69:
@@ -60,7 +56,6 @@ func (p *Peer) handshake68(networkID uint64, chain *core.BlockChain, td *big.Int
 		forkID     = forkid.NewID(chain.Config(), genesis, latest.Number.Uint64(), latest.Time)
 		forkFilter = forkid.NewFilter(chain)
 	)
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	errc := make(chan error, 2)
 	go func() {
 		pkt := &StatusPacket68{
@@ -81,10 +76,6 @@ func (p *Peer) handshake68(networkID uint64, chain *core.BlockChain, td *big.Int
 		return err
 	}
 	p.td, p.head = status.TD, status.Head
-<<<<<<< HEAD
-
-=======
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	// TD at mainnet block #7753254 is 76 bits. If it becomes 100 million times
 	// larger, it will still fit within 100 bits
 	if tdlen := p.td.BitLen(); tdlen > 100 {
