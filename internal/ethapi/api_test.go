@@ -655,22 +655,6 @@ func (b testBackend) SubscribePendingLogsEvent(ch chan<- []*types.Log) event.Sub
 	panic("implement me")
 }
 
-<<<<<<< HEAD
-=======
-func (b *testBackend) MevRunning() bool                       { return false }
-func (b *testBackend) HasBuilder(builder common.Address) bool { return false }
-func (b *testBackend) MevParams() *types.MevParams {
-	return &types.MevParams{}
-}
-func (b *testBackend) StartMev()                                                  {}
-func (b *testBackend) StopMev()                                                   {}
-func (b *testBackend) AddBuilder(builder common.Address, builderUrl string) error { return nil }
-func (b *testBackend) RemoveBuilder(builder common.Address) error                 { return nil }
-func (b *testBackend) SendBid(ctx context.Context, bid *types.BidArgs) (common.Hash, error) {
-	panic("implement me")
-}
-func (b *testBackend) MinerInTurn() bool { return false }
-
 func (b testBackend) CurrentView() *filtermaps.ChainView {
 	panic("implement me")
 }
@@ -683,7 +667,6 @@ func (b testBackend) HistoryPruningCutoff() uint64 {
 	return bn
 }
 
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 func TestEstimateGas(t *testing.T) {
 	t.Parallel()
 	// Initialize test accounts

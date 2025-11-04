@@ -91,12 +91,7 @@ type Backend interface {
 
 	ChainConfig() *params.ChainConfig
 	Engine() consensus.Engine
-<<<<<<< HEAD
-=======
-	// CurrentValidators return the list of validator at the latest block
-	CurrentValidators() ([]common.Address, error)
 	HistoryPruningCutoff() uint64
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 
 	// This is copied from filters.Backend
 	// eth/filters needs to be initialized from this backend type, so methods needed by
@@ -107,31 +102,9 @@ type Backend interface {
 	SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription
 	SubscribeFinalizedHeaderEvent(ch chan<- core.FinalizedHeaderEvent) event.Subscription
 	SubscribeNewVoteEvent(chan<- core.NewVoteEvent) event.Subscription
-<<<<<<< HEAD
-=======
-
-	// MevRunning return true if mev is running
-	MevRunning() bool
-	// MevParams returns the static params of mev
-	MevParams() *types.MevParams
-	// StartMev starts mev
-	StartMev()
-	// StopMev stops mev
-	StopMev()
-	// AddBuilder adds a builder to the bid simulator.
-	AddBuilder(builder common.Address, builderUrl string) error
-	// RemoveBuilder removes a builder from the bid simulator.
-	RemoveBuilder(builder common.Address) error
-	// HasBuilder returns true if the builder is in the builder list.
-	HasBuilder(builder common.Address) bool
-	// SendBid receives bid from the builders.
-	SendBid(ctx context.Context, bid *types.BidArgs) (common.Hash, error)
-	// MinerInTurn returns true if the validator is in turn to propose the block.
-	MinerInTurn() bool
 
 	CurrentView() *filtermaps.ChainView
 	NewMatcherBackend() filtermaps.MatcherBackend
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 }
 
 func GetAPIs(apiBackend Backend) []rpc.API {

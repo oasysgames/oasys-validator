@@ -1120,73 +1120,6 @@ func (api *BlockChainAPI) EstimateGas(ctx context.Context, args TransactionArgs,
 	return DoEstimateGas(ctx, api.b, args, bNrOrHash, overrides, blockOverrides, api.b.RPCGasCap())
 }
 
-<<<<<<< HEAD
-func (api *BlockChainAPI) needToReplay(ctx context.Context, block *types.Block, accounts []common.Address) (bool, error) {
-	receipts, err := api.b.GetReceipts(ctx, block.Hash())
-	if err != nil || len(receipts) != len(block.Transactions()) {
-		return false, fmt.Errorf("receipt incorrect for block number (%d): %v", block.NumberU64(), err)
-	}
-
-	accountSet := make(map[common.Address]struct{}, len(accounts))
-	for _, account := range accounts {
-		accountSet[account] = struct{}{}
-	}
-	spendValueMap := make(map[common.Address]uint64, len(accounts))
-	receiveValueMap := make(map[common.Address]uint64, len(accounts))
-
-	signer := types.MakeSigner(api.b.ChainConfig(), block.Number(), block.Time())
-	for index, tx := range block.Transactions() {
-		receipt := receipts[index]
-		from, err := types.Sender(signer, tx)
-		if err != nil {
-			return false, fmt.Errorf("get sender for tx failed: %v", err)
-		}
-
-		if _, exists := accountSet[from]; exists {
-			spendValueMap[from] += receipt.GasUsed * tx.GasPrice().Uint64()
-			if receipt.Status == types.ReceiptStatusSuccessful {
-				spendValueMap[from] += tx.Value().Uint64()
-			}
-		}
-
-		if tx.To() == nil {
-			continue
-		}
-
-		if _, exists := accountSet[*tx.To()]; exists && receipt.Status == types.ReceiptStatusSuccessful {
-			receiveValueMap[*tx.To()] += tx.Value().Uint64()
-		}
-	}
-
-	parent, err := api.b.BlockByHash(ctx, block.ParentHash())
-	if err != nil {
-		return false, fmt.Errorf("block not found for block number (%d): %v", block.NumberU64()-1, err)
-	}
-	parentState, err := api.b.Chain().StateAt(parent.Root())
-	if err != nil {
-		return false, fmt.Errorf("statedb not found for block number (%d): %v", block.NumberU64()-1, err)
-	}
-	currentState, err := api.b.Chain().StateAt(block.Root())
-	if err != nil {
-		return false, fmt.Errorf("statedb not found for block number (%d): %v", block.NumberU64(), err)
-	}
-	for _, account := range accounts {
-		parentBalance := parentState.GetBalance(account).Uint64()
-		currentBalance := currentState.GetBalance(account).Uint64()
-		if receiveValueMap[account]-spendValueMap[account] != currentBalance-parentBalance {
-			return true, nil
-		}
-	}
-
-	return false, nil
-}
-
-func (api *BlockChainAPI) GetVerifyResult(ctx context.Context, blockNr rpc.BlockNumber, blockHash common.Hash, diffHash common.Hash) *core.VerifyResult {
-	return api.b.Chain().GetVerifyResult(uint64(blockNr), blockHash, diffHash)
-}
-
-=======
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 // RPCMarshalHeader converts the given header to the RPC output .
 func RPCMarshalHeader(head *types.Header) map[string]interface{} {
 	result := map[string]interface{}{
@@ -1730,17 +1663,10 @@ func (api *TransactionAPI) GetRawTransactionByHash(ctx context.Context, hash com
 	return tx.MarshalBinary()
 }
 
-<<<<<<< HEAD
-// GetTransactionReceipt returns the transaction receipt for the given transaction hash.
+// GetTransactionReceiptsByBlockNumber returns the transaction receipts for the given block number.
 // func (api *TransactionAPI) GetTransactionReceiptsByBlockNumber(ctx context.Context, blockNr rpc.BlockNumber) ([]map[string]interface{}, error) {
 // 	blockNumber := uint64(blockNr.Int64())
 // 	blockHash := rawdb.ReadCanonicalHash(api.b.ChainDb(), blockNumber)
-=======
-// GetTransactionReceiptsByBlockNumber returns the transaction receipts for the given block number.
-func (api *TransactionAPI) GetTransactionReceiptsByBlockNumber(ctx context.Context, blockNr rpc.BlockNumber) ([]map[string]interface{}, error) {
-	blockNumber := uint64(blockNr.Int64())
-	blockHash := rawdb.ReadCanonicalHash(api.b.ChainDb(), blockNumber)
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 
 // 	receipts, err := api.b.GetReceipts(ctx, blockHash)
 // 	if err != nil {
@@ -1804,7 +1730,6 @@ func (api *TransactionAPI) GetTransactionReceiptsByBlockNumber(ctx context.Conte
 // }
 
 // GetTransactionDataAndReceipt returns the original transaction data and transaction receipt for the given transaction hash.
-<<<<<<< HEAD
 // func (api *TransactionAPI) GetTransactionDataAndReceipt(ctx context.Context, hash common.Hash) (map[string]interface{}, error) {
 // 	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(api.b.ChainDb(), hash)
 // 	if tx == nil {
@@ -1818,21 +1743,6 @@ func (api *TransactionAPI) GetTransactionReceiptsByBlockNumber(ctx context.Conte
 // 		return nil, nil
 // 	}
 // 	receipt := receipts[index]
-=======
-func (api *TransactionAPI) GetTransactionDataAndReceipt(ctx context.Context, hash common.Hash) (map[string]interface{}, error) {
-	tx, blockHash, blockNumber, index := rawdb.ReadCanonicalTransaction(api.b.ChainDb(), hash)
-	if tx == nil {
-		return nil, nil
-	}
-	receipts, err := api.b.GetReceipts(ctx, blockHash)
-	if err != nil {
-		return nil, err
-	}
-	if len(receipts) <= int(index) {
-		return nil, nil
-	}
-	receipt := receipts[index]
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 
 // 	// Derive the sender.
 // 	header, err := api.b.HeaderByHash(ctx, blockHash)
