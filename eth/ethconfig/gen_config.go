@@ -21,18 +21,9 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		NetworkId               uint64
 		SyncMode                SyncMode
 		DisablePeerTxBroadcast  bool
-<<<<<<< HEAD
-		EthDiscoveryURLs        []string
-		SnapDiscoveryURLs       []string
-		TrustDiscoveryURLs      []string
-=======
-		EVNNodeIDsToAdd         []enode.ID
-		EVNNodeIDsToRemove      []enode.ID
 		HistoryMode             history.HistoryMode
 		EthDiscoveryURLs        []string
 		SnapDiscoveryURLs       []string
-		BscDiscoveryURLs        []string
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 		NoPruning               bool
 		NoPrefetch              bool
 		DirectBroadcast         bool
@@ -75,14 +66,7 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		RPCEVMTimeout           time.Duration
 		RPCTxFeeCap             float64
 		OverridePassedForkTime  *uint64 `toml:",omitempty"`
-<<<<<<< HEAD
-		OverridePrague          *uint64 `toml:",omitempty"`
-=======
-		OverrideLorentz         *uint64 `toml:",omitempty"`
-		OverrideMaxwell         *uint64 `toml:",omitempty"`
-		OverrideFermi           *uint64 `toml:",omitempty"`
 		OverrideOsaka           *uint64 `toml:",omitempty"`
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 		OverrideVerkle          *uint64 `toml:",omitempty"`
 		BlobExtraReserve        uint64
 	}
@@ -91,18 +75,9 @@ func (c Config) MarshalTOML() (interface{}, error) {
 	enc.NetworkId = c.NetworkId
 	enc.SyncMode = c.SyncMode
 	enc.DisablePeerTxBroadcast = c.DisablePeerTxBroadcast
-<<<<<<< HEAD
-	enc.EthDiscoveryURLs = c.EthDiscoveryURLs
-	enc.SnapDiscoveryURLs = c.SnapDiscoveryURLs
-	enc.TrustDiscoveryURLs = c.TrustDiscoveryURLs
-=======
-	enc.EVNNodeIDsToAdd = c.EVNNodeIDsToAdd
-	enc.EVNNodeIDsToRemove = c.EVNNodeIDsToRemove
 	enc.HistoryMode = c.HistoryMode
 	enc.EthDiscoveryURLs = c.EthDiscoveryURLs
 	enc.SnapDiscoveryURLs = c.SnapDiscoveryURLs
-	enc.BscDiscoveryURLs = c.BscDiscoveryURLs
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	enc.NoPruning = c.NoPruning
 	enc.NoPrefetch = c.NoPrefetch
 	enc.DirectBroadcast = c.DirectBroadcast
@@ -145,14 +120,7 @@ func (c Config) MarshalTOML() (interface{}, error) {
 	enc.RPCEVMTimeout = c.RPCEVMTimeout
 	enc.RPCTxFeeCap = c.RPCTxFeeCap
 	enc.OverridePassedForkTime = c.OverridePassedForkTime
-<<<<<<< HEAD
-	enc.OverridePrague = c.OverridePrague
-=======
-	enc.OverrideLorentz = c.OverrideLorentz
-	enc.OverrideMaxwell = c.OverrideMaxwell
-	enc.OverrideFermi = c.OverrideFermi
 	enc.OverrideOsaka = c.OverrideOsaka
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	enc.OverrideVerkle = c.OverrideVerkle
 	enc.BlobExtraReserve = c.BlobExtraReserve
 	return &enc, nil
@@ -165,18 +133,9 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		NetworkId               *uint64
 		SyncMode                *SyncMode
 		DisablePeerTxBroadcast  *bool
-<<<<<<< HEAD
-		EthDiscoveryURLs        []string
-		SnapDiscoveryURLs       []string
-		TrustDiscoveryURLs      []string
-=======
-		EVNNodeIDsToAdd         []enode.ID
-		EVNNodeIDsToRemove      []enode.ID
 		HistoryMode             *history.HistoryMode
 		EthDiscoveryURLs        []string
 		SnapDiscoveryURLs       []string
-		BscDiscoveryURLs        []string
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 		NoPruning               *bool
 		NoPrefetch              *bool
 		DirectBroadcast         *bool
@@ -219,14 +178,7 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		RPCEVMTimeout           *time.Duration
 		RPCTxFeeCap             *float64
 		OverridePassedForkTime  *uint64 `toml:",omitempty"`
-<<<<<<< HEAD
-		OverridePrague          *uint64 `toml:",omitempty"`
-=======
-		OverrideLorentz         *uint64 `toml:",omitempty"`
-		OverrideMaxwell         *uint64 `toml:",omitempty"`
-		OverrideFermi           *uint64 `toml:",omitempty"`
 		OverrideOsaka           *uint64 `toml:",omitempty"`
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 		OverrideVerkle          *uint64 `toml:",omitempty"`
 		BlobExtraReserve        *uint64
 	}
@@ -246,31 +198,14 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	if dec.DisablePeerTxBroadcast != nil {
 		c.DisablePeerTxBroadcast = *dec.DisablePeerTxBroadcast
 	}
-<<<<<<< HEAD
-=======
-	if dec.EVNNodeIDsToAdd != nil {
-		c.EVNNodeIDsToAdd = dec.EVNNodeIDsToAdd
-	}
-	if dec.EVNNodeIDsToRemove != nil {
-		c.EVNNodeIDsToRemove = dec.EVNNodeIDsToRemove
-	}
 	if dec.HistoryMode != nil {
 		c.HistoryMode = *dec.HistoryMode
 	}
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	if dec.EthDiscoveryURLs != nil {
 		c.EthDiscoveryURLs = dec.EthDiscoveryURLs
 	}
 	if dec.SnapDiscoveryURLs != nil {
 		c.SnapDiscoveryURLs = dec.SnapDiscoveryURLs
-	}
-<<<<<<< HEAD
-	if dec.TrustDiscoveryURLs != nil {
-		c.TrustDiscoveryURLs = dec.TrustDiscoveryURLs
-=======
-	if dec.BscDiscoveryURLs != nil {
-		c.BscDiscoveryURLs = dec.BscDiscoveryURLs
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	}
 	if dec.NoPruning != nil {
 		c.NoPruning = *dec.NoPruning

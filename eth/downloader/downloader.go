@@ -21,11 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-<<<<<<< HEAD
-	"strings"
-=======
 	"sort"
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"

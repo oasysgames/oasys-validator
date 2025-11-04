@@ -96,16 +96,7 @@ type Config struct {
 	// transactions) or is continuously under high pressure (e.g., mempool is always full), then you can consider
 	// to turn it on.
 	DisablePeerTxBroadcast bool
-<<<<<<< HEAD
 
-	// This can be set to list of enrtree:// URLs which will be queried for
-	// nodes to connect to.
-	EthDiscoveryURLs   []string
-	SnapDiscoveryURLs  []string
-	TrustDiscoveryURLs []string
-=======
-	EVNNodeIDsToAdd        []enode.ID
-	EVNNodeIDsToRemove     []enode.ID
 	// HistoryMode configures chain history retention.
 	HistoryMode history.HistoryMode
 
@@ -113,8 +104,6 @@ type Config struct {
 	// nodes to connect to.
 	EthDiscoveryURLs  []string
 	SnapDiscoveryURLs []string
-	BscDiscoveryURLs  []string
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 
 	// State options.
 	NoPruning  bool // Whether to disable pruning and flush everything to disk

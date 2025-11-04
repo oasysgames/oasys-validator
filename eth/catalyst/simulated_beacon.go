@@ -207,8 +207,6 @@ func (c *SimulatedBeacon) sealBlock(withdrawals []*types.Withdrawal, timestamp u
 	if fcResponse == engine.STATUS_SYNCING {
 		return errors.New("chain rewind prevented invocation of payload creation")
 	}
-<<<<<<< HEAD
-=======
 
 	// If the payload was already known, we can skip the rest of the process.
 	// This edge case is possible due to a race condition between seal and debug.setHead.
@@ -216,7 +214,6 @@ func (c *SimulatedBeacon) sealBlock(withdrawals []*types.Withdrawal, timestamp u
 		return nil
 	}
 
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	envelope, err := c.engineAPI.getPayload(*fcResponse.PayloadID, true)
 	if err != nil {
 		return err
