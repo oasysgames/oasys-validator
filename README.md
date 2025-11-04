@@ -19,10 +19,21 @@ Read following manual on [**Oasys docs**](https://docs.oasys.games/docs/hub-vali
 
 Minimum:
 
+<<<<<<< HEAD
 * CPU with 2+ cores
 * 4GB RAM
 * 1TB free storage space to sync the Mainnet
 * 8 MBit/sec download Internet service
+=======
+## Release Types
+There are three types of release, each with a clear purpose and version scheme:
+
+- **1.Stable Release**: production-ready builds for the vast majority of users.  Format: `v<Major>.<Minor>.<Patch>`, example: [v1.5.19](https://github.com/bnb-chain/bsc/releases/tag/v1.5.19).
+- **2.Feature Release**: early access to a single feature without affecting the core product. Format: `v<Major>.<Minor>.<Patch>-feature-<FeatureName>`, example: [v1.5.19-feature-SI](https://github.com/bnb-chain/bsc/releases/tag/v1.5.19-feature-SI).
+- **3.Preview Release**: bleeding-edge builds for users who want the latest code. Format: `v<Major>.<Minor>.<Patch>-<Meta>`, Meta values indicate maturity: alpha (experimental), beta (largely complete), rc (release candidate), example: [v1.5.0-alpha](https://github.com/bnb-chain/bsc/releases/tag/v1.5.0-alpha).
+
+## Key features
+>>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 
 Recommended:
 
@@ -39,7 +50,11 @@ By running genesis.json on latest-release can operate testnet.
 
 For prerequisites and detailed build instructions please read the [Installation Instructions](https://geth.ethereum.org/docs/getting-started/installing-geth).
 
+<<<<<<< HEAD
 Building `geth` requires both a Go (version 1.19 or later) and a C compiler. You can install
+=======
+Building `geth` requires both a Go (version 1.24 or later) and a C compiler (GCC 5 or higher). You can install
+>>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 them using your favourite package manager. Once the dependencies are installed, run
 
 ```shell
@@ -79,9 +94,15 @@ All full node installation requires **only `1`** in steps.
 ### Programmatically interfacing `geth` nodes
 
 As a developer, sooner rather than later you'll want to start interacting with `geth` and the
+<<<<<<< HEAD
 Ethereum network via your own programs and not manually through the console. To aid
 this, `geth` has built-in support for a JSON-RPC based APIs ([standard APIs](https://ethereum.github.io/execution-apis/api-documentation/)
 and [`geth` specific APIs](https://geth.ethereum.org/docs/interacting-with-geth/rpc)).
+=======
+BSC network via your own programs and not manually through the console. To aid
+this, `geth` has built-in support for a JSON-RPC based APIs ([standard APIs](https://ethereum.org/en/developers/docs/apis/json-rpc/),
+[`geth` specific APIs](https://geth.ethereum.org/docs/interacting-with-geth/rpc), and [BSC's JSON-RPC API Reference](rpc/json-rpc-api.md)).
+>>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 These can be exposed via HTTP, WebSockets and IPC (UNIX sockets on UNIX based
 platforms, and named pipes on Windows).
 

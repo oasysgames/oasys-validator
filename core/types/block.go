@@ -273,6 +273,9 @@ type extblock struct {
 //
 // The body elements and the receipts are used to recompute and overwrite the
 // relevant portions of the header.
+//
+// The receipt's bloom must already calculated for the block's bloom to be
+// correctly calculated.
 func NewBlock(header *Header, body *Body, receipts []*Receipt, hasher TrieHasher) *Block {
 	if body == nil {
 		body = &Body{}
@@ -296,7 +299,10 @@ func NewBlock(header *Header, body *Body, receipts []*Receipt, hasher TrieHasher
 		b.header.ReceiptHash = EmptyReceiptsHash
 	} else {
 		b.header.ReceiptHash = DeriveSha(Receipts(receipts), hasher)
-		b.header.Bloom = CreateBloom(receipts)
+		// Receipts must go through MakeReceipt to calculate the receipt's bloom
+		// already. Merge the receipt's bloom together instead of recalculating
+		// everything.
+		b.header.Bloom = MergeBloom(receipts)
 	}
 
 	if len(uncles) == 0 {
@@ -633,97 +639,6 @@ func HeaderParentHashFromRLP(header []byte) common.Hash {
 		return common.Hash{}
 	}
 	return common.BytesToHash(parentHash)
-}
-
-type DiffLayer struct {
-	BlockHash common.Hash
-	Number    uint64
-	Receipts  Receipts // Receipts are duplicated stored to simplify the logic
-	Codes     []DiffCode
-	Destructs []common.Address
-	Accounts  []DiffAccount
-	Storages  []DiffStorage
-
-	DiffHash atomic.Value
-}
-
-type ExtDiffLayer struct {
-	BlockHash common.Hash
-	Number    uint64
-	Receipts  []*ReceiptForStorage // Receipts are duplicated stored to simplify the logic
-	Codes     []DiffCode
-	Destructs []common.Address
-	Accounts  []DiffAccount
-	Storages  []DiffStorage
-}
-
-// DecodeRLP decodes the Ethereum
-func (d *DiffLayer) DecodeRLP(s *rlp.Stream) error {
-	var ed ExtDiffLayer
-	if err := s.Decode(&ed); err != nil {
-		return err
-	}
-	d.BlockHash, d.Number, d.Codes, d.Destructs, d.Accounts, d.Storages = ed.BlockHash, ed.Number, ed.Codes, ed.Destructs, ed.Accounts, ed.Storages
-
-	d.Receipts = make([]*Receipt, len(ed.Receipts))
-	for i, storageReceipt := range ed.Receipts {
-		d.Receipts[i] = (*Receipt)(storageReceipt)
-	}
-	return nil
-}
-
-// EncodeRLP serializes b into the Ethereum RLP block format.
-func (d *DiffLayer) EncodeRLP(w io.Writer) error {
-	storageReceipts := make([]*ReceiptForStorage, len(d.Receipts))
-	for i, receipt := range d.Receipts {
-		storageReceipts[i] = (*ReceiptForStorage)(receipt)
-	}
-	return rlp.Encode(w, ExtDiffLayer{
-		BlockHash: d.BlockHash,
-		Number:    d.Number,
-		Receipts:  storageReceipts,
-		Codes:     d.Codes,
-		Destructs: d.Destructs,
-		Accounts:  d.Accounts,
-		Storages:  d.Storages,
-	})
-}
-
-type DiffCode struct {
-	Hash common.Hash
-	Code []byte
-}
-
-type DiffAccount struct {
-	Account common.Hash
-	Blob    []byte
-}
-
-type DiffStorage struct {
-	Account common.Hash
-	Keys    []common.Hash // Keys are hashed ones
-	Vals    [][]byte
-}
-
-func (storage *DiffStorage) Len() int { return len(storage.Keys) }
-func (storage *DiffStorage) Swap(i, j int) {
-	storage.Keys[i], storage.Keys[j] = storage.Keys[j], storage.Keys[i]
-	storage.Vals[i], storage.Vals[j] = storage.Vals[j], storage.Vals[i]
-}
-
-func (storage *DiffStorage) Less(i, j int) bool {
-	return string(storage.Keys[i][:]) < string(storage.Keys[j][:])
-}
-
-type DiffAccountsInTx struct {
-	TxHash   common.Hash
-	Accounts map[common.Address]*big.Int
-}
-
-type DiffAccountsInBlock struct {
-	Number       uint64
-	BlockHash    common.Hash
-	Transactions []DiffAccountsInTx
 }
 
 var extraSeal = 65 // Fixed number of extra-data suffix bytes reserved for signer seal

@@ -27,22 +27,6 @@ type table struct {
 	prefix string
 }
 
-func (t *table) BlockStoreReader() ethdb.Reader {
-	return t
-}
-
-func (t *table) BlockStore() ethdb.Database {
-	return t
-}
-
-func (t *table) SetBlockStore(block ethdb.Database) {
-	panic("not implement")
-}
-
-func (t *table) HasSeparateBlockStore() bool {
-	panic("not implement")
-}
-
 // NewTable returns a database object that prefixes all keys with a given string.
 func NewTable(db ethdb.Database, prefix string) ethdb.Database {
 	return &table{
@@ -64,12 +48,6 @@ func (t *table) Has(key []byte) (bool, error) {
 // Get retrieves the given prefixed key if it's present in the database.
 func (t *table) Get(key []byte) ([]byte, error) {
 	return t.db.Get(append([]byte(t.prefix), key...))
-}
-
-// HasAncient is a noop passthrough that just forwards the request to the underlying
-// database.
-func (t *table) HasAncient(kind string, number uint64) (bool, error) {
-	return t.db.HasAncient(kind, number)
 }
 
 // Ancient is a noop passthrough that just forwards the request to the underlying
@@ -143,10 +121,10 @@ func (t *table) TruncateTail(items uint64) (uint64, error) {
 	return t.db.TruncateTail(items)
 }
 
-// Sync is a noop passthrough that just forwards the request to the underlying
+// SyncAncient is a noop passthrough that just forwards the request to the underlying
 // database.
-func (t *table) Sync() error {
-	return t.db.Sync()
+func (t *table) SyncAncient() error {
+	return t.db.SyncAncient()
 }
 
 // AncientDatadir returns the ancient datadir of the underlying database.
@@ -168,6 +146,11 @@ func (t *table) Delete(key []byte) error {
 // DeleteRange deletes all of the keys (and values) in the range [start,end)
 // (inclusive on start, exclusive on end).
 func (t *table) DeleteRange(start, end []byte) error {
+	// The nilness will be lost by adding the prefix, explicitly converting it
+	// to a special flag representing the end of key range.
+	if end == nil {
+		end = ethdb.MaximumKey
+	}
 	return t.db.DeleteRange(append([]byte(t.prefix), start...), append([]byte(t.prefix), end...))
 }
 
@@ -224,23 +207,17 @@ func (t *table) Compact(start []byte, limit []byte) error {
 	return t.db.Compact(start, limit)
 }
 
+// SyncKeyValue ensures that all pending writes are flushed to disk,
+// guaranteeing data durability up to the point.
+func (t *table) SyncKeyValue() error {
+	return t.db.SyncKeyValue()
+}
+
 // NewBatch creates a write-only database that buffers changes to its host db
 // until a final write is called, each operation prefixing all keys with the
 // pre-configured string.
 func (t *table) NewBatch() ethdb.Batch {
 	return &tableBatch{t.db.NewBatch(), t.prefix}
-}
-
-func (t *table) DiffStore() ethdb.KeyValueStore {
-	return nil
-}
-
-func (t *table) SetDiffStore(diff ethdb.KeyValueStore) {
-	panic("not implement")
-}
-
-func (t *table) StateStore() ethdb.Database {
-	return nil
 }
 
 func (t *table) SetStateStore(state ethdb.Database) {
@@ -249,6 +226,10 @@ func (t *table) SetStateStore(state ethdb.Database) {
 
 func (t *table) GetStateStore() ethdb.Database {
 	return nil
+}
+
+func (t *table) HasSeparateStateStore() bool {
+	return false
 }
 
 func (t *table) StateStoreReader() ethdb.Reader {
@@ -260,7 +241,7 @@ func (t *table) NewBatchWithSize(size int) ethdb.Batch {
 	return &tableBatch{t.db.NewBatchWithSize(size), t.prefix}
 }
 
-func (t *table) SetupFreezerEnv(env *ethdb.FreezerEnv) error {
+func (t *table) SetupFreezerEnv(env *ethdb.FreezerEnv, blockHistory uint64) error {
 	return nil
 }
 
@@ -279,6 +260,16 @@ func (b *tableBatch) Put(key, value []byte) error {
 // Delete inserts a key removal into the batch for later committing.
 func (b *tableBatch) Delete(key []byte) error {
 	return b.batch.Delete(append([]byte(b.prefix), key...))
+}
+
+// DeleteRange removes all keys in the range [start, end) from the batch for later committing.
+func (b *tableBatch) DeleteRange(start, end []byte) error {
+	// The nilness will be lost by adding the prefix, explicitly converting it
+	// to a special flag representing the end of key range.
+	if end == nil {
+		end = ethdb.MaximumKey
+	}
+	return b.batch.DeleteRange(append([]byte(b.prefix), start...), append([]byte(b.prefix), end...))
 }
 
 // ValueSize retrieves the amount of data queued up for writing.

@@ -720,6 +720,34 @@ func (f *BlockFetcher) loop() {
 					f.enqueue(announce.origin, nil, block)
 				}
 			}
+<<<<<<< HEAD
+=======
+		case entry := <-f.quickBlockFetchingCh:
+			annHash := entry.announce.hash
+			// if there is error or timeout, and the schedule have not started, just retry the fetch
+			if entry.err != nil {
+				quickBlockFetchingErrMeter.Mark(1)
+				log.Debug("Quick block fetching err", "hash", annHash, "err", entry.err)
+				if _, ok := f.fetching[annHash]; !ok && len(f.announced[annHash]) > 1 {
+					// Pick the last peer to retrieve from, but ignore the current one
+					next := f.announced[annHash][len(f.announced[annHash])-1]
+					if next.origin != entry.announce.origin {
+						f.asyncFetchRangeBlocks(next)
+					}
+				}
+				continue
+			}
+			quickBlockFetchingSuccessMeter.Mark(1)
+			for _, block := range entry.blocks {
+				hash := block.Hash()
+				f.forgetHash(hash)
+				if f.getBlock(hash) != nil {
+					continue
+				}
+				f.enqueue(entry.announce.origin, nil, block)
+				quickBlockFetchingTimer.UpdateSince(entry.announce.time)
+			}
+>>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 		}
 	}
 }

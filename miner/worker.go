@@ -24,6 +24,10 @@ import (
 	"sync/atomic"
 	"time"
 
+<<<<<<< HEAD
+=======
+	mapset "github.com/deckarep/golang-set/v2"
+>>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	"github.com/holiman/uint256"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -38,6 +42,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
@@ -233,10 +238,18 @@ type worker struct {
 	recentMinedBlocks *lru.Cache[uint64, map[common.Hash]struct{}]
 
 	// Test hooks
+<<<<<<< HEAD
 	newTaskHook  func(*task)                        // Method to call upon receiving a new sealing task.
 	skipSealHook func(*task) bool                   // Method to decide whether skipping the sealing.
 	fullTaskHook func()                             // Method to call before pushing the full sealing task.
 	resubmitHook func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
+=======
+	newTaskHook       func(*task)                        // Method to call upon receiving a new sealing task.
+	skipSealHook      func(*task) bool                   // Method to decide whether skipping the sealing.
+	fullTaskHook      func()                             // Method to call before pushing the full sealing task.
+	resubmitHook      func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
+	recentMinedBlocks *lru.Cache[uint64, []common.Hash]
+>>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 }
 
 func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend, mux *event.TypeMux, init bool) *worker {
@@ -261,7 +274,11 @@ func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend,
 		startCh:            make(chan struct{}, 1),
 		exitCh:             make(chan struct{}),
 		resubmitIntervalCh: make(chan time.Duration),
+<<<<<<< HEAD
 		recentMinedBlocks:  lru.NewCache[uint64, map[common.Hash]struct{}](recentMinedCacheLimit),
+=======
+		recentMinedBlocks:  lru.NewCache[uint64, []common.Hash](recentMinedCacheLimit),
+>>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	}
 	// Subscribe events for blockchain
 	worker.chainHeadSub = eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)
@@ -291,6 +308,17 @@ func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend,
 	return worker
 }
 
+<<<<<<< HEAD
+=======
+func (w *worker) setBestBidFetcher(fetcher bidFetcher) {
+	w.bidFetcher = fetcher
+}
+
+func (w *worker) getPrefetcher() core.Prefetcher {
+	return w.prefetcher
+}
+
+>>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 // setEtherbase sets the etherbase used to initialize the block coinbase field.
 func (w *worker) setEtherbase(addr common.Address) {
 	w.confMu.Lock()
@@ -602,6 +630,7 @@ func (w *worker) resultLoop() {
 				logs = append(logs, receipt.Logs...)
 			}
 
+<<<<<<< HEAD
 			// Final safety to prevent double signing.
 			if w.isDoubleSign(header, true) {
 				log.Error("Reject Double Sign!!", "block", block.NumberU64(),
@@ -609,12 +638,36 @@ func (w *worker) resultLoop() {
 					"root", block.Root(),
 					"ParentHash", block.ParentHash())
 				continue
+=======
+			if prev, ok := w.recentMinedBlocks.Get(block.NumberU64()); ok {
+				doubleSign := false
+				prevParents := prev
+				for _, prevParent := range prevParents {
+					if prevParent == block.ParentHash() {
+						log.Error("Reject Double Sign!!", "block", block.NumberU64(),
+							"hash", block.Hash(),
+							"root", block.Root(),
+							"ParentHash", block.ParentHash())
+						doubleSign = true
+						break
+					}
+				}
+				if doubleSign {
+					continue
+				}
+				prevParents = append(prevParents, block.ParentHash())
+				w.recentMinedBlocks.Add(block.NumberU64(), prevParents)
+			} else {
+				// Add() will call removeOldest internally to remove the oldest element
+				// if the LRU Cache is full
+				w.recentMinedBlocks.Add(block.NumberU64(), []common.Hash{block.ParentHash()})
+>>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 			}
 
 			// Commit block and state to database.
 			task.state.SetExpectedStateRoot(block.Root())
 			start := time.Now()
-			status, err := w.chain.WriteBlockAndSetHead(block, receipts, logs, task.state, true)
+			status, err := w.chain.WriteBlockAndSetHead(block, receipts, logs, task.state, w.mux)
 			if status != core.CanonStatTy {
 				if err != nil {
 					log.Error("Failed writing block to chain", "err", err, "status", status)
@@ -627,8 +680,13 @@ func (w *worker) resultLoop() {
 			stats := w.chain.GetBlockStats(block.Hash())
 			stats.SendBlockTime.Store(time.Now().UnixMilli())
 			stats.StartMiningTime.Store(task.miningStartAt.UnixMilli())
+<<<<<<< HEAD
 			log.Info("Successfully sealed new block", "number", block.Number(), "sealhash", sealhash, "hash", hash,
 				"timestamp", block.Time(), "elapsed", common.PrettyDuration(time.Since(task.createdAt)))
+=======
+			log.Info("Successfully seal and write new block", "number", block.Number(), "sealhash", sealhash, "hash", hash,
+				"elapsed", common.PrettyDuration(time.Since(task.createdAt)))
+>>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 			w.mux.Post(core.NewMinedBlockEvent{Block: block})
 
 		case <-w.exitCh:
@@ -655,8 +713,14 @@ func (w *worker) makeEnv(parent *types.Header, header *types.Header, coinbase co
 	} else {
 		if prevEnv == nil {
 			state.StartPrefetcher("miner", nil)
-		} else {
+		} else if prevEnv.header.Number.Uint64() == header.Number.Uint64() {
 			state.TransferPrefetcher(prevEnv.state)
+		} else {
+			// in some corner case, new block was just imported and preEnv was for the previous block
+			// in this case, the prefetcher can not be transferred
+			log.Debug("new block was just imported, start prefetcher from scratch",
+				"prev number", prevEnv.header.Number.Uint64(), "cur number", header.Number.Uint64())
+			state.StartPrefetcher("miner", nil)
 		}
 	}
 
@@ -869,6 +933,24 @@ LOOP:
 			txs.Pop()
 			continue
 		}
+
+		// Make sure all transactions after osaka have cell proofs
+		if w.chainConfig.IsOsaka(env.header.Number, env.header.Time) {
+			if sidecar := tx.BlobTxSidecar(); sidecar != nil {
+				if sidecar.Version == 0 {
+					log.Info("Including blob tx with v0 sidecar, recomputing proofs", "hash", ltx.Hash)
+					sidecar.Proofs = make([]kzg4844.Proof, 0, len(sidecar.Blobs)*kzg4844.CellProofsPerBlob)
+					for _, blob := range sidecar.Blobs {
+						cellProofs, err := kzg4844.ComputeCellProofs(&blob)
+						if err != nil {
+							panic(err)
+						}
+						sidecar.Proofs = append(sidecar.Proofs, cellProofs...)
+					}
+				}
+			}
+		}
+
 		// Error may be ignored here. The error has already been checked
 		// during transaction acceptance in the transaction pool.
 		from, _ := types.Sender(env.signer, tx)
@@ -1124,9 +1206,13 @@ func (w *worker) generateWork(params *generateParams, witness bool) *newPayloadR
 			return &newPayloadResult{err: err}
 		}
 		// EIP-7002
-		core.ProcessWithdrawalQueue(&requests, work.evm)
+		if err := core.ProcessWithdrawalQueue(&requests, work.evm); err != nil {
+			return &newPayloadResult{err: err}
+		}
 		// EIP-7251 consolidations
-		core.ProcessConsolidationQueue(&requests, work.evm)
+		if err := core.ProcessConsolidationQueue(&requests, work.evm); err != nil {
+			return &newPayloadResult{err: err}
+		}
 	}
 	if requests != nil {
 		reqHash := types.CalcRequestsHash(requests)

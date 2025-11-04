@@ -20,6 +20,7 @@ import (
 	"math/big"
 	"math/rand"
 	"sync"
+	"sync/atomic"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/common"
@@ -60,9 +61,17 @@ const (
 type Peer struct {
 	id string // Unique ID for the peer, cached
 
+<<<<<<< HEAD
 	*p2p.Peer                   // The embedded P2P package peer
 	rw        p2p.MsgReadWriter // Input/output streams for snap
 	version   uint              // Protocol version negotiated
+=======
+	*p2p.Peer                         // The embedded P2P package peer
+	rw              p2p.MsgReadWriter // Input/output streams for snap
+	version         uint              // Protocol version negotiated
+	lastRange       atomic.Pointer[BlockRangeUpdatePacket]
+	statusExtension *UpgradeStatusExtension
+>>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 
 	lagging bool        // lagging peer is still connected, but won't be used to sync.
 	head    common.Hash // Latest advertised head block hash
@@ -190,6 +199,12 @@ func (p *Peer) SetJustifiedBlock(num uint64) {
 // KnownBlock returns whether peer is known to already have a block.
 func (p *Peer) KnownBlock(hash common.Hash) bool {
 	return p.knownBlocks.Contains(hash)
+}
+
+// BlockRange returns the latest announced block range.
+// This will be nil for peers below protocol version eth/69.
+func (p *Peer) BlockRange() *BlockRangeUpdatePacket {
+	return p.lastRange.Load()
 }
 
 // KnownTransaction returns whether peer is known to already have a transaction.
@@ -492,6 +507,14 @@ func (p *Peer) RequestTxs(hashes []common.Hash) error {
 		RequestId:                    id,
 		GetPooledTransactionsRequest: hashes,
 	})
+}
+
+// SendBlockRangeUpdate sends a notification about our available block range to the peer.
+func (p *Peer) SendBlockRangeUpdate(msg BlockRangeUpdatePacket) error {
+	if p.version < ETH69 {
+		return nil
+	}
+	return p2p.Send(p.rw, BlockRangeUpdateMsg, &msg)
 }
 
 // knownCache is a cache for known hashes.

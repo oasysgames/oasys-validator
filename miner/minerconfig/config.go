@@ -27,9 +27,30 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 )
 
+// Default timing configurations
 var (
+<<<<<<< HEAD
 	defaultDelayLeftOver = 50 * time.Millisecond
 	defaultRecommit      = 6 * time.Second
+=======
+	defaultRecommit              = 10 * time.Second
+	defaultMaxWaitProposalInSecs = uint64(45)
+
+	defaultDelayLeftOver         = 20 * time.Millisecond
+	defaultBidSimulationLeftOver = 30 * time.Millisecond
+	// Bid simulation speed on mainnet ranges from 400 to 700 mgasps.
+	// Here we assume 500 for estimation.
+	defaultNoInterruptLeftOver = 170 * time.Millisecond // For gas limit 75M
+)
+
+// Other default MEV-related configurations
+var (
+	defaultMevEnabled          = false
+	defaultGreedyMergeTx       = true
+	defaultBuilderFeeCeil      = "0"
+	defaultValidatorCommission = uint64(100)
+	defaultMaxBidsPerBuilder   = uint32(2) // Simple strategy: send one bid early, another near deadline
+>>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 )
 
 // Config is the configuration parameters of mining.
@@ -48,7 +69,11 @@ type Config struct {
 
 // DefaultConfig contains default settings for miner.
 var DefaultConfig = Config{
+<<<<<<< HEAD
 	GasCeil:  30000000,
+=======
+	GasCeil:  75000000,
+>>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	GasPrice: big.NewInt(params.GWei),
 
 	// The default recommit time is chosen as two seconds since
@@ -64,6 +89,33 @@ type BuilderConfig struct {
 	URL     string
 }
 
+<<<<<<< HEAD
+=======
+type MevConfig struct {
+	Enabled               *bool           `toml:",omitempty"` // Whether to enable Mev or not
+	GreedyMergeTx         *bool           `toml:",omitempty"` // Whether to merge local transactions to the bid
+	BuilderFeeCeil        *string         `toml:",omitempty"` // The maximum builder fee of a bid
+	SentryURL             string          // The url of Mev sentry
+	Builders              []BuilderConfig // The list of builders
+	ValidatorCommission   *uint64         `toml:",omitempty"` // 100 means the validator claims 1% from block reward
+	BidSimulationLeftOver *time.Duration  `toml:",omitempty"`
+	NoInterruptLeftOver   *time.Duration  `toml:",omitempty"`
+	MaxBidsPerBuilder     *uint32         `toml:",omitempty"` // Maximum number of bids allowed per builder per block
+}
+
+var DefaultMevConfig = MevConfig{
+	Enabled:               &defaultMevEnabled,
+	GreedyMergeTx:         &defaultGreedyMergeTx,
+	BuilderFeeCeil:        &defaultBuilderFeeCeil,
+	SentryURL:             "",
+	Builders:              nil,
+	ValidatorCommission:   &defaultValidatorCommission,
+	BidSimulationLeftOver: &defaultBidSimulationLeftOver,
+	NoInterruptLeftOver:   &defaultNoInterruptLeftOver,
+	MaxBidsPerBuilder:     &defaultMaxBidsPerBuilder,
+}
+
+>>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 func ApplyDefaultMinerConfig(cfg *Config) {
 	if cfg == nil {
 		log.Warn("ApplyDefaultMinerConfig cfg == nil")
@@ -79,4 +131,37 @@ func ApplyDefaultMinerConfig(cfg *Config) {
 		cfg.Recommit = &defaultRecommit
 		log.Info("ApplyDefaultMinerConfig", "Recommit", *cfg.Recommit)
 	}
+<<<<<<< HEAD
+=======
+
+	// check [Eth.Miner.Mev]
+	if cfg.Mev.Enabled == nil {
+		cfg.Mev.Enabled = &defaultMevEnabled
+		log.Info("ApplyDefaultMinerConfig", "Mev.Enabled", *cfg.Mev.Enabled)
+	}
+	if cfg.Mev.BuilderFeeCeil == nil {
+		cfg.Mev.BuilderFeeCeil = &defaultBuilderFeeCeil
+		log.Info("ApplyDefaultMinerConfig", "Mev.BuilderFeeCeil", *cfg.Mev.BuilderFeeCeil)
+	}
+	if cfg.Mev.GreedyMergeTx == nil {
+		cfg.Mev.GreedyMergeTx = &defaultGreedyMergeTx
+		log.Info("ApplyDefaultMinerConfig", "Mev.GreedyMergeTx", *cfg.Mev.GreedyMergeTx)
+	}
+	if cfg.Mev.ValidatorCommission == nil {
+		cfg.Mev.ValidatorCommission = &defaultValidatorCommission
+		log.Info("ApplyDefaultMinerConfig", "Mev.ValidatorCommission", *cfg.Mev.ValidatorCommission)
+	}
+	if cfg.Mev.BidSimulationLeftOver == nil {
+		cfg.Mev.BidSimulationLeftOver = &defaultBidSimulationLeftOver
+		log.Info("ApplyDefaultMinerConfig", "Mev.BidSimulationLeftOver", *cfg.Mev.BidSimulationLeftOver)
+	}
+	if cfg.Mev.NoInterruptLeftOver == nil {
+		cfg.Mev.NoInterruptLeftOver = &defaultNoInterruptLeftOver
+		log.Info("ApplyDefaultMinerConfig", "Mev.NoInterruptLeftOver", *cfg.Mev.NoInterruptLeftOver)
+	}
+	if cfg.Mev.MaxBidsPerBuilder == nil {
+		cfg.Mev.MaxBidsPerBuilder = &defaultMaxBidsPerBuilder
+		log.Info("ApplyDefaultMinerConfig", "Mev.MaxBidsPerBuilder", *cfg.Mev.MaxBidsPerBuilder)
+	}
+>>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 }

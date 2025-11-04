@@ -64,14 +64,26 @@ var (
 		utils.KeyStoreDirFlag,
 		utils.ExternalSignerFlag,
 		utils.NoUSBFlag, // deprecated
+<<<<<<< HEAD
 		// utils.DirectBroadcastFlag,
 		// utils.DisableSnapProtocolFlag,
 		// utils.EnableTrustProtocolFlag,
 		// utils.RangeLimitFlag,
+=======
+		utils.DirectBroadcastFlag,
+		utils.DisableSnapProtocolFlag,
+		utils.RangeLimitFlag,
+>>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 		utils.USBFlag,
 		utils.SmartCardDaemonPathFlag,
 		utils.OverridePassedForkTime,
+<<<<<<< HEAD
 		utils.OverridePrague,
+=======
+		utils.OverrideLorentz,
+		utils.OverrideMaxwell,
+		utils.OverrideFermi,
+>>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 		utils.OverrideVerkle,
 		utils.OverrideFullImmutabilityThreshold,
 		utils.OverrideMinBlocksForBlobRequests,
@@ -101,7 +113,13 @@ var (
 		utils.SnapshotFlag,
 		utils.TxLookupLimitFlag, // deprecated
 		utils.TransactionHistoryFlag,
+		utils.BlockHistoryFlag,
+		// utils.ChainHistoryFlag, // disabled in bsc
+		utils.LogHistoryFlag,
+		utils.LogNoHistoryFlag,
+		utils.LogExportCheckpointsFlag,
 		utils.StateHistoryFlag,
+<<<<<<< HEAD
 		// utils.PathDBSyncFlag,
 		// utils.JournalFileFlag,
 		utils.LightServeFlag,       // deprecated
@@ -111,9 +129,13 @@ var (
 		utils.LightNoPruneFlag,     // deprecated
 		utils.LightKDFFlag,         // deprecated
 		utils.LightNoSyncServeFlag, // deprecated
+=======
+		utils.PathDBSyncFlag,
+		utils.JournalFileFlag,
+		utils.LightKDFFlag,
+>>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 		utils.EthRequiredBlocksFlag,
 		utils.LegacyWhitelistFlag, // deprecated
-		utils.BloomFilterSizeFlag,
 		utils.TriesInMemoryFlag,
 		utils.CacheFlag,
 		utils.CacheDatabaseFlag,
@@ -124,10 +146,15 @@ var (
 		utils.CacheSnapshotFlag,
 		// utils.CacheNoPrefetchFlag,
 		utils.CachePreimagesFlag,
+<<<<<<< HEAD
 		// utils.MultiDataBaseFlag,
 		// utils.PersistDiffFlag,
 		// utils.DiffBlockFlag,
 		utils.PruneAncientDataFlag,
+=======
+		utils.MultiDataBaseFlag,
+		utils.PruneAncientDataFlag, // deprecated
+>>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 		utils.CacheLogSizeFlag,
 		utils.FDLimitFlag,
 		utils.CryptoKZGFlag,
@@ -164,14 +191,17 @@ var (
 		utils.VMTraceJsonConfigFlag,
 		utils.NetworkIdFlag,
 		utils.EthStatsURLFlag,
-		utils.NoCompactionFlag,
 		utils.GpoBlocksFlag,
 		utils.GpoPercentileFlag,
 		utils.GpoMaxGasPriceFlag,
 		utils.GpoIgnoreGasPriceFlag,
 		configFileFlag,
+<<<<<<< HEAD
 		// utils.BlockAmountReserved,
 		// utils.CheckSnapshotWithMPT,
+=======
+		utils.CheckSnapshotWithMPT,
+>>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 		utils.EnableDoubleSignMonitorFlag,
 		utils.VotingEnabledFlag,
 		utils.DisableVoteAttestationFlag,
@@ -267,6 +297,8 @@ func init() {
 		dumpCommand,
 		dumpGenesisCommand,
 		dumpRootHashCommand,
+		// pruneHistoryCommand, // disabled in bsc
+		downloadEraCommand,
 		// See accountcmd.go:
 		accountCommand,
 		walletCommand,
@@ -333,6 +365,7 @@ func main() {
 func prepare(ctx *cli.Context) {
 	// If we're running a known preset, log it for convenience.
 	switch {
+<<<<<<< HEAD
 	case ctx.IsSet(utils.OasysTestnetFlag.Name):
 		log.Info("Starting Oasys testnet...")
 
@@ -353,6 +386,10 @@ func prepare(ctx *cli.Context) {
   5. Networking is disabled; there is no listen-address, the maximum number of peers is set
      to 0, and discovery is disabled.
 `)
+=======
+	case ctx.IsSet(utils.ChapelFlag.Name):
+		log.Info("Starting BSC on Chapel testnet...")
+>>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	}
 	// If we're a full node on mainnet without --cache specified, bump default cache allowance
 	if !ctx.IsSet(utils.CacheFlag.Name) && !ctx.IsSet(utils.NetworkIdFlag.Name) {

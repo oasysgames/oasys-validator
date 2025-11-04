@@ -50,8 +50,9 @@ var allPrecompiles = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{2}):    &sha256hash{},
 	common.BytesToAddress([]byte{3}):    &ripemd160hash{},
 	common.BytesToAddress([]byte{4}):    &dataCopy{},
-	common.BytesToAddress([]byte{5}):    &bigModExp{eip2565: false},
-	common.BytesToAddress([]byte{0xf5}): &bigModExp{eip2565: true},
+	common.BytesToAddress([]byte{5}):    &bigModExp{eip2565: false, eip7883: false},
+	common.BytesToAddress([]byte{0xf5}): &bigModExp{eip2565: true, eip7883: false},
+	common.BytesToAddress([]byte{0xf6}): &bigModExp{eip2565: true, eip7883: true},
 	common.BytesToAddress([]byte{6}):    &bn256AddIstanbul{},
 	common.BytesToAddress([]byte{7}):    &bn256ScalarMulIstanbul{},
 	common.BytesToAddress([]byte{8}):    &bn256PairingIstanbul{},
@@ -172,10 +173,7 @@ func benchmarkPrecompiled(addr string, test precompiledTest, bench *testing.B) {
 			res, _, err = RunPrecompiledContract(p, data, reqGas, nil)
 		}
 		bench.StopTimer()
-		elapsed := uint64(time.Since(start))
-		if elapsed < 1 {
-			elapsed = 1
-		}
+		elapsed := max(uint64(time.Since(start)), 1)
 		gasUsed := reqGas * uint64(bench.N)
 		bench.ReportMetric(float64(reqGas), "gas/op")
 		// Keep it as uint64, multiply 100 to get two digit float later
@@ -249,6 +247,9 @@ func BenchmarkPrecompiledModExp(b *testing.B) { benchJson("modexp", "05", b) }
 
 func TestPrecompiledModExpEip2565(t *testing.T)      { testJson("modexp_eip2565", "f5", t) }
 func BenchmarkPrecompiledModExpEip2565(b *testing.B) { benchJson("modexp_eip2565", "f5", b) }
+
+func TestPrecompiledModExpEip7883(t *testing.T)      { testJson("modexp_eip7883", "f6", t) }
+func BenchmarkPrecompiledModExpEip7883(b *testing.B) { benchJson("modexp_eip7883", "f6", b) }
 
 // Tests the sample inputs from the elliptic curve addition EIP 213.
 func TestPrecompiledBn256Add(t *testing.T)      { testJson("bn256Add", "06", t) }
@@ -386,7 +387,7 @@ func BenchmarkPrecompiledBLS12381G1MultiExpWorstCase(b *testing.B) {
 		Name:        "WorstCaseG1",
 		NoBenchmark: false,
 	}
-	benchmarkPrecompiled("f0c", testcase, b)
+	benchmarkPrecompiled("f0b", testcase, b)
 }
 
 // BenchmarkPrecompiledBLS12381G2MultiExpWorstCase benchmarks the worst case we could find that still fits a gaslimit of 10MGas.
@@ -407,7 +408,7 @@ func BenchmarkPrecompiledBLS12381G2MultiExpWorstCase(b *testing.B) {
 		Name:        "WorstCaseG2",
 		NoBenchmark: false,
 	}
-	benchmarkPrecompiled("f0f", testcase, b)
+	benchmarkPrecompiled("f0d", testcase, b)
 }
 
 func TestDoubleSignSlash(t *testing.T) {
