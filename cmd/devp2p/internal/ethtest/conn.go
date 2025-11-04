@@ -339,35 +339,6 @@ loop:
 			if have, want := msg.ProtocolVersion, c.ourHighestProtoVersion; have != uint32(want) {
 				return fmt.Errorf("wrong protocol version: have %v, want %v", have, want)
 			}
-<<<<<<< HEAD
-=======
-			// make sure eth protocol version is set for negotiation
-			if c.negotiatedProtoVersion == 0 {
-				return errors.New("eth protocol version must be set in Conn")
-			}
-			if status == nil {
-				// default status message
-				status = &eth.StatusPacket68{
-					ProtocolVersion: uint32(c.negotiatedProtoVersion),
-					NetworkID:       chain.config.ChainID.Uint64(),
-					TD:              chain.TD(),
-					Head:            chain.blocks[chain.Len()-1].Hash(),
-					Genesis:         chain.blocks[0].Hash(),
-					ForkID:          chain.ForkID(),
-				}
-			}
-			if err := c.Write(ethProto, eth.StatusMsg, status); err != nil {
-				return fmt.Errorf("write to connection failed: %v", err)
-			}
-		case eth.UpgradeStatusMsg + protoOffset(ethProto):
-			msg := new(eth.UpgradeStatusPacket)
-			if err := rlp.DecodeBytes(data, &msg); err != nil {
-				return fmt.Errorf("error decoding status packet: %w", err)
-			}
-			if err := c.Write(ethProto, eth.UpgradeStatusMsg, msg); err != nil {
-				return fmt.Errorf("write to connection failed: %v", err)
-			}
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 			break loop
 		case discMsg:
 			var msg []p2p.DiscReason
@@ -383,26 +354,24 @@ loop:
 			return fmt.Errorf("bad status message: code %d", code)
 		}
 	}
-<<<<<<< HEAD
 	// make sure eth protocol version is set for negotiation
 	if c.negotiatedProtoVersion == 0 {
 		return errors.New("eth protocol version must be set in Conn")
 	}
 	if status == nil {
 		// default status message
-		status = &eth.StatusPacket{
+		status = &eth.StatusPacket69{
 			ProtocolVersion: uint32(c.negotiatedProtoVersion),
 			NetworkID:       chain.config.ChainID.Uint64(),
-			TD:              chain.TD(),
-			Head:            chain.blocks[chain.Len()-1].Hash(),
 			Genesis:         chain.blocks[0].Hash(),
 			ForkID:          chain.ForkID(),
+			EarliestBlock:   0,
+			LatestBlock:     chain.blocks[chain.Len()-1].NumberU64(),
+			LatestBlockHash: chain.blocks[chain.Len()-1].Hash(),
 		}
 	}
 	if err := c.Write(ethProto, eth.StatusMsg, status); err != nil {
 		return fmt.Errorf("write to connection failed: %v", err)
 	}
-=======
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	return nil
 }

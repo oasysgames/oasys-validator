@@ -69,33 +69,6 @@ The default pruning target is the HEAD-127 state.
 WARNING: it's only supported in hash mode(--state.scheme=hash)".
 `,
 			},
-<<<<<<< HEAD
-			// 			{
-			// 				Name:     "prune-block",
-			// 				Usage:    "Prune block data offline",
-			// 				Action:   pruneBlock,
-			// 				Category: "MISCELLANEOUS COMMANDS",
-			// 				Flags: []cli.Flag{
-			// 					utils.DataDirFlag,
-			// 					utils.AncientFlag,
-			// 					utils.BlockAmountReserved,
-			// 					utils.TriesInMemoryFlag,
-			// 					utils.CheckSnapshotWithMPT,
-			// 				},
-			// 				Description: `
-			// geth offline prune-block for block data in ancientdb.
-			// The amount of blocks expected for remaining after prune can be specified via block-amount-reserved in this command,
-			// will prune and only remain the specified amount of old block data in ancientdb.
-			// the brief workflow is to backup the number of this specified amount blocks backward in original ancientdb
-			// into new ancient_backup, then delete the original ancientdb dir and rename the ancient_backup to original one for replacement,
-			// finally assemble the statedb and new ancientDb together.
-			// The purpose of doing it is because the block data will be moved into the ancient store when it
-			// becomes old enough(exceed the Threshold 90000), the disk usage will be very large over time, and is occupied mainly by ancientDb,
-			// so it's very necessary to do block data prune, this feature will handle it.
-			// `,
-			// 			},
-=======
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 			{
 				Name:      "verify-state",
 				Usage:     "Recalculate state hash based on the snapshot for verification",

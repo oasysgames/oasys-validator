@@ -68,13 +68,6 @@ var (
 		Flags: slices.Concat([]cli.Flag{
 			utils.CachePreimagesFlag,
 			utils.OverridePassedForkTime,
-<<<<<<< HEAD
-			utils.OverridePrague,
-=======
-			utils.OverrideLorentz,
-			utils.OverrideMaxwell,
-			utils.OverrideFermi,
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 			utils.OverrideVerkle,
 			// utils.MultiDataBaseFlag,
 		}, utils.DatabaseFlags),
@@ -507,42 +500,7 @@ func initNetwork(ctx *cli.Context) error {
 		utils.Fatalf("Failed to create node configs: %v", err)
 	}
 
-<<<<<<< HEAD
-	// write node configs
-=======
-	nodeIDs := make([]enode.ID, len(enodes))
-	for i := 0; i < len(enodes); i++ {
-		nodeIDs[i] = enodes[i].ID()
-	}
-	// add more feature configs
-	if enableSentryNode {
-		for i := 0; i < len(sentryConfigs); i++ {
-			sentryConfigs[i].Node.P2P.ProxyedValidatorAddresses = accounts[i]
-		}
-	}
-	if ctx.Bool(utils.InitEVNValidatorWhitelist.Name) {
-		for i := 0; i < size; i++ {
-			configs[i].Node.P2P.EVNNodeIdsWhitelist = nodeIDs
-		}
-	}
-	if ctx.Bool(utils.InitEVNValidatorRegister.Name) {
-		for i := 0; i < size; i++ {
-			configs[i].Eth.EVNNodeIDsToAdd = []enode.ID{nodeIDs[i]}
-		}
-	}
-	if enableSentryNode && ctx.Bool(utils.InitEVNSentryWhitelist.Name) {
-		for i := 0; i < len(sentryConfigs); i++ {
-			sentryConfigs[i].Node.P2P.EVNNodeIdsWhitelist = sentryNodeIDs
-		}
-	}
-	if enableSentryNode && ctx.Bool(utils.InitEVNSentryRegister.Name) {
-		for i := 0; i < size; i++ {
-			configs[i].Eth.EVNNodeIDsToAdd = append(configs[i].Eth.EVNNodeIDsToAdd, sentryNodeIDs[i])
-		}
-	}
-
 	// write node & sentry configs
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	for i, config := range configs {
 		err = writeConfig(inGenesisFile, config, path.Join(initDir, fmt.Sprintf("node%d", i)))
 		if err != nil {

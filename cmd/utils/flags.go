@@ -106,14 +106,9 @@ var (
 	}
 	MultiDataBaseFlag = &cli.BoolFlag{
 		Name: "multidatabase",
-<<<<<<< HEAD
-		Usage: "Enable a separated state and block database, it will be created within two subdirectory called state and block, " +
-			"Users can copy this state or block directory to another directory or disk, and then create a symbolic link to the state directory under the chaindata",
-		Value:    bscFeaturesDefaultBool,
-=======
 		Usage: "Enable a separated state database, it will be created subdirectory called state, " +
 			"Users can copy this state directory to another directory or disk, and then create a symbolic link to the state directory under the chaindata",
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
+		Value:    bscFeaturesDefaultBool,
 		Category: flags.EthCategory,
 	}
 	DirectBroadcastFlag = &cli.BoolFlag{
@@ -128,15 +123,6 @@ var (
 		Value:    bscFeaturesDefaultBool,
 		Category: flags.EthCategory,
 	}
-<<<<<<< HEAD
-	EnableTrustProtocolFlag = &cli.BoolFlag{
-		Name:     "enabletrustprotocol",
-		Usage:    "Enable trust protocol",
-		Value:    bscFeaturesDefaultBool,
-		Category: flags.FastNodeCategory,
-	}
-=======
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	RangeLimitFlag = &cli.BoolFlag{
 		Name:     "rangelimit",
 		Usage:    "Enable 5000 blocks limit for range query",
@@ -611,27 +597,6 @@ var (
 		Usage:    "Enable recording the SHA3/keccak preimages of trie keys",
 		Category: flags.PerfCategory,
 	}
-<<<<<<< HEAD
-	PersistDiffFlag = &cli.BoolFlag{
-		Name:     "persistdiff",
-		Usage:    "Enable persistence of the diff layer",
-		Value:    bscFeaturesDefaultBool,
-		Category: flags.FastNodeCategory,
-	}
-	DiffBlockFlag = &cli.Uint64Flag{
-		Name:     "diffblock",
-		Usage:    "The number of blocks should be persisted in db (default = 86400)",
-		Value:    uint64(86400),
-		Category: flags.FastNodeCategory,
-	}
-	PruneAncientDataFlag = &cli.BoolFlag{
-		Name:     "pruneancient",
-		Usage:    "Prune ancient data, is an optional config and disabled by default. Only keep the latest 9w blocks' data,the older blocks' data will be permanently pruned. Notice:the geth/chaindata/ancient dir will be removed, if restart without the flag, the ancient data will start with the previous point that the oldest unpruned block number. Recommends to the user who don't care about the ancient data.",
-		Value:    bscFeaturesDefaultBool,
-		Category: flags.BlockHistoryCategory,
-	}
-=======
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	CacheLogSizeFlag = &cli.IntFlag{
 		Name:     "cache.blocklogs",
 		Usage:    "Size (in number of blocks) of the log cache for filtering",
@@ -1947,15 +1912,9 @@ func setRequiredBlocks(ctx *cli.Context, cfg *ethconfig.Config) {
 
 // SetEthConfig applies eth-related command line flags to the config.
 func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
-<<<<<<< HEAD
-	// Avoid conflicting network flags
-	CheckExclusive(ctx, OasysMainnetFlag, OasysTestnetFlag, DeveloperFlag)
-	CheckExclusive(ctx, DeveloperFlag, ExternalSignerFlag) // Can't use both ephemeral unlocked and external signer
-=======
 	// Avoid conflicting network flags, don't allow network id override on preset networks
-	flags.CheckExclusive(ctx, BSCMainnetFlag, DeveloperFlag, NetworkIdFlag)
+	flags.CheckExclusive(ctx, OasysMainnetFlag, OasysTestnetFlag, DeveloperFlag, NetworkIdFlag)
 	flags.CheckExclusive(ctx, DeveloperFlag, ExternalSignerFlag) // Can't use both ephemeral unlocked and external signer
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 
 	// Set configurations from CLI flags
 	setEtherbase(ctx, cfg)
@@ -2165,11 +2124,7 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		cfg.RPCTxFeeCap = ctx.Float64(RPCGlobalTxFeeCapFlag.Name)
 	}
 	if ctx.IsSet(NoDiscoverFlag.Name) {
-<<<<<<< HEAD
-		cfg.EthDiscoveryURLs, cfg.SnapDiscoveryURLs, cfg.TrustDiscoveryURLs = []string{}, []string{}, []string{}
-=======
-		cfg.EthDiscoveryURLs, cfg.SnapDiscoveryURLs, cfg.BscDiscoveryURLs = []string{}, []string{}, []string{}
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
+		cfg.EthDiscoveryURLs, cfg.SnapDiscoveryURLs = []string{}, []string{}
 	} else if ctx.IsSet(DNSDiscoveryFlag.Name) {
 		urls := ctx.String(DNSDiscoveryFlag.Name)
 		if urls == "" {
@@ -2324,11 +2279,6 @@ func SetDNSDiscoveryDefaults(cfg *ethconfig.Config, genesis common.Hash) {
 	if url := params.KnownDNSNetwork(genesis, protocol); url != "" {
 		cfg.EthDiscoveryURLs = []string{url}
 		cfg.SnapDiscoveryURLs = cfg.EthDiscoveryURLs
-<<<<<<< HEAD
-		cfg.TrustDiscoveryURLs = cfg.EthDiscoveryURLs
-=======
-		cfg.BscDiscoveryURLs = cfg.EthDiscoveryURLs
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	}
 }
 
@@ -2473,12 +2423,6 @@ func parseMiningFeatures(ctx *cli.Context, cfg *ethconfig.Config) string {
 		return ""
 	}
 	var features []string
-<<<<<<< HEAD
-=======
-	if cfg.Miner.Mev.Enabled != nil && *cfg.Miner.Mev.Enabled {
-		features = append(features, "MEV")
-	}
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	if cfg.Miner.VoteEnable {
 		features = append(features, "FFVoting")
 	}
