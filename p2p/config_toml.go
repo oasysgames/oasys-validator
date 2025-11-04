@@ -16,7 +16,6 @@ var _ = (*configMarshaling)(nil)
 // MarshalTOML marshals as TOML.
 func (c Config) MarshalTOML() (interface{}, error) {
 	type Config struct {
-<<<<<<< HEAD
 		PrivateKey         *ecdsa.PrivateKey `toml:"-"`
 		MaxPeers           int
 		MaxPeersPerIP      int `toml:",omitempty"`
@@ -28,8 +27,8 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		Name               string `toml:"-"`
 		BootstrapNodes     []*enode.Node
 		BootstrapNodesV5   []*enode.Node `toml:",omitempty"`
+		EnableENRFilter    bool          `toml:",omitempty"`
 		StaticNodes        []*enode.Node
-		VerifyNodes        []*enode.Node
 		TrustedNodes       []*enode.Node
 		NetRestrict        *netutil.Netlist `toml:",omitempty"`
 		NodeDatabase       string           `toml:",omitempty"`
@@ -42,35 +41,6 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		EnableMsgEvents    bool
 		Logger             log.Logger `toml:"-"`
 		PeerFilterPatterns []string
-=======
-		PrivateKey                *ecdsa.PrivateKey `toml:"-"`
-		MaxPeers                  int
-		MaxPeersPerIP             int `toml:",omitempty"`
-		MaxPendingPeers           int `toml:",omitempty"`
-		DialRatio                 int `toml:",omitempty"`
-		NoDiscovery               bool
-		DiscoveryV4               bool   `toml:",omitempty"`
-		DiscoveryV5               bool   `toml:",omitempty"`
-		Name                      string `toml:"-"`
-		BootstrapNodes            []*enode.Node
-		BootstrapNodesV5          []*enode.Node `toml:",omitempty"`
-		EnableENRFilter           bool          `toml:",omitempty"`
-		StaticNodes               []*enode.Node
-		TrustedNodes              []*enode.Node
-		EVNNodeIdsWhitelist       []enode.ID       `toml:",omitempty"`
-		ProxyedValidatorAddresses []common.Address `toml:",omitempty"`
-		NetRestrict               *netutil.Netlist `toml:",omitempty"`
-		NodeDatabase              string           `toml:",omitempty"`
-		Protocols                 []Protocol       `toml:"-" json:"-"`
-		ListenAddr                string
-		DiscAddr                  string
-		NAT                       nat.Interface `toml:",omitempty"`
-		Dialer                    NodeDialer    `toml:"-"`
-		NoDial                    bool          `toml:",omitempty"`
-		EnableMsgEvents           bool
-		Logger                    log.Logger `toml:"-"`
-		PeerFilterPatterns        []string
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	}
 	var enc Config
 	enc.PrivateKey = c.PrivateKey
@@ -104,7 +74,6 @@ func (c Config) MarshalTOML() (interface{}, error) {
 // UnmarshalTOML unmarshals from TOML.
 func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	type Config struct {
-<<<<<<< HEAD
 		PrivateKey         *ecdsa.PrivateKey `toml:"-"`
 		MaxPeers           *int
 		MaxPeersPerIP      *int `toml:",omitempty"`
@@ -116,8 +85,8 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		Name               *string `toml:"-"`
 		BootstrapNodes     []*enode.Node
 		BootstrapNodesV5   []*enode.Node `toml:",omitempty"`
+		EnableENRFilter    *bool         `toml:",omitempty"`
 		StaticNodes        []*enode.Node
-		VerifyNodes        []*enode.Node
 		TrustedNodes       []*enode.Node
 		NetRestrict        *netutil.Netlist `toml:",omitempty"`
 		NodeDatabase       *string          `toml:",omitempty"`
@@ -130,35 +99,6 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		EnableMsgEvents    *bool
 		Logger             log.Logger `toml:"-"`
 		PeerFilterPatterns []string
-=======
-		PrivateKey                *ecdsa.PrivateKey `toml:"-"`
-		MaxPeers                  *int
-		MaxPeersPerIP             *int `toml:",omitempty"`
-		MaxPendingPeers           *int `toml:",omitempty"`
-		DialRatio                 *int `toml:",omitempty"`
-		NoDiscovery               *bool
-		DiscoveryV4               *bool   `toml:",omitempty"`
-		DiscoveryV5               *bool   `toml:",omitempty"`
-		Name                      *string `toml:"-"`
-		BootstrapNodes            []*enode.Node
-		BootstrapNodesV5          []*enode.Node `toml:",omitempty"`
-		EnableENRFilter           *bool         `toml:",omitempty"`
-		StaticNodes               []*enode.Node
-		TrustedNodes              []*enode.Node
-		EVNNodeIdsWhitelist       []enode.ID       `toml:",omitempty"`
-		ProxyedValidatorAddresses []common.Address `toml:",omitempty"`
-		NetRestrict               *netutil.Netlist `toml:",omitempty"`
-		NodeDatabase              *string          `toml:",omitempty"`
-		Protocols                 []Protocol       `toml:"-" json:"-"`
-		ListenAddr                *string
-		DiscAddr                  *string
-		NAT                       *configNAT `toml:",omitempty"`
-		Dialer                    NodeDialer `toml:"-"`
-		NoDial                    *bool      `toml:",omitempty"`
-		EnableMsgEvents           *bool
-		Logger                    log.Logger `toml:"-"`
-		PeerFilterPatterns        []string
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	}
 	var dec Config
 	if err := unmarshal(&dec); err != nil {
