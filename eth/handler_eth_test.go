@@ -268,11 +268,7 @@ func testRecvTransactions(t *testing.T, protocol uint) {
 		head = handler.chain.CurrentBlock()
 		td   = handler.chain.GetTd(head.Hash(), head.Number.Uint64())
 	)
-<<<<<<< HEAD
-	if err := src.Handshake(1, td, head.Hash(), genesis.Hash(), forkid.NewIDWithChain(handler.chain), forkid.NewFilter(handler.chain)); err != nil {
-=======
 	if err := src.Handshake(1, handler.chain, eth.BlockRangeUpdatePacket{}, td, nil); err != nil {
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 		t.Fatalf("failed to run protocol handshake")
 	}
 	// Send the transaction to the sink and verify that it's added to the tx pool
@@ -405,11 +401,7 @@ func testSendTransactions(t *testing.T, protocol uint) {
 		head = handler.chain.CurrentBlock()
 		td   = handler.chain.GetTd(head.Hash(), head.Number.Uint64())
 	)
-<<<<<<< HEAD
-	if err := sink.Handshake(1, td, head.Hash(), genesis.Hash(), forkid.NewIDWithChain(handler.chain), forkid.NewFilter(handler.chain)); err != nil {
-=======
 	if err := sink.Handshake(1, handler.chain, eth.BlockRangeUpdatePacket{}, td, nil); err != nil {
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 		t.Fatalf("failed to run protocol handshake")
 	}
 	// After the handshake completes, the source handler should stream the sink
@@ -622,11 +614,7 @@ func testBroadcastBlock(t *testing.T, peers, bcasts int) {
 		// Wait a bit for the above handlers to start
 		time.Sleep(100 * time.Millisecond)
 
-<<<<<<< HEAD
-		if err := sinkPeer.Handshake(1, td, genesis.Hash(), genesis.Hash(), forkid.NewIDWithChain(source.chain), forkid.NewFilter(source.chain)); err != nil {
-=======
 		if err := sinkPeer.Handshake(1, source.chain, eth.BlockRangeUpdatePacket{}, td, nil); err != nil {
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 			t.Fatalf("failed to run protocol handshake")
 		}
 		go eth.Handle(sink, sinkPeer)
@@ -698,11 +686,7 @@ func testBroadcastMalformedBlock(t *testing.T, protocol uint) {
 		genesis = source.chain.Genesis()
 		td      = source.chain.GetTd(genesis.Hash(), genesis.NumberU64())
 	)
-<<<<<<< HEAD
-	if err := sink.Handshake(1, td, genesis.Hash(), genesis.Hash(), forkid.NewIDWithChain(source.chain), forkid.NewFilter(source.chain)); err != nil {
-=======
 	if err := sink.Handshake(1, source.chain, eth.BlockRangeUpdatePacket{}, td, nil); err != nil {
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 		t.Fatalf("failed to run protocol handshake")
 	}
 	// After the handshake completes, the source handler should stream the sink
@@ -803,11 +787,7 @@ func TestOptionMaxPeersPerIP(t *testing.T) {
 			t.Errorf("current num is %d, maxPeersPerIP is %d, but failed:%s", num, maxPeersPerIP, err)
 		}(tryNum)
 
-<<<<<<< HEAD
-		if err := src.Handshake(1, td, head.Hash(), genesis.Hash(), forkid.NewIDWithChain(handler.chain), forkid.NewFilter(handler.chain)); err != nil {
-=======
 		if err := src.Handshake(1, handler.chain, eth.BlockRangeUpdatePacket{}, td, nil); err != nil {
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 			t.Fatalf("failed to run protocol handshake")
 		}
 		// make sure runEthPeer execute one by one.

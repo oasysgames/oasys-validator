@@ -18,11 +18,7 @@ package eth
 
 import (
 	"errors"
-<<<<<<< HEAD
-=======
-	"fmt"
 	"maps"
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	"math"
 	"math/big"
 	"slices"
@@ -144,19 +140,9 @@ type handlerConfig struct {
 }
 
 type handler struct {
-<<<<<<< HEAD
 	nodeID                 enode.ID
 	networkID              uint64
-	forkFilter             forkid.Filter // Fork ID filter, constant across the lifetime of the node
 	disablePeerTxBroadcast bool
-=======
-	nodeID                     enode.ID
-	networkID                  uint64
-	disablePeerTxBroadcast     bool
-	enableEVNFeatures          bool
-	evnNodeIdsWhitelistMap     map[enode.ID]struct{}
-	proxyedValidatorAddressMap map[common.Address]struct{}
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 
 	snapSync        atomic.Bool // Flag whether snap sync is enabled (gets disabled if we already have blocks)
 	synced          atomic.Bool // Flag whether we're considered synchronised (enables transaction processing)
@@ -216,7 +202,6 @@ func newHandler(config *handlerConfig) (*handler, error) {
 		config.PeerSet = newPeerSet() // Nicety initialization for tests
 	}
 	h := &handler{
-<<<<<<< HEAD
 		nodeID:                 config.NodeID,
 		networkID:              config.Network,
 		forkFilter:             forkid.NewFilter(config.Chain),
@@ -234,33 +219,6 @@ func newHandler(config *handlerConfig) (*handler, error) {
 		handlerDoneCh:          make(chan struct{}),
 		handlerStartCh:         make(chan struct{}),
 		stopCh:                 make(chan struct{}),
-=======
-		nodeID:                     config.NodeID,
-		networkID:                  config.Network,
-		disablePeerTxBroadcast:     config.DisablePeerTxBroadcast,
-		eventMux:                   config.EventMux,
-		database:                   config.Database,
-		txpool:                     config.TxPool,
-		votepool:                   config.VotePool,
-		chain:                      config.Chain,
-		peers:                      config.PeerSet,
-		peersPerIP:                 make(map[string]int),
-		requiredBlocks:             config.RequiredBlocks,
-		directBroadcast:            config.DirectBroadcast,
-		enableEVNFeatures:          config.EnableEVNFeatures,
-		evnNodeIdsWhitelistMap:     make(map[enode.ID]struct{}),
-		proxyedValidatorAddressMap: make(map[common.Address]struct{}),
-		quitSync:                   make(chan struct{}),
-		handlerDoneCh:              make(chan struct{}),
-		handlerStartCh:             make(chan struct{}),
-		stopCh:                     make(chan struct{}),
-	}
-	for _, nodeID := range config.EVNNodeIdsWhitelist {
-		h.evnNodeIdsWhitelistMap[nodeID] = struct{}{}
-	}
-	for _, address := range config.ProxyedValidatorAddresses {
-		h.proxyedValidatorAddressMap[address] = struct{}{}
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	}
 	if config.Sync == ethconfig.FullSync {
 		// The database seems empty as the current block is the genesis. Yet the snap
@@ -382,15 +340,6 @@ func newHandler(config *handlerConfig) (*handler, error) {
 // protoTracker tracks the number of active protocol handlers.
 func (h *handler) protoTracker() {
 	defer h.wg.Done()
-<<<<<<< HEAD
-=======
-
-	if h.enableEVNFeatures && h.synced.Load() {
-		h.peers.enableEVNFeatures(h.queryValidatorNodeIDsMap(), h.evnNodeIdsWhitelistMap)
-	}
-	updateTicker := time.NewTicker(10 * time.Second)
-	defer updateTicker.Stop()
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	var active int
 	for {
 		select {
@@ -398,15 +347,6 @@ func (h *handler) protoTracker() {
 			active++
 		case <-h.handlerDoneCh:
 			active--
-<<<<<<< HEAD
-=======
-		case <-updateTicker.C:
-			if h.enableEVNFeatures && h.synced.Load() {
-				// add onchain validator p2p node list later, it will enable the direct broadcast + no tx broadcast feature
-				// here check & enable peer broadcast features periodically, and it's a simple way to handle the peer change and the list change scenarios.
-				h.peers.enableEVNFeatures(h.queryValidatorNodeIDsMap(), h.evnNodeIdsWhitelistMap)
-			}
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 		case <-h.quitSync:
 			// Wait for all active handlers to finish.
 			for ; active > 0; active-- {
@@ -461,12 +401,7 @@ func (h *handler) runEthPeer(peer *eth.Peer, handler eth.Handler) error {
 		number = head.Number.Uint64()
 		td     = h.chain.GetTd(hash, number)
 	)
-<<<<<<< HEAD
-	forkID := forkid.NewID(h.chain.Config(), genesis, number, head.Time)
-	if err := peer.Handshake(h.networkID, td, hash, genesis.Hash(), forkID, h.forkFilter); err != nil {
-=======
 	if err := peer.Handshake(h.networkID, h.chain, h.blockRange.currentRange(), td, &eth.UpgradeStatusExtension{DisablePeerTxBroadcast: h.disablePeerTxBroadcast}); err != nil {
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 		peer.Log().Debug("Ethereum handshake failed", "err", err)
 		return err
 	}

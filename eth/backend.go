@@ -78,11 +78,7 @@ const (
 	ChainData        = "chaindata"
 )
 
-<<<<<<< HEAD
-=======
 const (
-	MaxBlockHandleDelayMs = 3000 // max delay for block handles, max 3000 ms
-
 	// This is the fairness knob for the discovery mixer. When looking for peers, we'll
 	// wait this long for a single source of candidates before moving on and trying other
 	// sources. If this timeout expires, the source will be skipped in this round, but it
@@ -102,18 +98,6 @@ const (
 	maxParallelENRRequests = 16
 )
 
-var (
-	sendBlockTimer        = metrics.NewRegisteredTimer("chain/delay/block/send", nil)
-	recvBlockTimer        = metrics.NewRegisteredTimer("chain/delay/block/recv", nil)
-	startInsertBlockTimer = metrics.NewRegisteredTimer("chain/delay/block/insert", nil)
-	startMiningTimer      = metrics.NewRegisteredTimer("chain/delay/block/mining", nil)
-	importedBlockTimer    = metrics.NewRegisteredTimer("chain/delay/block/imported", nil)
-	sendVoteTimer         = metrics.NewRegisteredTimer("chain/delay/vote/send", nil)
-	firstVoteTimer        = metrics.NewRegisteredTimer("chain/delay/vote/first", nil)
-	majorityVoteTimer     = metrics.NewRegisteredTimer("chain/delay/vote/majority", nil)
-)
-
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 // Config contains the configuration options of the ETH protocol.
 // Deprecated: use ethconfig.Config instead.
 type Config = ethconfig.Config
@@ -354,11 +338,6 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	if err != nil {
 		return nil, err
 	}
-<<<<<<< HEAD
-	eth.blockchain.ReconstructVerificationDataForHeadBlock()
-	eth.bloomIndexer.Start(eth.blockchain)
-=======
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 
 	// Initialize filtermaps log index.
 	fmConfig := filtermaps.Config{
@@ -409,7 +388,6 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	// Permit the downloader to use the trie cache allowance during fast sync
 	cacheLimit := options.TrieCleanLimit + options.TrieDirtyLimit + options.SnapshotLimit
 	if eth.handler, err = newHandler(&handlerConfig{
-<<<<<<< HEAD
 		NodeID:                 eth.p2pServer.Self().ID(),
 		Database:               chainDb,
 		Chain:                  eth.blockchain,
@@ -422,24 +400,6 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		DirectBroadcast:        config.DirectBroadcast,
 		DisablePeerTxBroadcast: config.DisablePeerTxBroadcast,
 		PeerSet:                peers,
-=======
-		NodeID:                    eth.p2pServer.Self().ID(),
-		Database:                  chainDb,
-		Chain:                     eth.blockchain,
-		TxPool:                    eth.txPool,
-		Network:                   networkID,
-		Sync:                      config.SyncMode,
-		BloomCache:                uint64(cacheLimit),
-		EventMux:                  eth.eventMux,
-		RequiredBlocks:            config.RequiredBlocks,
-		DirectBroadcast:           config.DirectBroadcast,
-		EnableEVNFeatures:         stack.Config().EnableEVNFeatures,
-		EVNNodeIdsWhitelist:       stack.Config().P2P.EVNNodeIdsWhitelist,
-		ProxyedValidatorAddresses: stack.Config().P2P.ProxyedValidatorAddresses,
-		DisablePeerTxBroadcast:    config.DisablePeerTxBroadcast,
-		PeerSet:                   newPeerSet(),
-		EnableQuickBlockFetching:  stack.Config().EnableQuickBlockFetching,
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	}); err != nil {
 		return nil, err
 	}
@@ -697,17 +657,12 @@ func (s *Ethereum) Start() error {
 	// Start the networking layer
 	s.handler.Start(s.p2pServer.MaxPeers, s.p2pServer.MaxPeersPerIP)
 
-<<<<<<< HEAD
-=======
-	go s.reportRecentBlocksLoop()
-
 	// Start the connection manager
 	s.dropper.Start(s.p2pServer, func() bool { return !s.Synced() })
 
 	// start log indexer
 	s.filterMaps.Start()
 	go s.updateFilterMapsHeads()
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	return nil
 }
 
@@ -797,23 +752,6 @@ func (s *Ethereum) setupDiscovery() error {
 		s.discmix.AddSource(iter)
 	}
 
-<<<<<<< HEAD
-	// Add trust nodes from DNS.
-	if len(s.config.TrustDiscoveryURLs) > 0 {
-		iter, err := dnsclient.NewIterator(s.config.TrustDiscoveryURLs...)
-=======
-	// Add bsc nodes from DNS.
-	if len(s.config.BscDiscoveryURLs) > 0 {
-		iter, err := dnsclient.NewIterator(s.config.BscDiscoveryURLs...)
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
-		if err != nil {
-			return err
-		}
-		s.discmix.AddSource(iter)
-	}
-
-<<<<<<< HEAD
-=======
 	// Add DHT nodes from discv4.
 	if s.p2pServer.DiscoveryV4() != nil {
 		iter := s.p2pServer.DiscoveryV4().RandomNodes()
@@ -830,7 +768,6 @@ func (s *Ethereum) setupDiscovery() error {
 		s.discmix.AddSource(iter)
 	}
 
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	// Add DHT nodes from discv5.
 	if s.p2pServer.DiscoveryV5() != nil {
 		filter := eth.NewNodeFilter(s.blockchain)

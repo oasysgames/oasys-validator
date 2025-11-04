@@ -27,12 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/eth/protocols/bsc"
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/eth/protocols/snap"
-<<<<<<< HEAD
-	"github.com/ethereum/go-ethereum/eth/protocols/trust"
-=======
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/metrics"
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	"github.com/ethereum/go-ethereum/p2p"
 )
 
@@ -355,10 +350,7 @@ func (ps *peerSet) peersWithoutBlock(hash common.Hash) []*ethPeer {
 			list = append(list, p)
 		}
 	}
-<<<<<<< HEAD
-=======
 	log.Debug("get peers without block", "hash", hash, "total", len(ps.peers), "unknown", len(list))
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	return list
 }
 
