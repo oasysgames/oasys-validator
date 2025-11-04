@@ -130,7 +130,6 @@ func newTestBackend(config *node.Config) (*node.Node, []*types.Block, error) {
 }
 
 func generateTestChain() []*types.Block {
-<<<<<<< HEAD
 	generate := func(i int, g *core.BlockGen) {
 		g.OffsetTime(5)
 		g.SetExtra([]byte("test"))
@@ -138,50 +137,6 @@ func generateTestChain() []*types.Block {
 			// Test transactions are included in block #2.
 			g.AddTx(testTx1)
 			g.AddTx(testTx2)
-=======
-	signer := types.HomesteadSigner{}
-	// Create a database pre-initialize with a genesis block
-	db := rawdb.NewMemoryDatabase()
-	genesis.MustCommit(db, triedb.NewDatabase(db, nil))
-	chain, _ := core.NewBlockChain(db, genesis, ethash.NewFaker(), nil)
-	generate := func(i int, block *core.BlockGen) {
-		block.OffsetTime(5)
-		block.SetExtra([]byte("test"))
-		//block.SetCoinbase(testAddr)
-
-		for idx, testBlock := range testBlocks {
-			// Specific block setting, the index in this generator has 1 diff from specified blockNr.
-			if i+1 == testBlock.blockNr {
-				for _, testTransaction := range testBlock.txs {
-					tx, err := types.SignTx(types.NewTransaction(block.TxNonce(testAddr), testTransaction.to,
-						testTransaction.value, params.TxGas, testTransaction.gasPrice, testTransaction.data), signer, testKey)
-					if err != nil {
-						panic(err)
-					}
-					block.AddTxWithChain(chain, tx)
-				}
-				break
-			}
-
-			// Default block setting.
-			if idx == len(testBlocks)-1 {
-				// We want to simulate an empty middle block, having the same state as the
-				// first one. The last is needs a state change again to force a reorg.
-				for _, testTransaction := range testBlocks[0].txs {
-					tx, err := types.SignTx(types.NewTransaction(block.TxNonce(testAddr), testTransaction.to,
-						testTransaction.value, params.TxGas, testTransaction.gasPrice, testTransaction.data), signer, testKey)
-					if err != nil {
-						panic(err)
-					}
-					block.AddTxWithChain(chain, tx)
-				}
-			}
-		}
-		// for testTransactionInBlock
-		if i+1 == testBlockNum {
-			block.AddTxWithChain(chain, testTx1)
-			block.AddTxWithChain(chain, testTx2)
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 		}
 	}
 	_, blocks, _ := core.GenerateChainWithGenesis(genesis, beacon.New(ethash.NewFaker()), 2, generate)
@@ -224,23 +179,12 @@ func TestEthClient(t *testing.T) {
 		"CallContractAtHash": {
 			func(t *testing.T) { testCallContractAtHash(t, client) },
 		},
-<<<<<<< HEAD
 		"AtFunctions": {
 			func(t *testing.T) { testAtFunctions(t, client) },
 		},
 		"TransactionSender": {
 			func(t *testing.T) { testTransactionSender(t, client) },
 		},
-=======
-		// DO not have TestAtFunctions now, because we do not have pending block now
-		// "AtFunctions": {
-		// 	func(t *testing.T) { testAtFunctions(t, client) },
-		// },
-		// TODO(Nathan): why skip this case?
-		// "TransactionSender": {
-		// 	func(t *testing.T) { testTransactionSender(t, client) },
-		// },
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 		"TestSendTransactionConditional": {
 			func(t *testing.T) { testSendTransactionConditional(t, client) },
 		},
@@ -663,47 +607,6 @@ func testAtFunctions(t *testing.T, client *rpc.Client) {
 	}
 }
 
-func testTransactionSender(t *testing.T, client *rpc.Client) {
-	ec := ethclient.NewClient(client)
-	ctx := context.Background()
-
-	// Retrieve testTx1 via RPC.
-	block2, err := ec.HeaderByNumber(ctx, big.NewInt(2))
-	if err != nil {
-		t.Fatal("can't get block 1:", err)
-	}
-	tx1, err := ec.TransactionInBlock(ctx, block2.Hash(), 0)
-	if err != nil {
-		t.Fatal("can't get tx:", err)
-	}
-	if tx1.Hash() != testTx1.Hash() {
-		t.Fatalf("wrong tx hash %v, want %v", tx1.Hash(), testTx1.Hash())
-	}
-
-	// The sender address is cached in tx1, so no additional RPC should be required in
-	// TransactionSender. Ensure the server is not asked by canceling the context here.
-	canceledCtx, cancel := context.WithCancel(context.Background())
-	cancel()
-	<-canceledCtx.Done() // Ensure the close of the Done channel
-	sender1, err := ec.TransactionSender(canceledCtx, tx1, block2.Hash(), 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if sender1 != testAddr {
-		t.Fatal("wrong sender:", sender1)
-	}
-
-	// Now try to get the sender of testTx2, which was not fetched through RPC.
-	// TransactionSender should query the server here.
-	sender2, err := ec.TransactionSender(ctx, testTx2, block2.Hash(), 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if sender2 != testAddr {
-		t.Fatal("wrong sender:", sender2)
-	}
-}
-
 func testSendTransactionConditional(t *testing.T, client *rpc.Client) {
 	ec := ethclient.NewClient(client)
 
@@ -739,7 +642,6 @@ func testSendTransactionConditional(t *testing.T, client *rpc.Client) {
 	}
 }
 
-<<<<<<< HEAD
 func sendTransaction(ec *ethclient.Client) error {
 	chainID, err := ec.ChainID(context.Background())
 	if err != nil {
@@ -762,8 +664,8 @@ func sendTransaction(ec *ethclient.Client) error {
 		return err
 	}
 	return ec.SendTransaction(context.Background(), tx)
-=======
-//nolint:unused
+}
+
 func testTransactionSender(t *testing.T, client *rpc.Client) {
 	ec := ethclient.NewClient(client)
 	ctx := context.Background()
@@ -802,13 +704,11 @@ func testTransactionSender(t *testing.T, client *rpc.Client) {
 	}
 }
 
-//nolint:unused
 func newCanceledContext() context.Context {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	<-ctx.Done() // Ensure the close of the Done channel
 	return ctx
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 }
 
 func sendTransactionConditional(ec *ethclient.Client) error {
