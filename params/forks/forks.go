@@ -40,12 +40,6 @@ const (
 	Shanghai
 	Cancun
 	Prague
-<<<<<<< HEAD
-=======
-	Lorentz
-	Maxwell
-	Fermi
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	Osaka
 )
 
