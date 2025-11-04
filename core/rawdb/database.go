@@ -670,27 +670,6 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		logged = time.Now()
 
 		// Key-value store statistics
-<<<<<<< HEAD
-		headers         stat
-		bodies          stat
-		receipts        stat
-		tds             stat
-		numHashPairings stat
-		blobSidecars    stat
-		hashNumPairings stat
-		legacyTries     stat
-		stateLookups    stat
-		accountTries    stat
-		storageTries    stat
-		codes           stat
-		txLookups       stat
-		accountSnaps    stat
-		storageSnaps    stat
-		preimages       stat
-		bloomBits       stat
-		cliqueSnaps     stat
-		oasysSnaps      stat
-=======
 		headers            stat
 		bodies             stat
 		receipts           stat
@@ -708,7 +687,7 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		storageSnaps       stat
 		preimages          stat
 		cliqueSnaps        stat
-		parliaSnaps        stat
+		oasysSnaps         stat
 		bloomBits          stat
 		filterMapRows      stat
 		filterMapLastBlock stat
@@ -716,7 +695,6 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 
 		// Path-mode archive data
 		stateIndex stat
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 
 		// Verkle statistics
 		verkleTries        stat
@@ -780,20 +758,8 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 			metadata.Add(size)
 		case bytes.HasPrefix(key, CliqueSnapshotPrefix) && len(key) == 7+common.HashLength:
 			cliqueSnaps.Add(size)
-<<<<<<< HEAD
 		case bytes.HasPrefix(key, OasysSnapshotPrefix) && len(key) == 7+common.HashLength:
 			oasysSnaps.Add(size)
-		case bytes.HasPrefix(key, ChtTablePrefix) ||
-			bytes.HasPrefix(key, ChtIndexTablePrefix) ||
-			bytes.HasPrefix(key, ChtPrefix): // Canonical hash trie
-			chtTrieNodes.Add(size)
-		case bytes.HasPrefix(key, BloomTrieTablePrefix) ||
-			bytes.HasPrefix(key, BloomTrieIndexPrefix) ||
-			bytes.HasPrefix(key, BloomTriePrefix): // Bloomtrie sub
-			bloomTrieNodes.Add(size)
-=======
-		case bytes.HasPrefix(key, ParliaSnapshotPrefix) && len(key) == 7+common.HashLength:
-			parliaSnaps.Add(size)
 
 		// new log index
 		case bytes.HasPrefix(key, filterMapRowPrefix) && len(key) <= len(filterMapRowPrefix)+9:
@@ -812,7 +778,6 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		// Path-based historic state indexes
 		case bytes.HasPrefix(key, StateHistoryIndexPrefix) && len(key) >= len(StateHistoryIndexPrefix)+common.HashLength:
 			stateIndex.Add(size)
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 
 		// Verkle trie data is detected, determine the sub-category
 		case bytes.HasPrefix(key, VerklePrefix):

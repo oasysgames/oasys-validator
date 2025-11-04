@@ -187,17 +187,13 @@ func isSystemCall(caller common.Address) bool {
 // parameters. It also handles any necessary value transfer required and takse
 // the necessary steps to create accounts and reverses the state in case of an
 // execution error or failed value transfer.
-<<<<<<< HEAD
-func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas uint64, value *uint256.Int) (ret []byte, leftOverGas uint64, err error) {
+func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, gas uint64, value *uint256.Int) (ret []byte, leftOverGas uint64, err error) {
 	// Fail if the address is not allowed to call
 	// Skip the check if this call is readonly (eth_call)
 	readOnly := evm.Config.NoBaseFee
 	if !readOnly && evm.chainConfig.Oasys != nil && IsDeniedToCall(evm.StateDB, addr) {
 		return nil, 0, ErrUnauthorizedCall
 	}
-=======
-func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, gas uint64, value *uint256.Int) (ret []byte, leftOverGas uint64, err error) {
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	// Capture the tracer start/end events in debug mode
 	if evm.Config.Tracer != nil {
 		evm.captureBegin(evm.depth, CALL, caller, addr, input, gas, value.ToBig())

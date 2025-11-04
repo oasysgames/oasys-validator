@@ -1098,36 +1098,11 @@ func (p *BlobPool) SetGasTip(tip *big.Int) {
 	p.updateStorageMetrics()
 }
 
-<<<<<<< HEAD
-// validateTx checks whether a transaction is valid according to the consensus
-// rules and adheres to some heuristic limits of the local node (price and size).
-func (p *BlobPool) validateTx(tx *types.Transaction) error {
-	// Ensure the transaction adheres to basic pool filters (type, size, tip) and
-	// consensus rules
-	baseOpts := &txpool.ValidationOptions{
-		Config:  p.chain.Config(),
-		Accept:  1 << types.BlobTxType,
-		MaxSize: txMaxSize,
-		MinTip:  p.gasTip.ToBig(),
-		MaxGas:  p.GetMaxGas(),
-=======
 // ValidateTxBasics checks whether a transaction is valid according to the consensus
 // rules, but does not check state-dependent validation such as sufficient balance.
 // This check is meant as an early check which only needs to be performed once,
 // and does not require the pool mutex to be held.
 func (p *BlobPool) ValidateTxBasics(tx *types.Transaction) error {
-	sender, err := types.Sender(p.signer, tx)
-	if err != nil {
-		return err
-	}
-	for _, blackAddr := range types.NanoBlackList {
-		if sender == blackAddr || (tx.To() != nil && *tx.To() == blackAddr) {
-			log.Error("blacklist account detected", "account", blackAddr, "tx", tx.Hash())
-			return txpool.ErrInBlackList
-		}
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
-	}
-
 	opts := &txpool.ValidationOptions{
 		Config:       p.chain.Config(),
 		Accept:       1 << types.BlobTxType,

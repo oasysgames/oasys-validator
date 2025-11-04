@@ -624,22 +624,7 @@ func (pool *LegacyPool) Pending(filter txpool.PendingFilter) map[common.Address]
 // rules, but does not check state-dependent validation such as sufficient balance.
 // This check is meant as an early check which only needs to be performed once,
 // and does not require the pool mutex to be held.
-<<<<<<< HEAD
-func (pool *LegacyPool) validateTxBasics(tx *types.Transaction) error {
-=======
 func (pool *LegacyPool) ValidateTxBasics(tx *types.Transaction) error {
-	sender, err := types.Sender(pool.signer, tx)
-	if err != nil {
-		return err
-	}
-	for _, blackAddr := range types.NanoBlackList {
-		if sender == blackAddr || (tx.To() != nil && *tx.To() == blackAddr) {
-			log.Error("blacklist account detected", "account", blackAddr, "tx", tx.Hash())
-			return txpool.ErrInBlackList
-		}
-	}
-
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	opts := &txpool.ValidationOptions{
 		Config: pool.chainconfig,
 		Accept: 0 |
