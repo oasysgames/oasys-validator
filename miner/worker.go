@@ -24,10 +24,6 @@ import (
 	"sync/atomic"
 	"time"
 
-<<<<<<< HEAD
-=======
-	mapset "github.com/deckarep/golang-set/v2"
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	"github.com/holiman/uint256"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -234,22 +230,12 @@ type worker struct {
 	// payload in proof-of-stake stage.
 	recommit time.Duration
 
-	// Store recently signed block numbers and parent hashes to prevent double signing.
-	recentMinedBlocks *lru.Cache[uint64, map[common.Hash]struct{}]
-
 	// Test hooks
-<<<<<<< HEAD
-	newTaskHook  func(*task)                        // Method to call upon receiving a new sealing task.
-	skipSealHook func(*task) bool                   // Method to decide whether skipping the sealing.
-	fullTaskHook func()                             // Method to call before pushing the full sealing task.
-	resubmitHook func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
-=======
 	newTaskHook       func(*task)                        // Method to call upon receiving a new sealing task.
 	skipSealHook      func(*task) bool                   // Method to decide whether skipping the sealing.
 	fullTaskHook      func()                             // Method to call before pushing the full sealing task.
 	resubmitHook      func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
 	recentMinedBlocks *lru.Cache[uint64, []common.Hash]
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 }
 
 func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend, mux *event.TypeMux, init bool) *worker {
@@ -274,11 +260,7 @@ func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend,
 		startCh:            make(chan struct{}, 1),
 		exitCh:             make(chan struct{}),
 		resubmitIntervalCh: make(chan time.Duration),
-<<<<<<< HEAD
-		recentMinedBlocks:  lru.NewCache[uint64, map[common.Hash]struct{}](recentMinedCacheLimit),
-=======
 		recentMinedBlocks:  lru.NewCache[uint64, []common.Hash](recentMinedCacheLimit),
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	}
 	// Subscribe events for blockchain
 	worker.chainHeadSub = eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)
@@ -308,17 +290,6 @@ func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend,
 	return worker
 }
 
-<<<<<<< HEAD
-=======
-func (w *worker) setBestBidFetcher(fetcher bidFetcher) {
-	w.bidFetcher = fetcher
-}
-
-func (w *worker) getPrefetcher() core.Prefetcher {
-	return w.prefetcher
-}
-
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 // setEtherbase sets the etherbase used to initialize the block coinbase field.
 func (w *worker) setEtherbase(addr common.Address) {
 	w.confMu.Lock()
@@ -630,15 +601,6 @@ func (w *worker) resultLoop() {
 				logs = append(logs, receipt.Logs...)
 			}
 
-<<<<<<< HEAD
-			// Final safety to prevent double signing.
-			if w.isDoubleSign(header, true) {
-				log.Error("Reject Double Sign!!", "block", block.NumberU64(),
-					"hash", block.Hash(),
-					"root", block.Root(),
-					"ParentHash", block.ParentHash())
-				continue
-=======
 			if prev, ok := w.recentMinedBlocks.Get(block.NumberU64()); ok {
 				doubleSign := false
 				prevParents := prev
@@ -661,7 +623,6 @@ func (w *worker) resultLoop() {
 				// Add() will call removeOldest internally to remove the oldest element
 				// if the LRU Cache is full
 				w.recentMinedBlocks.Add(block.NumberU64(), []common.Hash{block.ParentHash()})
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 			}
 
 			// Commit block and state to database.
@@ -680,13 +641,8 @@ func (w *worker) resultLoop() {
 			stats := w.chain.GetBlockStats(block.Hash())
 			stats.SendBlockTime.Store(time.Now().UnixMilli())
 			stats.StartMiningTime.Store(task.miningStartAt.UnixMilli())
-<<<<<<< HEAD
 			log.Info("Successfully sealed new block", "number", block.Number(), "sealhash", sealhash, "hash", hash,
 				"timestamp", block.Time(), "elapsed", common.PrettyDuration(time.Since(task.createdAt)))
-=======
-			log.Info("Successfully seal and write new block", "number", block.Number(), "sealhash", sealhash, "hash", hash,
-				"elapsed", common.PrettyDuration(time.Since(task.createdAt)))
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 			w.mux.Post(core.NewMinedBlockEvent{Block: block})
 
 		case <-w.exitCh:
