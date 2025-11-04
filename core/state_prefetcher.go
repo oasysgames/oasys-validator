@@ -59,35 +59,7 @@ func (p *statePrefetcher) Prefetch(transactions types.Transactions, header *type
 		workers errgroup.Group
 		reader  = statedb.Reader()
 	)
-<<<<<<< HEAD
-	transactions := block.Transactions()
-	txChan := make(chan int, prefetchThread)
-	// No need to execute the first batch, since the main processor will do it.
-	for i := 0; i < prefetchThread; i++ {
-		go func() {
-			newStatedb := statedb.CopyDoPrefetch()
-			gaspool := new(GasPool).AddGas(block.GasLimit())
-			blockContext := NewEVMBlockContext(header, p.chain, nil)
-			evm := vm.NewEVM(blockContext, newStatedb, p.config, *cfg)
-			// Iterate over and process the individual transactions
-			for {
-				select {
-				case txIndex := <-txChan:
-					tx := transactions[txIndex]
-					// Convert the transaction into an executable message and pre-cache its sender
-					msg, err := TransactionToMessage(tx, signer, header.BaseFee)
-					msg.SkipNonceChecks = true
-					msg.SkipFromEOACheck = true
-					if err != nil {
-						return // Also invalid block, bail out
-					}
-					newStatedb.SetTxContext(tx.Hash(), txIndex)
-					// We attempt to apply a transaction. The goal is not to execute
-					// the transaction successfully, rather to warm up touched data slots.
-					ApplyMessage(evm, msg, gaspool)
-=======
 	workers.SetLimit(max(1, 3*runtime.NumCPU()/5)) // Aggressively run the prefetching
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 
 	// Iterate over and process the individual transactions
 	for i, tx := range transactions {
@@ -167,14 +139,8 @@ func (p *statePrefetcher) PrefetchMining(txs TransactionsByPriceAndNonce, header
 	for i := 0; i < prefetchMiningThread; i++ {
 		go func(startCh <-chan *types.Transaction, stopCh <-chan struct{}) {
 			newStatedb := statedb.CopyDoPrefetch()
-<<<<<<< HEAD
-			gaspool := new(GasPool).AddGas(gasLimit)
-			blockContext := NewEVMBlockContext(header, p.chain, nil)
-			evm := vm.NewEVM(blockContext, newStatedb, p.config, cfg)
-=======
 			evm := vm.NewEVM(NewEVMBlockContext(header, p.chain, nil), newStatedb, p.config, cfg)
 			idx := 0
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 			// Iterate over and process the individual transactions
 			for {
 				select {

@@ -4143,15 +4143,11 @@ func (c *mockParlia) CalcDifficulty(chain consensus.ChainHeaderReader, time uint
 	return big.NewInt(1)
 }
 
-<<<<<<< HEAD
 func TestOasysBlobFeeReward(t *testing.T) {
 	coinbase := common.HexToAddress("0xbeef")
-=======
-func TestParliaBlobFeeReward(t *testing.T) {
 	testKey, _ := crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 	// testAddr is the Ethereum address of the tester account.
 	testAddr := crypto.PubkeyToAddress(testKey.PublicKey)
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 
 	// Have N headers in the freezer
 	frdir := t.TempDir()

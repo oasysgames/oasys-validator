@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"slices"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/tracing"
@@ -583,12 +582,6 @@ func (st *stateTransition) validateAuthorization(auth *types.SetCodeAuthorizatio
 	if err != nil {
 		return authority, fmt.Errorf("%w: %v", ErrAuthorizationInvalidSignature, err)
 	}
-<<<<<<< HEAD
-=======
-	if slices.Contains(types.NanoBlackList, authority) {
-		return authority, errors.New("block blacklist account")
-	}
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	// Check the authority account
 	//  1) doesn't have code or has existing delegation
 	//  2) matches the auth's nonce

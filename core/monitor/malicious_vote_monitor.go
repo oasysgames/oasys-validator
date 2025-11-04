@@ -30,11 +30,7 @@ type MaliciousVoteMonitor struct {
 
 func NewMaliciousVoteMonitor() *MaliciousVoteMonitor {
 	return &MaliciousVoteMonitor{
-<<<<<<< HEAD
-		curVotes: make(map[types.BLSPublicKey]*lru.Cache),
-=======
-		curVotes: make(map[types.BLSPublicKey]*lru.Cache[uint64, *types.VoteEnvelope], 21), // mainnet config
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
+		curVotes: make(map[types.BLSPublicKey]*lru.Cache[uint64, *types.VoteEnvelope], 31), // mainnet config
 	}
 }
 

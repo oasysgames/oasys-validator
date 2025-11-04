@@ -38,11 +38,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/prque"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
-<<<<<<< HEAD
 	contracts "github.com/ethereum/go-ethereum/contracts/oasys"
-=======
 	"github.com/ethereum/go-ethereum/core/history"
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 	"github.com/ethereum/go-ethereum/core/monitor"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -616,15 +613,6 @@ func NewBlockChain(db ethdb.Database, genesis *Genesis, engine consensus.Engine,
 		rawdb.WriteChainConfig(db, genesisHash, chainConfig)
 	}
 
-<<<<<<< HEAD
-func (bc *BlockChain) ReconstructVerificationDataForHeadBlock() {
-	bc.engine.VerifyHeader(bc, bc.CurrentHeader())
-}
-
-// GetVMConfig returns the block chain VM config.
-func (bc *BlockChain) GetVMConfig() *vm.Config {
-	return &bc.vmConfig
-=======
 	// Start tx indexer if it's enabled.
 	if bc.cfg.TxLookupLimit >= 0 {
 		bc.txIndexer = newTxIndexer(uint64(bc.cfg.TxLookupLimit), bc)
@@ -647,7 +635,10 @@ func (bc *BlockChain) GetVMConfig() *vm.Config {
 	}
 
 	return bc, nil
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
+}
+
+func (bc *BlockChain) ReconstructVerificationDataForHeadBlock() {
+	bc.engine.VerifyHeader(bc, bc.CurrentHeader())
 }
 
 func (bc *BlockChain) NoTries() bool {
@@ -833,14 +824,9 @@ func (bc *BlockChain) loadLastState() error {
 		snapTd := bc.GetTd(currentSnapBlock.Hash(), currentSnapBlock.Number.Uint64())
 		log.Info("Loaded most recent local snap block", "number", currentSnapBlock.Number, "hash", currentSnapBlock.Hash(), "root", currentSnapBlock.Root, "td", snapTd, "age", common.PrettyAge(time.Unix(int64(currentSnapBlock.Time), 0)))
 	}
-<<<<<<< HEAD
 	if pos, ok := bc.engine.(consensus.PoS); ok {
 		if currentFinalizedHeader := pos.GetFinalizedHeader(bc, headHeader); currentFinalizedHeader != nil {
-=======
-	if posa, ok := bc.engine.(consensus.PoSA); ok {
-		if currentFinalizedHeader := posa.GetFinalizedHeader(bc, headHeader); currentFinalizedHeader != nil {
 			bc.currentFinalBlock.Store(currentFinalizedHeader)
->>>>>>> fca6a6bee850b226938d2f2a990afab3246efc1e
 			if currentFinalizedBlock := bc.GetBlockByHash(currentFinalizedHeader.Hash()); currentFinalizedBlock != nil {
 				finalTd := bc.GetTd(currentFinalizedBlock.Hash(), currentFinalizedBlock.NumberU64())
 				log.Info("Loaded most recent local finalized block", "number", currentFinalizedBlock.Number(), "hash", currentFinalizedBlock.Hash(), "root", currentFinalizedBlock.Root(), "td", finalTd, "age", common.PrettyAge(time.Unix(int64(currentFinalizedBlock.Time()), 0)))
