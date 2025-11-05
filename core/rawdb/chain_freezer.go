@@ -744,7 +744,7 @@ func (f *chainFreezer) SyncAncient() error {
 }
 
 func trySlowdownFreeze(head *types.Header) {
-	if time.Since(time.UnixMilli(int64(head.MilliTimestamp()))) > SlowdownFreezeWindow {
+	if time.Since(time.Unix(int64(head.Time), 0)) > SlowdownFreezeWindow {
 		return
 	}
 	if freezerBatchLimit == SlowFreezerBatchLimit {

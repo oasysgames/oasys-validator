@@ -18,6 +18,7 @@
 package eth
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -392,7 +393,7 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		RequiredBlocks:         config.RequiredBlocks,
 		DirectBroadcast:        config.DirectBroadcast,
 		DisablePeerTxBroadcast: config.DisablePeerTxBroadcast,
-		PeerSet:                peers,
+		PeerSet:                newPeerSet(),
 	}); err != nil {
 		return nil, err
 	}
@@ -475,7 +476,7 @@ func (s *Ethereum) APIs() []rpc.API {
 	apis := ethapi.GetAPIs(s.APIBackend)
 
 	// Append any APIs exposed explicitly by the consensus engine
-	if p, ok := s.engine.(*parlia.Parlia); ok {
+	if p, ok := s.engine.(*oasys.Oasys); ok {
 		apis = append(apis, p.APIs(s.BlockChain())...)
 	}
 

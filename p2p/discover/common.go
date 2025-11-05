@@ -78,10 +78,10 @@ func GetEthEntry(chain string) (enr.Entry, error) {
 		Tail   []rlp.RawValue `rlp:"tail"`
 	}
 	switch chain {
-	case "bsc":
-		eth.ForkID = forkid.NewID(params.BSCChainConfig, core.DefaultBSCGenesisBlock().ToBlock(), uint64(0), uint64(0))
-	case "chapel":
-		eth.ForkID = forkid.NewID(params.ChapelChainConfig, core.DefaultChapelGenesisBlock().ToBlock(), uint64(0), uint64(0))
+	case "oasys-mainnet":
+		eth.ForkID = forkid.NewID(params.OasysMainnetChainConfig, core.DefaultOasysMainnetGenesisBlock().ToBlock(), uint64(0), uint64(0))
+	case "oasys-testnet":
+		eth.ForkID = forkid.NewID(params.OasysTestnetChainConfig, core.DefaultOasysTestnetGenesisBlock().ToBlock(), uint64(0), uint64(0))
 	default:
 		return nil, fmt.Errorf("unknown network %q", chain)
 	}

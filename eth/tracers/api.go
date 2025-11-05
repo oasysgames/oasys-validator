@@ -272,8 +272,9 @@ func (api *API) traceChain(start, end *types.Block, config *TraceConfig, closed 
 			// Fetch and execute the block trace taskCh
 			for task := range taskCh {
 				var (
-					signer   = types.MakeSigner(api.backend.ChainConfig(), task.block.Number(), task.block.Time())
-					blockCtx = core.NewEVMBlockContext(task.block.Header(), api.chainContext(ctx), nil)
+					signer         = types.MakeSigner(api.backend.ChainConfig(), task.block.Number(), task.block.Time())
+					blockCtx       = core.NewEVMBlockContext(task.block.Header(), api.chainContext(ctx), nil)
+					beforeSystemTx = true
 				)
 				// Trace all the transactions contained within
 				for i, tx := range task.block.Transactions() {
@@ -638,10 +639,11 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 
 	// Native tracers have low overhead
 	var (
-		txs       = block.Transactions()
-		blockHash = block.Hash()
-		signer    = types.MakeSigner(api.backend.ChainConfig(), block.Number(), block.Time())
-		results   = make([]*txTraceResult, len(txs))
+		txs            = block.Transactions()
+		blockHash      = block.Hash()
+		signer         = types.MakeSigner(api.backend.ChainConfig(), block.Number(), block.Time())
+		results        = make([]*txTraceResult, len(txs))
+		beforeSystemTx = true
 	)
 	for i, tx := range txs {
 		// Generate the next state snapshot fast without tracing
@@ -919,6 +921,13 @@ func (api *API) TraceTransaction(ctx context.Context, hash common.Hash, config *
 	msg, err := core.TransactionToMessage(tx, types.MakeSigner(api.backend.ChainConfig(), block.Number(), block.Time()), block.BaseFee())
 	if err != nil {
 		return nil, err
+	}
+
+	var isSystemTx bool
+	if posa, ok := api.backend.Engine().(consensus.PoS); ok {
+		if isSystem, _ := posa.IsSystemTransaction(tx, block.Header()); isSystem {
+			isSystemTx = true
+		}
 	}
 
 	txctx := &Context{

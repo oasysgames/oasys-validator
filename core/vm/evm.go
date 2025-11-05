@@ -455,7 +455,7 @@ func (evm *EVM) create(caller common.Address, code []byte, gas uint64, value *ui
 	// because this check targets raw transactions from EOA, and `CREATE2`
 	// within internal transactions is excluded.
 	// Need to check after nonce increment to evict failed tx from the pool.
-	if evm.depth == 0 && typ == CREATE && evm.chainConfig.Oasys != nil && !IsAllowedToCreate(evm.StateDB, caller.Address()) {
+	if evm.depth == 0 && typ == CREATE && evm.chainConfig.Oasys != nil && !IsAllowedToCreate(evm.StateDB, caller) {
 		return nil, common.Address{}, 0, ErrUnauthorizedCreate
 	}
 	// Charge the contract creation init gas in verkle mode

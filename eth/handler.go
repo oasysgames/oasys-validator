@@ -204,7 +204,6 @@ func newHandler(config *handlerConfig) (*handler, error) {
 	h := &handler{
 		nodeID:                 config.NodeID,
 		networkID:              config.Network,
-		forkFilter:             forkid.NewFilter(config.Chain),
 		disablePeerTxBroadcast: config.DisablePeerTxBroadcast,
 		eventMux:               config.EventMux,
 		database:               config.Database,
