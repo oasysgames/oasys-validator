@@ -785,18 +785,8 @@ func (c *ChainConfig) IsConstantinople(num *big.Int) bool {
 }
 
 func (c *ChainConfig) NeedBadSharedStorage(num *big.Int) bool {
-	if c.IsHertzfix(num) || c.ChainID == nil {
-		return false
-	}
-
-	if c.ChainID.Cmp(big.NewInt(56)) == 0 && num.Cmp(big.NewInt(33851236)) == 0 {
-		return true
-	}
-
-	if c.ChainID.Cmp(big.NewInt(97)) == 0 && (num.Cmp(big.NewInt(35547779)) == 0 || num.Cmp(big.NewInt(35548081)) == 0) {
-		return true
-	}
-
+	// Always return false for Oasys
+	// This method is used for compatibility with old erroneous data(https://forum.bnbchain.org/t/about-the-hertzfix/2400) only for BSC mainnet and testnet.
 	return false
 }
 
