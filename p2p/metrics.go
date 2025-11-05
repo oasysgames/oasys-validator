@@ -80,7 +80,6 @@ var (
 	serveOtherError = metrics.NewRegisteredMeter("p2p/serves/error/other", nil)
 
 	normalPeerLatencyStat = metrics.NewRegisteredTimer("p2p/peers/normal/latency", nil)
-	evnPeerLatencyStat    = metrics.NewRegisteredTimer("p2p/peers/evn/latency", nil)
 )
 
 // markDialError matches errors that occur while setting up a dial connection to the

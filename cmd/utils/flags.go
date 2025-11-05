@@ -2424,9 +2424,7 @@ func parseMiningFeatures(ctx *cli.Context, cfg *ethconfig.Config) string {
 
 func parseNetFeatures(stack *node.Node) string {
 	var features []string
-	if stack.Config().EnableEVNFeatures {
-		features = append(features, "EVN")
-	}
+	// EVN features are removed here
 	return strings.Join(features, "|")
 }
 
