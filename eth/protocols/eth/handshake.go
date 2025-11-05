@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/gopool"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/forkid"
 	"github.com/ethereum/go-ethereum/metrics"
@@ -38,18 +37,18 @@ const (
 
 // Handshake executes the eth protocol handshake, negotiating version number,
 // network IDs, difficulties, head and genesis blocks.
-func (p *Peer) Handshake(networkID uint64, chain *core.BlockChain, rangeMsg BlockRangeUpdatePacket, td *big.Int, extension *UpgradeStatusExtension) error {
+func (p *Peer) Handshake(networkID uint64, chain *core.BlockChain, rangeMsg BlockRangeUpdatePacket, td *big.Int) error {
 	switch p.version {
 	case ETH69:
 		return p.handshake69(networkID, chain, rangeMsg)
 	case ETH68:
-		return p.handshake68(networkID, chain, td, extension)
+		return p.handshake68(networkID, chain, td)
 	default:
 		return errors.New("unsupported protocol version")
 	}
 }
 
-func (p *Peer) handshake68(networkID uint64, chain *core.BlockChain, td *big.Int, extension *UpgradeStatusExtension) error {
+func (p *Peer) handshake68(networkID uint64, chain *core.BlockChain, td *big.Int) error {
 	var (
 		genesis    = chain.Genesis()
 		latest     = chain.CurrentBlock()
@@ -80,35 +79,6 @@ func (p *Peer) handshake68(networkID uint64, chain *core.BlockChain, td *big.Int
 	// larger, it will still fit within 100 bits
 	if tdlen := p.td.BitLen(); tdlen > 100 {
 		return fmt.Errorf("too large total difficulty: bitlen %d", tdlen)
-	}
-
-	var upgradeStatus UpgradeStatusPacket // safe to read after two values have been received from errc
-	if extension == nil {
-		extension = &UpgradeStatusExtension{}
-	}
-	extensionRaw, err := extension.Encode()
-	if err != nil {
-		return err
-	}
-	gopool.Submit(func() {
-		errc <- p2p.Send(p.rw, UpgradeStatusMsg, &UpgradeStatusPacket{
-			Extension: extensionRaw,
-		})
-	})
-	gopool.Submit(func() {
-		errc <- p.readUpgradeStatus(&upgradeStatus)
-	})
-	if err := waitForHandshake(errc, p); err != nil {
-		return err
-	}
-	extension, err = upgradeStatus.GetExtension()
-	if err != nil {
-		return err
-	}
-	p.statusExtension = extension
-	if p.statusExtension.DisablePeerTxBroadcast {
-		p.Log().Debug("peer does not need broadcast txs, closing broadcast routines")
-		p.CloseTxBroadcast()
 	}
 	return nil
 }
