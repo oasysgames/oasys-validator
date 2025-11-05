@@ -234,7 +234,7 @@ func constructDevModeBanner(ctx *cli.Context, cfg gethConfig) string {
        0x%x (10^49 ETH)
 `, cfg.Eth.Miner.Etherbase)
 		if cfg.Eth.Miner.Etherbase == utils.DeveloperAddr {
-			devModeBanner += fmt.Sprintf(` 
+			devModeBanner += fmt.Sprintf(`
        Private Key
        ------------------
        0x%x
@@ -252,14 +252,6 @@ func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend) {
 	if ctx.IsSet(utils.OverridePassedForkTime.Name) {
 		v := ctx.Uint64(utils.OverridePassedForkTime.Name)
 		cfg.Eth.OverridePassedForkTime = &v
-	}
-	if ctx.IsSet(utils.OverridePrague.Name) {
-		v := ctx.Uint64(utils.OverridePrague.Name)
-		cfg.Eth.OverridePrague = &v
-	}
-	if ctx.IsSet(utils.OverrideFermi.Name) {
-		v := ctx.Uint64(utils.OverrideFermi.Name)
-		cfg.Eth.OverrideFermi = &v
 	}
 	if ctx.IsSet(utils.OverrideVerkle.Name) {
 		v := ctx.Uint64(utils.OverrideVerkle.Name)

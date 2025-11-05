@@ -276,12 +276,6 @@ func (o *ChainOverrides) apply(cfg *params.ChainConfig) error {
 		cfg.ShanghaiTime = o.OverridePassedForkTime
 		cfg.CancunTime = o.OverridePassedForkTime
 	}
-	if o.OverridePrague != nil {
-		cfg.PragueTime = o.OverridePrague
-	}
-	if o.OverrideFermi != nil {
-		cfg.FermiTime = o.OverrideFermi
-	}
 	if o.OverrideVerkle != nil {
 		cfg.VerkleTime = o.OverrideVerkle
 	}

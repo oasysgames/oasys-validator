@@ -300,16 +300,6 @@ var (
 		Usage:    "Manually specify the hard fork timestamps which have passed on the mainnet, overriding the bundled setting",
 		Category: flags.EthCategory,
 	}
-	OverridePrague = &cli.Uint64Flag{
-		Name:     "override.prague",
-		Usage:    "Manually specify the Prague fork timestamp, overriding the bundled setting",
-		Category: flags.EthCategory,
-	}
-	OverrideFermi = &cli.Uint64Flag{
-		Name:     "override.fermi",
-		Usage:    "Manually specify the Fermi fork timestamp, overriding the bundled setting",
-		Category: flags.EthCategory,
-	}
 	OverrideVerkle = &cli.Uint64Flag{
 		Name:     "override.verkle",
 		Usage:    "Manually specify the Verkle fork timestamp, overriding the bundled setting",

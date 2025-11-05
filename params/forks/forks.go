@@ -72,8 +72,5 @@ var forkToString = map[Fork]string{
 	Shanghai:         "Shanghai",
 	Cancun:           "Cancun",
 	Prague:           "Prague",
-	Lorentz:          "Lorentz",
-	Maxwell:          "Maxwell",
-	Fermi:            "Fermi",
 	Osaka:            "Osaka",
 }

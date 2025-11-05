@@ -194,12 +194,6 @@ type Config struct {
 	// OverridePassedForkTime
 	OverridePassedForkTime *uint64 `toml:",omitempty"`
 
-	// OverridePrague (TODO: remove after the fork)
-	OverridePrague *uint64 `toml:",omitempty"`
-
-	// OverrideFermi (TODO: remove after the fork)
-	OverrideFermi *uint64 `toml:",omitempty"`
-
 	// OverrideOsaka (TODO: remove after the fork)
 	OverrideOsaka *uint64 `toml:",omitempty"`
 

@@ -333,12 +333,6 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	if dec.OverridePassedForkTime != nil {
 		c.OverridePassedForkTime = dec.OverridePassedForkTime
 	}
-	if dec.OverridePrague != nil {
-		c.OverridePrague = dec.OverridePrague
-	}
-	if dec.OverrideFermi != nil {
-		c.OverrideFermi = dec.OverrideFermi
-	}
 	if dec.OverrideOsaka != nil {
 		c.OverrideOsaka = dec.OverrideOsaka
 	}
