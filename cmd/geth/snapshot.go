@@ -235,6 +235,7 @@ func pruneState(ctx *cli.Context) error {
 	return nil
 }
 
+//nolint:unused
 func pruneAllState(ctx *cli.Context) error {
 	stack, _ := makeConfigNode(ctx)
 	defer stack.Close()

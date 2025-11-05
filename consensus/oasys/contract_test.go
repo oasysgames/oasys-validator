@@ -18,7 +18,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/internal/ethapi/override"
 	"github.com/ethereum/go-ethereum/params"
@@ -596,7 +595,7 @@ func makeEnv(wallet accounts.Wallet, account accounts.Account) (*testEnv, error)
 	engine.Authorize(account.Address, wallet.SignData, wallet.SignTx)
 
 	// Generate a batch of blocks, each properly signed
-	chain, err := core.NewBlockChain(db, nil, genspec, nil, engine, vm.Config{}, nil, nil)
+	chain, err := core.NewBlockChain(db, genspec, engine, nil)
 	if err != nil {
 		return nil, err
 	}

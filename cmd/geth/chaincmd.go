@@ -79,6 +79,7 @@ participating.
 It expects the genesis file as argument.`,
 	}
 	// this command is not used in Oasys
+	//nolint:unused
 	initNetworkCommand = &cli.Command{
 		Action:    initNetwork,
 		Name:      "init-network",
@@ -348,6 +349,7 @@ func initGenesis(ctx *cli.Context) error {
 	return nil
 }
 
+//nolint:unused
 func parseIps(ipStr string, size int) ([]string, error) {
 	var ips []string
 	if len(ipStr) != 0 {
@@ -370,6 +372,7 @@ func parseIps(ipStr string, size int) ([]string, error) {
 	return ips, nil
 }
 
+//nolint:unused
 func parsePorts(portStr string, defaultPort int, size int) ([]int, error) {
 	var ports []int
 	if strings.Contains(portStr, ",") {
@@ -402,6 +405,7 @@ func parsePorts(portStr string, defaultPort int, size int) ([]int, error) {
 	return ports, nil
 }
 
+//nolint:unused
 func createPorts(ipStr string, port int, size int) []int {
 	ports := make([]int, size)
 	if len(ipStr) == 0 { // localhost , so different ports
@@ -417,6 +421,8 @@ func createPorts(ipStr string, port int, size int) []int {
 }
 
 // Create config for node i in the cluster
+//
+//nolint:unused
 func createNodeConfig(baseConfig gethConfig, ip string, port int, enodes []*enode.Node, index int, staticConnect bool) gethConfig {
 	baseConfig.Node.HTTPHost = ip
 	baseConfig.Node.P2P.ListenAddr = fmt.Sprintf(":%d", port)
@@ -437,6 +443,8 @@ func createNodeConfig(baseConfig gethConfig, ip string, port int, enodes []*enod
 }
 
 // initNetwork will bootstrap and initialize a new genesis block, and nodekey, config files for network nodes
+//
+//nolint:unused
 func initNetwork(ctx *cli.Context) error {
 	initDir := ctx.String(utils.InitNetworkDir.Name)
 	if len(initDir) == 0 {
@@ -503,6 +511,7 @@ func initNetwork(ctx *cli.Context) error {
 	return nil
 }
 
+//nolint:unused
 func createConfigs(base gethConfig, initDir string, prefix string, ips []string, ports []int, extraEnodes []*enode.Node, connectOneExtraEnodes bool, staticConnect bool) ([]gethConfig, []*enode.Node, [][]common.Address, error) {
 	if len(ips) != len(ports) {
 		return nil, nil, nil, errors.New("mismatch of size and length of ports")
@@ -539,6 +548,7 @@ func createConfigs(base gethConfig, initDir string, prefix string, ips []string,
 	return configs, enodes, accounts, nil
 }
 
+//nolint:unused
 func writeConfig(inGenesisFile *os.File, config gethConfig, dir string) error {
 	configBytes, err := tomlSettings.Marshal(config)
 	if err != nil {

@@ -125,6 +125,7 @@ Remove blockchain and state databases`,
 For each trie node encountered, it checks that the key corresponds to the keccak256(value). If this is not true, this indicates
 a data corruption.`,
 	}
+	//nolint:unused
 	dbHbss2PbssCmd = &cli.Command{
 		Action:    hbss2pbss,
 		Name:      "hbss-to-pbss",
@@ -152,6 +153,7 @@ a data corruption.`,
 		},
 		Description: "This command looks up the specified trie node key from the database.",
 	}
+	//nolint:unused
 	dbTrieDeleteCmd = &cli.Command{
 		Action:    dbTrieDelete,
 		Name:      "trie-delete",
@@ -201,6 +203,7 @@ corruption if it is aborted during execution'!`,
 		Description: `This command deletes the specified database key from the database.
 WARNING: This is a low-level operation which may cause database corruption!`,
 	}
+	//nolint:unused
 	dbDeleteTrieStateCmd = &cli.Command{
 		Action: dbDeleteTrieState,
 		Name:   "delete-trie-state",
@@ -739,6 +742,8 @@ func dbTrieGet(ctx *cli.Context) error {
 }
 
 // dbTrieDelete delete the trienode of a given database key
+//
+//nolint:unused
 func dbTrieDelete(ctx *cli.Context) error {
 	if ctx.NArg() < 1 || ctx.NArg() > 2 {
 		return fmt.Errorf("required arguments: %v", ctx.Command.ArgsUsage)
@@ -834,6 +839,8 @@ func dbDelete(ctx *cli.Context) error {
 }
 
 // dbDeleteTrieState deletes all trie state related key-value pairs from the database and the ancient state store.
+//
+//nolint:unused
 func dbDeleteTrieState(ctx *cli.Context) error {
 	if ctx.NArg() > 0 {
 		return fmt.Errorf("no arguments required")
@@ -1201,6 +1208,7 @@ func showMetaData(ctx *cli.Context) error {
 	return nil
 }
 
+//nolint:unused
 func hbss2pbss(ctx *cli.Context) error {
 	if ctx.NArg() > 1 {
 		return fmt.Errorf("required arguments: %v", ctx.Command.ArgsUsage)

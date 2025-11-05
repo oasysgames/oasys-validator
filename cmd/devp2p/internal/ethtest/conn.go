@@ -360,14 +360,13 @@ loop:
 	}
 	if status == nil {
 		// default status message
-		status = &eth.StatusPacket69{
+		status = &eth.StatusPacket68{
 			ProtocolVersion: uint32(c.negotiatedProtoVersion),
 			NetworkID:       chain.config.ChainID.Uint64(),
+			TD:              chain.TD(),
+			Head:            chain.blocks[chain.Len()-1].Hash(),
 			Genesis:         chain.blocks[0].Hash(),
 			ForkID:          chain.ForkID(),
-			EarliestBlock:   0,
-			LatestBlock:     chain.blocks[chain.Len()-1].NumberU64(),
-			LatestBlockHash: chain.blocks[chain.Len()-1].Hash(),
 		}
 	}
 	if err := c.Write(ethProto, eth.StatusMsg, status); err != nil {

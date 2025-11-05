@@ -1361,6 +1361,8 @@ func NewRPCPendingTransaction(tx *types.Transaction, current *types.Header, conf
 }
 
 // newRPCTransactionsFromBlockIndex returns transactions that will serialize to the RPC representation.
+//
+//nolint:unused
 func newRPCTransactionsFromBlockIndex(b *types.Block, config *params.ChainConfig) []*RPCTransaction {
 	txs := b.Transactions()
 	result := make([]*RPCTransaction, 0, len(txs))
