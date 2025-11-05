@@ -601,28 +601,13 @@ func (w *worker) resultLoop() {
 				logs = append(logs, receipt.Logs...)
 			}
 
-			if prev, ok := w.recentMinedBlocks.Get(block.NumberU64()); ok {
-				doubleSign := false
-				prevParents := prev
-				for _, prevParent := range prevParents {
-					if prevParent == block.ParentHash() {
-						log.Error("Reject Double Sign!!", "block", block.NumberU64(),
-							"hash", block.Hash(),
-							"root", block.Root(),
-							"ParentHash", block.ParentHash())
-						doubleSign = true
-						break
-					}
-				}
-				if doubleSign {
-					continue
-				}
-				prevParents = append(prevParents, block.ParentHash())
-				w.recentMinedBlocks.Add(block.NumberU64(), prevParents)
-			} else {
-				// Add() will call removeOldest internally to remove the oldest element
-				// if the LRU Cache is full
-				w.recentMinedBlocks.Add(block.NumberU64(), []common.Hash{block.ParentHash()})
+			// Final safety to prevent double signing.
+			if w.isDoubleSign(header, true) {
+				log.Error("Reject Double Sign!!", "block", block.NumberU64(),
+					"hash", block.Hash(),
+					"root", block.Root(),
+					"ParentHash", block.ParentHash())
+				continue
 			}
 
 			// Commit block and state to database.
@@ -1451,17 +1436,22 @@ func (w *worker) getSealingBlock(params *generateParams) *newPayloadResult {
 // If store is true, it records the block as sealed.
 func (w *worker) isDoubleSign(header *types.Header, store bool) (doubleSign bool) {
 	number, parent := header.Number.Uint64(), header.ParentHash
-	prevParents, exists := w.recentMinedBlocks.Get(number)
-	if exists {
-		_, doubleSign = prevParents[parent]
-	}
-	if store {
-		if exists {
-			prevParents[parent] = struct{}{}
-		} else {
-			prevParents = map[common.Hash]struct{}{parent: struct{}{}}
+	if prev, ok := w.recentMinedBlocks.Get(number); ok {
+		prevParents := prev
+		for _, prevParent := range prevParents {
+			if prevParent == parent {
+				doubleSign = true
+				return doubleSign
+			}
+		}
+		if store {
+			prevParents = append(prevParents, parent)
 			w.recentMinedBlocks.Add(number, prevParents)
 		}
+	} else if store {
+		// Add() will call removeOldest internally to remove the oldest element
+		// if the LRU Cache is full
+		w.recentMinedBlocks.Add(number, []common.Hash{parent})
 	}
 	return doubleSign
 }
