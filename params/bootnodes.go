@@ -16,7 +16,11 @@
 
 package params
 
-import "github.com/ethereum/go-ethereum/common"
+import (
+	"strings"
+
+	"github.com/ethereum/go-ethereum/common"
+)
 
 // MainnetBootnodes are the enode URLs of the P2P bootstrap nodes running on
 // the main Ethereum network.
@@ -42,5 +46,7 @@ const dnsPrefix = "enrtree://AKA3AM6LPBYEUDMVNU3BSVQJ5AD45Y7YPOHJLEF6W26QOE4VTUD
 // genesis hash and protocol. See https://github.com/ethereum/discv4-dns-lists for more
 // information.
 func KnownDNSNetwork(genesis common.Hash, protocol string) string {
-	return dnsPrefix + "" // Use `dnsPrefix` to avoid a linter warning
+	// Return empty string.
+	// This is a workaround to avoid a linter warning.
+	return strings.ReplaceAll(dnsPrefix, dnsPrefix, "")
 }
