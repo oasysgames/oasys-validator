@@ -73,7 +73,13 @@ func Parse(spec string) (Interface, error) {
 	if found && mech != "stun" {
 		ip = net.ParseIP(after)
 		if ip == nil {
-			return nil, errors.New("invalid IP address")
+			// Support domain name resolution for `oasys-private-l1`
+			ips, err := net.LookupIP(after)
+			if err != nil {
+				log.Debug("Failed to resolve domain name", "domain", after, "err", err)
+				return nil, errors.New("invalid IP address")
+			}
+			ip = ips[0]
 		}
 	}
 	switch mech {
