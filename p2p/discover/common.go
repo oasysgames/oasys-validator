@@ -72,6 +72,22 @@ func ParseEthFilter(chain string) (NodeFilterFunc, error) {
 	return f, nil
 }
 
+func GetEthEntry(chain string) (enr.Entry, error) {
+	var eth struct {
+		ForkID forkid.ID
+		Tail   []rlp.RawValue `rlp:"tail"`
+	}
+	switch chain {
+	case "oasys-mainnet":
+		eth.ForkID = forkid.NewID(params.OasysMainnetChainConfig, core.DefaultOasysMainnetGenesisBlock().ToBlock(), uint64(0), uint64(0))
+	case "oasys-testnet":
+		eth.ForkID = forkid.NewID(params.OasysTestnetChainConfig, core.DefaultOasysTestnetGenesisBlock().ToBlock(), uint64(0), uint64(0))
+	default:
+		return nil, fmt.Errorf("unknown network %q", chain)
+	}
+	return enr.WithEntry("eth", &eth), nil
+}
+
 // Config holds settings for the discovery listener.
 type Config struct {
 	// These settings are required and configure the UDP listener:

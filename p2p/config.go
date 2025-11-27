@@ -18,6 +18,7 @@ package p2p
 
 import (
 	"crypto/ecdsa"
+	"encoding"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common/mclock"
@@ -75,13 +76,14 @@ type Config struct {
 	// protocol.
 	BootstrapNodesV5 []*enode.Node `toml:",omitempty"`
 
+	// EnableENRFilter enables the ENR filter for the discovery protocol.
+	// TODO(galaio): add a switch with a default value of false has been added to avoid compatibility issues.
+	// After the node version is upgraded for a while, it can be set to true by default.
+	EnableENRFilter bool `toml:",omitempty"`
+
 	// Static nodes are used as pre-configured connections which are always
 	// maintained and re-connected on disconnects.
 	StaticNodes []*enode.Node
-
-	// Verify nodes are used as pre-configured connections which are always
-	// maintained and re-connected on disconnects.
-	VerifyNodes []*enode.Node
 
 	// Trusted nodes are used as pre-configured connections which are always
 	// allowed to connect, even above the peer limit.
@@ -143,6 +145,13 @@ type configMarshaling struct {
 
 type configNAT struct {
 	nat.Interface
+}
+
+func (w *configNAT) MarshalText() ([]byte, error) {
+	if tm, ok := w.Interface.(encoding.TextMarshaler); ok {
+		return tm.MarshalText()
+	}
+	return nil, fmt.Errorf("NAT specification %#v cannot be marshaled", w.Interface)
 }
 
 func (w *configNAT) UnmarshalText(input []byte) error {

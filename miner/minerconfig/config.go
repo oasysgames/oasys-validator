@@ -27,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 )
 
+// Default timing configurations
 var (
 	defaultDelayLeftOver = 50 * time.Millisecond
 	defaultRecommit      = 6 * time.Second
@@ -48,7 +49,7 @@ type Config struct {
 
 // DefaultConfig contains default settings for miner.
 var DefaultConfig = Config{
-	GasCeil:  30000000,
+	GasCeil:  60_000_000, // Same as go-ethereum(v1.16.4)
 	GasPrice: big.NewInt(params.GWei),
 
 	// The default recommit time is chosen as two seconds since

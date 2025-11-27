@@ -760,8 +760,8 @@ func (c *Oasys) applyTransaction(
 	receipt.GasUsed = gasUsed
 
 	// Set the receipt logs and create a bloom for filtering
-	receipt.Logs = state.GetLogs(expectedTx.Hash(), header.Number.Uint64(), common.Hash{})
-	receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
+	receipt.Logs = state.GetLogs(expectedTx.Hash(), header.Number.Uint64(), common.Hash{}, 0)
+	receipt.Bloom = types.CreateBloom(receipt)
 	receipt.BlockHash = common.Hash{}
 	receipt.BlockNumber = header.Number
 	receipt.TransactionIndex = uint(state.TxIndex())
@@ -799,7 +799,7 @@ func applyMessage(
 	state.SetNonce(msg.From, state.GetNonce(msg.From)+1, tracing.NonceChangeEoACall)
 
 	ret, returnGas, err := evm.Call(
-		vm.AccountRef(msg.From),
+		msg.From,
 		*msg.To,
 		msg.Data,
 		msg.GasLimit,

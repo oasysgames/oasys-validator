@@ -24,10 +24,7 @@ type Label struct {
 // GetOrRegisterLabel returns an existing Label or constructs and registers a
 // new Label.
 func GetOrRegisterLabel(name string, r Registry) *Label {
-	if r == nil {
-		r = DefaultRegistry
-	}
-	return r.GetOrRegister(name, NewLabel).(*Label)
+	return getOrRegister(name, NewLabel, r)
 }
 
 // NewLabel constructs a new Label.
@@ -47,7 +44,5 @@ func (l *Label) Snapshot() *LabelSnapshot {
 func (l *Label) Mark(value map[string]interface{}) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
-	for k, v := range value {
-		l.value[k] = v
-	}
+	maps.Copy(l.value, value)
 }

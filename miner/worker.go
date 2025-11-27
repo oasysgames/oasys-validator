@@ -38,6 +38,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
@@ -229,14 +230,12 @@ type worker struct {
 	// payload in proof-of-stake stage.
 	recommit time.Duration
 
-	// Store recently signed block numbers and parent hashes to prevent double signing.
-	recentMinedBlocks *lru.Cache[uint64, map[common.Hash]struct{}]
-
 	// Test hooks
-	newTaskHook  func(*task)                        // Method to call upon receiving a new sealing task.
-	skipSealHook func(*task) bool                   // Method to decide whether skipping the sealing.
-	fullTaskHook func()                             // Method to call before pushing the full sealing task.
-	resubmitHook func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
+	newTaskHook       func(*task)                        // Method to call upon receiving a new sealing task.
+	skipSealHook      func(*task) bool                   // Method to decide whether skipping the sealing.
+	fullTaskHook      func()                             // Method to call before pushing the full sealing task.
+	resubmitHook      func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
+	recentMinedBlocks *lru.Cache[uint64, []common.Hash]
 }
 
 func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend, mux *event.TypeMux, init bool) *worker {
@@ -261,7 +260,7 @@ func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend,
 		startCh:            make(chan struct{}, 1),
 		exitCh:             make(chan struct{}),
 		resubmitIntervalCh: make(chan time.Duration),
-		recentMinedBlocks:  lru.NewCache[uint64, map[common.Hash]struct{}](recentMinedCacheLimit),
+		recentMinedBlocks:  lru.NewCache[uint64, []common.Hash](recentMinedCacheLimit),
 	}
 	// Subscribe events for blockchain
 	worker.chainHeadSub = eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)
@@ -614,7 +613,7 @@ func (w *worker) resultLoop() {
 			// Commit block and state to database.
 			task.state.SetExpectedStateRoot(block.Root())
 			start := time.Now()
-			status, err := w.chain.WriteBlockAndSetHead(block, receipts, logs, task.state, true)
+			status, err := w.chain.WriteBlockAndSetHead(block, receipts, logs, task.state, w.mux)
 			if status != core.CanonStatTy {
 				if err != nil {
 					log.Error("Failed writing block to chain", "err", err, "status", status)
@@ -655,8 +654,14 @@ func (w *worker) makeEnv(parent *types.Header, header *types.Header, coinbase co
 	} else {
 		if prevEnv == nil {
 			state.StartPrefetcher("miner", nil)
-		} else {
+		} else if prevEnv.header.Number.Uint64() == header.Number.Uint64() {
 			state.TransferPrefetcher(prevEnv.state)
+		} else {
+			// in some corner case, new block was just imported and preEnv was for the previous block
+			// in this case, the prefetcher can not be transferred
+			log.Debug("new block was just imported, start prefetcher from scratch",
+				"prev number", prevEnv.header.Number.Uint64(), "cur number", header.Number.Uint64())
+			state.StartPrefetcher("miner", nil)
 		}
 	}
 
@@ -869,6 +874,24 @@ LOOP:
 			txs.Pop()
 			continue
 		}
+
+		// Make sure all transactions after osaka have cell proofs
+		if w.chainConfig.IsOsaka(env.header.Number, env.header.Time) {
+			if sidecar := tx.BlobTxSidecar(); sidecar != nil {
+				if sidecar.Version == 0 {
+					log.Info("Including blob tx with v0 sidecar, recomputing proofs", "hash", ltx.Hash)
+					sidecar.Proofs = make([]kzg4844.Proof, 0, len(sidecar.Blobs)*kzg4844.CellProofsPerBlob)
+					for _, blob := range sidecar.Blobs {
+						cellProofs, err := kzg4844.ComputeCellProofs(&blob)
+						if err != nil {
+							panic(err)
+						}
+						sidecar.Proofs = append(sidecar.Proofs, cellProofs...)
+					}
+				}
+			}
+		}
+
 		// Error may be ignored here. The error has already been checked
 		// during transaction acceptance in the transaction pool.
 		from, _ := types.Sender(env.signer, tx)
@@ -1124,9 +1147,13 @@ func (w *worker) generateWork(params *generateParams, witness bool) *newPayloadR
 			return &newPayloadResult{err: err}
 		}
 		// EIP-7002
-		core.ProcessWithdrawalQueue(&requests, work.evm)
+		if err := core.ProcessWithdrawalQueue(&requests, work.evm); err != nil {
+			return &newPayloadResult{err: err}
+		}
 		// EIP-7251 consolidations
-		core.ProcessConsolidationQueue(&requests, work.evm)
+		if err := core.ProcessConsolidationQueue(&requests, work.evm); err != nil {
+			return &newPayloadResult{err: err}
+		}
 	}
 	if requests != nil {
 		reqHash := types.CalcRequestsHash(requests)
@@ -1409,17 +1436,22 @@ func (w *worker) getSealingBlock(params *generateParams) *newPayloadResult {
 // If store is true, it records the block as sealed.
 func (w *worker) isDoubleSign(header *types.Header, store bool) (doubleSign bool) {
 	number, parent := header.Number.Uint64(), header.ParentHash
-	prevParents, exists := w.recentMinedBlocks.Get(number)
-	if exists {
-		_, doubleSign = prevParents[parent]
-	}
-	if store {
-		if exists {
-			prevParents[parent] = struct{}{}
-		} else {
-			prevParents = map[common.Hash]struct{}{parent: struct{}{}}
+	if prev, ok := w.recentMinedBlocks.Get(number); ok {
+		prevParents := prev
+		for _, prevParent := range prevParents {
+			if prevParent == parent {
+				doubleSign = true
+				return doubleSign
+			}
+		}
+		if store {
+			prevParents = append(prevParents, parent)
 			w.recentMinedBlocks.Add(number, prevParents)
 		}
+	} else if store {
+		// Add() will call removeOldest internally to remove the oldest element
+		// if the LRU Cache is full
+		w.recentMinedBlocks.Add(number, []common.Hash{parent})
 	}
 	return doubleSign
 }

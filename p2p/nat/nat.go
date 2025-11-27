@@ -73,7 +73,13 @@ func Parse(spec string) (Interface, error) {
 	if found && mech != "stun" {
 		ip = net.ParseIP(after)
 		if ip == nil {
-			return nil, errors.New("invalid IP address")
+			// Support domain name resolution for `oasys-private-l1`
+			ips, err := net.LookupIP(after)
+			if err != nil {
+				log.Debug("Failed to resolve domain name", "domain", after, "err", err)
+				return nil, errors.New("invalid IP address")
+			}
+			ip = ips[0]
 		}
 	}
 	switch mech {
@@ -142,7 +148,7 @@ type ExtIP net.IP
 
 func (n ExtIP) ExternalIP() (net.IP, error)  { return net.IP(n), nil }
 func (n ExtIP) String() string               { return fmt.Sprintf("ExtIP(%v)", net.IP(n)) }
-func (n ExtIP) MarshalText() ([]byte, error) { return []byte(fmt.Sprintf("extip:%v", net.IP(n))), nil }
+func (n ExtIP) MarshalText() ([]byte, error) { return fmt.Appendf(nil, "extip:%v", net.IP(n)), nil }
 
 // These do nothing.
 

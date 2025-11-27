@@ -49,14 +49,6 @@ var alphabetSoup = "ABCDEF090807060504030201ffffffffffffffffffffffffffffffffffff
 var commonParams []*twoOperandParams
 var twoOpMethods map[string]executionFunc
 
-type contractRef struct {
-	addr common.Address
-}
-
-func (c contractRef) Address() common.Address {
-	return c.addr
-}
-
 func init() {
 	// Params is a list of common edgecases that should be used for some common tests
 	params := []string{
@@ -575,11 +567,12 @@ func TestOpTstore(t *testing.T) {
 		mem          = NewMemory()
 		caller       = common.Address{}
 		to           = common.Address{1}
-		contractRef  = contractRef{caller}
-		contract     = NewContract(contractRef, AccountRef(to), new(uint256.Int), 0)
+		contract     = GetContract(caller, to, new(uint256.Int), 0, nil)
 		scopeContext = ScopeContext{mem, stack, contract}
 		value        = common.Hex2Bytes("abcdef00000000000000abba000000000deaf000000c0de00100000000133700")
 	)
+
+	defer ReturnContract(contract)
 
 	// Add a stateObject for the caller and the contract being called
 	statedb.CreateAccount(caller)
