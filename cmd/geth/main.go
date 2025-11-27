@@ -99,6 +99,7 @@ var (
 		utils.SnapshotFlag,
 		utils.TxLookupLimitFlag, // deprecated
 		utils.TransactionHistoryFlag,
+		utils.DisableTxIndexerFlag,
 		utils.BlockHistoryFlag,
 		// utils.ChainHistoryFlag, // disabled in bsc
 		utils.LogHistoryFlag,

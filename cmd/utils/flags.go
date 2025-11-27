@@ -364,6 +364,14 @@ var (
 		Value:    ethconfig.Defaults.TransactionHistory,
 		Category: flags.StateCategory,
 	}
+	// Disable by default. For most validators and full nodes, they don't need to index transactions.
+	// For RPC and explorer nodes, enable this flag.
+	DisableTxIndexerFlag = &cli.BoolFlag{
+		Name:     "history.disabletxindexer",
+		Usage:    "Disable transaction indexer",
+		Value:    true,
+		Category: flags.StateCategory,
+	}
 	BlockHistoryFlag = &cli.Uint64Flag{
 		Name:     "history.blocks",
 		Usage:    "Number of recent blocks to maintain in DB (default = 0, 0 = entire chain). Pruning is not involving TxIndex/bloomIndex.",
@@ -2011,10 +2019,22 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		log.Warn("The config option 'TxLookupLimit' is deprecated and will be removed, please use 'TransactionHistory'")
 		cfg.TransactionHistory = cfg.TxLookupLimit
 	}
+	if ctx.IsSet(DisableTxIndexerFlag.Name) {
+		cfg.DisableTxIndexer = ctx.Bool(DisableTxIndexerFlag.Name)
+		cfg.TransactionHistory = 0
+	}
 	if ctx.IsSet(TransactionHistoryFlag.Name) {
+		if cfg.DisableTxIndexer {
+			log.Warn("Disabling transaction indexing is not allowed when --history.transactions is set")
+			cfg.DisableTxIndexer = false
+		}
 		cfg.TransactionHistory = ctx.Uint64(TransactionHistoryFlag.Name)
 	} else if ctx.IsSet(TxLookupLimitFlag.Name) {
 		log.Warn("The flag --txlookuplimit is deprecated and will be removed, please use --history.transactions")
+		if cfg.DisableTxIndexer {
+			log.Warn("Disabling transaction indexing is not allowed when --txlookuplimit is set")
+			cfg.DisableTxIndexer = false
+		}
 		cfg.TransactionHistory = ctx.Uint64(TxLookupLimitFlag.Name)
 	}
 	if ctx.IsSet(BlockHistoryFlag.Name) {
