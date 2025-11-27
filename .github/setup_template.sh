@@ -47,7 +47,7 @@ spacer() {
     echo -e "\n"
 }
 
-# Check if systemd can be used. 
+# Check if systemd can be used.
 if ! systemctl --version >/dev/null 2>&1; then
     msg_err "Unsupported operating system."
     exit 1
@@ -82,7 +82,7 @@ fi
 
 # Check if unzip can be used.
 if ! unzip -h >/dev/null 2>&1; then
-    msg_err "Please install the unzip command." 
+    msg_err "Please install the unzip command."
     exit 1
 fi
 
@@ -191,7 +191,7 @@ Environment=NETWORK_ID=$NETWORK_ID
 Environment=BOOTNODES=$BOOTNODES
 Environment=ETHERBASE=$ETHERBASE
 Environment=PASSWORD=$PASSWORD_FILE
-Environment=GASLIMIT=30000000
+Environment=GASLIMIT=60000000
 
 ExecStart=$INSTALL_PATH \\
   --datadir \${DATA_DIR} \\

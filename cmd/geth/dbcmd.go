@@ -97,12 +97,10 @@ Remove blockchain and state databases`,
 		},
 	}
 	dbInspectCmd = &cli.Command{
-		Action:    inspect,
-		Name:      "inspect",
-		ArgsUsage: "<prefix> <start>",
-		Flags: slices.Concat([]cli.Flag{
-			utils.SyncModeFlag,
-		}, utils.NetworkFlags, utils.DatabaseFlags),
+		Action:      inspect,
+		Name:        "inspect",
+		ArgsUsage:   "<prefix> <start>",
+		Flags:       slices.Concat(utils.NetworkFlags, utils.DatabaseFlags),
 		Usage:       "Inspect the storage size for each type of data in the database",
 		Description: `This commands iterates the entire database. If the optional 'prefix' and 'start' arguments are provided, then the iteration is limited to the given subset of data.`,
 	}
@@ -127,6 +125,7 @@ Remove blockchain and state databases`,
 For each trie node encountered, it checks that the key corresponds to the keccak256(value). If this is not true, this indicates
 a data corruption.`,
 	}
+	//nolint:unused
 	dbHbss2PbssCmd = &cli.Command{
 		Action:    hbss2pbss,
 		Name:      "hbss-to-pbss",
@@ -154,6 +153,7 @@ a data corruption.`,
 		},
 		Description: "This command looks up the specified trie node key from the database.",
 	}
+	//nolint:unused
 	dbTrieDeleteCmd = &cli.Command{
 		Action:    dbTrieDelete,
 		Name:      "trie-delete",
@@ -172,16 +172,13 @@ a data corruption.`,
 		Action: dbStats,
 		Name:   "stats",
 		Usage:  "Print leveldb statistics",
-		Flags: slices.Concat([]cli.Flag{
-			utils.SyncModeFlag,
-		}, utils.NetworkFlags, utils.DatabaseFlags),
+		Flags:  slices.Concat(utils.NetworkFlags, utils.DatabaseFlags),
 	}
 	dbCompactCmd = &cli.Command{
 		Action: dbCompact,
 		Name:   "compact",
 		Usage:  "Compact leveldb database. WARNING: May take a very long time",
 		Flags: slices.Concat([]cli.Flag{
-			utils.SyncModeFlag,
 			utils.CacheFlag,
 			utils.CacheDatabaseFlag,
 		}, utils.NetworkFlags, utils.DatabaseFlags),
@@ -190,13 +187,11 @@ WARNING: This operation may take a very long time to finish, and may cause datab
 corruption if it is aborted during execution'!`,
 	}
 	dbGetCmd = &cli.Command{
-		Action:    dbGet,
-		Name:      "get",
-		Usage:     "Show the value of a database key",
-		ArgsUsage: "<hex-encoded key>",
-		Flags: slices.Concat([]cli.Flag{
-			utils.SyncModeFlag,
-		}, utils.NetworkFlags, utils.DatabaseFlags),
+		Action:      dbGet,
+		Name:        "get",
+		Usage:       "Show the value of a database key",
+		ArgsUsage:   "<hex-encoded key>",
+		Flags:       slices.Concat(utils.NetworkFlags, utils.DatabaseFlags),
 		Description: "This command looks up the specified database key from the database.",
 	}
 	dbDeleteCmd = &cli.Command{
@@ -204,12 +199,11 @@ corruption if it is aborted during execution'!`,
 		Name:      "delete",
 		Usage:     "Delete a database key (WARNING: may corrupt your database)",
 		ArgsUsage: "<hex-encoded key>",
-		Flags: slices.Concat([]cli.Flag{
-			utils.SyncModeFlag,
-		}, utils.NetworkFlags, utils.DatabaseFlags),
+		Flags:     slices.Concat(utils.NetworkFlags, utils.DatabaseFlags),
 		Description: `This command deletes the specified database key from the database.
 WARNING: This is a low-level operation which may cause database corruption!`,
 	}
+	//nolint:unused
 	dbDeleteTrieStateCmd = &cli.Command{
 		Action: dbDeleteTrieState,
 		Name:   "delete-trie-state",
@@ -224,59 +218,47 @@ WARNING: This is a low-level operation which may cause database corruption!`,
 		Name:      "put",
 		Usage:     "Set the value of a database key (WARNING: may corrupt your database)",
 		ArgsUsage: "<hex-encoded key> <hex-encoded value>",
-		Flags: slices.Concat([]cli.Flag{
-			utils.SyncModeFlag,
-		}, utils.NetworkFlags, utils.DatabaseFlags),
+		Flags:     slices.Concat(utils.NetworkFlags, utils.DatabaseFlags),
 		Description: `This command sets a given database key to the given value.
 WARNING: This is a low-level operation which may cause database corruption!`,
 	}
 	dbGetSlotsCmd = &cli.Command{
-		Action:    dbDumpTrie,
-		Name:      "dumptrie",
-		Usage:     "Show the storage key/values of a given storage trie",
-		ArgsUsage: "<hex-encoded state root> <hex-encoded account hash> <hex-encoded storage trie root> <hex-encoded start (optional)> <int max elements (optional)>",
-		Flags: slices.Concat([]cli.Flag{
-			utils.SyncModeFlag,
-		}, utils.NetworkFlags, utils.DatabaseFlags),
+		Action:      dbDumpTrie,
+		Name:        "dumptrie",
+		Usage:       "Show the storage key/values of a given storage trie",
+		ArgsUsage:   "<hex-encoded state root> <hex-encoded account hash> <hex-encoded storage trie root> <hex-encoded start (optional)> <int max elements (optional)>",
+		Flags:       slices.Concat(utils.NetworkFlags, utils.DatabaseFlags),
 		Description: "This command looks up the specified database key from the database.",
 	}
 	dbDumpFreezerIndex = &cli.Command{
-		Action:    freezerInspect,
-		Name:      "freezer-index",
-		Usage:     "Dump out the index of a specific freezer table",
-		ArgsUsage: "<freezer-type> <table-type> <start (int)> <end (int)>",
-		Flags: slices.Concat([]cli.Flag{
-			utils.SyncModeFlag,
-		}, utils.NetworkFlags, utils.DatabaseFlags),
+		Action:      freezerInspect,
+		Name:        "freezer-index",
+		Usage:       "Dump out the index of a specific freezer table",
+		ArgsUsage:   "<freezer-type> <table-type> <start (int)> <end (int)>",
+		Flags:       slices.Concat(utils.NetworkFlags, utils.DatabaseFlags),
 		Description: "This command displays information about the freezer index.",
 	}
 	dbImportCmd = &cli.Command{
-		Action:    importLDBdata,
-		Name:      "import",
-		Usage:     "Imports leveldb-data from an exported RLP dump.",
-		ArgsUsage: "<dumpfile> <start (optional)",
-		Flags: slices.Concat([]cli.Flag{
-			utils.SyncModeFlag,
-		}, utils.NetworkFlags, utils.DatabaseFlags),
+		Action:      importLDBdata,
+		Name:        "import",
+		Usage:       "Imports leveldb-data from an exported RLP dump.",
+		ArgsUsage:   "<dumpfile> <start (optional)",
+		Flags:       slices.Concat(utils.NetworkFlags, utils.DatabaseFlags),
 		Description: "The import command imports the specific chain data from an RLP encoded stream.",
 	}
 	dbExportCmd = &cli.Command{
-		Action:    exportChaindata,
-		Name:      "export",
-		Usage:     "Exports the chain data into an RLP dump. If the <dumpfile> has .gz suffix, gzip compression will be used.",
-		ArgsUsage: "<type> <dumpfile>",
-		Flags: slices.Concat([]cli.Flag{
-			utils.SyncModeFlag,
-		}, utils.NetworkFlags, utils.DatabaseFlags),
+		Action:      exportChaindata,
+		Name:        "export",
+		Usage:       "Exports the chain data into an RLP dump. If the <dumpfile> has .gz suffix, gzip compression will be used.",
+		ArgsUsage:   "<type> <dumpfile>",
+		Flags:       slices.Concat(utils.NetworkFlags, utils.DatabaseFlags),
 		Description: "Exports the specified chain data to an RLP encoded stream, optionally gzip-compressed.",
 	}
 	dbMetadataCmd = &cli.Command{
-		Action: showMetaData,
-		Name:   "metadata",
-		Usage:  "Shows metadata about the chain status.",
-		Flags: slices.Concat([]cli.Flag{
-			utils.SyncModeFlag,
-		}, utils.NetworkFlags, utils.DatabaseFlags),
+		Action:      showMetaData,
+		Name:        "metadata",
+		Usage:       "Shows metadata about the chain status.",
+		Flags:       slices.Concat(utils.NetworkFlags, utils.DatabaseFlags),
 		Description: "Shows metadata about the chain status.",
 	}
 	ancientInspectCmd = &cli.Command{
@@ -295,7 +277,6 @@ of ancientStore, will also displays the reserved number of blocks in ancientStor
 		Usage:     "Inspect the state history within block range",
 		ArgsUsage: "<address> [OPTIONAL <storage-slot>]",
 		Flags: slices.Concat([]cli.Flag{
-			utils.SyncModeFlag,
 			&cli.Uint64Flag{
 				Name:  "start",
 				Usage: "block number of the range start, zero means earliest history",
@@ -424,7 +405,7 @@ func inspectTrie(ctx *cli.Context) error {
 	stack, _ := makeConfigNode(ctx)
 	defer stack.Close()
 
-	db := utils.MakeChainDatabase(ctx, stack, true, false)
+	db := utils.MakeChainDatabase(ctx, stack, true)
 	defer db.Close()
 	var headerBlockHash common.Hash
 	if ctx.NArg() >= 1 {
@@ -483,7 +464,6 @@ func inspectTrie(ctx *cli.Context) error {
 		if dbScheme == rawdb.PathScheme {
 			config = &triedb.Config{
 				PathDB: utils.PathDBConfigAddJournalFilePath(stack, pathdb.ReadOnly),
-				Cache:  0,
 			}
 		} else if dbScheme == rawdb.HashScheme {
 			config = triedb.HashDefaults
@@ -530,7 +510,7 @@ func inspect(ctx *cli.Context) error {
 	stack, _ := makeConfigNode(ctx)
 	defer stack.Close()
 
-	db := utils.MakeChainDatabase(ctx, stack, true, false)
+	db := utils.MakeChainDatabase(ctx, stack, true)
 	defer db.Close()
 
 	return rawdb.InspectDatabase(db, prefix, start)
@@ -540,7 +520,7 @@ func ancientInspect(ctx *cli.Context) error {
 	stack, _ := makeConfigNode(ctx)
 	defer stack.Close()
 
-	db := utils.MakeChainDatabase(ctx, stack, true, false)
+	db := utils.MakeChainDatabase(ctx, stack, true)
 	defer db.Close()
 	return rawdb.AncientInspect(db)
 }
@@ -563,7 +543,7 @@ func checkStateContent(ctx *cli.Context) error {
 	stack, _ := makeConfigNode(ctx)
 	defer stack.Close()
 
-	db := utils.MakeChainDatabase(ctx, stack, true, false)
+	db := utils.MakeChainDatabase(ctx, stack, true)
 	defer db.Close()
 	var (
 		it        ethdb.Iterator
@@ -574,11 +554,8 @@ func checkStateContent(ctx *cli.Context) error {
 		startTime = time.Now()
 		lastLog   = time.Now()
 	)
-	if stack.CheckIfMultiDataBase() {
-		it = rawdb.NewKeyLengthIterator(db.StateStore().NewIterator(prefix, start), 32)
-	} else {
-		it = rawdb.NewKeyLengthIterator(db.NewIterator(prefix, start), 32)
-	}
+
+	it = rawdb.NewKeyLengthIterator(db.GetStateStore().NewIterator(prefix, start), 32)
 	for it.Next() {
 		count++
 		k := it.Key()
@@ -617,15 +594,13 @@ func dbStats(ctx *cli.Context) error {
 	stack, _ := makeConfigNode(ctx)
 	defer stack.Close()
 
-	db := utils.MakeChainDatabase(ctx, stack, true, false)
+	db := utils.MakeChainDatabase(ctx, stack, true)
 	defer db.Close()
 
 	showDBStats(db)
-	if stack.CheckIfMultiDataBase() {
+	if db.HasSeparateStateStore() {
 		fmt.Println("show stats of state store")
-		showDBStats(db.StateStore())
-		fmt.Println("show stats of block store")
-		showDBStats(db.BlockStore())
+		showDBStats(db.GetStateStore())
 	}
 
 	return nil
@@ -635,16 +610,15 @@ func dbCompact(ctx *cli.Context) error {
 	stack, _ := makeConfigNode(ctx)
 	defer stack.Close()
 
-	db := utils.MakeChainDatabase(ctx, stack, false, false)
+	db := utils.MakeChainDatabase(ctx, stack, false)
 	defer db.Close()
 
 	log.Info("Stats before compaction")
 	showDBStats(db)
+
 	if stack.CheckIfMultiDataBase() {
 		fmt.Println("show stats of state store")
-		showDBStats(db.StateStore())
-		fmt.Println("show stats of block store")
-		showDBStats(db.BlockStore())
+		showDBStats(db.GetStateStore())
 	}
 
 	log.Info("Triggering compaction")
@@ -654,11 +628,7 @@ func dbCompact(ctx *cli.Context) error {
 	}
 
 	if stack.CheckIfMultiDataBase() {
-		if err := db.StateStore().Compact(nil, nil); err != nil {
-			log.Error("Compact err", "error", err)
-			return err
-		}
-		if err := db.BlockStore().Compact(nil, nil); err != nil {
+		if err := db.GetStateStore().Compact(nil, nil); err != nil {
 			log.Error("Compact err", "error", err)
 			return err
 		}
@@ -668,9 +638,7 @@ func dbCompact(ctx *cli.Context) error {
 	showDBStats(db)
 	if stack.CheckIfMultiDataBase() {
 		fmt.Println("show stats of state store after compaction")
-		showDBStats(db.StateStore())
-		fmt.Println("show stats of block store after compaction")
-		showDBStats(db.BlockStore())
+		showDBStats(db.GetStateStore())
 	}
 	return nil
 }
@@ -683,7 +651,7 @@ func dbGet(ctx *cli.Context) error {
 	stack, _ := makeConfigNode(ctx)
 	defer stack.Close()
 
-	db := utils.MakeChainDatabase(ctx, stack, true, false)
+	db := utils.MakeChainDatabase(ctx, stack, true)
 	defer db.Close()
 
 	key, err := common.ParseHexOrString(ctx.Args().Get(0))
@@ -692,13 +660,8 @@ func dbGet(ctx *cli.Context) error {
 		return err
 	}
 	opDb := db
-	if stack.CheckIfMultiDataBase() {
-		keyType := rawdb.DataTypeByKey(key)
-		if keyType == rawdb.StateDataType {
-			opDb = db.StateStore()
-		} else if keyType == rawdb.BlockDataType {
-			opDb = db.BlockStore()
-		}
+	if stack.CheckIfMultiDataBase() && rawdb.DataTypeByKey(key) == rawdb.StateDataType {
+		opDb = db.GetStateStore()
 	}
 
 	data, err := opDb.Get(key)
@@ -719,12 +682,8 @@ func dbTrieGet(ctx *cli.Context) error {
 	defer stack.Close()
 
 	var db ethdb.Database
-	chaindb := utils.MakeChainDatabase(ctx, stack, true, false)
-	if chaindb.StateStore() != nil {
-		db = chaindb.StateStore()
-	} else {
-		db = chaindb
-	}
+	chaindb := utils.MakeChainDatabase(ctx, stack, true)
+	db = chaindb.GetStateStore()
 	defer chaindb.Close()
 
 	scheme := ctx.String(utils.StateSchemeFlag.Name)
@@ -783,6 +742,8 @@ func dbTrieGet(ctx *cli.Context) error {
 }
 
 // dbTrieDelete delete the trienode of a given database key
+//
+//nolint:unused
 func dbTrieDelete(ctx *cli.Context) error {
 	if ctx.NArg() < 1 || ctx.NArg() > 2 {
 		return fmt.Errorf("required arguments: %v", ctx.Command.ArgsUsage)
@@ -791,12 +752,8 @@ func dbTrieDelete(ctx *cli.Context) error {
 	defer stack.Close()
 
 	var db ethdb.Database
-	chaindb := utils.MakeChainDatabase(ctx, stack, true, false)
-	if chaindb.StateStore() != nil {
-		db = chaindb.StateStore()
-	} else {
-		db = chaindb
-	}
+	chaindb := utils.MakeChainDatabase(ctx, stack, true)
+	db = chaindb.GetStateStore()
 	defer chaindb.Close()
 
 	scheme := ctx.String(utils.StateSchemeFlag.Name)
@@ -857,7 +814,7 @@ func dbDelete(ctx *cli.Context) error {
 	stack, _ := makeConfigNode(ctx)
 	defer stack.Close()
 
-	db := utils.MakeChainDatabase(ctx, stack, false, false)
+	db := utils.MakeChainDatabase(ctx, stack, false)
 	defer db.Close()
 
 	key, err := common.ParseHexOrString(ctx.Args().Get(0))
@@ -866,13 +823,8 @@ func dbDelete(ctx *cli.Context) error {
 		return err
 	}
 	opDb := db
-	if stack.CheckIfMultiDataBase() {
-		keyType := rawdb.DataTypeByKey(key)
-		if keyType == rawdb.StateDataType {
-			opDb = db.StateStore()
-		} else if keyType == rawdb.BlockDataType {
-			opDb = db.BlockStore()
-		}
+	if opDb.HasSeparateStateStore() && rawdb.DataTypeByKey(key) == rawdb.StateDataType {
+		opDb = db.GetStateStore()
 	}
 
 	data, err := opDb.Get(key)
@@ -887,6 +839,8 @@ func dbDelete(ctx *cli.Context) error {
 }
 
 // dbDeleteTrieState deletes all trie state related key-value pairs from the database and the ancient state store.
+//
+//nolint:unused
 func dbDeleteTrieState(ctx *cli.Context) error {
 	if ctx.NArg() > 0 {
 		return fmt.Errorf("no arguments required")
@@ -895,7 +849,7 @@ func dbDeleteTrieState(ctx *cli.Context) error {
 	stack, config := makeConfigNode(ctx)
 	defer stack.Close()
 
-	db := utils.MakeChainDatabase(ctx, stack, false, false)
+	db := utils.MakeChainDatabase(ctx, stack, false)
 	defer db.Close()
 
 	var (
@@ -904,7 +858,7 @@ func dbDeleteTrieState(ctx *cli.Context) error {
 	)
 
 	// If separate trie db exists, delete all files in the db folder
-	if db.StateStore() != nil {
+	if db.HasSeparateStateStore() {
 		statePath := filepath.Join(stack.ResolvePath("chaindata"), "state")
 		log.Info("Removing separate trie database", "path", statePath)
 		err = filepath.Walk(statePath, func(path string, info os.FileInfo, err error) error {
@@ -970,7 +924,7 @@ func dbPut(ctx *cli.Context) error {
 	stack, _ := makeConfigNode(ctx)
 	defer stack.Close()
 
-	db := utils.MakeChainDatabase(ctx, stack, false, false)
+	db := utils.MakeChainDatabase(ctx, stack, false)
 	defer db.Close()
 
 	var (
@@ -991,13 +945,8 @@ func dbPut(ctx *cli.Context) error {
 	}
 
 	opDb := db
-	if stack.CheckIfMultiDataBase() {
-		keyType := rawdb.DataTypeByKey(key)
-		if keyType == rawdb.StateDataType {
-			opDb = db.StateStore()
-		} else if keyType == rawdb.BlockDataType {
-			opDb = db.BlockStore()
-		}
+	if db.HasSeparateStateStore() && rawdb.DataTypeByKey(key) == rawdb.StateDataType {
+		opDb = db.GetStateStore()
 	}
 
 	data, err = opDb.Get(key)
@@ -1015,7 +964,7 @@ func dbDumpTrie(ctx *cli.Context) error {
 	stack, _ := makeConfigNode(ctx)
 	defer stack.Close()
 
-	db := utils.MakeChainDatabase(ctx, stack, true, false)
+	db := utils.MakeChainDatabase(ctx, stack, true)
 	defer db.Close()
 	triedb := utils.MakeTrieDatabase(ctx, stack, db, false, true, false)
 	defer triedb.Close()
@@ -1128,7 +1077,7 @@ func importLDBdata(ctx *cli.Context) error {
 		}
 		close(stop)
 	}()
-	db := utils.MakeChainDatabase(ctx, stack, false, false)
+	db := utils.MakeChainDatabase(ctx, stack, false)
 	defer db.Close()
 	return utils.ImportLDBData(db, fName, int64(start), stop)
 }
@@ -1225,7 +1174,7 @@ func exportChaindata(ctx *cli.Context) error {
 		}
 		close(stop)
 	}()
-	db := utils.MakeChainDatabase(ctx, stack, true, false)
+	db := utils.MakeChainDatabase(ctx, stack, true)
 	defer db.Close()
 	return utils.ExportChaindata(ctx.Args().Get(1), kind, exporter(db), stop)
 }
@@ -1233,9 +1182,9 @@ func exportChaindata(ctx *cli.Context) error {
 func showMetaData(ctx *cli.Context) error {
 	stack, _ := makeConfigNode(ctx)
 	defer stack.Close()
-	db := utils.MakeChainDatabase(ctx, stack, true, false)
+	db := utils.MakeChainDatabase(ctx, stack, true)
 	defer db.Close()
-	ancients, err := db.BlockStore().Ancients()
+	ancients, err := db.Ancients()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error accessing ancients: %v", err)
 	}
@@ -1259,6 +1208,7 @@ func showMetaData(ctx *cli.Context) error {
 	return nil
 }
 
+//nolint:unused
 func hbss2pbss(ctx *cli.Context) error {
 	if ctx.NArg() > 1 {
 		return fmt.Errorf("required arguments: %v", ctx.Command.ArgsUsage)
@@ -1281,18 +1231,13 @@ func hbss2pbss(ctx *cli.Context) error {
 	stack, _ := makeConfigNode(ctx)
 	defer stack.Close()
 
-	db := utils.MakeChainDatabase(ctx, stack, false, false)
-	db.BlockStore().Sync()
-	stateDiskDb := db.StateStore()
+	db := utils.MakeChainDatabase(ctx, stack, false)
+	db.SyncAncient()
 	defer db.Close()
 
 	// convert hbss trie node to pbss trie node
 	var lastStateID uint64
-	if stateDiskDb != nil {
-		lastStateID = rawdb.ReadPersistentStateID(stateDiskDb)
-	} else {
-		lastStateID = rawdb.ReadPersistentStateID(db)
-	}
+	lastStateID = rawdb.ReadPersistentStateID(db.GetStateStore())
 	if lastStateID == 0 || force {
 		config := triedb.HashDefaults
 		triedb := triedb.NewDatabase(db, config)
@@ -1343,19 +1288,14 @@ func hbss2pbss(ctx *cli.Context) error {
 		log.Info("Convert hbss to pbss success. Nothing to do.")
 	}
 
-	// repair state ancient offset
-	if stateDiskDb != nil {
-		lastStateID = rawdb.ReadPersistentStateID(stateDiskDb)
-	} else {
-		lastStateID = rawdb.ReadPersistentStateID(db)
-	}
+	lastStateID = rawdb.ReadPersistentStateID(db.GetStateStore())
 
 	if lastStateID == 0 {
 		log.Error("Convert hbss to pbss trie node error. The last state id is still 0")
 	}
 
 	var ancient string
-	if db.StateStore() != nil {
+	if db.HasSeparateStateStore() {
 		dirName := filepath.Join(stack.ResolvePath("chaindata"), "state")
 		ancient = filepath.Join(dirName, "ancient")
 	} else {
@@ -1367,11 +1307,7 @@ func hbss2pbss(ctx *cli.Context) error {
 		return err
 	}
 	// prune hbss trie node
-	if stateDiskDb != nil {
-		err = rawdb.PruneHashTrieNodeInDataBase(stateDiskDb)
-	} else {
-		err = rawdb.PruneHashTrieNodeInDataBase(db)
-	}
+	err = rawdb.PruneHashTrieNodeInDataBase(db.GetStateStore())
 	if err != nil {
 		log.Error("Prune Hash trie node in database failed", "error", err)
 		return err
@@ -1468,7 +1404,7 @@ func inspectHistory(ctx *cli.Context) error {
 	stack, _ := makeConfigNode(ctx)
 	defer stack.Close()
 
-	db := utils.MakeChainDatabase(ctx, stack, true, false)
+	db := utils.MakeChainDatabase(ctx, stack, true)
 	defer db.Close()
 
 	triedb := utils.MakeTrieDatabase(ctx, stack, db, false, false, false)
@@ -1487,7 +1423,7 @@ func inspectHistory(ctx *cli.Context) error {
 		if header == nil {
 			return 0, fmt.Errorf("block #%d is not existent", blockNumber)
 		}
-		id := rawdb.ReadStateID(db, header.Root)
+		id := rawdb.ReadStateID(db.GetStateStore(), header.Root)
 		if id == nil {
 			first, last, err := triedb.HistoryRange()
 			if err == nil {

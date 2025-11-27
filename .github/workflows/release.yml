@@ -69,7 +69,7 @@ jobs:
 
       - name: Compress Binaries
         run: |
-          (cd binaries/linux_amd64 && zip -q - geth) > geth-${{ github.ref_name }}-linux-amd64.zip 
+          (cd binaries/linux_amd64 && zip -q - geth) > geth-${{ github.ref_name }}-linux-amd64.zip
           (cd binaries/linux_arm64 && zip -q - geth) > geth-${{ github.ref_name }}-linux-arm64.zip
 
       - name: Create genesis.zip

@@ -7,19 +7,20 @@ assignees: ''
 ---
 
 #### System information
-
 Geth version: `geth version`
 OS & Version: Windows/Linux/OSX
 Commit hash : (if `develop`)
+Arguments:
 
-#### Expected behaviour
+#### Description
+- Steps to reproduce the behaviour
+...
 
+- Expected behaviour
+...
 
-#### Actual behaviour
-
-
-#### Steps to reproduce the behaviour
-
+- Actual behaviour
+...
 
 #### Backtrace
 
