@@ -26,6 +26,10 @@ var (
 		name:    "SlashIndicator",
 		address: "0x5200000000000000000000000000000000000040",
 	}
+	transactionBlocker = &contract{
+		name:    "TransactionBlocker",
+		address: "0x5200000000000000000000000000000000000060",
+	}
 
 	// Governance
 	permissionedContractFactory = &contract{

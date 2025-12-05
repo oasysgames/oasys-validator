@@ -26,6 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
@@ -52,7 +53,7 @@ type ValidationOptions struct {
 // ValidationFunction is an method type which the pools use to perform the tx-validations which do not
 // require state access. Production code typically uses ValidateTransaction, whereas testing-code
 // might choose to instead use something else, e.g. to always fail or avoid heavy cpu usage.
-type ValidationFunction func(tx *types.Transaction, head *types.Header, signer types.Signer, opts *ValidationOptions) error
+type ValidationFunction func(tx *types.Transaction, head *types.Header, signer types.Signer, opts *ValidationOptions, state *state.StateDB) error
 
 // ValidateTransaction is a helper method to check whether a transaction is valid
 // according to the consensus rules, but does not check state-dependent validation
@@ -60,7 +61,7 @@ type ValidationFunction func(tx *types.Transaction, head *types.Header, signer t
 //
 // This check is public to allow different transaction pools to check the basic
 // rules without duplicating code and running the risk of missed updates.
-func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types.Signer, opts *ValidationOptions) error {
+func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types.Signer, opts *ValidationOptions, state *state.StateDB) error {
 	// Ensure transactions not implemented by the calling pool are rejected
 	if opts.Accept&(1<<tx.Type()) == 0 {
 		return fmt.Errorf("%w: tx type %v not supported by this pool", core.ErrTxTypeNotSupported, tx.Type())
@@ -118,8 +119,17 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 		return core.ErrTipAboveFeeCap
 	}
 	// Make sure the transaction is signed properly
-	if _, err := types.Sender(signer, tx); err != nil {
+	sender, err := types.Sender(signer, tx)
+	if err != nil {
 		return fmt.Errorf("%w: %v", ErrInvalidSender, err)
+	}
+	// Make sure the sender is not blocked
+	if vm.IsBlockedAddress(state, sender) {
+		return fmt.Errorf("%w: the sender is blocked. sender: %s", vm.ErrAddressBlocked, sender.Hex())
+	}
+	// Make sure the destination is not blocked
+	if tx.To() != nil && vm.IsBlockedAddress(state, *tx.To()) {
+		return fmt.Errorf("%w: the destination is blocked. destination: %s", vm.ErrAddressBlocked, tx.To().Hex())
 	}
 	// Ensure the transaction has more gas than the bare minimum needed to cover
 	// the transaction metadata
@@ -145,7 +155,14 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 		return fmt.Errorf("%w: gas tip cap %v, minimum needed %v", ErrTxGasPriceTooLow, tx.GasTipCap(), opts.MinTip)
 	}
 	if tx.Type() == types.BlobTxType {
-		return validateBlobTx(tx, head, opts)
+		return validateBlobTx(tx, head, opts, state)
+	}
+	// Ensure the transaction is not blocked
+	if vm.IsBlockedAll(state) {
+		// Bypass the blocked check for the transaction to the transaction blocker contract
+		if tx.To() == nil || tx.To().Cmp(vm.TransactionBlockerContract) != 0 {
+			return vm.ErrAllTransactionBlocked
+		}
 	}
 	if tx.Type() == types.SetCodeTxType {
 		if len(tx.SetCodeAuthorizations()) == 0 {
@@ -156,7 +173,14 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 }
 
 // validateBlobTx implements the blob-transaction specific validations.
-func validateBlobTx(tx *types.Transaction, head *types.Header, opts *ValidationOptions) error {
+func validateBlobTx(tx *types.Transaction, head *types.Header, opts *ValidationOptions, state *state.StateDB) error {
+	// Ensure the value is zero and data is empty if all transactions are blocked
+	if vm.IsBlockedAll(state) {
+		if tx.Value().Sign() != 0 || len(tx.Data()) > 0 {
+			return fmt.Errorf("%w: only transactions with zero value and empty tx data are allowed for blob-type transactions. value: %v, data: %v", vm.ErrAllTransactionBlocked, tx.Value(), tx.Data())
+		}
+	}
+
 	sidecar := tx.BlobTxSidecar()
 	if sidecar == nil {
 		return errors.New("missing sidecar in blob transaction")

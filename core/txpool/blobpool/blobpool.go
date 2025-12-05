@@ -1111,7 +1111,7 @@ func (p *BlobPool) ValidateTxBasics(tx *types.Transaction) error {
 		MaxBlobCount: maxBlobsPerTx,
 		MaxGas:       p.GetMaxGas(),
 	}
-	return txpool.ValidateTransaction(tx, p.head, p.signer, opts)
+	return txpool.ValidateTransaction(tx, p.head, p.signer, opts, p.state)
 }
 
 // checkDelegationLimit determines if the tx sender is delegated or has a

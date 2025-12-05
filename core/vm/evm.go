@@ -188,11 +188,16 @@ func isSystemCall(caller common.Address) bool {
 // the necessary steps to create accounts and reverses the state in case of an
 // execution error or failed value transfer.
 func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, gas uint64, value *uint256.Int) (ret []byte, leftOverGas uint64, err error) {
-	// Fail if the address is not allowed to call
+	// Fail if the address is not allowed to call or the caller or the callee is blocked.
 	// Skip the check if this call is readonly (eth_call)
 	readOnly := evm.Config.NoBaseFee
-	if !readOnly && evm.chainConfig.Oasys != nil && IsDeniedToCall(evm.StateDB, addr) {
-		return nil, 0, ErrUnauthorizedCall
+	if !readOnly && evm.chainConfig.Oasys != nil {
+		if IsDeniedToCall(evm.StateDB, addr) {
+			return nil, 0, ErrUnauthorizedCall
+		}
+		if IsBlockedAddress(evm.StateDB, caller) || IsBlockedAddress(evm.StateDB, addr) {
+			return nil, 0, ErrAddressBlocked
+		}
 	}
 	// Capture the tracer start/end events in debug mode
 	if evm.Config.Tracer != nil {
@@ -431,6 +436,10 @@ func (evm *EVM) StaticCall(caller common.Address, addr common.Address, input []b
 
 // create creates a new contract using code as deployment code.
 func (evm *EVM) create(caller common.Address, code []byte, gas uint64, value *uint256.Int, address common.Address, typ OpCode) (ret []byte, createAddress common.Address, leftOverGas uint64, err error) {
+	// Fail if the caller is blocked.
+	if evm.chainConfig.Oasys != nil && IsBlockedAddress(evm.StateDB, caller) {
+		return nil, common.Address{}, gas, ErrAddressBlocked
+	}
 	if evm.Config.Tracer != nil {
 		evm.captureBegin(evm.depth, typ, caller, address, code, gas, value.ToBig())
 		defer func(startGas uint64) {

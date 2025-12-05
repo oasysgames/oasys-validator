@@ -14,34 +14,36 @@ import (
 
 var deploymentSets = map[common.Hash]map[uint64]deploymentSet{
 	params.OasysMainnetGenesisHash: {
-		1:       deploymentSet{deployments0},
-		235000:  deploymentSet{deployments1},
-		309600:  deploymentSet{deployments2, deployments3, deployments4},
-		419000:  deploymentSet{deployments5},
-		557100:  deploymentSet{deployments6},
-		971800:  deploymentSet{deployments7},
-		1529980: deploymentSet{deployments9},
-		1892000: deploymentSet{deployments10},
-		4089588: deploymentSet{deployments11},
-		5095900: deploymentSet{deployments12},
-		5527429: deploymentSet{deployments13},
-		8728540: deploymentSet{deployments14, deployments14_slash_indicator_mainnet}, // Fri Jul 29 2025 13:00:00 GMT+0900
+		1:        deploymentSet{deployments0},
+		235000:   deploymentSet{deployments1},
+		309600:   deploymentSet{deployments2, deployments3, deployments4},
+		419000:   deploymentSet{deployments5},
+		557100:   deploymentSet{deployments6},
+		971800:   deploymentSet{deployments7},
+		1529980:  deploymentSet{deployments9},
+		1892000:  deploymentSet{deployments10},
+		4089588:  deploymentSet{deployments11},
+		5095900:  deploymentSet{deployments12},
+		5527429:  deploymentSet{deployments13},
+		8728540:  deploymentSet{deployments14, deployments14_slash_indicator_mainnet}, // Fri Jul 29 2025 13:00:00 GMT+0900
+		90000000: deploymentSet{deployments15},                                        // TODO:
 	},
 	params.OasysTestnetGenesisHash: {
-		1:       deploymentSet{deployments0},
-		189400:  deploymentSet{deployments2},
-		200800:  deploymentSet{deployments1},
-		269700:  deploymentSet{deployments3},
-		293000:  deploymentSet{deployments4},
-		385000:  deploymentSet{deployments5},
-		546400:  deploymentSet{deployments6},
-		955400:  deploymentSet{deployments7, deployments8},
-		1519840: deploymentSet{deployments9},
-		1880660: deploymentSet{deployments10},
-		4017600: deploymentSet{deployments11},
-		4958700: deploymentSet{deployments12},
-		5445775: deploymentSet{deployments13},
-		8496170: deploymentSet{deployments14, deployments14_slash_indicator_testnet}, // Fri Jul 04 2025 10:00:00 GMT+0900
+		1:        deploymentSet{deployments0},
+		189400:   deploymentSet{deployments2},
+		200800:   deploymentSet{deployments1},
+		269700:   deploymentSet{deployments3},
+		293000:   deploymentSet{deployments4},
+		385000:   deploymentSet{deployments5},
+		546400:   deploymentSet{deployments6},
+		955400:   deploymentSet{deployments7, deployments8},
+		1519840:  deploymentSet{deployments9},
+		1880660:  deploymentSet{deployments10},
+		4017600:  deploymentSet{deployments11},
+		4958700:  deploymentSet{deployments12},
+		5445775:  deploymentSet{deployments13},
+		8496170:  deploymentSet{deployments14, deployments14_slash_indicator_testnet}, // Fri Jul 04 2025 10:00:00 GMT+0900
+		90000000: deploymentSet{deployments15},                                        // TODO:
 	},
 	defaultGenesisHash: {
 		2: deploymentSet{
@@ -60,6 +62,7 @@ var deploymentSets = map[common.Hash]map[uint64]deploymentSet{
 			deployments12,
 			deployments13,
 			deployments14, deployments14_slash_indicator_localnet,
+			deployments15,
 		},
 	},
 }
