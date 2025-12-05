@@ -636,7 +636,7 @@ func (pool *LegacyPool) ValidateTxBasics(tx *types.Transaction) error {
 		MinTip:  pool.gasTip.Load().ToBig(),
 		MaxGas:  pool.GetMaxGas(),
 	}
-	return txpool.ValidateTransaction(tx, pool.currentHead.Load(), pool.signer, opts)
+	return txpool.ValidateTransaction(tx, pool.currentHead.Load(), pool.signer, opts, pool.currentState)
 }
 
 // validateTx checks whether a transaction is valid according to the consensus

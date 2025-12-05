@@ -25,6 +25,9 @@ const (
 
 	// Address of contracts in `oasys-governance-contract`.
 	EVMAccessControl = BuiltInContractPrefix2 + "00000000000000000000003F"
+
+	// Address of contracts in `oasys-genesis-contract`.
+	TransactionBlocker = BuiltInContractPrefix2 + "000000000000000000000060"
 )
 
 var (
