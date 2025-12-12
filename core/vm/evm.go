@@ -200,7 +200,7 @@ func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, g
 		if IsBlockedAddress(evm.StateDB, caller) || IsBlockedAddress(evm.StateDB, addr) {
 			return nil, 0, ErrAddressBlocked
 		}
-		// Check if the caller is allowed to create contract via the Deterministic Deployment Proxy(create2).
+		// Check if the caller is allowed to create contract via the Deterministic Deployment Proxy (create2).
 		if addr.Cmp(oasys.DeterministicDeploymentProxy) == 0 && !IsAllowedToCreate(evm.StateDB, caller) {
 			return nil, 0, ErrUnauthorizedCreate
 		}
