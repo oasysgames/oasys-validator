@@ -1916,7 +1916,7 @@ func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 		}
 		// Fail if the caller is not allowed to create
 		if (to == nil || to.Cmp(oasys.DeterministicDeploymentProxy) == 0) && !vm.IsAllowedToCreate(state, from) {
-			return common.Hash{}, fmt.Errorf("the caller is not allowed to create contract. Please contact with Oasys team. from: %s", from.Hex())
+			return common.Hash{}, fmt.Errorf("the caller is not allowed to create contract. Please contact the Oasys team. from: %s", from.Hex())
 		}
 		// Fail if the address is not allowed to call
 		if to != nil && vm.IsDeniedToCall(state, *to) {
