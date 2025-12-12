@@ -36,6 +36,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
+	"github.com/ethereum/go-ethereum/contracts/oasys"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -1914,8 +1915,8 @@ func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 			return common.Hash{}, errors.New("state not found")
 		}
 		// Fail if the caller is not allowed to create
-		if to == nil && !vm.IsAllowedToCreate(state, from) {
-			return common.Hash{}, fmt.Errorf("the deployer address is not allowed. please submit application form. from: %s", from)
+		if (to == nil || to.Cmp(oasys.DeterministicDeploymentProxy) == 0) && !vm.IsAllowedToCreate(state, from) {
+			return common.Hash{}, fmt.Errorf("the caller is not allowed to create contract. Please contact with Oasys team. from: %s", from.Hex())
 		}
 		// Fail if the address is not allowed to call
 		if to != nil && vm.IsDeniedToCall(state, *to) {

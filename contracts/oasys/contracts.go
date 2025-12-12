@@ -41,6 +41,14 @@ var (
 		address: "0x520000000000000000000000000000000000003F",
 	}
 
+	// CREATE2 deterministic deployment proxy, deployed at the same address across the Ethereum ecosystem.
+	// Access is controlled by `EVMAccessControl`.
+	// Original source code: https://github.com/Arachnid/deterministic-deployment-proxy/tree/v1.0.0
+	deterministicDeploymentProxy = &contract{
+		name:    "DeterministicDeploymentProxy",
+		address: "0x7A0D94F55792C434d74a40883C6ed8545E406D12",
+	}
+
 	// ERC20 Tokens
 	wrappedOAS = &contract{
 		name:    "WOAS",

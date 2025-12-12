@@ -24,6 +24,7 @@ import (
 	"github.com/holiman/uint256"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/contracts/oasys"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -188,15 +189,20 @@ func isSystemCall(caller common.Address) bool {
 // the necessary steps to create accounts and reverses the state in case of an
 // execution error or failed value transfer.
 func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, gas uint64, value *uint256.Int) (ret []byte, leftOverGas uint64, err error) {
-	// Fail if the address is not allowed to call or the caller or the callee is blocked.
-	// Skip the check if this call is readonly (eth_call)
-	readOnly := evm.Config.NoBaseFee
+	// Check the access control of the call.
+	readOnly := evm.Config.NoBaseFee // Skip the check if this call is readonly (eth_call).
 	if !readOnly && evm.chainConfig.Oasys != nil {
+		// Check if the address is denied to call
 		if IsDeniedToCall(evm.StateDB, addr) {
 			return nil, 0, ErrUnauthorizedCall
 		}
+		// Check if the caller or the callee is blocked
 		if IsBlockedAddress(evm.StateDB, caller) || IsBlockedAddress(evm.StateDB, addr) {
 			return nil, 0, ErrAddressBlocked
+		}
+		// Check if the caller is allowed to create contract via the Deterministic Deployment Proxy(create2).
+		if addr.Cmp(oasys.DeterministicDeploymentProxy) == 0 && !IsAllowedToCreate(evm.StateDB, caller) {
+			return nil, 0, ErrUnauthorizedCreate
 		}
 	}
 	// Capture the tracer start/end events in debug mode

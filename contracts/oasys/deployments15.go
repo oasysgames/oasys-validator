@@ -36,13 +36,13 @@ var deployments15 = []*deployment{
 									"0xbe32b47A35C31d294B3c58d92ca83876DdC38776": "0x1",
 								},
 							},
-							// For local development
-							GenesisHash: &mapping{
-								keyFn: addressKeyFn,
-								values: map[string]interface{}{
-									"0x6f22304c8d5640930aabf9995f1dd808d340332e": "0x1",
-								},
-							},
+							// // For local development
+							// GenesisHash: &mapping{
+							// 	keyFn: addressKeyFn,
+							// 	values: map[string]interface{}{
+							// 		"0x6f22304c8d5640930aabf9995f1dd808d340332e": "0x1",
+							// 	},
+							// },
 						},
 					},
 					"OPERATOR_ROLE": structvalue{
@@ -60,17 +60,23 @@ var deployments15 = []*deployment{
 									"0xBb5a4FF43683a1281800A6Bc8a94365f055F444F": "0x1",
 								},
 							},
-							// For local development
-							GenesisHash: &mapping{
-								keyFn: addressKeyFn,
-								values: map[string]interface{}{
-									"0x6f22304c8d5640930aabf9995f1dd808d340332e": "0x1",
-								},
-							},
+							// // For local development
+							// GenesisHash: &mapping{
+							// 	keyFn: addressKeyFn,
+							// 	values: map[string]interface{}{
+							// 		"0x6f22304c8d5640930aabf9995f1dd808d340332e": "0x1",
+							// 	},
+							// },
 						},
 					},
 				},
 			},
 		},
+	},
+	{
+		// commit: https://github.com/Arachnid/deterministic-deployment-proxy/tree/v1.0.0
+		contract: deterministicDeploymentProxy,
+		// From Foundry: https://github.com/foundry-rs/foundry/blob/v1.0.0/crates/evm/core/src/constants.rs#L51
+		code: mustDecodeCode(`7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3`),
 	},
 }
