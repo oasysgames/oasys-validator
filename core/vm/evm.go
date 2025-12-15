@@ -197,6 +197,7 @@ func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, g
 			return nil, 0, ErrUnauthorizedCall
 		}
 		// Check if the caller or the callee is blocked
+		// Don't call `IsBlockedAll`; system transactions must remain unblocked.
 		if IsBlockedAddress(evm.StateDB, caller) || IsBlockedAddress(evm.StateDB, addr) {
 			return nil, 0, ErrAddressBlocked
 		}

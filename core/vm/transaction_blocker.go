@@ -24,6 +24,7 @@ var (
 )
 
 // Check the `isBlockedAll` variable in the `TransactionBlocker` contract
+// Keep in mind that system transactions must remain unblocked.
 func IsBlockedAll(state StateDB) bool {
 	val := state.GetState(TransactionBlockerContract, isBlockedAllSlotHash)
 	return val.Cmp(emptyHash) != 0
