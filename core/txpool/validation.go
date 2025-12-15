@@ -124,22 +124,24 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrInvalidSender, err)
 	}
-	// Make sure the sender is allowed to create contract
-	// Create2 built-in deployment proxy is only allowed to call by the allowed addresses.
-	if (tx.To() == nil || tx.To().Cmp(oasys.DeterministicDeploymentProxy) == 0) && !vm.IsAllowedToCreate(state, sender) {
-		return fmt.Errorf("%w: the sender is not allowed to create contract. Please contact the Oasys team. sender: %s", vm.ErrUnauthorizedCreate, sender.Hex())
-	}
-	// Make sure the sender is not blocked
-	if vm.IsBlockedAddress(state, sender) {
-		return fmt.Errorf("%w: the sender is blocked. sender: %s", vm.ErrAddressBlocked, sender.Hex())
-	}
-	// Make sure the destination is not in denylist
-	if tx.To() != nil && vm.IsDeniedToCall(state, *tx.To()) {
-		return fmt.Errorf("%w: the destination is in denylist. destination: %s", vm.ErrUnauthorizedCall, tx.To().Hex())
-	}
-	// Make sure the destination is not blocked
-	if tx.To() != nil && vm.IsBlockedAddress(state, *tx.To()) {
-		return fmt.Errorf("%w: the destination is blocked. destination: %s", vm.ErrAddressBlocked, tx.To().Hex())
+	if opts.Config.Oasys != nil {
+		// Make sure the sender is allowed to create contract
+		// Create2 built-in deployment proxy is only allowed to call by the allowed addresses.
+		if (tx.To() == nil || tx.To().Cmp(oasys.DeterministicDeploymentProxy) == 0) && !vm.IsAllowedToCreate(state, sender) {
+			return fmt.Errorf("%w: the sender is not allowed to create contract. Please contact the Oasys team. sender: %s", vm.ErrUnauthorizedCreate, sender.Hex())
+		}
+		// Make sure the sender is not blocked
+		if vm.IsBlockedAddress(state, sender) {
+			return fmt.Errorf("%w: the sender is blocked. sender: %s", vm.ErrAddressBlocked, sender.Hex())
+		}
+		// Make sure the destination is not in denylist
+		if tx.To() != nil && vm.IsDeniedToCall(state, *tx.To()) {
+			return fmt.Errorf("%w: the destination is in denylist. destination: %s", vm.ErrUnauthorizedCall, tx.To().Hex())
+		}
+		// Make sure the destination is not blocked
+		if tx.To() != nil && vm.IsBlockedAddress(state, *tx.To()) {
+			return fmt.Errorf("%w: the destination is blocked. destination: %s", vm.ErrAddressBlocked, tx.To().Hex())
+		}
 	}
 	// Ensure the transaction has more gas than the bare minimum needed to cover
 	// the transaction metadata
@@ -168,7 +170,7 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 		return validateBlobTx(tx, head, opts, state)
 	}
 	// Ensure the transaction is not blocked
-	if vm.IsBlockedAll(state) {
+	if opts.Config.Oasys != nil && vm.IsBlockedAll(state) {
 		// Bypass the blocked check for the transaction to the transaction blocker contract
 		if tx.To() == nil || tx.To().Cmp(vm.TransactionBlockerContract) != 0 {
 			return vm.ErrAllTransactionBlocked
@@ -185,7 +187,7 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 // validateBlobTx implements the blob-transaction specific validations.
 func validateBlobTx(tx *types.Transaction, head *types.Header, opts *ValidationOptions, state *state.StateDB) error {
 	// Ensure the value is zero and data is empty if all transactions are blocked
-	if vm.IsBlockedAll(state) {
+	if opts.Config.Oasys != nil && vm.IsBlockedAll(state) {
 		if tx.Value().Sign() != 0 || len(tx.Data()) > 0 {
 			return fmt.Errorf("%w: only transactions with zero value and empty tx data are allowed for blob-type transactions. value: %v, data: %v", vm.ErrAllTransactionBlocked, tx.Value(), tx.Data())
 		}
