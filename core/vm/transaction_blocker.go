@@ -20,7 +20,7 @@ var (
 
 	isBlockedAllSlot     = int64(1)
 	isBlockedAddressSlot = uint64(2)
-	isBlockedAllSlotHash = common.Hash(common.LeftPadBytes(big.NewInt(isBlockedAllSlot).Bytes(), 32))
+	isBlockedAllSlotHash = common.BigToHash(big.NewInt(isBlockedAllSlot))
 )
 
 // Check the `isBlockedAll` variable in the `TransactionBlocker` contract
