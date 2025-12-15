@@ -23,6 +23,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
+	"github.com/ethereum/go-ethereum/contracts/oasys"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -123,9 +124,18 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrInvalidSender, err)
 	}
+	// Make sure the sender is allowed to create contract
+	// Create2 built-in deployment proxy is only allowed to call by the allowed addresses.
+	if (tx.To() == nil || tx.To().Cmp(oasys.DeterministicDeploymentProxy) == 0) && !vm.IsAllowedToCreate(state, sender) {
+		return fmt.Errorf("%w: the sender is not allowed to create contract. Please contact the Oasys team. sender: %s", vm.ErrUnauthorizedCreate, sender.Hex())
+	}
 	// Make sure the sender is not blocked
 	if vm.IsBlockedAddress(state, sender) {
 		return fmt.Errorf("%w: the sender is blocked. sender: %s", vm.ErrAddressBlocked, sender.Hex())
+	}
+	// Make sure the destination is not in denlylist
+	if tx.To() != nil && vm.IsDeniedToCall(state, *tx.To()) {
+		return fmt.Errorf("%w: the destination is in denlylist. destination: %s", vm.ErrUnauthorizedCall, tx.To().Hex())
 	}
 	// Make sure the destination is not blocked
 	if tx.To() != nil && vm.IsBlockedAddress(state, *tx.To()) {

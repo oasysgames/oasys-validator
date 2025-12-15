@@ -25,8 +25,8 @@ var deploymentSets = map[common.Hash]map[uint64]deploymentSet{
 		4089588:  deploymentSet{deployments11},
 		5095900:  deploymentSet{deployments12},
 		5527429:  deploymentSet{deployments13},
-		8728540:  deploymentSet{deployments14, deployments14_slash_indicator_mainnet}, // Fri Jul 29 2025 13:00:00 GMT+0900
-		90000000: deploymentSet{deployments15},                                        // TODO:
+		8728540:  deploymentSet{deployments14, deployments14_slash_indicator_mainnet},        // Fri Jul 29 2025 13:00:00 GMT+0900
+		90000000: deploymentSet{deployments15, deployments15_deterministic_deployment_proxy}, // TODO:
 	},
 	params.OasysTestnetGenesisHash: {
 		1:        deploymentSet{deployments0},
@@ -43,7 +43,7 @@ var deploymentSets = map[common.Hash]map[uint64]deploymentSet{
 		4958700:  deploymentSet{deployments12},
 		5445775:  deploymentSet{deployments13},
 		8496170:  deploymentSet{deployments14, deployments14_slash_indicator_testnet}, // Fri Jul 04 2025 10:00:00 GMT+0900
-		90000000: deploymentSet{deployments15},                                        // TODO:
+		90000000: deploymentSet{deployments15},                                        // TODO: No `deployments15_deterministic_deployment_proxy` as it already exists in testnet.
 	},
 	defaultGenesisHash: {
 		2: deploymentSet{
@@ -62,7 +62,7 @@ var deploymentSets = map[common.Hash]map[uint64]deploymentSet{
 			deployments12,
 			deployments13,
 			deployments14, deployments14_slash_indicator_localnet,
-			deployments15,
+			deployments15, deployments15_deterministic_deployment_proxy,
 		},
 	},
 }

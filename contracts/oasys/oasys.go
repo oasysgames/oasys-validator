@@ -35,7 +35,7 @@ var (
 	defaultGenesisHash common.Hash
 
 	// Address of the DeterministicDeploymentProxy contract.
-	DeterministicDeploymentProxy = common.HexToAddress("0x7A0D94F55792C434d74a40883C6ed8545E406D12")
+	DeterministicDeploymentProxy = common.HexToAddress("0x4e59b44847b379578588920ca78fbf26c0b4956c")
 )
 
 // Interface that extracts necessary methods from vm.StateDB

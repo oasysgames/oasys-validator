@@ -73,6 +73,10 @@ var deployments15 = []*deployment{
 			},
 		},
 	},
+}
+
+// Not include in `deployments15` to skip deployment in testnet.
+var deployments15_deterministic_deployment_proxy = []*deployment{
 	{
 		// commit: https://github.com/Arachnid/deterministic-deployment-proxy/tree/v1.0.0
 		contract: deterministicDeploymentProxy,

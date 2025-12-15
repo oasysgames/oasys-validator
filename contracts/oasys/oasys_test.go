@@ -1207,7 +1207,7 @@ func _deployments15(genesisHash common.Hash, contracts wantContracts) {
 			name:     "TransactionBlocker",
 			codeHash: "aa1db98e1b636101bb1a019ac13ca408",
 		},
-		"0x7A0D94F55792C434d74a40883C6ed8545E406D12": {
+		"0x4e59b44847b379578588920ca78fbf26c0b4956c": {
 			name:     "DeterministicDeploymentProxy",
 			codeHash: "5364a74988590d2ada5cb995374120b6",
 		},
