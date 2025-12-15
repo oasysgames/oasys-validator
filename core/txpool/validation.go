@@ -133,9 +133,9 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 	if vm.IsBlockedAddress(state, sender) {
 		return fmt.Errorf("%w: the sender is blocked. sender: %s", vm.ErrAddressBlocked, sender.Hex())
 	}
-	// Make sure the destination is not in denlylist
+	// Make sure the destination is not in denylist
 	if tx.To() != nil && vm.IsDeniedToCall(state, *tx.To()) {
-		return fmt.Errorf("%w: the destination is in denlylist. destination: %s", vm.ErrUnauthorizedCall, tx.To().Hex())
+		return fmt.Errorf("%w: the destination is in denylist. destination: %s", vm.ErrUnauthorizedCall, tx.To().Hex())
 	}
 	// Make sure the destination is not blocked
 	if tx.To() != nil && vm.IsBlockedAddress(state, *tx.To()) {
