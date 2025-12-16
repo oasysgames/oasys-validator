@@ -27,7 +27,7 @@ const (
 	EVMAccessControl = BuiltInContractPrefix2 + "00000000000000000000003F"
 
 	// Address of TransactionBlocker contract.
-	TransactionBlocker = BuiltInContractPrefix2 + "000000000000000000000060"
+	TransactionBlocker = BuiltInContractPrefix2 + "00000000000000000000004F"
 )
 
 var (

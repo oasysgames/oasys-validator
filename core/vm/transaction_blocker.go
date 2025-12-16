@@ -1,8 +1,8 @@
 package vm
 
 import (
+	"bytes"
 	"errors"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/contracts/oasys"
@@ -18,21 +18,21 @@ var (
 	// Address of the transaction blocker contract
 	TransactionBlockerContract = common.HexToAddress(oasys.TransactionBlocker)
 
-	isBlockedAllSlot     = int64(1)
-	isBlockedAddressSlot = uint64(2)
-	isBlockedAllSlotHash = common.BigToHash(big.NewInt(isBlockedAllSlot))
+	isBlockedAddressSlot = uint64(1)
+	isBlockedAllSlot     = uint64(2)
+	blockedAllKeyHash    = computeAddressMapStorageKey(common.Address(bytes.Repeat([]byte{0xFF}, common.AddressLength)), isBlockedAllSlot)
 )
 
-// Check the `isBlockedAll` variable in the `TransactionBlocker` contract
-// Keep in mind that system transactions must remain unblocked.
-func IsBlockedAll(state StateDB) bool {
-	val := state.GetState(TransactionBlockerContract, isBlockedAllSlotHash)
-	return val.Cmp(emptyHash) != 0
-}
-
-// Check the `_isBlockedAddress` mappings in the `TransactionBlocker` contract
+// Call `isBlockedAddress` function in the `TransactionBlocker` contract by directly accessing the storage
 func IsBlockedAddress(state StateDB, address common.Address) bool {
 	hash := computeAddressMapStorageKey(address, isBlockedAddressSlot)
 	val := state.GetState(TransactionBlockerContract, hash)
+	return val.Cmp(emptyHash) != 0
+}
+
+// Call `isBlockedAll` function in the `TransactionBlocker` contract by directly accessing the storage
+// Keep in mind that system transactions must remain unblocked.
+func IsBlockedAll(state StateDB) bool {
+	val := state.GetState(TransactionBlockerContract, blockedAllKeyHash)
 	return val.Cmp(emptyHash) != 0
 }

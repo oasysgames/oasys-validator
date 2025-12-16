@@ -26,10 +26,6 @@ var (
 		name:    "SlashIndicator",
 		address: "0x5200000000000000000000000000000000000040",
 	}
-	transactionBlocker = &contract{
-		name:    "TransactionBlocker",
-		address: "0x5200000000000000000000000000000000000060",
-	}
 
 	// Governance
 	permissionedContractFactory = &contract{
@@ -39,6 +35,10 @@ var (
 	evmAccessControl = &contract{
 		name:    "EVMAccessControl",
 		address: "0x520000000000000000000000000000000000003F",
+	}
+	transactionBlocker = &contract{
+		name:    "TransactionBlocker",
+		address: "0x520000000000000000000000000000000000004F",
 	}
 
 	// CREATE2 deterministic deployment proxy, deployed at the same address across the Ethereum ecosystem.
