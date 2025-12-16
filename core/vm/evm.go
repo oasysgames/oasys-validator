@@ -346,6 +346,14 @@ func (evm *EVM) CallCode(caller common.Address, addr common.Address, input []byt
 // DelegateCall differs from CallCode in the sense that it executes the given address'
 // code with the caller as context and the caller is set to the caller of the caller.
 func (evm *EVM) DelegateCall(originCaller common.Address, caller common.Address, addr common.Address, input []byte, gas uint64, value *uint256.Int) (ret []byte, leftOverGas uint64, err error) {
+	// Check the access control of the call.
+	readOnly := evm.Config.NoBaseFee // Skip the check if this call is readonly (eth_call).
+	if !readOnly && evm.chainConfig.Oasys != nil {
+		// Check if the caller is allowed to create contract via the Deterministic Deployment Proxy (create2).
+		if addr.Cmp(oasys.DeterministicDeploymentProxy) == 0 && !IsAllowedToCreate(evm.StateDB, caller) {
+			return nil, 0, ErrUnauthorizedCreate
+		}
+	}
 	// Invoke tracer hooks that signal entering/exiting a call frame
 	if evm.Config.Tracer != nil {
 		// DELEGATECALL inherits value from parent call
