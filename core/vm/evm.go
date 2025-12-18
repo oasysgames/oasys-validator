@@ -450,10 +450,6 @@ func (evm *EVM) StaticCall(caller common.Address, addr common.Address, input []b
 
 // create creates a new contract using code as deployment code.
 func (evm *EVM) create(caller common.Address, code []byte, gas uint64, value *uint256.Int, address common.Address, typ OpCode) (ret []byte, createAddress common.Address, leftOverGas uint64, err error) {
-	// Fail if the caller is blocked.
-	if evm.chainConfig.Oasys != nil && IsBlockedAddress(evm.StateDB, caller) {
-		return nil, common.Address{}, gas, ErrAddressBlocked
-	}
 	if evm.Config.Tracer != nil {
 		evm.captureBegin(evm.depth, typ, caller, address, code, gas, value.ToBig())
 		defer func(startGas uint64) {
@@ -473,13 +469,18 @@ func (evm *EVM) create(caller common.Address, code []byte, gas uint64, value *ui
 		return nil, common.Address{}, gas, ErrNonceUintOverflow
 	}
 	evm.StateDB.SetNonce(caller, nonce+1, tracing.NonceChangeContractCreator)
-
-	// Fail if the caller is not allowed to create. Limited to `CREATE`
-	// because this check targets raw transactions from EOA, and `CREATE2`
-	// within internal transactions is excluded.
-	// Need to check after nonce increment to evict failed tx from the pool.
-	if evm.depth == 0 && typ == CREATE && evm.chainConfig.Oasys != nil && !IsAllowedToCreate(evm.StateDB, caller) {
-		return nil, common.Address{}, 0, ErrUnauthorizedCreate
+	if evm.chainConfig.Oasys != nil {
+		// Fail if the caller is not allowed to create. Limited to `CREATE`
+		// because this check targets raw transactions from EOA, and `CREATE2`
+		// within internal transactions is excluded.
+		// Need to check after nonce increment to evict failed tx from the pool.
+		if evm.depth == 0 && typ == CREATE && !IsAllowedToCreate(evm.StateDB, caller) {
+			return nil, common.Address{}, 0, ErrUnauthorizedCreate
+		}
+		// Fail if the caller is blocked.
+		if IsBlockedAddress(evm.StateDB, caller) {
+			return nil, common.Address{}, gas, ErrAddressBlocked
+		}
 	}
 	// Charge the contract creation init gas in verkle mode
 	if evm.chainRules.IsEIP4762 {
