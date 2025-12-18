@@ -14,6 +14,7 @@ GIT_COMMIT_DATE=$(shell git log -n1 --pretty='format:%cd' --date=format:'%Y%m%d'
 #? geth: Build geth.
 geth:
 	$(GORUN) build/ci.go install ./cmd/geth
+	go build -buildmode=plugin -trimpath -tags urfave_cli_no_docs,ckzg -o ./plugin_name.so txblocker/txblocker_plugin.go
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/geth\" to launch geth."
 
