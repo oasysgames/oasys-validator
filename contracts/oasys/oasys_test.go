@@ -1202,10 +1202,13 @@ func _deployments14(genesisHash common.Hash, contracts wantContracts) {
 }
 
 func _deployments15(genesisHash common.Hash, contracts wantContracts) {
+	// StakeManager
+	contracts["0x0000000000000000000000000000000000001001"].codeHash = "9accc809190f2fcea257a6a3fbd0bfc4"
+	// TransactionBlocker
 	appends := wantContracts{
 		"0x520000000000000000000000000000000000004F": {
 			name:     "TransactionBlocker",
-			codeHash: "169e5d572d5c0a2a4402a0ec068ac419",
+			codeHash: "7876460aea5be2968503ee82779c0919",
 		},
 	}
 
@@ -1215,6 +1218,7 @@ func _deployments15(genesisHash common.Hash, contracts wantContracts) {
 			"0x0bce92cc78449169524412e83bbfd32ee216dec5bba171ae073372f5ed4cecef": "0x0000000000000000000000000000000000000000000000000000000000000001",
 			"0x9d45e49a732f60a178c294b56c93b9ad5c903d62acc0d9d7d7efc850a5d71054": "0x0000000000000000000000000000000000000000000000000000000000000001",
 		}
+		// DeterministicDeploymentProxy
 		appends["0x4e59b44847b379578588920ca78fbf26c0b4956c"] = &wantContract{
 			name:     "DeterministicDeploymentProxy",
 			codeHash: "5364a74988590d2ada5cb995374120b6",
@@ -1225,12 +1229,16 @@ func _deployments15(genesisHash common.Hash, contracts wantContracts) {
 			"0x9deaf035b302af9e8d3ffb94ff3cf77718c97fca1cafc9835e08481dd6411eb5": "0x0000000000000000000000000000000000000000000000000000000000000001",
 		}
 	default:
+		// DeterministicDeploymentProxy
 		appends["0x520000000000000000000000000000000000004F"].storage = map[string]string{}
 		appends["0x4e59b44847b379578588920ca78fbf26c0b4956c"] = &wantContract{
 			name:     "DeterministicDeploymentProxy",
 			codeHash: "5364a74988590d2ada5cb995374120b6",
 		}
 	}
+
+	appends["0x520000000000000000000000000000000000004F"].storage["0xcc69885fda6bcc1a4ace058b4a62bf5e179ea78fd58a1ccd71c22cc9b688792f"] = "0x0000000000000000000000000000000000000000000000000000000000000001"
+	appends["0x520000000000000000000000000000000000004F"].storage["0xe90b7bceb6e7df5418fb78d8ee546e97c83a08bbccc01a0644d599ccd2a7c2e0"] = "0x0000000000000000000000000000000000000000000000000000000000000001"
 
 	for k, v := range appends {
 		contracts[k] = v
