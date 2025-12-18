@@ -26,8 +26,8 @@ func TestEVMAccessControl(t *testing.T) {
 		params.OasysTestChainConfig,
 		Config{},
 	)
-	allowedDeployer := common.HexToAddress("0x1")
-	deniedDeployer := common.HexToAddress("0x2")
+	allowedDeployer := common.HexToAddress("0x11")
+	deniedDeployer := common.HexToAddress("0x22")
 	contract := crypto.CreateAddress(common.HexToAddress("0x3"), 0)
 	input := []byte{}
 	gas := uint64(1_000_000)
