@@ -30,14 +30,18 @@ const (
 	// The default interval to reload the plugin
 	DefaultPluginReloadInterval = 1 * time.Hour
 
-	pluginFileName     = "suspicious_txfilter.so"
-	pluginMetadataName = "suspicious_txfilter.json"
-	pluginURLPrefix    = "https://cdn."
-	pluginURLSuffix    = ".oasys.games/suspicious_txfilter/"
-	localhostBaseURL   = "http://localhost:8080/"
+	// The suspicious txfilter plugin file name
+	PluginFileName = "suspicious_txfilter.so"
 
-	pluginFunctionName       = "BlockTransaction"
-	pluginFuncNameGetVersion = "version"
+	// The suspicious txfilter plugin metadata file name
+	PluginMetadataFileName = "suspicious_txfilter.json"
+
+	pluginURLPrefix  = "https://cdn."
+	pluginURLSuffix  = ".oasys.games/suspicious_txfilter/"
+	localhostBaseURL = "http://localhost:8080/"
+
+	pluginFunctionName       = "FilterTransaction"
+	pluginFuncNameGetVersion = "Version"
 )
 
 var (
@@ -50,7 +54,7 @@ var (
 	SuspiciousTxfilterGlobal *SuspiciousTxfilter
 )
 
-type pluginMetadata struct {
+type SuspiciousTxfilterPluginMetadata struct {
 	Version            string `json:"version"`
 	BundleHex          string `json:"bundle_hex"`
 	BundlePublicKeyHex string `json:"bundle_public_key_hex"`
@@ -63,7 +67,7 @@ type SuspiciousTxfilter struct {
 	exitCh  chan struct{}
 
 	plugin   atomic.Pointer[plugin.Plugin]
-	metadata atomic.Pointer[pluginMetadata]
+	metadata atomic.Pointer[SuspiciousTxfilterPluginMetadata]
 
 	verifier *sigverify.Verifier
 }
@@ -74,10 +78,9 @@ func NewSuspiciousTxfilter(config *params.ChainConfig, datadir string, exitCh ch
 	}
 
 	b := &SuspiciousTxfilter{
-		datadir:  datadir,
-		config:   config,
-		exitCh:   exitCh,
-		metadata: atomic.Pointer[pluginMetadata]{},
+		datadir: datadir,
+		config:  config,
+		exitCh:  exitCh,
 	}
 
 	if _, _, err := b.fetchPluginMetadata(); err != nil {
@@ -92,7 +95,7 @@ func NewSuspiciousTxfilter(config *params.ChainConfig, datadir string, exitCh ch
 			if err := b.fetchPlugin(); err != nil {
 				log.Error("Failed to download suspicious txfilter plugin", "err", err)
 			}
-			if err := b.loadPlugin(false); err != nil {
+			if err := b.loadPlugin(true); err != nil {
 				log.Error("Failed to load suspicious txfilter plugin", "err", err)
 			}
 		}
@@ -129,60 +132,45 @@ func (b *SuspiciousTxfilter) VerifyPluginVersion(plugin *plugin.Plugin) error {
 	return nil
 }
 
-func (b *SuspiciousTxfilter) BlockTransaction(msg *Message, logs []*types.Log) (isBlocked bool, reason string, err error) {
+func (b *SuspiciousTxfilter) FilterTransaction(msg *Message, logs []*types.Log) (isBlocked bool, reason string, err error) {
+	// Don't filter if the plugin is disabled
 	if b.metadata.Load().Disable {
 		return false, "", nil
 	}
 
+	// Skip filtering if the plugin is not loaded
 	plugin := b.plugin.Load()
 	if plugin == nil {
 		return false, "", fmt.Errorf("plugin not loaded")
 	}
 
-	from := msg.From
-	to := common.Address{}
-	if msg.To != nil {
-		to = *msg.To
+	// Copy data to call the plugin function
+	var (
+		from, to   common.Address
+		value      [32]byte
+		copiedLogs = make([]types.Log, len(logs))
+	)
+	from = msg.From
+	copy(to[:], msg.To[:])
+	copy(value[:], msg.Value.Bytes())
+	for i, log := range logs {
+		copiedLogs[i].Topics = make([]common.Hash, len(log.Topics))
+		for j, topic := range log.Topics {
+			copy(copiedLogs[i].Topics[j][:], topic[:])
+		}
+		copy(copiedLogs[i].Data, log.Data)
 	}
 
-	var value [32]byte
-	copy(value[:], msg.Value.Bytes())
-
-	copiedLogs := b.copyLogs(logs)
-
+	// Call the plugin function
 	f, err := plugin.Lookup(pluginFunctionName)
 	if err != nil {
 		return false, "", fmt.Errorf("failed to lookup plugin function: %w", err)
 	}
-
 	process, ok := f.(func(common.Address, common.Address, [32]byte, []types.Log) (bool, string, error))
 	if !ok {
 		return false, "", fmt.Errorf("plugin function has incorrect signature")
 	}
-
-	isBlocked, reason, err = process(from, to, value, copiedLogs)
-	if err != nil {
-		log.Warn("BlockTransaction plugin error", "isBlocked", isBlocked, "reason", reason, "err", err)
-	}
-	return isBlocked, reason, err
-}
-
-func (b *SuspiciousTxfilter) copyLogs(logs []*types.Log) []types.Log {
-	copiedLogs := make([]types.Log, len(logs))
-	for i, log := range logs {
-		copiedLogs[i].Address = log.Address
-		copiedLogs[i].Topics = make([]common.Hash, len(log.Topics))
-		copy(copiedLogs[i].Topics, log.Topics)
-		copiedLogs[i].Data = make([]byte, len(log.Data))
-		copy(copiedLogs[i].Data, log.Data)
-		copiedLogs[i].BlockNumber = log.BlockNumber
-		copiedLogs[i].TxHash = log.TxHash
-		copiedLogs[i].TxIndex = log.TxIndex
-		copiedLogs[i].BlockHash = log.BlockHash
-		copiedLogs[i].Index = log.Index
-		copiedLogs[i].Removed = log.Removed
-	}
-	return copiedLogs
+	return process(from, to, value, copiedLogs)
 }
 
 func (b *SuspiciousTxfilter) fetchPlugin() error {
@@ -207,6 +195,12 @@ func (b *SuspiciousTxfilter) fetchPlugin() error {
 }
 
 func (b *SuspiciousTxfilter) fetchPluginMetadata() (isNewPlugin bool, isNewPubKey bool, err error) {
+	metadata := b.metadata.Load()
+	if metadata == nil {
+		// Initialize with default values
+		metadata = &SuspiciousTxfilterPluginMetadata{}
+	}
+
 	body, err := fetch(b.pluginMetadataDownloadURL())
 	if err != nil {
 		return false, false, fmt.Errorf("failed to download plugin metadata: %w", err)
@@ -214,7 +208,6 @@ func (b *SuspiciousTxfilter) fetchPluginMetadata() (isNewPlugin bool, isNewPubKe
 	defer body.Close()
 
 	var (
-		metadata     = b.metadata.Load()
 		oldVersion   = metadata.Version
 		oldPubKeyHex = metadata.BundlePublicKeyHex
 	)
@@ -237,11 +230,15 @@ func (b *SuspiciousTxfilter) startReloadLoop(reloadInterval time.Duration) {
 	for {
 		select {
 		case <-timer.C:
-			if err := b.reloadPlugin(); err != nil {
+			reload, err := b.reloadPlugin()
+			if err != nil {
 				log.Warn("Failed to reload suspicious txfilter plugin", "err", err)
 			}
+			if reload {
+				log.Info("Reloaded suspicious txfilter plugin", "version", b.metadata.Load().Version)
+			}
 		case <-b.exitCh:
-			log.Debug("Stop suspicious txfilter reload loop", "exitCh", b.exitCh)
+			log.Info("Stop suspicious txfilter reload loop", "exitCh", b.exitCh)
 			return
 		}
 	}
@@ -319,26 +316,30 @@ func (b *SuspiciousTxfilter) verifyPlugin(bundle bundle.Bundle) error {
 	return nil
 }
 
-func (b *SuspiciousTxfilter) reloadPlugin() error {
+func (b *SuspiciousTxfilter) reloadPlugin() (reload bool, err error) {
 	// Download the plugin metadata
 	isNewPlugin, isNewPubKey, err := b.fetchPluginMetadata()
 	if err != nil {
-		return fmt.Errorf("failed to download plugin metadata: %w", err)
+		err = fmt.Errorf("failed to download plugin metadata: %w", err)
+		return
 	}
 	if !isNewPlugin {
-		return nil
+		return
 	}
 	if err = b.fetchPlugin(); err != nil {
-		return fmt.Errorf("failed to download plugin: %w", err)
+		err = fmt.Errorf("failed to download plugin: %w", err)
+		return
 	}
 	if err = b.loadPlugin(isNewPubKey); err != nil {
-		return fmt.Errorf("failed to load plugin: %w", err)
+		err = fmt.Errorf("failed to load plugin: %w", err)
+		return
 	}
-	return nil
+	reload = true
+	return
 }
 
 func (b *SuspiciousTxfilter) pluginPath() string {
-	return path.Join(b.datadir, pluginFileName)
+	return path.Join(b.datadir, PluginFileName)
 }
 
 func (b *SuspiciousTxfilter) buildPluginURL(filename string) string {
@@ -350,11 +351,11 @@ func (b *SuspiciousTxfilter) buildPluginURL(filename string) string {
 }
 
 func (b *SuspiciousTxfilter) pluginDownloadURL() string {
-	return b.buildPluginURL(pluginFileName)
+	return b.buildPluginURL(PluginFileName)
 }
 
 func (b *SuspiciousTxfilter) pluginMetadataDownloadURL() string {
-	return b.buildPluginURL(pluginMetadataName)
+	return b.buildPluginURL(PluginMetadataFileName)
 }
 
 func (b *SuspiciousTxfilter) getNetworkName() string {

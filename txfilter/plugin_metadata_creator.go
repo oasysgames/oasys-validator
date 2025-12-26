@@ -1,0 +1,89 @@
+package main
+
+import (
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+
+	"github.com/ethereum/go-ethereum/core"
+)
+
+// Usage: go run txfilter/plugin_metadata_creator.go <plugin_path> [pubkey_path] [output_path] [version]
+// Example: go run txfilter/plugin_metadata_creator.go ./build/bin/suspicious_txfilter.so.bundle ./cosign.pub ./suspicious_txfilter.json 1.0.0
+func main() {
+	// Default values
+	pluginPath := filepath.Join("./", "build", "bin", core.PluginFileName)
+	pubKeyPath := "cosign.pub"
+	outputPath := "./suspicious_txfilter.json"
+	version := "1.0.0"
+
+	// Parse positional arguments
+	args := os.Args[1:]
+	if len(args) > 0 {
+		pluginPath = args[0]
+	}
+	if len(args) > 1 {
+		pubKeyPath = args[1]
+	}
+	if len(args) > 2 {
+		outputPath = args[2]
+	}
+	if len(args) > 3 {
+		version = args[3]
+	}
+
+	// Get absolute paths
+	pluginAbsPath, err := filepath.Abs(pluginPath)
+	if err != nil {
+		log.Fatalf("Failed to get absolute path for plugin: %v", err)
+	}
+	outputAbsPath, err := filepath.Abs(outputPath)
+	if err != nil {
+		log.Fatalf("Failed to get absolute path for output: %v", err)
+	}
+	pubKeyAbsPath, err := filepath.Abs(pubKeyPath)
+	if err != nil {
+		log.Fatalf("Failed to get absolute path for pubkey: %v", err)
+	}
+
+	// Read bundle file (bundle file is plugin file + ".bundle")
+	bundleData, err := os.ReadFile(pluginAbsPath)
+	if err != nil {
+		log.Fatalf("Failed to read bundle file %s: %v", pluginAbsPath, err)
+	}
+
+	// Read public key file
+	pubKeyData, err := os.ReadFile(pubKeyAbsPath)
+	if err != nil {
+		log.Fatalf("Failed to read public key file %s: %v", pubKeyAbsPath, err)
+	}
+
+	// Convert to hex
+	bundleHex := hex.EncodeToString(bundleData)
+	pubKeyHex := hex.EncodeToString(pubKeyData)
+
+	// Create metadata
+	metadata := core.SuspiciousTxfilterPluginMetadata{
+		Version:            version,
+		BundleHex:          bundleHex,
+		BundlePublicKeyHex: pubKeyHex,
+		Disable:            false,
+	}
+
+	// Marshal to JSON
+	jsonData, err := json.MarshalIndent(metadata, "", "  ")
+	if err != nil {
+		log.Fatalf("Failed to marshal JSON: %v", err)
+	}
+
+	// Determine output file path
+	outputFile := filepath.Join(outputAbsPath)
+	if err := os.WriteFile(outputFile, jsonData, 0644); err != nil {
+		log.Fatalf("Failed to write JSON file: %v", err)
+	}
+
+	fmt.Printf("Plugin metadata created successfully at %s\n", outputFile)
+}

@@ -15,7 +15,30 @@ GIT_COMMIT_DATE=$(shell git log -n1 --pretty='format:%cd' --date=format:'%Y%m%d'
 geth:
 	$(GORUN) build/ci.go install ./cmd/geth
 	@echo "Done building."
+	@$(MAKE) plugin
 	@echo "Run \"$(GOBIN)/geth\" to launch geth."
+
+#? plugin: Build the suspicious txfilter plugin.
+# The plugin must be built with the exact same Go version, build tags, and go.mod as the test binary.
+plugin:
+	@echo "Building suspicious txfilter plugin..."
+	@go build -buildmode=plugin -trimpath -tags urfave_cli_no_docs,ckzg -o ./build/bin/suspicious_txfilter.so txfilter/dummy_plugin.go
+	@echo "Plugin built successfully."
+
+#? plugin-test: Build / sign / create metadata for the suspicious txfilter plugin for testing.
+plugin-test:
+	@echo "Building suspicious txfilter plugin for testing..."
+	@go build -buildmode=plugin -ldflags "-X main.version=1.0.0" -o ./txfilter/testdata/suspicious_txfilter-v1.so ./txfilter/dummy_plugin.go
+	@go build -buildmode=plugin -ldflags "-X main.version=2.0.0" -o ./txfilter/testdata/suspicious_txfilter-v2.so ./txfilter/dummy_plugin.go
+	@echo "Plugin for testing built successfully."
+	@echo "Sign the plugin..."
+	@cosign sign-blob --key ./txfilter/testdata/cosign-test.key --bundle ./txfilter/testdata/suspicious_txfilter-v1.so.bundle ./txfilter/testdata/suspicious_txfilter-v1.so
+	@cosign sign-blob --key ./txfilter/testdata/cosign-test.key --bundle ./txfilter/testdata/suspicious_txfilter-v2.so.bundle ./txfilter/testdata/suspicious_txfilter-v2.so
+	@echo "Plugin signed successfully."
+	@echo "Create plugin metadata..."
+	@go run txfilter/plugin_metadata_creator.go ./txfilter/testdata/suspicious_txfilter-v1.so.bundle ./txfilter/testdata/cosign-test.pub ./txfilter/testdata/suspicious_txfilter-v1.json 1.0.0
+	@go run txfilter/plugin_metadata_creator.go ./txfilter/testdata/suspicious_txfilter-v2.so.bundle ./txfilter/testdata/cosign-test.pub ./txfilter/testdata/suspicious_txfilter-v2.json 2.0.0
+	@echo "Plugin metadata created successfully."
 
 #? faucet: Build faucet
 faucet:

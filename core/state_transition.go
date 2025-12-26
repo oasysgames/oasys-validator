@@ -516,7 +516,7 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 
 	if SuspiciousTxfilterGlobal != nil {
 		logs := st.evm.StateDB.GetLogs(common.Hash{}, 0, common.Hash{}, 0)
-		if isBlocked, reason, err := SuspiciousTxfilterGlobal.BlockTransaction(msg, logs); err != nil {
+		if isBlocked, reason, err := SuspiciousTxfilterGlobal.FilterTransaction(msg, logs); err != nil {
 			log.Warn("failed to block transaction", "error", err)
 		} else if isBlocked {
 			st.evm.StateDB.RevertToSnapshot(snapshot)
