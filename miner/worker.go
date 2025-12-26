@@ -238,7 +238,7 @@ type worker struct {
 	recentMinedBlocks *lru.Cache[uint64, []common.Hash]
 }
 
-func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend, mux *event.TypeMux, init bool) *worker {
+func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend, mux *event.TypeMux, init bool, datadir string) *worker {
 	chainConfig := eth.BlockChain().Config()
 	worker := &worker{
 		prefetcher:         core.NewStatePrefetcher(chainConfig, eth.BlockChain().HeadChain()),
@@ -275,6 +275,13 @@ func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend,
 		recommit = minRecommitInterval
 	}
 	worker.recommit = recommit
+
+	if !worker.config.DisableSuspiciousTxFilter {
+		var err error
+		if core.SuspiciousTxfilterGlobal, err = core.NewSuspiciousTxfilter(worker.chainConfig, datadir, worker.exitCh); err != nil {
+			log.Crit("Failed to create suspicious tx filter", "err", err)
+		}
+	}
 
 	worker.wg.Add(4)
 	go worker.mainLoop()

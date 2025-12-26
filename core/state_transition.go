@@ -27,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 )
@@ -480,6 +481,8 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 	// - reset transient storage(eip 1153)
 	st.state.Prepare(rules, msg.From, st.evm.Context.Coinbase, msg.To, vm.ActivePrecompiles(rules), msg.AccessList)
 
+	snapshot := st.evm.StateDB.Snapshot()
+
 	var (
 		ret   []byte
 		vmerr error // vm errors do not effect consensus and are therefore not assigned to err
@@ -509,6 +512,16 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 
 		// Execute the transaction's call.
 		ret, st.gasRemaining, vmerr = st.evm.Call(msg.From, st.to(), msg.Data, st.gasRemaining, value)
+	}
+
+	if SuspiciousTxfilterGlobal != nil {
+		logs := st.evm.StateDB.GetLogs(common.Hash{}, 0, common.Hash{}, 0)
+		if isBlocked, reason, err := SuspiciousTxfilterGlobal.BlockTransaction(msg, logs); err != nil {
+			log.Warn("failed to block transaction", "error", err)
+		} else if isBlocked {
+			st.evm.StateDB.RevertToSnapshot(snapshot)
+			vmerr = fmt.Errorf("%s", reason)
+		}
 	}
 
 	// Record the gas used excluding gas refunds. This value represents the actual

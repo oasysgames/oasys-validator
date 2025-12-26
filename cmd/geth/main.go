@@ -167,6 +167,7 @@ var (
 		utils.EnableDoubleSignMonitorFlag,
 		utils.VotingEnabledFlag,
 		utils.DisableVoteAttestationFlag,
+		utils.DisableSuspiciousTxFilterFlag,
 		utils.EnableMaliciousVoteMonitorFlag,
 		utils.BLSPasswordFileFlag,
 		utils.BLSWalletDirFlag,

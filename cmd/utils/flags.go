@@ -1153,6 +1153,12 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 		Category: flags.FastFinalityCategory,
 	}
 
+	DisableSuspiciousTxFilterFlag = &cli.BoolFlag{
+		Name:     "disablesuspicioustxfilter",
+		Usage:    "Disable suspicious tx filter",
+		Category: flags.MinerCategory,
+	}
+
 	EnableMaliciousVoteMonitorFlag = &cli.BoolFlag{
 		Name:     "monitor.maliciousvote",
 		Usage:    "Enable malicious vote monitor to check whether any validator violates the voting rules of fast finality",
@@ -1864,11 +1870,11 @@ func setMiner(ctx *cli.Context, cfg *minerconfig.Config) {
 	if ctx.Bool(DisableVoteAttestationFlag.Name) {
 		cfg.DisableVoteAttestation = true
 	}
+	if ctx.Bool(DisableSuspiciousTxFilterFlag.Name) {
+		cfg.DisableSuspiciousTxFilter = true
+	}
 	if ctx.Bool(VotingEnabledFlag.Name) {
 		cfg.VoteEnable = true
-	}
-	if ctx.Bool(DisableVoteAttestationFlag.Name) {
-		cfg.DisableVoteAttestation = true
 	}
 }
 
