@@ -1208,7 +1208,7 @@ func _deployments15(genesisHash common.Hash, contracts wantContracts) {
 	appends := wantContracts{
 		"0x520000000000000000000000000000000000004F": {
 			name:     "TransactionBlocker",
-			codeHash: "7876460aea5be2968503ee82779c0919",
+			codeHash: "1136c5c3bfce0d857fe7fa7e50098991",
 		},
 	}
 
