@@ -481,7 +481,11 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 	// - reset transient storage(eip 1153)
 	st.state.Prepare(rules, msg.From, st.evm.Context.Coinbase, msg.To, vm.ActivePrecompiles(rules), msg.AccessList)
 
-	snapshot := st.evm.StateDB.Snapshot()
+	// Snapshot for suspicious txfilter
+	var snapshot int
+	if SuspiciousTxfilterGlobal != nil {
+		snapshot = st.evm.StateDB.Snapshot()
+	}
 
 	var (
 		ret   []byte
@@ -517,10 +521,10 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 	if SuspiciousTxfilterGlobal != nil {
 		logs := st.evm.StateDB.GetLogs(common.Hash{}, 0, common.Hash{}, 0)
 		if isBlocked, reason, err := SuspiciousTxfilterGlobal.FilterTransaction(msg, logs); err != nil {
-			log.Warn("failed to block transaction", "error", err)
+			log.Warn("suspicious txfilter failed", "error", err)
 		} else if isBlocked {
 			st.evm.StateDB.RevertToSnapshot(snapshot)
-			vmerr = fmt.Errorf("%s", reason)
+			vmerr = fmt.Errorf("suspicious txfilter: %s", reason)
 		}
 	}
 

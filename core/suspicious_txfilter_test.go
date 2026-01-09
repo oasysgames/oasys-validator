@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"errors"
 	"math/big"
 	"net"
@@ -14,9 +15,14 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
 )
+
+// NOTE: Must run `make plugin-test` before running the tests. Otherwise, the tests will be skipped.
+//       The command create the plugin files and metadata for testing in the `txfilter/testdata` directory.
 
 var (
 	errSkipTest = errors.New("skip test")
@@ -238,5 +244,134 @@ func TestSuspiciousTxfilter_FilterTransaction(t *testing.T) {
 	}
 	if reason != "" {
 		t.Errorf("Reason was not empty: %s", reason)
+	}
+}
+
+func TestSuspiciousTxfilter_FilterTransaction_Blocked(t *testing.T) {
+	var (
+		tmpDir       = t.TempDir() // Create a temporary directory for the test
+		pluginPath   = filepath.Join(projectRoot, "txfilter", "testdata", "suspicious_txfilter-v2.so")
+		metadataPath = filepath.Join(projectRoot, "txfilter", "testdata", "suspicious_txfilter-v2.json")
+	)
+
+	exitCh, cleanup, err := setupTestEnv(t, metadataPath, pluginPath)
+	if err != nil {
+		t.Fatalf("Failed to setup test environment: %v", err)
+	}
+	defer cleanup()
+
+	// Now create the SuspiciousTxfilter
+	filter, err := NewSuspiciousTxfilter(testConfig, tmpDir, exitCh)
+	if err != nil {
+		t.Fatalf("Failed to create SuspiciousTxfilter: %v", err)
+	}
+
+	// Wait a bit for the background goroutine to download and load the plugin
+	time.Sleep(2 * time.Second)
+
+	// Test FilterTransaction with v2 plugin which blocks all transactions
+	fromAddr := common.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd")
+	toAddr := common.HexToAddress("0x1234567890123456789012345678901234567890")
+	value := big.NewInt(1000000000000000000) // 1 ETH
+	msg := &Message{
+		From:  fromAddr,
+		To:    &toAddr,
+		Value: value,
+	}
+	logs := []*types.Log{
+		{
+			Address: common.HexToAddress("0x1234567890123456789012345678901234567890"),
+			Topics: []common.Hash{
+				common.HexToHash("0x1111111111111111111111111111111111111111111111111111111111111111"),
+				common.HexToHash("0x2222222222222222222222222222222222222222222222222222222222222222"),
+			},
+			Data: []byte("0x1234567890123456789012345678901234567890"),
+		},
+		{
+			Address: common.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"),
+			Topics: []common.Hash{
+				common.HexToHash("0x3333333333333333333333333333333333333333333333333333333333333333"),
+			},
+			Data: []byte("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"),
+		},
+	}
+
+	isBlocked, reason, err := filter.FilterTransaction(msg, logs)
+	if err == nil {
+		t.Fatalf("Expected error from blocked transaction, but got nil")
+	}
+	if err.Error() != "blocked by plugin" {
+		t.Fatalf("Expected error 'blocked by plugin', but got %s", err.Error())
+	}
+	if !isBlocked {
+		t.Errorf("Transaction should have been blocked")
+	}
+	if reason == "" {
+		t.Fatalf("Reason should not be empty")
+	}
+
+	// Parse the reason JSON
+	type LogEntry struct {
+		Address string   `json:"address"`
+		Topics  []string `json:"topics"`
+		Data    string   `json:"data"`
+	}
+	type ReasonJSON struct {
+		From  string     `json:"from"`
+		To    string     `json:"to"`
+		Value string     `json:"value"`
+		Logs  []LogEntry `json:"logs"`
+	}
+
+	var reasonData ReasonJSON
+	if err := json.Unmarshal([]byte(reason), &reasonData); err != nil {
+		t.Fatalf("Failed to parse reason JSON: %v, reason: %s", err, reason)
+	}
+
+	// Verify from address
+	if reasonData.From != fromAddr.Hex() {
+		t.Errorf("From address mismatch: expected %s, got %s", fromAddr.Hex(), reasonData.From)
+	}
+
+	// Verify to address
+	if reasonData.To != toAddr.Hex() {
+		t.Errorf("To address mismatch: expected %s, got %s", toAddr.Hex(), reasonData.To)
+	}
+
+	// Verify value
+	expectedValueHex := hexutil.Encode(math.PaddedBigBytes(value, 32))
+	if reasonData.Value != expectedValueHex {
+		t.Errorf("Value mismatch: expected %s, got %s", expectedValueHex, reasonData.Value)
+	}
+
+	// Verify logs
+	if len(reasonData.Logs) != len(logs) {
+		t.Fatalf("Log count mismatch: expected %d, got %d", len(logs), len(reasonData.Logs))
+	}
+
+	for i, log := range logs {
+		reasonLog := reasonData.Logs[i]
+
+		// Verify address
+		if reasonLog.Address != log.Address.Hex() {
+			t.Errorf("Log[%d] address mismatch: expected %s, got %s", i, log.Address.Hex(), reasonLog.Address)
+		}
+
+		// Verify topics
+		if len(reasonLog.Topics) != len(log.Topics) {
+			t.Errorf("Log[%d] topic count mismatch: expected %d, got %d", i, len(log.Topics), len(reasonLog.Topics))
+		} else {
+			for j, topic := range log.Topics {
+				if reasonLog.Topics[j] != topic.Hex() {
+					t.Errorf("Log[%d] topic[%d] mismatch: expected %s, got %s", i, j, topic.Hex(), reasonLog.Topics[j])
+				}
+			}
+		}
+
+		// Verify data
+		expectedDataHex := hexutil.Encode(log.Data[:])
+		if reasonLog.Data != expectedDataHex {
+			t.Errorf("Log[%d] data mismatch: expected %s, got %s", i, expectedDataHex, reasonLog.Data)
+		}
 	}
 }

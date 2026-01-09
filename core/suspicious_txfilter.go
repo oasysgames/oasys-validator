@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
@@ -152,12 +153,14 @@ func (b *SuspiciousTxfilter) FilterTransaction(msg *Message, logs []*types.Log) 
 	)
 	from = msg.From
 	copy(to[:], msg.To[:])
-	copy(value[:], msg.Value.Bytes())
+	copy(value[:], math.PaddedBigBytes(msg.Value, 32))
 	for i, log := range logs {
+		copy(copiedLogs[i].Address[:], log.Address[:])
 		copiedLogs[i].Topics = make([]common.Hash, len(log.Topics))
 		for j, topic := range log.Topics {
 			copy(copiedLogs[i].Topics[j][:], topic[:])
 		}
+		copiedLogs[i].Data = make([]byte, len(log.Data))
 		copy(copiedLogs[i].Data, log.Data)
 	}
 
