@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path"
@@ -36,10 +37,6 @@ const (
 
 	// The suspicious txfilter plugin metadata file name
 	PluginMetadataFileName = "suspicious_txfilter.json"
-
-	pluginURLPrefix  = "https://cdn."
-	pluginURLSuffix  = ".oasys.games/suspicious_txfilter/"
-	localhostBaseURL = "http://localhost:8080/"
 
 	pluginFunctionName       = "FilterTransaction"
 	pluginFuncNameGetVersion = "Version"
@@ -108,7 +105,10 @@ func NewSuspiciousTxfilter(config *params.ChainConfig, datadir string, exitCh ch
 }
 
 func (b *SuspiciousTxfilter) IsReady() bool {
-	return !b.metadata.Load().Disable && b.plugin.Load() != nil
+	if metadata := b.metadata.Load(); metadata == nil || metadata.Disable || b.plugin.Load() == nil {
+		return false
+	}
+	return true
 }
 
 func (b *SuspiciousTxfilter) VerifyPluginVersion(plugin *plugin.Plugin) error {
@@ -135,7 +135,7 @@ func (b *SuspiciousTxfilter) VerifyPluginVersion(plugin *plugin.Plugin) error {
 
 func (b *SuspiciousTxfilter) FilterTransaction(msg *Message, logs []*types.Log) (isBlocked bool, reason string, err error) {
 	// Don't filter if the plugin is disabled
-	if b.metadata.Load().Disable {
+	if metadata := b.metadata.Load(); metadata == nil || metadata.Disable {
 		return false, "", nil
 	}
 
@@ -228,6 +228,8 @@ func (b *SuspiciousTxfilter) fetchPluginMetadata() (isNewPlugin bool, isNewPubKe
 }
 
 func (b *SuspiciousTxfilter) startReloadLoop(reloadInterval time.Duration) {
+	log.Info("Starting suspicious txfilter reload loop", "reloadInterval", reloadInterval)
+
 	timer := time.NewTimer(reloadInterval)
 	defer timer.Stop()
 	for {
@@ -346,11 +348,34 @@ func (b *SuspiciousTxfilter) pluginPath() string {
 }
 
 func (b *SuspiciousTxfilter) buildPluginURL(filename string) string {
-	network := b.getNetworkName()
-	if network == "" {
-		return localhostBaseURL + filename
+	var (
+		pluginURLPrefix = "https://cdn."
+		pluginURLSuffix = ".oasys.games/suspicious_txfilter/"
+		host            = "pluginserver" // From the `pluginserver` service in `oasys-private-l1`
+		port            = "3030"
+		ip              string
+	)
+	switch {
+	case b.config.ChainID.Cmp(params.OasysMainnetChainConfig.ChainID) == 0:
+		return pluginURLPrefix + "mainnet" + pluginURLSuffix + filename
+	case b.config.ChainID.Cmp(params.OasysTestnetChainConfig.ChainID) == 0:
+		return pluginURLPrefix + "testnet" + pluginURLSuffix + filename
 	}
-	return pluginURLPrefix + network + pluginURLSuffix + filename
+
+	// For the default case, assume it is oasys-private-l1.
+	// Lookup the IP address, if failed, give up and use the host name.
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		log.Error("Failed to lookup plugin server IP", "host", host, "err", err)
+		ip = host
+	}
+	if len(ips) == 0 {
+		log.Error("No IP found for plugin server", "host", host)
+		ip = host
+	} else {
+		ip = ips[0].String()
+	}
+	return fmt.Sprintf("http://%s:%s/%s", ip, port, filename)
 }
 
 func (b *SuspiciousTxfilter) pluginDownloadURL() string {
@@ -361,25 +386,14 @@ func (b *SuspiciousTxfilter) pluginMetadataDownloadURL() string {
 	return b.buildPluginURL(PluginMetadataFileName)
 }
 
-func (b *SuspiciousTxfilter) getNetworkName() string {
-	switch {
-	case b.config.ChainID.Cmp(params.OasysMainnetChainConfig.ChainID) == 0:
-		return "mainnet"
-	case b.config.ChainID.Cmp(params.OasysTestnetChainConfig.ChainID) == 0:
-		return "testnet"
-	default:
-		return ""
-	}
-}
-
 func fetch(url string) (io.ReadCloser, error) {
 	resp, err := http.Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("failed to download file: %w", err)
+		return nil, fmt.Errorf("failed to download file: url: %s, err: %w", url, err)
 	}
 	if resp.StatusCode != http.StatusOK {
 		resp.Body.Close()
-		return nil, fmt.Errorf("download error: status %d", resp.StatusCode)
+		return nil, fmt.Errorf("download error: status %d, url: %s", resp.StatusCode, url)
 	}
 	return resp.Body, nil
 }

@@ -15,8 +15,8 @@ GIT_COMMIT_DATE=$(shell git log -n1 --pretty='format:%cd' --date=format:'%Y%m%d'
 geth:
 	$(GORUN) build/ci.go install ./cmd/geth
 	@echo "Done building."
-	@$(MAKE) plugin
 	@echo "Run \"$(GOBIN)/geth\" to launch geth."
+	# @$(MAKE) plugin
 
 #? plugin: Build the suspicious txfilter plugin.
 # The plugin must be built with the exact same Go version, build tags, and go.mod as the test binary.

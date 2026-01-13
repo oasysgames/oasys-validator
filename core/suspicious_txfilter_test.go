@@ -115,6 +115,9 @@ func TestNewSuspiciousTxfilter(t *testing.T) {
 
 	exitCh, cleanup, err := setupTestEnv(t, metadataPath, pluginPath)
 	if err != nil {
+		if errors.Is(err, errSkipTest) {
+			t.Skipf("Skipping test: %v", err)
+		}
 		t.Fatalf("Failed to setup test environment: %v", err)
 	}
 	defer cleanup()
@@ -178,6 +181,9 @@ func TestSuspiciousTxfilter_reloadPlugin(t *testing.T) {
 	)
 	_, cleanup, err := setupTestEnv(t, metadataPath2, pluginPath2)
 	if err != nil {
+		if errors.Is(err, errSkipTest) {
+			t.Skipf("Skipping test: %v", err)
+		}
 		t.Fatalf("Failed to setup test environment: %v", err)
 	}
 	defer cleanup()
@@ -206,6 +212,9 @@ func TestSuspiciousTxfilter_FilterTransaction(t *testing.T) {
 
 	exitCh, cleanup, err := setupTestEnv(t, metadataPath, pluginPath)
 	if err != nil {
+		if errors.Is(err, errSkipTest) {
+			t.Skipf("Skipping test: %v", err)
+		}
 		t.Fatalf("Failed to setup test environment: %v", err)
 	}
 	defer cleanup()
@@ -256,6 +265,9 @@ func TestSuspiciousTxfilter_FilterTransaction_Blocked(t *testing.T) {
 
 	exitCh, cleanup, err := setupTestEnv(t, metadataPath, pluginPath)
 	if err != nil {
+		if errors.Is(err, errSkipTest) {
+			t.Skipf("Skipping test: %v", err)
+		}
 		t.Fatalf("Failed to setup test environment: %v", err)
 	}
 	defer cleanup()
