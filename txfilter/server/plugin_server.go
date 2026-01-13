@@ -15,10 +15,8 @@ const (
 	defaultHost         = "localhost"
 	defaultPort         = "8080"
 	pluginEndpoint      = "/suspicious_txfilter.so"
-	bundleEndpoint      = "/suspicious_txfilter.so.bundle"
 	metadataEndpoint    = "/suspicious_txfilter.json"
 	defaultPluginFile   = "suspicious_txfilter.so"
-	defaultBundleFile   = "suspicious_txfilter.so.bundle"
 	defaultMetadataFile = "suspicious_txfilter.json"
 )
 
@@ -57,7 +55,6 @@ func (rw *responseWriter) WriteHeader(code int) {
 func main() {
 	var (
 		pluginFile   = flag.String("plugin", defaultPluginFile, "Path to the plugin .so file")
-		bundleFile   = flag.String("bundle", defaultBundleFile, "Path to the signed bundle file")
 		metadataFile = flag.String("metadata", defaultMetadataFile, "Path to the metadata JSON file")
 		host         = flag.String("host", defaultHost, "Host to bind to (empty string binds to all interfaces)")
 		port         = flag.String("port", defaultPort, "Port to listen on")
@@ -85,15 +82,11 @@ func main() {
 
 	// Get absolute paths
 	pluginFilePath := filepath.Join(*dir, *pluginFile)
-	bundleFilePath := filepath.Join(*dir, *bundleFile)
 	metadataFilePath := filepath.Join(*dir, *metadataFile)
 
 	// Verify files exist
 	if _, err := os.Stat(pluginFilePath); os.IsNotExist(err) {
 		logger.Fatalf("Plugin file not found: %s", pluginFilePath)
-	}
-	if _, err := os.Stat(bundleFilePath); os.IsNotExist(err) {
-		logger.Fatalf("Bundle file not found: %s", bundleFilePath)
 	}
 	if _, err := os.Stat(metadataFilePath); os.IsNotExist(err) {
 		logger.Fatalf("Metadata file not found: %s", metadataFilePath)
@@ -106,14 +99,6 @@ func main() {
 			return
 		}
 		http.ServeFile(w, r, pluginFilePath)
-	}, logger))
-
-	http.HandleFunc(bundleEndpoint, loggingMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		http.ServeFile(w, r, bundleFilePath)
 	}, logger))
 
 	http.HandleFunc(metadataEndpoint, loggingMiddleware(func(w http.ResponseWriter, r *http.Request) {
@@ -147,10 +132,8 @@ func main() {
 
 	logger.Printf("Starting plugin server on %s", addr)
 	logger.Printf("Serving plugin file: %s", pluginFilePath)
-	logger.Printf("Serving bundle file: %s", bundleFilePath)
 	logger.Printf("Serving metadata file: %s", metadataFilePath)
 	logger.Printf("Plugin endpoint: http://%s:%s%s", displayHost, *port, pluginEndpoint)
-	logger.Printf("Bundle endpoint: http://%s:%s%s", displayHost, *port, bundleEndpoint)
 	logger.Printf("Metadata endpoint: http://%s:%s%s", displayHost, *port, metadataEndpoint)
 
 	if err := http.ListenAndServe(addr, nil); err != nil {
