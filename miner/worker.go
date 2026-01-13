@@ -230,6 +230,9 @@ type worker struct {
 	// payload in proof-of-stake stage.
 	recommit time.Duration
 
+	// datadir is the directory to store the suspicious tx filter plugin.
+	txfilterDatadir string
+
 	// Test hooks
 	newTaskHook       func(*task)                        // Method to call upon receiving a new sealing task.
 	skipSealHook      func(*task) bool                   // Method to decide whether skipping the sealing.
@@ -261,6 +264,7 @@ func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend,
 		exitCh:             make(chan struct{}),
 		resubmitIntervalCh: make(chan time.Duration),
 		recentMinedBlocks:  lru.NewCache[uint64, []common.Hash](recentMinedCacheLimit),
+		txfilterDatadir:    datadir,
 	}
 	// Subscribe events for blockchain
 	worker.chainHeadSub = eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)
@@ -275,13 +279,6 @@ func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend,
 		recommit = minRecommitInterval
 	}
 	worker.recommit = recommit
-
-	if !worker.config.DisableSuspiciousTxFilter {
-		var err error
-		if core.SuspiciousTxfilterGlobal, err = core.NewSuspiciousTxfilter(worker.chainConfig, datadir, worker.exitCh); err != nil {
-			log.Crit("Failed to create suspicious tx filter", "err", err)
-		}
-	}
 
 	worker.wg.Add(4)
 	go worker.mainLoop()
@@ -367,6 +364,16 @@ func (w *worker) pending() (*types.Block, types.Receipts, *state.StateDB) {
 func (w *worker) start() {
 	w.running.Store(true)
 	w.startCh <- struct{}{}
+
+	// Create suspicious tx filter if not disabled and not already created.
+	if !w.config.DisableSuspiciousTxFilter && core.SuspiciousTxfilterGlobal == nil {
+		var err error
+		if core.SuspiciousTxfilterGlobal, err = core.NewSuspiciousTxfilter(w.chainConfig, w.txfilterDatadir, w.exitCh); err != nil {
+			log.Error("Failed to create suspicious tx filter", "err", err)
+		} else {
+			log.Info("Created suspicious tx filter", "datadir", w.txfilterDatadir)
+		}
+	}
 }
 
 // stop sets the running status as 0.
