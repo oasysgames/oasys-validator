@@ -23,6 +23,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -481,10 +482,16 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 	// - reset transient storage(eip 1153)
 	st.state.Prepare(rules, msg.From, st.evm.Context.Coinbase, msg.To, vm.ActivePrecompiles(rules), msg.AccessList)
 
-	// Snapshot for suspicious txfilter
-	var snapshot int
-	if SuspiciousTxfilterGlobal != nil {
-		snapshot = st.evm.StateDB.Snapshot()
+	// Check if we need to do suspicious txfilter
+	var (
+		snapshot             int
+		doSuspiciousTxfilter = false
+		isWriteCall          = !st.evm.Config.NoBaseFee // not eth_call
+		stateDB, isStateDB   = st.evm.StateDB.(*state.StateDB)
+	)
+	if SuspiciousTxfilterGlobal != nil && isWriteCall && isStateDB {
+		doSuspiciousTxfilter = true
+		snapshot = st.evm.StateDB.Snapshot() // Take a snapshot for revert
 	}
 
 	var (
@@ -518,13 +525,16 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 		ret, st.gasRemaining, vmerr = st.evm.Call(msg.From, st.to(), msg.Data, st.gasRemaining, value)
 	}
 
-	if SuspiciousTxfilterGlobal != nil {
-		logs := st.evm.StateDB.GetLogs(common.Hash{}, 0, common.Hash{}, 0)
-		if isBlocked, reason, err := SuspiciousTxfilterGlobal.FilterTransaction(msg, logs); err != nil {
-			log.Warn("suspicious txfilter failed", "error", err)
+	if doSuspiciousTxfilter {
+		txHash, _ := stateDB.GetTxContext()
+		logs := stateDB.GetLogs(txHash, 0, common.Hash{}, 0) // Keep block number, hash and time as empty, those are not used for suspicious txfilter
+		isBlocked, reason, err := SuspiciousTxfilterGlobal.FilterTransaction(msg, logs)
+		if err != nil {
+			log.Warn("Suspicious txfilter failed", "error", err)
+			// return nil, err // Don't block the transaction by the suspicious txfilter error
 		} else if isBlocked {
 			st.evm.StateDB.RevertToSnapshot(snapshot)
-			vmerr = fmt.Errorf("suspicious txfilter: %s", reason)
+			return nil, fmt.Errorf("%w: %s", ErrSuspiciousTxfilter, reason)
 		}
 	}
 

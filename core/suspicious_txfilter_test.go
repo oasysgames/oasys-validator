@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"net"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"plugin"
+	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -385,5 +387,18 @@ func TestSuspiciousTxfilter_FilterTransaction_Blocked(t *testing.T) {
 		if reasonLog.Data != expectedDataHex {
 			t.Errorf("Log[%d] data mismatch: expected %s, got %s", i, expectedDataHex, reasonLog.Data)
 		}
+	}
+}
+
+func TestSuspiciousTxfilter_buildPluginURL(t *testing.T) {
+	filter := &SuspiciousTxfilter{
+		config: &params.ChainConfig{
+			ChainID: big.NewInt(params.OasysMainnetChainConfig.ChainID.Int64()),
+		},
+	}
+	url := filter.buildPluginURL(PluginFileName)
+	expectedURL := fmt.Sprintf("https://cdn.mainnet.oasys.games/suspicious_txfilter/suspicious_txfilter_%s_%s.so", runtime.GOOS, runtime.GOARCH)
+	if url != expectedURL {
+		t.Errorf("Expected URL: %s, got: %s", expectedURL, url)
 	}
 }

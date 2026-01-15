@@ -11,7 +11,10 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"plugin"
+	"runtime"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -348,21 +351,27 @@ func (b *SuspiciousTxfilter) pluginPath() string {
 }
 
 func (b *SuspiciousTxfilter) buildPluginURL(filename string) string {
-	var (
-		pluginURLPrefix = "https://cdn."
-		pluginURLSuffix = ".oasys.games/suspicious_txfilter/"
-		host            = "pluginserver" // From the `pluginserver` service in `oasys-private-l1`
-		port            = "3030"
-		ip              string
-	)
-	switch {
-	case b.config.ChainID.Cmp(params.OasysMainnetChainConfig.ChainID) == 0:
-		return pluginURLPrefix + "mainnet" + pluginURLSuffix + filename
-	case b.config.ChainID.Cmp(params.OasysTestnetChainConfig.ChainID) == 0:
-		return pluginURLPrefix + "testnet" + pluginURLSuffix + filename
+	// For mainnet and testnet
+	if b.config.ChainID.Cmp(params.OasysMainnetChainConfig.ChainID) == 0 || b.config.ChainID.Cmp(params.OasysTestnetChainConfig.ChainID) == 0 {
+		var (
+			fileExt  = filepath.Ext(filename)                // e.g., ".so" or ".json"
+			fileName = strings.TrimSuffix(filename, fileExt) // e.g., "suspicious_txfilter"
+			network  = "mainnet"
+			osName   = runtime.GOOS
+			osArch   = runtime.GOARCH
+		)
+		if b.config.ChainID.Cmp(params.OasysTestnetChainConfig.ChainID) == 0 {
+			network = "testnet"
+		}
+		return fmt.Sprintf("https://cdn.%s.oasys.games/suspicious_txfilter/%s_%s_%s%s", network, fileName, osName, osArch, fileExt)
 	}
 
 	// For the default case, assume it is oasys-private-l1.
+	var (
+		host = "pluginserver" // From the `pluginserver` service in `oasys-private-l1`
+		port = "3030"
+		ip   string
+	)
 	// Lookup the IP address, if failed, give up and use the host name.
 	ips, err := net.LookupIP(host)
 	if err != nil {
