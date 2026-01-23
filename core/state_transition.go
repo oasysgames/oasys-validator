@@ -533,6 +533,7 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 			log.Warn("Suspicious txfilter failed", "error", err)
 			// return nil, err // Don't block the transaction by the suspicious txfilter error
 		} else if isBlocked {
+			log.Info("Suspicious txfilter blocked", "reason", reason)
 			st.evm.StateDB.RevertToSnapshot(snapshot)
 			return nil, fmt.Errorf("%w: %s", ErrSuspiciousTxfilter, reason)
 		}

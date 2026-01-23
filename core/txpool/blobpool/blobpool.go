@@ -83,6 +83,9 @@ const (
 	// limboedTransactionStore is the subfolder containing the currently included
 	// but not yet finalized transaction blobs.
 	limboedTransactionStore = "limbo"
+
+	// lifetime is the maximum amount of time a transaction can be in the pool.
+	lifetime = 3 * 60 // Transaction lifetime (seconds)
 )
 
 // blobTxMeta is the minimal subset of types.BlobTx necessary to validate and
@@ -111,6 +114,8 @@ type blobTxMeta struct {
 	evictionExecTip      *uint256.Int // Worst gas tip across all previous nonces
 	evictionExecFeeJumps float64      // Worst base fee (converted to fee jumps) across all previous nonces
 	evictionBlobFeeJumps float64      // Worse blob fee (converted to fee jumps) across all previous nonces
+
+	txtime int64 // Unix timestamp of transaction
 }
 
 // newBlobTxMeta retrieves the indexed metadata fields from a blob transaction
@@ -129,6 +134,7 @@ func newBlobTxMeta(id uint64, size uint64, storageSize uint32, tx *types.Transac
 		blobFeeCap:  uint256.MustFromBig(tx.BlobGasFeeCap()),
 		execGas:     tx.Gas(),
 		blobGas:     tx.BlobGas(),
+		txtime:      tx.Time().Unix(),
 	}
 	meta.basefeeJumps = dynamicFeeJumps(meta.execFeeCap)
 	meta.blobfeeJumps = dynamicFeeJumps(meta.blobFeeCap)
@@ -1538,6 +1544,9 @@ func (p *BlobPool) add(tx *types.Transaction) (err error) {
 	}
 	p.updateStorageMetrics()
 
+	// Drop old transactions by lifetime to avoid suspicious txs remaining in the pool.
+	p.dropByLifetime()
+
 	addValidMeter.Mark(1)
 	return nil
 }
@@ -1593,6 +1602,29 @@ func (p *BlobPool) drop() {
 
 	if err := p.store.Delete(drop.id); err != nil {
 		log.Error("Failed to drop evicted transaction", "id", drop.id, "err", err)
+	}
+}
+
+// dropByLifetime drops transactions by lifetime from the pool.
+func (p *BlobPool) dropByLifetime() {
+	for from, txs := range p.index {
+		remainingTxsCount := len(txs)
+		for _, tx := range txs {
+			if time.Now().Unix()-tx.txtime > lifetime {
+				p.lookup.untrack(tx)
+				if err := p.store.Delete(tx.id); err != nil {
+					log.Error("Failed to drop evicted transaction", "id", tx.id, "err", err)
+				} else {
+					remainingTxsCount--
+					log.Debug("Dropped transaction by lifetime", "from", from, "evicted", tx.nonce, "id", tx.id)
+				}
+			}
+		}
+		if remainingTxsCount == 0 {
+			delete(p.index, from)
+			delete(p.spent, from)
+			p.reserver.Release(from)
+		}
 	}
 }
 
