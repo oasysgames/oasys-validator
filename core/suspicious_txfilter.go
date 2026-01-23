@@ -377,8 +377,7 @@ func (b *SuspiciousTxfilter) buildPluginURL(filename string) string {
 	if err != nil {
 		log.Error("Failed to lookup plugin server IP", "host", host, "err", err)
 		ip = host
-	}
-	if len(ips) == 0 {
+	} else if len(ips) == 0 {
 		log.Error("No IP found for plugin server", "host", host)
 		ip = host
 	} else {
