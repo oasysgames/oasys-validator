@@ -155,7 +155,9 @@ func (b *SuspiciousTxfilter) FilterTransaction(msg *Message, logs []*types.Log) 
 		copiedLogs = make([]types.Log, len(logs))
 	)
 	from = msg.From
-	copy(to[:], msg.To[:])
+	if msg.To != nil {
+		copy(to[:], msg.To[:])
+	}
 	copy(value[:], math.PaddedBigBytes(msg.Value, 32))
 	for i, log := range logs {
 		copy(copiedLogs[i].Address[:], log.Address[:])
