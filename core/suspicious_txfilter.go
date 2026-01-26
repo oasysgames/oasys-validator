@@ -247,6 +247,7 @@ func (b *SuspiciousTxfilter) startReloadLoop(reloadInterval time.Duration) {
 			if reload {
 				log.Info("Reloaded suspicious txfilter plugin", "version", b.metadata.Load().Version)
 			}
+			timer.Reset(reloadInterval)
 		case <-b.exitCh:
 			log.Info("Stop suspicious txfilter reload loop", "exitCh", b.exitCh)
 			return
