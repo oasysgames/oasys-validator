@@ -101,7 +101,7 @@ func NewSuspiciousTxfilter(config *params.ChainConfig, datadir string, exitCh ch
 			}
 		}
 
-		go b.startReloadLoop(DefaultPluginReloadInterval)
+		b.startReloadLoop(DefaultPluginReloadInterval)
 	}()
 
 	return b, nil
