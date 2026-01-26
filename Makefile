@@ -31,7 +31,7 @@ plugin-test:
 	@go build -buildmode=plugin -ldflags "-X main.version=1.0.0 -X main.blockedByPlugin=false" -o ./txfilter/testdata/suspicious_txfilter-v1.so ./txfilter/dummy_plugin.go
 	@go build -buildmode=plugin -ldflags "-X main.version=2.0.0 -X main.blockedByPlugin=true" -o ./txfilter/testdata/suspicious_txfilter-v2.so ./txfilter/dummy_plugin.go
 	@echo "Plugin for testing built successfully."
-	@echo "Sign the plugin..."
+	@echo "Sign the plugin...(the key password is empty)"
 	@cosign sign-blob --key ./txfilter/testdata/cosign-test.key --bundle ./txfilter/testdata/suspicious_txfilter-v1.so.bundle ./txfilter/testdata/suspicious_txfilter-v1.so
 	@cosign sign-blob --key ./txfilter/testdata/cosign-test.key --bundle ./txfilter/testdata/suspicious_txfilter-v2.so.bundle ./txfilter/testdata/suspicious_txfilter-v2.so
 	@echo "Plugin signed successfully."

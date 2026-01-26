@@ -1867,11 +1867,11 @@ func setMiner(ctx *cli.Context, cfg *minerconfig.Config) {
 		recommitIntervalFlag := ctx.Duration(MinerRecommitIntervalFlag.Name)
 		cfg.Recommit = &recommitIntervalFlag
 	}
-	if ctx.Bool(DisableVoteAttestationFlag.Name) {
-		cfg.DisableVoteAttestation = true
-	}
 	if ctx.Bool(DisableSuspiciousTxFilterFlag.Name) {
 		cfg.DisableSuspiciousTxFilter = true
+	}
+	if ctx.Bool(DisableVoteAttestationFlag.Name) {
+		cfg.DisableVoteAttestation = true
 	}
 	if ctx.Bool(VotingEnabledFlag.Name) {
 		cfg.VoteEnable = true

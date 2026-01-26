@@ -13,7 +13,7 @@ import (
 
 const (
 	defaultHost         = "localhost"
-	defaultPort         = "8080"
+	defaultPort         = "3030"
 	pluginEndpoint      = "/suspicious_txfilter.so"
 	metadataEndpoint    = "/suspicious_txfilter.json"
 	defaultPluginFile   = "suspicious_txfilter.so"

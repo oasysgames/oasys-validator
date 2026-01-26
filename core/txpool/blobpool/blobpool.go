@@ -85,7 +85,7 @@ const (
 	limboedTransactionStore = "limbo"
 
 	// lifetime is the maximum amount of time a transaction can be in the pool.
-	lifetime = 3 * 60 // Transaction lifetime (seconds)
+	lifetime = 3 * 60 // seconds
 )
 
 // blobTxMeta is the minimal subset of types.BlobTx necessary to validate and
@@ -1607,24 +1607,32 @@ func (p *BlobPool) drop() {
 
 // dropByLifetime drops transactions by lifetime from the pool.
 func (p *BlobPool) dropByLifetime() {
+	deletingAccounts := []common.Address{}
 	for from, txs := range p.index {
-		remainingTxsCount := len(txs)
+		droppingTxs := []*blobTxMeta{}
 		for _, tx := range txs {
 			if time.Now().Unix()-tx.txtime > lifetime {
+				droppingTxs = append(droppingTxs, tx)
+			}
+		}
+		if len(droppingTxs) > 0 {
+			for _, tx := range droppingTxs {
 				p.lookup.untrack(tx)
 				if err := p.store.Delete(tx.id); err != nil {
 					log.Error("Failed to drop evicted transaction", "id", tx.id, "err", err)
 				} else {
-					remainingTxsCount--
 					log.Debug("Dropped transaction by lifetime", "from", from, "evicted", tx.nonce, "id", tx.id)
 				}
 			}
 		}
-		if remainingTxsCount == 0 {
-			delete(p.index, from)
-			delete(p.spent, from)
-			p.reserver.Release(from)
+		if len(txs) == len(droppingTxs) {
+			deletingAccounts = append(deletingAccounts, from)
 		}
+	}
+	for _, addr := range deletingAccounts {
+		delete(p.index, addr)
+		delete(p.spent, addr)
+		p.reserver.Release(addr)
 	}
 }
 

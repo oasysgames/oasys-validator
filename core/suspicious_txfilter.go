@@ -71,6 +71,7 @@ type SuspiciousTxfilter struct {
 	metadata atomic.Pointer[SuspiciousTxfilterPluginMetadata]
 
 	verifier *sigverify.Verifier
+	client   *http.Client
 }
 
 func NewSuspiciousTxfilter(config *params.ChainConfig, datadir string, exitCh chan struct{}) (*SuspiciousTxfilter, error) {
@@ -78,44 +79,47 @@ func NewSuspiciousTxfilter(config *params.ChainConfig, datadir string, exitCh ch
 		return nil, fmt.Errorf("suspicious tx filter is only supported on oasys chain")
 	}
 
-	b := &SuspiciousTxfilter{
+	s := &SuspiciousTxfilter{
 		datadir: datadir,
 		config:  config,
 		exitCh:  exitCh,
+		client:  &http.Client{Timeout: 30 * time.Second},
 	}
 
-	if _, _, err := b.fetchPluginMetadata(); err != nil {
+	if _, _, err := s.fetchPluginMetadata(); err != nil {
 		return nil, fmt.Errorf("failed to download plugin metadata: %w", err)
 	}
 
 	// Do background loading of the plugin
 	go func() {
 		// Try to load existing plugin, fetch if missing or invalid
-		pluginPath := b.pluginPath()
-		if _, err := os.Stat(pluginPath); os.IsNotExist(err) || b.loadPlugin(true) != nil {
-			if err := b.fetchPlugin(); err != nil {
+		pluginPath := s.pluginPath()
+		if _, err := os.Stat(pluginPath); os.IsNotExist(err) || s.loadPlugin(true) != nil {
+			if err := s.fetchPlugin(); err != nil {
 				log.Error("Failed to download suspicious txfilter plugin", "err", err)
+				return
 			}
-			if err := b.loadPlugin(true); err != nil {
+			if err := s.loadPlugin(true); err != nil {
 				log.Error("Failed to load suspicious txfilter plugin", "err", err)
+				return
 			}
 		}
 
-		b.startReloadLoop(DefaultPluginReloadInterval)
+		s.startReloadLoop(DefaultPluginReloadInterval)
 	}()
 
-	return b, nil
+	return s, nil
 }
 
-func (b *SuspiciousTxfilter) IsReady() bool {
-	if metadata := b.metadata.Load(); metadata == nil || metadata.Disable || b.plugin.Load() == nil {
+func (s *SuspiciousTxfilter) IsReady() bool {
+	if metadata := s.metadata.Load(); metadata == nil || metadata.Disable || s.plugin.Load() == nil {
 		return false
 	}
 	return true
 }
 
-func (b *SuspiciousTxfilter) VerifyPluginVersion(plugin *plugin.Plugin) error {
-	metadata := b.metadata.Load()
+func (s *SuspiciousTxfilter) VerifyPluginVersion(plugin *plugin.Plugin) error {
+	metadata := s.metadata.Load()
 	if metadata == nil || metadata.Version == "" {
 		return fmt.Errorf("plugin metadata not found")
 	}
@@ -136,14 +140,14 @@ func (b *SuspiciousTxfilter) VerifyPluginVersion(plugin *plugin.Plugin) error {
 	return nil
 }
 
-func (b *SuspiciousTxfilter) FilterTransaction(msg *Message, logs []*types.Log) (isBlocked bool, reason string, err error) {
+func (s *SuspiciousTxfilter) FilterTransaction(msg *Message, logs []*types.Log) (isBlocked bool, reason string, err error) {
 	// Don't filter if the plugin is disabled
-	if metadata := b.metadata.Load(); metadata == nil || metadata.Disable {
+	if metadata := s.metadata.Load(); metadata == nil || metadata.Disable {
 		return false, "", nil
 	}
 
 	// Skip filtering if the plugin is not loaded
-	plugin := b.plugin.Load()
+	plugin := s.plugin.Load()
 	if plugin == nil {
 		return false, "", fmt.Errorf("plugin not loaded")
 	}
@@ -181,35 +185,44 @@ func (b *SuspiciousTxfilter) FilterTransaction(msg *Message, logs []*types.Log) 
 	return process(from, to, value, copiedLogs)
 }
 
-func (b *SuspiciousTxfilter) fetchPlugin() error {
-	url := b.pluginDownloadURL()
-	body, err := fetch(url)
+func (s *SuspiciousTxfilter) fetchPlugin() error {
+	url := s.pluginDownloadURL()
+	body, err := s.fetch(url)
 	if err != nil {
 		return fmt.Errorf("failed to download plugin: %w", err)
 	}
 	defer body.Close()
 
-	pluginPath := b.pluginPath()
+	pluginPath := s.pluginPath()
 	file, err := os.OpenFile(pluginPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644) // Overwrite the plugin file
 	if err != nil {
 		return fmt.Errorf("failed to create plugin file: %w", err)
 	}
-	defer file.Close()
+
+	// Clean up the plugin file if the copy fails
+	failCopy := false
+	defer func() {
+		file.Close()
+		if failCopy {
+			os.Remove(pluginPath)
+		}
+	}()
 
 	if _, err = io.Copy(file, body); err != nil {
+		failCopy = true
 		return fmt.Errorf("failed to copy plugin body to file: %w", err)
 	}
 	return nil
 }
 
-func (b *SuspiciousTxfilter) fetchPluginMetadata() (isNewPlugin bool, isNewPubKey bool, err error) {
-	metadata := b.metadata.Load()
+func (s *SuspiciousTxfilter) fetchPluginMetadata() (isNewPlugin bool, isNewPubKey bool, err error) {
+	metadata := s.metadata.Load()
 	if metadata == nil {
 		// Initialize with default values
 		metadata = &SuspiciousTxfilterPluginMetadata{}
 	}
 
-	body, err := fetch(b.pluginMetadataDownloadURL())
+	body, err := s.fetch(s.pluginMetadataDownloadURL())
 	if err != nil {
 		return false, false, fmt.Errorf("failed to download plugin metadata: %w", err)
 	}
@@ -228,11 +241,11 @@ func (b *SuspiciousTxfilter) fetchPluginMetadata() (isNewPlugin bool, isNewPubKe
 	if metadata.BundlePublicKeyHex != oldPubKeyHex {
 		isNewPubKey = true
 	}
-	b.metadata.Store(metadata)
+	s.metadata.Store(metadata)
 	return
 }
 
-func (b *SuspiciousTxfilter) startReloadLoop(reloadInterval time.Duration) {
+func (s *SuspiciousTxfilter) startReloadLoop(reloadInterval time.Duration) {
 	log.Info("Starting suspicious txfilter reload loop", "reloadInterval", reloadInterval)
 
 	timer := time.NewTimer(reloadInterval)
@@ -240,23 +253,24 @@ func (b *SuspiciousTxfilter) startReloadLoop(reloadInterval time.Duration) {
 	for {
 		select {
 		case <-timer.C:
-			reload, err := b.reloadPlugin()
+			reload, err := s.reloadPlugin()
 			if err != nil {
+				s.plugin.Store(nil)
 				log.Warn("Failed to reload suspicious txfilter plugin", "err", err)
 			}
 			if reload {
-				log.Info("Reloaded suspicious txfilter plugin", "version", b.metadata.Load().Version)
+				log.Info("Reloaded suspicious txfilter plugin", "version", s.metadata.Load().Version)
 			}
 			timer.Reset(reloadInterval)
-		case <-b.exitCh:
-			log.Info("Stop suspicious txfilter reload loop", "exitCh", b.exitCh)
+		case <-s.exitCh:
+			log.Info("Stop suspicious txfilter reload loop", "exitCh", s.exitCh)
 			return
 		}
 	}
 }
 
-func (b *SuspiciousTxfilter) loadPlugin(isNewPubKey bool) error {
-	bundleData, err := hex.DecodeString(b.metadata.Load().BundleHex)
+func (s *SuspiciousTxfilter) loadPlugin(isNewPubKey bool) error {
+	bundleData, err := hex.DecodeString(s.metadata.Load().BundleHex)
 	if err != nil {
 		return fmt.Errorf("failed to decode bundle hex: %w", err)
 	}
@@ -267,31 +281,31 @@ func (b *SuspiciousTxfilter) loadPlugin(isNewPubKey bool) error {
 	}
 
 	if isNewPubKey {
-		if err = b.updateVerifier(); err != nil {
+		if err = s.updateVerifier(); err != nil {
 			return err
 		}
 	}
 
-	if err = b.verifyPlugin(bundle); err != nil {
+	if err = s.verifyPlugin(bundle); err != nil {
 		return err
 	}
 
-	loadedPlugin, err := plugin.Open(b.pluginPath())
+	loadedPlugin, err := plugin.Open(s.pluginPath())
 	if err != nil {
 		return fmt.Errorf("failed to open plugin: %w", err)
 	}
 
-	if err = b.VerifyPluginVersion(loadedPlugin); err != nil {
-		b.plugin.Store(nil)
+	if err = s.VerifyPluginVersion(loadedPlugin); err != nil {
+		s.plugin.Store(nil)
 		return fmt.Errorf("failed to verify plugin version: %w", err)
 	}
 
-	b.plugin.Store(loadedPlugin)
+	s.plugin.Store(loadedPlugin)
 	return nil
 }
 
-func (b *SuspiciousTxfilter) updateVerifier() error {
-	pubKeyData, err := hex.DecodeString(b.metadata.Load().BundlePublicKeyHex)
+func (s *SuspiciousTxfilter) updateVerifier() error {
+	pubKeyData, err := hex.DecodeString(s.metadata.Load().BundlePublicKeyHex)
 	if err != nil {
 		return fmt.Errorf("failed to decode bundle public key hex: %w", err)
 	}
@@ -302,18 +316,18 @@ func (b *SuspiciousTxfilter) updateVerifier() error {
 	}
 
 	trustedMaterial := trustedPublicKeyMaterial(pubKey)
-	if b.verifier, err = sigverify.NewVerifier(trustedMaterial, sigverify.WithNoObserverTimestamps()); err != nil {
+	if s.verifier, err = sigverify.NewVerifier(trustedMaterial, sigverify.WithNoObserverTimestamps()); err != nil {
 		return fmt.Errorf("failed to create verifier: %w", err)
 	}
 	return nil
 }
 
-func (b *SuspiciousTxfilter) verifyPlugin(bundle bundle.Bundle) error {
-	if b.verifier == nil {
+func (s *SuspiciousTxfilter) verifyPlugin(bundle bundle.Bundle) error {
+	if s.verifier == nil {
 		return fmt.Errorf("verifier not initialized")
 	}
 
-	pluginPath := b.pluginPath()
+	pluginPath := s.pluginPath()
 	file, err := os.Open(pluginPath)
 	if err != nil {
 		return fmt.Errorf("failed to open plugin file: %w", err)
@@ -321,15 +335,15 @@ func (b *SuspiciousTxfilter) verifyPlugin(bundle bundle.Bundle) error {
 	defer file.Close()
 
 	artifactPolicy := sigverify.WithArtifact(file)
-	if _, err := b.verifier.Verify(&bundle, sigverify.NewPolicy(artifactPolicy, sigverify.WithKey())); err != nil {
+	if _, err := s.verifier.Verify(&bundle, sigverify.NewPolicy(artifactPolicy, sigverify.WithKey())); err != nil {
 		return fmt.Errorf("failed to verify bundle: %w", err)
 	}
 	return nil
 }
 
-func (b *SuspiciousTxfilter) reloadPlugin() (reload bool, err error) {
+func (s *SuspiciousTxfilter) reloadPlugin() (reload bool, err error) {
 	// Download the plugin metadata
-	isNewPlugin, isNewPubKey, err := b.fetchPluginMetadata()
+	isNewPlugin, isNewPubKey, err := s.fetchPluginMetadata()
 	if err != nil {
 		err = fmt.Errorf("failed to download plugin metadata: %w", err)
 		return
@@ -337,11 +351,19 @@ func (b *SuspiciousTxfilter) reloadPlugin() (reload bool, err error) {
 	if !isNewPlugin {
 		return
 	}
-	if err = b.fetchPlugin(); err != nil {
+
+	// Clear current plugin if error occurs
+	defer func() {
+		if err != nil {
+			s.plugin.Store(nil)
+		}
+	}()
+
+	if err = s.fetchPlugin(); err != nil {
 		err = fmt.Errorf("failed to download plugin: %w", err)
 		return
 	}
-	if err = b.loadPlugin(isNewPubKey); err != nil {
+	if err = s.loadPlugin(isNewPubKey); err != nil {
 		err = fmt.Errorf("failed to load plugin: %w", err)
 		return
 	}
@@ -349,13 +371,13 @@ func (b *SuspiciousTxfilter) reloadPlugin() (reload bool, err error) {
 	return
 }
 
-func (b *SuspiciousTxfilter) pluginPath() string {
-	return path.Join(b.datadir, PluginFileName)
+func (s *SuspiciousTxfilter) pluginPath() string {
+	return path.Join(s.datadir, PluginFileName)
 }
 
-func (b *SuspiciousTxfilter) buildPluginURL(filename string) string {
+func (s *SuspiciousTxfilter) buildPluginURL(filename string) string {
 	// For mainnet and testnet
-	if b.config.ChainID.Cmp(params.OasysMainnetChainConfig.ChainID) == 0 || b.config.ChainID.Cmp(params.OasysTestnetChainConfig.ChainID) == 0 {
+	if s.config.ChainID.Cmp(params.OasysMainnetChainConfig.ChainID) == 0 || s.config.ChainID.Cmp(params.OasysTestnetChainConfig.ChainID) == 0 {
 		var (
 			fileExt  = filepath.Ext(filename)                // e.g., ".so" or ".json"
 			fileName = strings.TrimSuffix(filename, fileExt) // e.g., "suspicious_txfilter"
@@ -363,7 +385,7 @@ func (b *SuspiciousTxfilter) buildPluginURL(filename string) string {
 			osName   = runtime.GOOS
 			osArch   = runtime.GOARCH
 		)
-		if b.config.ChainID.Cmp(params.OasysTestnetChainConfig.ChainID) == 0 {
+		if s.config.ChainID.Cmp(params.OasysTestnetChainConfig.ChainID) == 0 {
 			network = "testnet"
 		}
 		return fmt.Sprintf("https://cdn.%s.oasys.games/suspicious_txfilter/%s_%s_%s%s", network, fileName, osName, osArch, fileExt)
@@ -389,16 +411,16 @@ func (b *SuspiciousTxfilter) buildPluginURL(filename string) string {
 	return fmt.Sprintf("http://%s:%s/%s", ip, port, filename)
 }
 
-func (b *SuspiciousTxfilter) pluginDownloadURL() string {
-	return b.buildPluginURL(PluginFileName)
+func (s *SuspiciousTxfilter) pluginDownloadURL() string {
+	return s.buildPluginURL(PluginFileName)
 }
 
-func (b *SuspiciousTxfilter) pluginMetadataDownloadURL() string {
-	return b.buildPluginURL(PluginMetadataFileName)
+func (s *SuspiciousTxfilter) pluginMetadataDownloadURL() string {
+	return s.buildPluginURL(PluginMetadataFileName)
 }
 
-func fetch(url string) (io.ReadCloser, error) {
-	resp, err := http.Get(url)
+func (s *SuspiciousTxfilter) fetch(url string) (io.ReadCloser, error) {
+	resp, err := s.client.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download file: url: %s, err: %w", url, err)
 	}

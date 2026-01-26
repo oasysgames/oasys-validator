@@ -152,6 +152,20 @@ func TestNewSuspiciousTxfilter(t *testing.T) {
 }
 
 func TestSuspiciousTxfilter_reloadPlugin(t *testing.T) {
+	// Host the new plugin files
+	var (
+		newMetadataPath = filepath.Join(projectRoot, "txfilter", "testdata", "suspicious_txfilter-v2.json")
+		newPluginPath   = filepath.Join(projectRoot, "txfilter", "testdata", "suspicious_txfilter-v2.so")
+	)
+	_, cleanup, err := setupTestEnv(t, newMetadataPath, newPluginPath)
+	if err != nil {
+		if errors.Is(err, errSkipTest) {
+			t.Skipf("Skipping test: %v", err)
+		}
+		t.Fatalf("Failed to setup test environment: %v", err)
+	}
+	defer cleanup()
+
 	var (
 		tmpDir     = t.TempDir() // Create a temporary directory for the test
 		pluginPath = filepath.Join(projectRoot, "txfilter", "testdata", "suspicious_txfilter-v1.so")
@@ -175,20 +189,6 @@ func TestSuspiciousTxfilter_reloadPlugin(t *testing.T) {
 		Disable:            false,
 	}
 	filter.metadata.Store(metadata)
-
-	// Host the new plugin files
-	var (
-		metadataPath2 = filepath.Join(projectRoot, "txfilter", "testdata", "suspicious_txfilter-v2.json")
-		pluginPath2   = filepath.Join(projectRoot, "txfilter", "testdata", "suspicious_txfilter-v2.so")
-	)
-	_, cleanup, err := setupTestEnv(t, metadataPath2, pluginPath2)
-	if err != nil {
-		if errors.Is(err, errSkipTest) {
-			t.Skipf("Skipping test: %v", err)
-		}
-		t.Fatalf("Failed to setup test environment: %v", err)
-	}
-	defer cleanup()
 
 	// Reload the plugin
 	reload, err := filter.reloadPlugin()
