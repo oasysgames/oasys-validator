@@ -47,7 +47,7 @@ const (
 
 var (
 	// Global instance of the suspicious tx filter.
-	// This value is initialized in the `minter` package.
+	// This value is initialized in the `miner` package.
 	//
 	// We keep this as a global variable to avoid passing the instance through
 	// multiple layers and changing many interfaces. Modifying those interfaces
