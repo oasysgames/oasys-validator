@@ -527,7 +527,7 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 
 	if doSuspiciousTxfilter {
 		txHash, _ := stateDB.GetTxContext()
-		logs := stateDB.GetLogs(txHash, 0, common.Hash{}, 0) // Keep block number, hash and time as empty, those are not used for suspicious txfilter
+		logs := stateDB.GetLogs(txHash, 0, common.Hash{}, 0) // NOTE: block number, block hash and block time are intentionally zeroed here. SuspiciousTxfilter implementations must NOT rely on these fields.
 		isBlocked, reason, err := SuspiciousTxfilterGlobal.FilterTransaction(msg, logs)
 		if err != nil {
 			log.Warn("Suspicious txfilter failed", "error", err)
