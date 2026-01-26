@@ -1615,17 +1615,18 @@ func (p *BlobPool) dropByLifetime() {
 				droppingTxs = append(droppingTxs, tx)
 			}
 		}
+		deletedTxsCount := 0
 		if len(droppingTxs) > 0 {
 			for _, tx := range droppingTxs {
 				p.lookup.untrack(tx)
 				if err := p.store.Delete(tx.id); err != nil {
 					log.Error("Failed to drop evicted transaction", "id", tx.id, "err", err)
 				} else {
-					log.Debug("Dropped transaction by lifetime", "from", from, "evicted", tx.nonce, "id", tx.id)
+					deletedTxsCount++
 				}
 			}
 		}
-		if len(txs) == len(droppingTxs) {
+		if deletedTxsCount == len(txs) {
 			deletingAccounts = append(deletingAccounts, from)
 		}
 	}

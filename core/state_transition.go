@@ -531,7 +531,7 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 		isBlocked, reason, err := SuspiciousTxfilterGlobal.FilterTransaction(msg, logs)
 		if err != nil {
 			log.Warn("Suspicious txfilter failed", "error", err)
-			// return nil, err // Don't block the transaction by the suspicious txfilter error
+			// return nil, err // Don't block execution by any error from the plugin
 		} else if isBlocked {
 			log.Info("Suspicious txfilter blocked", "reason", reason)
 			st.evm.StateDB.RevertToSnapshot(snapshot)
