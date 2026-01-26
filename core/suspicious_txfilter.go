@@ -202,7 +202,10 @@ func (s *SuspiciousTxfilter) fetchPlugin() error {
 	// Clean up the plugin file if the copy fails
 	failCopy := false
 	defer func() {
-		file.Close()
+		if err := file.Close(); err != nil {
+			log.Error("failed to close plugin file", "path", pluginPath, "err", err)
+			failCopy = true
+		}
 		if failCopy {
 			os.Remove(pluginPath)
 		}
