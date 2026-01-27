@@ -30,7 +30,7 @@ var (
 	errSkipTest = errors.New("skip test")
 	projectRoot = "../"
 	testConfig  = &params.ChainConfig{
-		ChainID: big.NewInt(12345),
+		ChainID: params.AllDevChainProtocolChanges.ChainID,
 		Oasys: &params.OasysConfig{
 			Period: 15,
 			Epoch:  5760,
@@ -65,7 +65,7 @@ func setupTestEnv(t *testing.T, metadataPath, pluginPath string) (chan struct{},
 	return exitCh, cleanup, nil
 }
 
-// setupTestServer creates an HTTP test server on localhost:8080 to serve the metadata and plugin files.
+// setupTestServer creates an HTTP test server on localhost:3030 to serve the metadata and plugin files.
 func setupTestServer(t *testing.T, metadataPath, pluginPath string) (*httptest.Server, net.Listener, error) {
 	// Read the metadata JSON from root directory
 	metadataData, err := os.ReadFile(metadataPath)
@@ -96,10 +96,10 @@ func setupTestServer(t *testing.T, metadataPath, pluginPath string) (*httptest.S
 	localhostServer := httptest.NewUnstartedServer(mux)
 	localhostServer.Listener.Close() // Close the auto-created listener
 
-	// Try to listen on localhost:8080
-	listener, err := net.Listen("tcp", "localhost:8080")
+	// Try to listen on localhost:3030
+	listener, err := net.Listen("tcp", "localhost:3030")
 	if err != nil {
-		t.Skipf("Cannot bind to localhost:8080 (may be in use): %v", err)
+		t.Fatalf("Cannot bind to localhost:3030 (may be in use): %v", err)
 	}
 
 	localhostServer.Listener = listener
@@ -176,6 +176,7 @@ func TestSuspiciousTxfilter_reloadPlugin(t *testing.T) {
 		datadir:  tmpDir,
 		config:   testConfig,
 		metadata: atomic.Pointer[SuspiciousTxfilterPluginMetadata]{},
+		client:   &http.Client{},
 	}
 	p, err := plugin.Open(pluginPath)
 	if err != nil {

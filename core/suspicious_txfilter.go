@@ -394,6 +394,11 @@ func (s *SuspiciousTxfilter) buildPluginURL(filename string) string {
 		return fmt.Sprintf("https://cdn.%s.oasys.games/suspicious_txfilter/%s_%s_%s%s", network, fileName, osName, osArch, fileExt)
 	}
 
+	// For testing
+	if s.config.ChainID.Cmp(params.AllDevChainProtocolChanges.ChainID) == 0 {
+		return fmt.Sprintf("http://localhost:3030/%s", filename)
+	}
+
 	// For the default case, assume it is oasys-private-l1.
 	var (
 		host = "pluginserver" // From the `pluginserver` service in `oasys-private-l1`
