@@ -484,14 +484,12 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 
 	// Check if we need to do suspicious txfilter
 	var (
-		snapshot             int
 		doSuspiciousTxfilter = false
 		isWriteCall          = !st.evm.Config.NoBaseFee // not eth_call
 		stateDB, isStateDB   = st.evm.StateDB.(*state.StateDB)
 	)
 	if SuspiciousTxfilterGlobal != nil && isWriteCall && isStateDB {
 		doSuspiciousTxfilter = true
-		snapshot = st.evm.StateDB.Snapshot() // Take a snapshot for revert
 	}
 
 	var (
@@ -533,8 +531,8 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 			log.Warn("Suspicious txfilter failed", "error", err)
 			// return nil, err // Don't block execution by any error from the plugin
 		} else if isBlocked {
-			log.Info("Suspicious txfilter blocked", "reason", reason)
-			st.evm.StateDB.RevertToSnapshot(snapshot)
+			// No need to revert — tx that throw errors will be reverted by worker.applyTransaction.
+			// st.evm.StateDB.RevertToSnapshot(snapshot)
 			return nil, fmt.Errorf("%w: %s", ErrSuspiciousTxfilter, reason)
 		}
 	}
