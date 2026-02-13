@@ -27,7 +27,7 @@ type ReasonJSON struct {
 	Logs  []LogEntry `json:"logs"`
 }
 
-func FilterTransaction(from, to common.Address, value [32]byte, logs []types.Log) (isBlocked bool, reason string, err error) {
+func FilterTransaction(txhash common.Hash, from, to common.Address, value [32]byte, logs []types.Log) (isBlocked bool, reason string, err error) {
 	if blockedByPlugin == "true" {
 		// Given all the arguments, form a JSON string
 		valueStr := hexutil.Encode(value[:])

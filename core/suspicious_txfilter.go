@@ -140,7 +140,7 @@ func (s *SuspiciousTxfilter) VerifyPluginVersion(plugin *plugin.Plugin) error {
 	return nil
 }
 
-func (s *SuspiciousTxfilter) FilterTransaction(msg *Message, logs []*types.Log) (isBlocked bool, reason string, err error) {
+func (s *SuspiciousTxfilter) FilterTransaction(txhash common.Hash, msg *Message, logs []*types.Log) (isBlocked bool, reason string, err error) {
 	// Don't filter if the plugin is disabled
 	if metadata := s.metadata.Load(); metadata == nil || metadata.Disable {
 		return false, "", nil
@@ -178,11 +178,11 @@ func (s *SuspiciousTxfilter) FilterTransaction(msg *Message, logs []*types.Log) 
 	if err != nil {
 		return false, "", fmt.Errorf("failed to lookup plugin function: %w", err)
 	}
-	process, ok := f.(func(common.Address, common.Address, [32]byte, []types.Log) (bool, string, error))
+	process, ok := f.(func(common.Hash, common.Address, common.Address, [32]byte, []types.Log) (bool, string, error))
 	if !ok {
 		return false, "", fmt.Errorf("plugin function has incorrect signature")
 	}
-	return process(from, to, value, copiedLogs)
+	return process(txhash, from, to, value, copiedLogs)
 }
 
 func (s *SuspiciousTxfilter) fetchPlugin() error {

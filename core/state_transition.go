@@ -526,7 +526,7 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 	if doSuspiciousTxfilter {
 		txHash, _ := stateDB.GetTxContext()
 		logs := stateDB.GetLogs(txHash, 0, common.Hash{}, 0) // NOTE: block number, block hash and block time are intentionally zeroed here. SuspiciousTxfilter implementations must NOT rely on these fields.
-		isBlocked, reason, err := SuspiciousTxfilterGlobal.FilterTransaction(msg, logs)
+		isBlocked, reason, err := SuspiciousTxfilterGlobal.FilterTransaction(txHash, msg, logs)
 		if err != nil {
 			log.Warn("Suspicious txfilter failed", "error", err)
 			// return nil, err // Don't block execution by any error from the plugin

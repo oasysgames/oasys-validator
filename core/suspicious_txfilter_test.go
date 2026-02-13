@@ -247,7 +247,7 @@ func TestSuspiciousTxfilter_FilterTransaction(t *testing.T) {
 			Data: []byte("0x1234567890123456789012345678901234567890"),
 		},
 	}
-	isBlocked, reason, err := filter.FilterTransaction(msg, logs)
+	isBlocked, reason, err := filter.FilterTransaction(common.Hash{}, msg, logs)
 	if err != nil {
 		t.Fatalf("Failed to filter transaction: %v", err)
 	}
@@ -311,7 +311,7 @@ func TestSuspiciousTxfilter_FilterTransaction_Blocked(t *testing.T) {
 		},
 	}
 
-	isBlocked, reason, err := filter.FilterTransaction(msg, logs)
+	isBlocked, reason, err := filter.FilterTransaction(common.Hash{}, msg, logs)
 	if err == nil {
 		t.Fatalf("Expected error from blocked transaction, but got nil")
 	}
