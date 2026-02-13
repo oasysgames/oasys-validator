@@ -85,7 +85,7 @@ const (
 	limboedTransactionStore = "limbo"
 
 	// lifetime is the maximum amount of time a transaction can be in the pool.
-	lifetime = 3 * 60 // seconds
+	lifetime = 3 * time.Minute
 )
 
 // blobTxMeta is the minimal subset of types.BlobTx necessary to validate and
@@ -1609,28 +1609,33 @@ func (p *BlobPool) drop() {
 func (p *BlobPool) dropByLifetime() {
 	deletingAccounts := []common.Address{}
 	for from, txs := range p.index {
-		droppingTxs := []*blobTxMeta{}
-		for _, tx := range txs {
-			if time.Now().Unix()-tx.txtime > lifetime {
-				droppingTxs = append(droppingTxs, tx)
+		dropStartIndex := len(txs)
+		for i := 0; i < len(txs); i++ {
+			// check if the tx is expired
+			// if yes, set the dropStartIndex to drop all the higher nonces's tx (p.index is sorted by nonce)
+			if dropStartIndex > i && time.Now().Unix()-txs[i].txtime > int64(lifetime.Seconds()) {
+				dropStartIndex = i
 			}
-		}
-		deletedTxsCount := 0
-		if len(droppingTxs) > 0 {
-			for _, tx := range droppingTxs {
-				p.lookup.untrack(tx)
-				if err := p.store.Delete(tx.id); err != nil {
-					log.Error("Failed to drop evicted transaction", "id", tx.id, "err", err)
-				} else {
-					deletedTxsCount++
+			if dropStartIndex <= i {
+				p.lookup.untrack(txs[i])
+				p.stored -= uint64(txs[i].storageSize)
+				p.spent[from] = new(uint256.Int).Sub(p.spent[from], txs[i].costCap)
+				if err := p.store.Delete(txs[i].id); err != nil {
+					log.Error("Failed to drop evicted transaction", "id", txs[i].id, "err", err)
 				}
 			}
 		}
-		if deletedTxsCount == len(txs) {
+		if dropStartIndex == 0 {
+			// if dropStartIndex is 0, it means all the txs are expired, delete the account
 			deletingAccounts = append(deletingAccounts, from)
+		} else if dropStartIndex < len(txs) {
+			// partially dropped: truncate index and fix eviction heap
+			p.index[from] = txs[:dropStartIndex]
+			heap.Fix(p.evict, p.evict.index[from])
 		}
 	}
 	for _, addr := range deletingAccounts {
+		heap.Remove(p.evict, p.evict.index[addr])
 		delete(p.index, addr)
 		delete(p.spent, addr)
 		p.reserver.Release(addr)
