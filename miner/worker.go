@@ -369,8 +369,8 @@ func (w *worker) start() {
 	if !w.config.DisableSuspiciousTxFilter && core.SuspiciousTxfilterGlobal == nil {
 		var err error
 		if core.SuspiciousTxfilterGlobal, err = core.NewSuspiciousTxfilter(w.chainConfig, w.txfilterDatadir, w.exitCh); err != nil {
-			// Just left error here keeping miner running without suspicious tx filter.
-			log.Error("Failed to create suspicious tx filter", "err", err)
+			// Stop execution here to avoid miner running without suspicious tx filter.
+			log.Crit("Failed to create suspicious tx filter", "err", err)
 		} else {
 			log.Info("Created suspicious tx filter", "datadir", w.txfilterDatadir)
 		}

@@ -183,10 +183,12 @@ func TestSuspiciousTxfilter_reloadPlugin(t *testing.T) {
 		t.Fatalf("Failed to open plugin: %v", err)
 	}
 	filter.plugin.Store(p)
+	bundlePublicKeyHex := "1234567890"
 	metadata := &SuspiciousTxfilterPluginMetadata{
 		Version:            "1.0.0",
 		BundleHex:          "1234567890",
-		BundlePublicKeyHex: "1234567890",
+		IsKeyless:          false,
+		BundlePublicKeyHex: &bundlePublicKeyHex,
 		Disable:            false,
 	}
 	filter.metadata.Store(metadata)
@@ -315,8 +317,9 @@ func TestSuspiciousTxfilter_FilterTransaction_Blocked(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Expected error from blocked transaction, but got nil")
 	}
-	if err.Error() != "blocked by plugin" {
-		t.Fatalf("Expected error 'blocked by plugin', but got %s", err.Error())
+	expectedErr := "isBlocked=true is ignored if the plugin returns an error"
+	if err.Error() != expectedErr {
+		t.Fatalf("Expected error '%s', but got %s", expectedErr, err.Error())
 	}
 	if !isBlocked {
 		t.Errorf("Transaction should have been blocked")

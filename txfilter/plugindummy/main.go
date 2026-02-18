@@ -53,7 +53,7 @@ func FilterTransaction(txhash common.Hash, from, to common.Address, value [32]by
 			return false, reason, errors.New("failed to marshal reason JSON")
 		}
 		reason = string(reasonBytes)
-		return true, reason, errors.New("blocked by plugin")
+		return true, reason, errors.New("isBlocked=true is ignored if the plugin returns an error")
 	}
 	return false, "", nil
 }

@@ -1630,6 +1630,9 @@ func (p *BlobPool) dropByLifetime() {
 			deletingAccounts = append(deletingAccounts, from)
 		} else if dropStartIndex < len(txs) {
 			// partially dropped: truncate index and fix eviction heap
+			for i := dropStartIndex; i < len(txs); i++ {
+				txs[i] = nil
+			}
 			p.index[from] = txs[:dropStartIndex]
 			heap.Fix(p.evict, p.evict.index[from])
 		}

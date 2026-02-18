@@ -23,12 +23,10 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 )
@@ -482,16 +480,6 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 	// - reset transient storage(eip 1153)
 	st.state.Prepare(rules, msg.From, st.evm.Context.Coinbase, msg.To, vm.ActivePrecompiles(rules), msg.AccessList)
 
-	// Check if we need to do suspicious txfilter
-	var (
-		doSuspiciousTxfilter = false
-		isWriteCall          = !st.evm.Config.NoBaseFee // not eth_call
-		stateDB, isStateDB   = st.evm.StateDB.(*state.StateDB)
-	)
-	if SuspiciousTxfilterGlobal != nil && isWriteCall && isStateDB {
-		doSuspiciousTxfilter = true
-	}
-
 	var (
 		ret   []byte
 		vmerr error // vm errors do not effect consensus and are therefore not assigned to err
@@ -521,20 +509,6 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 
 		// Execute the transaction's call.
 		ret, st.gasRemaining, vmerr = st.evm.Call(msg.From, st.to(), msg.Data, st.gasRemaining, value)
-	}
-
-	if doSuspiciousTxfilter {
-		txHash, _ := stateDB.GetTxContext()
-		logs := stateDB.GetLogs(txHash, 0, common.Hash{}, 0) // NOTE: block number, block hash and block time are intentionally zeroed here. SuspiciousTxfilter implementations must NOT rely on these fields.
-		isBlocked, reason, err := SuspiciousTxfilterGlobal.FilterTransaction(txHash, msg, logs)
-		if err != nil {
-			log.Warn("Suspicious txfilter failed", "error", err)
-			// return nil, err // Don't block execution by any error from the plugin
-		} else if isBlocked {
-			// No need to revert — tx that throw errors will be reverted by worker.applyTransaction.
-			// st.evm.StateDB.RevertToSnapshot(snapshot)
-			return nil, fmt.Errorf("%w: %s", ErrSuspiciousTxfilter, reason)
-		}
 	}
 
 	// Record the gas used excluding gas refunds. This value represents the actual

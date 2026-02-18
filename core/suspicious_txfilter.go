@@ -56,10 +56,13 @@ var (
 )
 
 type SuspiciousTxfilterPluginMetadata struct {
-	Version            string `json:"version"`
-	BundleHex          string `json:"bundle_hex"`
-	BundlePublicKeyHex string `json:"bundle_public_key_hex"`
-	Disable            bool   `json:"disable"`
+	Version             string  `json:"version"`
+	BundleHex           string  `json:"bundle_hex"`
+	IsKeyless           bool    `json:"is_keyless"`
+	CertificateIdentity *string `json:"certificate_identity,omitempty"`  // Required for keyless
+	CertificateIssuer   *string `json:"certificate_issuer,omitempty"`    // Required for keyless
+	BundlePublicKeyHex  *string `json:"bundle_public_key_hex,omitempty"` // Required for non-keyless
+	Disable             bool    `json:"disable"`
 }
 
 type SuspiciousTxfilter struct {
@@ -86,26 +89,27 @@ func NewSuspiciousTxfilter(config *params.ChainConfig, datadir string, exitCh ch
 		client:  &http.Client{Timeout: 30 * time.Second},
 	}
 
-	if _, _, err := s.fetchPluginMetadata(); err != nil {
+	if _, err := s.fetchPluginMetadata(); err != nil {
 		return nil, fmt.Errorf("failed to download plugin metadata: %w", err)
 	}
 
 	// Do background loading of the plugin
 	go func() {
+		// Start the reload loop even if the plugin is not loaded successfully.
+		defer s.startReloadLoop(DefaultPluginReloadInterval)
+
 		// Try to load existing plugin, fetch if missing or invalid
 		pluginPath := s.pluginPath()
-		if _, err := os.Stat(pluginPath); os.IsNotExist(err) || s.loadPlugin(true) != nil {
+		if _, err := os.Stat(pluginPath); os.IsNotExist(err) || s.loadPlugin() != nil {
 			if err := s.fetchPlugin(); err != nil {
 				log.Error("Failed to download suspicious txfilter plugin", "err", err)
 				return
 			}
-			if err := s.loadPlugin(true); err != nil {
+			if err := s.loadPlugin(); err != nil {
 				log.Error("Failed to load suspicious txfilter plugin", "err", err)
 				return
 			}
 		}
-
-		s.startReloadLoop(DefaultPluginReloadInterval)
 	}()
 
 	return s, nil
@@ -124,16 +128,10 @@ func (s *SuspiciousTxfilter) VerifyPluginVersion(plugin *plugin.Plugin) error {
 		return fmt.Errorf("plugin metadata not found")
 	}
 
-	f, err := plugin.Lookup(pluginFuncNameGetVersion)
+	pluginVersion, err := pluginVersion(plugin)
 	if err != nil {
-		return fmt.Errorf("failed to lookup plugin function: %w", err)
+		return fmt.Errorf("failed to get plugin version: %w", err)
 	}
-	version, ok := f.(func() string)
-	if !ok {
-		return fmt.Errorf("plugin function has incorrect signature")
-	}
-
-	pluginVersion := version()
 	if pluginVersion != metadata.Version {
 		return fmt.Errorf("plugin version mismatch: %s != %s", pluginVersion, metadata.Version)
 	}
@@ -218,7 +216,7 @@ func (s *SuspiciousTxfilter) fetchPlugin() error {
 	return nil
 }
 
-func (s *SuspiciousTxfilter) fetchPluginMetadata() (isNewPlugin bool, isNewPubKey bool, err error) {
+func (s *SuspiciousTxfilter) fetchPluginMetadata() (version string, err error) {
 	metadata := s.metadata.Load()
 	if metadata == nil {
 		// Initialize with default values
@@ -227,25 +225,29 @@ func (s *SuspiciousTxfilter) fetchPluginMetadata() (isNewPlugin bool, isNewPubKe
 
 	body, err := s.fetch(s.pluginMetadataDownloadURL())
 	if err != nil {
-		return false, false, fmt.Errorf("failed to download plugin metadata: %w", err)
+		return "", fmt.Errorf("failed to download plugin metadata: %w", err)
 	}
 	defer body.Close()
 
-	var (
-		oldVersion   = metadata.Version
-		oldPubKeyHex = metadata.BundlePublicKeyHex
-	)
 	if err = json.NewDecoder(body).Decode(metadata); err != nil {
-		return false, false, fmt.Errorf("failed to unmarshal plugin metadata: %w", err)
+		return "", fmt.Errorf("failed to unmarshal plugin metadata: %w", err)
 	}
-	if metadata.Version != oldVersion {
-		isNewPlugin = true
+
+	if metadata.IsKeyless {
+		if metadata.CertificateIdentity == nil {
+			return "", fmt.Errorf("certificate_identity is required for keyless plugin verification")
+		}
+		if metadata.CertificateIssuer == nil {
+			return "", fmt.Errorf("certificate_issuer is required for keyless plugin verification")
+		}
+	} else {
+		if metadata.BundlePublicKeyHex == nil {
+			return "", fmt.Errorf("public key is required for non-keyless plugin verification")
+		}
 	}
-	if metadata.BundlePublicKeyHex != oldPubKeyHex {
-		isNewPubKey = true
-	}
+
 	s.metadata.Store(metadata)
-	return
+	return metadata.Version, nil
 }
 
 func (s *SuspiciousTxfilter) startReloadLoop(reloadInterval time.Duration) {
@@ -258,7 +260,6 @@ func (s *SuspiciousTxfilter) startReloadLoop(reloadInterval time.Duration) {
 		case <-timer.C:
 			reload, err := s.reloadPlugin()
 			if err != nil {
-				s.plugin.Store(nil)
 				log.Warn("Failed to reload suspicious txfilter plugin", "err", err)
 			}
 			if reload {
@@ -272,7 +273,7 @@ func (s *SuspiciousTxfilter) startReloadLoop(reloadInterval time.Duration) {
 	}
 }
 
-func (s *SuspiciousTxfilter) loadPlugin(isNewPubKey bool) error {
+func (s *SuspiciousTxfilter) loadPlugin() error {
 	bundleData, err := hex.DecodeString(s.metadata.Load().BundleHex)
 	if err != nil {
 		return fmt.Errorf("failed to decode bundle hex: %w", err)
@@ -283,13 +284,14 @@ func (s *SuspiciousTxfilter) loadPlugin(isNewPubKey bool) error {
 		return fmt.Errorf("failed to unmarshal bundle: %w", err)
 	}
 
-	if isNewPubKey {
-		if err = s.updateVerifier(); err != nil {
-			return err
-		}
+	metadata := s.metadata.Load()
+
+	// It's ok to update the verifier every time, as loading new plugin is not frequent.
+	if err = s.updateVerifier(metadata); err != nil {
+		return err
 	}
 
-	if err = s.verifyPlugin(bundle); err != nil {
+	if err = s.verifyPlugin(bundle, metadata); err != nil {
 		return err
 	}
 
@@ -299,7 +301,6 @@ func (s *SuspiciousTxfilter) loadPlugin(isNewPubKey bool) error {
 	}
 
 	if err = s.VerifyPluginVersion(loadedPlugin); err != nil {
-		s.plugin.Store(nil)
 		return fmt.Errorf("failed to verify plugin version: %w", err)
 	}
 
@@ -307,25 +308,48 @@ func (s *SuspiciousTxfilter) loadPlugin(isNewPubKey bool) error {
 	return nil
 }
 
-func (s *SuspiciousTxfilter) updateVerifier() error {
-	pubKeyData, err := hex.DecodeString(s.metadata.Load().BundlePublicKeyHex)
+func (s *SuspiciousTxfilter) updateVerifier(metadata *SuspiciousTxfilterPluginMetadata) error {
+	if metadata.IsKeyless {
+		// Get the public TUF root from Sigstore
+		trustedRoot, err := root.FetchTrustedRoot()
+		if err != nil {
+			return fmt.Errorf("failed to fetch trusted root: %w", err)
+		}
+		// Create the verifier
+		// - WithSignedCertificateTimestamps(1): The certificate is registered in the real CT log
+		// - WithTransparencyLog(1): Require at least one Rekor entry
+		// - WithObserverTimestamps(1): The certificate is valid at the time of the Rekor entry timestamp
+		if s.verifier, err = sigverify.NewVerifier(
+			trustedRoot,
+			sigverify.WithSignedCertificateTimestamps(1),
+			sigverify.WithTransparencyLog(1),
+			sigverify.WithObserverTimestamps(1),
+		); err != nil {
+			return fmt.Errorf("failed to create verifier: %w", err)
+		}
+		return nil
+	}
+
+	pubKeyData, err := hex.DecodeString(*metadata.BundlePublicKeyHex)
 	if err != nil {
 		return fmt.Errorf("failed to decode bundle public key hex: %w", err)
 	}
-
 	pubKey, err := cryptoutils.UnmarshalPEMToPublicKey(pubKeyData)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal bundle public key: %w", err)
 	}
 
-	trustedMaterial := trustedPublicKeyMaterial(pubKey)
-	if s.verifier, err = sigverify.NewVerifier(trustedMaterial, sigverify.WithNoObserverTimestamps()); err != nil {
+	trustedRoot := trustedPublicKeyMaterial(pubKey)
+	if s.verifier, err = sigverify.NewVerifier(
+		trustedRoot,
+		sigverify.WithNoObserverTimestamps(),
+	); err != nil {
 		return fmt.Errorf("failed to create verifier: %w", err)
 	}
 	return nil
 }
 
-func (s *SuspiciousTxfilter) verifyPlugin(bundle bundle.Bundle) error {
+func (s *SuspiciousTxfilter) verifyPlugin(bundle bundle.Bundle, metadata *SuspiciousTxfilterPluginMetadata) error {
 	if s.verifier == nil {
 		return fmt.Errorf("verifier not initialized")
 	}
@@ -338,40 +362,55 @@ func (s *SuspiciousTxfilter) verifyPlugin(bundle bundle.Bundle) error {
 	defer file.Close()
 
 	artifactPolicy := sigverify.WithArtifact(file)
+
+	if metadata.IsKeyless {
+		// Execute the verification
+		// - WithArtifact: The artifact to verify
+		// - WithCertificateIdentity: The identity of the certificate that signed the artifact
+		if _, err := s.verifier.Verify(&bundle, sigverify.NewPolicy(
+			artifactPolicy,
+			sigverify.WithCertificateIdentity(sigverify.CertificateIdentity{
+				SubjectAlternativeName: sigverify.SubjectAlternativeNameMatcher{
+					SubjectAlternativeName: *metadata.CertificateIdentity,
+				},
+				Issuer: sigverify.IssuerMatcher{
+					Issuer: *metadata.CertificateIssuer,
+				},
+			}),
+		)); err != nil {
+			return fmt.Errorf("failed to verify bundle: %w", err)
+		}
+		return nil
+	}
+
 	if _, err := s.verifier.Verify(&bundle, sigverify.NewPolicy(artifactPolicy, sigverify.WithKey())); err != nil {
 		return fmt.Errorf("failed to verify bundle: %w", err)
 	}
 	return nil
 }
 
-func (s *SuspiciousTxfilter) reloadPlugin() (reload bool, err error) {
+func (s *SuspiciousTxfilter) reloadPlugin() (reloaded bool, err error) {
 	// Download the plugin metadata
-	isNewPlugin, isNewPubKey, err := s.fetchPluginMetadata()
+	metadataVersion, err := s.fetchPluginMetadata()
 	if err != nil {
 		err = fmt.Errorf("failed to download plugin metadata: %w", err)
 		return
 	}
-	if !isNewPlugin {
-		return
-	}
 
-	// Clear current plugin if error occurs
-	defer func() {
-		if err != nil {
-			s.plugin.Store(nil)
-		}
-	}()
+	// Skip reloading if the plugin version matches the metadata version
+	if pluginVersion, err := pluginVersion(s.plugin.Load()); err == nil && pluginVersion == metadataVersion {
+		return false, nil
+	}
 
 	if err = s.fetchPlugin(); err != nil {
 		err = fmt.Errorf("failed to download plugin: %w", err)
 		return
 	}
-	if err = s.loadPlugin(isNewPubKey); err != nil {
+	if err = s.loadPlugin(); err != nil {
 		err = fmt.Errorf("failed to load plugin: %w", err)
 		return
 	}
-	reload = true
-	return
+	return true, nil
 }
 
 func (s *SuspiciousTxfilter) pluginPath() string {
@@ -437,6 +476,21 @@ func (s *SuspiciousTxfilter) fetch(url string) (io.ReadCloser, error) {
 		return nil, fmt.Errorf("download error: status %d, url: %s", resp.StatusCode, url)
 	}
 	return resp.Body, nil
+}
+
+func pluginVersion(plugin *plugin.Plugin) (string, error) {
+	if plugin == nil {
+		return "", fmt.Errorf("plugin is nil")
+	}
+	f, err := plugin.Lookup(pluginFuncNameGetVersion)
+	if err != nil {
+		return "", fmt.Errorf("failed to lookup plugin function: %w", err)
+	}
+	version, ok := f.(func() string)
+	if !ok {
+		return "", fmt.Errorf("plugin function has incorrect signature")
+	}
+	return version(), nil
 }
 
 type nonExpiringVerifier struct {
