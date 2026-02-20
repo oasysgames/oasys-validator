@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"math/rand"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +14,37 @@ import (
 
 func hashFromIndex(i uint64) common.Hash {
 	return crypto.Keccak256Hash([]byte(fmt.Sprintf("tx%d", i)))
+}
+
+func makeElapsedItems(c *lrucache, window time.Duration) {
+	for i := uint(0); i < c.len(); i++ {
+		meta := c.get(i)
+		meta.createdAt = meta.createdAt.Add(-window)
+	}
+}
+
+func checkLinearSearch(c *lrucache, threshold uint64, window time.Duration, currentAmount uint64) (block bool, reason string, index uint) {
+	windowStart := time.Now().Add(-window)
+
+	// Check if the current tx exceeds the threshold
+	if threshold < currentAmount {
+		return true, fmt.Sprintf("over block amount threshold: %d (single tx)", threshold), 0
+	}
+
+	for i := uint(0); i < c.len(); i++ {
+		meta := c.get(i)
+		sum := computeTotal(c, meta, currentAmount)
+		// if bellow threadhold, exit
+		if sum <= threshold {
+			return false, "", i
+		}
+		// if within window, return true
+		if meta.createdAt.After(windowStart) {
+			return true, fmt.Sprintf("over block amount threshold: %d, window sum: %d, current tx amount: %d", threshold, sum, currentAmount), i
+		}
+	}
+
+	return
 }
 
 func TestLruCache_push(t *testing.T) {
@@ -229,7 +261,7 @@ func TestCheckAmountThreshold(t *testing.T) {
 		t.Errorf("expected index 0, got %d", index)
 	}
 
-	time.Sleep(window) // Sleep for window, make first pushed items elapsed
+	makeElapsedItems(c, window)
 	c.push(hashFromIndex(3), 40)
 	c.push(hashFromIndex(4), 50)
 
@@ -287,7 +319,7 @@ func TestCheckAmountThreshold(t *testing.T) {
 		t.Errorf("expected index 2, got %d", index)
 	}
 
-	time.Sleep(window)
+	makeElapsedItems(c, window)
 	c.push(hashFromIndex(6), 70)
 
 	// not exceed thresholds
@@ -327,5 +359,33 @@ func TestCheckAmountThreshold(t *testing.T) {
 	}
 	if index != 1 {
 		t.Errorf("expected index 1, got %d", index)
+	}
+}
+
+func TestCheckAmountThreshold_StressTest(t *testing.T) {
+	var (
+		cap        = uint(255)
+		iterations = cap * 1000
+		window     = 1 * time.Second
+		threadhold = uint64(cap)
+		c          = newCache(cap)
+	)
+
+	for i := uint(0); i < iterations; i++ {
+		// amout between 1 and threadhold / 10
+		amount := uint64(rand.Intn(int(threadhold/10)) + 1)
+		c.push(hashFromIndex(uint64(i)), amount)
+
+		// Randomly make some items elapsed
+		if rand.Intn(int(cap/2)) == 0 {
+			makeElapsedItems(c, window)
+		}
+
+		// Check with both algorithms
+		block, reason, index := checkAmountThreshold(c, threadhold, window, amount)
+		expectedBlock, expectedReason, expectedIndex := checkLinearSearch(c, threadhold, window, amount)
+		if block != expectedBlock {
+			t.Errorf("expected block %t, got %t, expected reason %s, got reason %s, expected index %d, got index %d", expectedBlock, block, expectedReason, reason, expectedIndex, index)
+		}
 	}
 }

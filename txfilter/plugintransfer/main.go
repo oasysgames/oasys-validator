@@ -285,8 +285,7 @@ func computeTotal(c *lrucache, target *metadata, currentAmount uint64) uint64 {
 }
 
 func checkAmountThreshold(c *lrucache, threshold uint64, window time.Duration, currentAmount uint64) (block bool, reason string, midindex uint /* <- midindex is used for testing */) {
-	now := time.Now()
-	windowStart := now.Add(-window)
+	windowStart := time.Now().Add(-window)
 
 	// Check if the current tx exceeds the threshold
 	if threshold < currentAmount {
