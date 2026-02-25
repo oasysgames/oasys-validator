@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"math/rand"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -105,6 +108,12 @@ func TestAmountFromRaw(t *testing.T) {
 			want:     123,
 		},
 		{
+			name:     "less then decimals",
+			value:    rawFromString256("999999"),
+			decimals: 6,
+			want:     0,
+		},
+		{
 			name:     "overflow saturates",
 			value:    maxRaw,
 			decimals: 18,
@@ -119,6 +128,152 @@ func TestAmountFromRaw(t *testing.T) {
 				t.Errorf("amountFromRaw(..., %d) = %d, want %d", tt.decimals, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestConfigCache(t *testing.T) {
+	originalConfigURL := configURL
+	originalCountedTxs := countedTxs
+	defer func() {
+		configURL = originalConfigURL
+		countedTxs = originalCountedTxs
+	}()
+
+	whitelistA := common.HexToAddress("0x1000000000000000000000000000000000000001")
+	whitelistB := common.HexToAddress("0x1000000000000000000000000000000000000002")
+	targetA := common.HexToAddress("0x2000000000000000000000000000000000000001")
+
+	configs := []PluginConfig{
+		{
+			Version:           1,
+			Whitelists:        map[common.Address]bool{whitelistA: true},
+			MeasurementWindow: 2 * time.Second,
+			Threshold: ThresholdConfig{
+				WarningCountThreshold:  2,
+				BlockCountThreshold:    3,
+				WarningAmountThreshold: 100,
+				BlockAmountThreshold:   200,
+			},
+			NativeToken: NativeTokenConfig{
+				ToYenRate: 0.123,
+			},
+			TargetERC20s: []TargetERC20Config{
+				{
+					Address:   targetA,
+					Decimals:  6,
+					ToYenRate: 155.61,
+				},
+			},
+			Disabled: false,
+		},
+		{
+			Version:           2,
+			Whitelists:        map[common.Address]bool{whitelistB: true},
+			MeasurementWindow: 3 * time.Second,
+			Threshold: ThresholdConfig{
+				WarningCountThreshold:  3,
+				BlockCountThreshold:    5, // higher than v1 to verify expandCap
+				WarningAmountThreshold: 150,
+				BlockAmountThreshold:   300,
+			},
+			NativeToken: NativeTokenConfig{
+				ToYenRate: 200,
+			},
+			TargetERC20s: []TargetERC20Config{
+				{
+					Address:   targetA,
+					Decimals:  6,
+					ToYenRate: 3,
+				},
+			},
+			Disabled: false,
+		},
+	}
+
+	reqCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		idx := reqCount
+		if idx >= len(configs) {
+			idx = len(configs) - 1
+		}
+		reqCount++
+		if err := json.NewEncoder(w).Encode(configs[idx]); err != nil {
+			t.Fatalf("failed to encode test config: %v", err)
+		}
+	}))
+	defer srv.Close()
+
+	configURL = srv.URL
+	countedTxs = nil
+
+	c := ConfigCache{
+		ttl:    1 * time.Hour,
+		client: http.Client{Timeout: 3 * time.Second},
+	}
+
+	if !c.isExpired() {
+		t.Fatal("expected empty cache to be expired")
+	}
+	if !c.isEmptyConfig() {
+		t.Fatal("expected empty config before update")
+	}
+
+	// 1st update: initialize config and countedTxs
+	if err := c.update(); err != nil {
+		t.Fatalf("update(v1) failed: %v", err)
+	}
+
+	if c.isExpired() {
+		t.Fatal("expected cache to be fresh right after update")
+	}
+	if c.isEmptyConfig() {
+		t.Fatal("expected config to be non-empty after update")
+	}
+	if countedTxs == nil {
+		t.Fatal("expected countedTxs to be initialized")
+	}
+	if countedTxs.cap != configs[0].Threshold.BlockCountThreshold {
+		t.Fatalf("countedTxs.cap = %d, want %d", countedTxs.cap, configs[0].Threshold.BlockCountThreshold)
+	}
+	if !c.isWhitelisted(whitelistA) {
+		t.Fatal("expected whitelistA to be whitelisted in v1")
+	}
+	if c.isWhitelisted(whitelistB) {
+		t.Fatal("expected whitelistB to not be whitelisted in v1")
+	}
+	if target, ok := c.isTargetERC20(targetA); !ok || target.Decimals != 6 || target.ToYenRate != 155.61 {
+		t.Fatalf("expected targetA with decimals=6 and rate=2, got ok=%t target=%+v", ok, target)
+	}
+
+	// more than 1 yen
+	nativeRaw := rawFromString256("10000000000000000000") // 10 * 10^18
+	if got := c.toYen(nil, nativeRaw); got != 1 {
+		t.Fatalf("toYen(native) = %d, want 1", got)
+	}
+	erc20Raw := rawFromString256("1000000") // 1 with decimals=6
+	target, _ := c.isTargetERC20(targetA)
+	if got := c.toYen(target, erc20Raw); got != 155 {
+		t.Fatalf("toYen(erc20) = %d, want 155", got)
+	}
+	// less than 1 yen
+	nativeRaw = rawFromString256("8000000000000000000") // 8 * 10^18
+	if got := c.toYen(nil, nativeRaw); got != 0 {
+		t.Fatalf("toYen(native) = %d, want 0", got)
+	}
+	erc20Raw = rawFromString256("999999") // 0.999999 with decimals=6
+	if got := c.toYen(target, erc20Raw); got != 0 {
+		t.Fatalf("toYen(erc20) = %d, want 0", got)
+	}
+
+	// 2nd update: version bump should expand countedTxs cap.
+	if err := c.update(); err != nil {
+		t.Fatalf("update(v2) failed: %v", err)
+	}
+	if countedTxs.cap != configs[1].Threshold.BlockCountThreshold {
+		t.Fatalf("countedTxs.cap = %d, want %d after v2", countedTxs.cap, configs[1].Threshold.BlockCountThreshold)
+	}
+	if !c.isWhitelisted(whitelistB) {
+		t.Fatal("expected whitelistB to be whitelisted in v2")
 	}
 }
 

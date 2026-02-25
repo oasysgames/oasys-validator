@@ -186,7 +186,7 @@ func (c *ConfigCache) update() error {
 	// Update the last updated time
 	c.updatedAt = time.Now()
 
-	//
+	// Initialize or expand the countedTxs cache
 	if oldVersion != c.Config.Version || countedTxs == nil {
 		newCap := c.Config.Threshold.BlockCountThreshold
 		if countedTxs == nil {
