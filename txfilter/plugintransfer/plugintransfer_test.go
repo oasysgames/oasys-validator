@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	gethmath "github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -45,6 +46,80 @@ func checkLinearSearch(c *lrucache, threshold uint64, window time.Duration, curr
 	}
 
 	return
+}
+
+func rawFromString256(s string) [32]byte {
+	v := gethmath.MustParseBig256(s)
+	b := gethmath.PaddedBigBytes(v, 32)
+	var raw [32]byte
+	copy(raw[:], b)
+	return raw
+}
+
+func TestAmountFromRaw(t *testing.T) {
+	var maxRaw [32]byte
+	for i := range maxRaw {
+		maxRaw[i] = 0xff
+	}
+
+	tests := []struct {
+		name     string
+		value    [32]byte
+		decimals uint8
+		want     uint64
+	}{
+		{
+			name:     "zero",
+			value:    [32]byte{},
+			decimals: 18,
+			want:     0,
+		},
+		{
+			name:     "no decimals",
+			value:    rawFromString256("12345"),
+			decimals: 0,
+			want:     12345,
+		},
+		{
+			name:     "exact ether unit",
+			value:    rawFromString256("1000000000000000000"), // 1e18
+			decimals: 18,
+			want:     1,
+		},
+		{
+			name:     "fractional truncation",
+			value:    rawFromString256("1500000000000000000"), // 1.5e18
+			decimals: 18,
+			want:     1,
+		},
+		{
+			name:     "total supply",
+			value:    rawFromString256("10000000000000000000000000000"), // 10,000,000,000 x 10^18
+			decimals: 18,
+			want:     10_000_000_000,
+		},
+		{
+			name:     "usdc style decimals",
+			value:    rawFromString256("123456789"),
+			decimals: 6,
+			want:     123,
+		},
+		{
+			name:     "overflow saturates",
+			value:    maxRaw,
+			decimals: 18,
+			want:     math.MaxUint64,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := amountFromRaw(tt.value, tt.decimals)
+			if got != tt.want {
+				t.Errorf("amountFromRaw(..., %d) = %d, want %d", tt.decimals, got, tt.want)
+			}
+		})
+	}
 }
 
 func TestLruCache_push(t *testing.T) {
