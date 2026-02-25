@@ -76,52 +76,28 @@ func FilterTransaction(txhash common.Hash, from, to common.Address, value [32]by
 	}
 
 	// Check the count and amount thresholds
-	blocks, reason := isOverThreshold(&configCache.Config, countedTxs, accumulatedAmount)
+	now := time.Now().Unix()
+	blocks, reason := isOverThreshold(&configCache.Config, countedTxs, accumulatedAmount, now)
 	if blocks {
 		return block(reason)
 	}
 
 	// Count the transaction
-	countedTxs.push(txhash, accumulatedAmount)
+	countedTxs.push(txhash, accumulatedAmount, now)
 
 	return allow()
-}
-
-// amountFromRaw converts a 32-byte raw value to human-readable units by dividing by 10^decimals.
-// Supports common decimals: 18 (ETH/wei), 6 (USDC on most chains), 8, etc.
-func amountFromRaw(value [32]byte, decimals uint8) uint64 {
-	divisor := uint64(1)
-	for i := uint8(0); i < decimals; i++ {
-		divisor *= 10
-	}
-	const maxResult = (math.MaxUint64 - 255) / 256 // overflow threshold for result*256 + quotient
-	var remHi, remLo uint64                        // 128-bit remainder
-	var result uint64
-	for _, b := range value {
-		// val = remainder*256 + b (128-bit)
-		valHi := remHi<<8 | remLo>>56
-		valLo := remLo<<8 | uint64(b)
-		quotient, remainder := bits.Div64(valHi, valLo, divisor)
-		remHi, remLo = 0, remainder // remainder < divisor, fits in 64 bits
-
-		if result >= maxResult {
-			return math.MaxUint64 // overflow, value too large
-		}
-		result = result*256 + quotient
-	}
-	return result
 }
 
 func allow() (bool, string, error) {
 	return false, "", nil
 }
 
-func block(reason string) (bool, string, error) {
-	return true, reason, nil
-}
-
 func warn(reason string) {
 	log.Warn("Exceed warning threshold", "plugin", "plugintransfer", "reason", reason)
+}
+
+func block(reason string) (bool, string, error) {
+	return true, reason, nil
 }
 
 type PluginConfig struct {
@@ -219,13 +195,37 @@ func (c *ConfigCache) toYen(target *TargetERC20Config, value [32]byte) uint64 {
 	return uint64(float64(amountFromRaw(value, target.Decimals)) * target.ToYenRate)
 }
 
-func isOverThreshold(config *PluginConfig, lrucache *lrucache, amount uint64) (blocks bool, reason string) {
+func amountFromRaw(value [32]byte, decimals uint8) uint64 {
+	divisor := uint64(1)
+	for i := uint8(0); i < decimals; i++ {
+		divisor *= 10
+	}
+	const maxResult = (math.MaxUint64 - 255) / 256 // overflow threshold for result*256 + quotient
+	var remHi, remLo uint64                        // 128-bit remainder
+	var result uint64
+	for _, b := range value {
+		// val = remainder*256 + b (128-bit)
+		valHi := remHi<<8 | remLo>>56
+		valLo := remLo<<8 | uint64(b)
+		quotient, remainder := bits.Div64(valHi, valLo, divisor)
+		remHi, remLo = 0, remainder // remainder < divisor, fits in 64 bits
+
+		if result >= maxResult {
+			return math.MaxUint64 // overflow, value too large
+		}
+		result = result*256 + quotient
+	}
+	return result
+}
+
+func isOverThreshold(config *PluginConfig, lrucache *lrucache, amount uint64, now int64) (blocks bool, reason string) {
 	// Check warning count threshold
-	if b, r := checkCountThreshold(lrucache, config.Threshold.WarningCountThreshold, config.MeasurementWindow, "warning"); b {
+	startTime := now - int64(config.MeasurementWindow/time.Second)
+	if b, r := checkCountThreshold(lrucache, config.Threshold.WarningCountThreshold, startTime); b {
 		warn(r)
 
 		// Continue to check block count threshold
-		if b, r := checkCountThreshold(lrucache, config.Threshold.BlockCountThreshold, config.MeasurementWindow, "block"); b {
+		if b, r := checkCountThreshold(lrucache, config.Threshold.BlockCountThreshold, startTime); b {
 			blocks = true
 			reason = r
 			// return -> continue checking amount threshold
@@ -233,12 +233,11 @@ func isOverThreshold(config *PluginConfig, lrucache *lrucache, amount uint64) (b
 	}
 
 	// Check warning amount threadhold
-	window := config.MeasurementWindow
-	if b, r, _ := checkAmountThreshold(lrucache, config.Threshold.WarningAmountThreshold, window, amount); b {
+	if b, r, _ := checkAmountThreshold(lrucache, config.Threshold.WarningAmountThreshold, startTime, amount); b {
 		warn(r)
 
 		// Continue to check block amount threshold
-		if b, r, _ := checkAmountThreshold(lrucache, config.Threshold.BlockAmountThreshold, window, amount); b {
+		if b, r, _ := checkAmountThreshold(lrucache, config.Threshold.BlockAmountThreshold, startTime, amount); b {
 			blocks = true
 			if reason != "" {
 				reason = fmt.Sprintf("%s, %s", reason, r)
@@ -252,15 +251,13 @@ func isOverThreshold(config *PluginConfig, lrucache *lrucache, amount uint64) (b
 	return
 }
 
-func checkCountThreshold(c *lrucache, threshold uint, window time.Duration, level string) (blocks bool, reason string) {
+func checkCountThreshold(c *lrucache, threshold uint, startTime int64) (blocks bool, reason string) {
 	n := c.len()
-	windowStart := time.Now().Add(-window)
-
 	if n >= threshold {
 		meta := c.get(n - threshold)
-		if meta != nil && !meta.createdAt.Before(windowStart) {
+		if meta != nil && meta.createdAt >= startTime {
 			blocks = true
-			reason = fmt.Sprintf("over %s count threshold: %d", level, threshold)
+			reason = fmt.Sprintf("over count threshold: %d", threshold)
 			return
 		}
 	}
@@ -268,22 +265,7 @@ func checkCountThreshold(c *lrucache, threshold uint, window time.Duration, leve
 	return
 }
 
-func computeTotal(c *lrucache, target *metadata, currentAmount uint64) uint64 {
-	newestMeta := c.getNewest()
-	accumulatedAmountIncludeCurrent := newestMeta.accumulatedAmount + newestMeta.amount + currentAmount
-	isOddOverflow := newestMeta.isOddOverflow
-	if math.MaxUint64-newestMeta.accumulatedAmount < newestMeta.amount+currentAmount {
-		isOddOverflow = !newestMeta.isOddOverflow // overflow, flip the overflow flag
-	}
-	if target.isOddOverflow == isOddOverflow {
-		return accumulatedAmountIncludeCurrent - target.accumulatedAmount
-	}
-	return math.MaxUint64 - target.accumulatedAmount + accumulatedAmountIncludeCurrent + 1
-}
-
-func checkAmountThreshold(c *lrucache, threshold uint64, window time.Duration, currentAmount uint64) (block bool, reason string, midindex uint /* <- midindex is used for testing */) {
-	windowStart := time.Now().Add(-window)
-
+func checkAmountThreshold(c *lrucache, threshold uint64, startTime int64, currentAmount uint64) (block bool, reason string, midindex uint /* <- midindex is used for testing */) {
 	// Check if the current tx exceeds the threshold
 	if threshold < currentAmount {
 		return true, fmt.Sprintf("over block amount threshold: %d (single tx)", threshold), 0
@@ -310,13 +292,13 @@ func checkAmountThreshold(c *lrucache, threshold uint64, window time.Duration, c
 		midMeta := c.get(midindex)
 		sum := computeTotal(c, midMeta, currentAmount)
 		if sum <= threshold { // not exceed threshold
-			if midMeta.createdAt.Before(windowStart) {
+			if midMeta.createdAt < startTime {
 				// Window elapsed, no need to check further
 				return
 			}
 			high = midindex - 1 // move to the leff (go older items)
 		} else { // exceed threshold
-			if midMeta.createdAt.After(windowStart) {
+			if midMeta.createdAt >= startTime {
 				// Within window, found!
 				return true, fmt.Sprintf("over block amount threshold: %d, window sum: %d, current tx amount: %d", threshold, sum, currentAmount), midindex
 			}
@@ -327,9 +309,22 @@ func checkAmountThreshold(c *lrucache, threshold uint64, window time.Duration, c
 	return
 }
 
+func computeTotal(c *lrucache, target *metadata, currentAmount uint64) uint64 {
+	newestMeta := c.getNewest()
+	accumulatedAmountIncludeCurrent := newestMeta.accumulatedAmount + newestMeta.amount + currentAmount
+	isOddOverflow := newestMeta.isOddOverflow
+	if math.MaxUint64-newestMeta.accumulatedAmount < newestMeta.amount+currentAmount {
+		isOddOverflow = !newestMeta.isOddOverflow // overflow, flip the overflow flag
+	}
+	if target.isOddOverflow == isOddOverflow {
+		return accumulatedAmountIncludeCurrent - target.accumulatedAmount
+	}
+	return math.MaxUint64 - target.accumulatedAmount + accumulatedAmountIncludeCurrent + 1
+}
+
 type metadata struct {
 	amount            uint64
-	createdAt         time.Time
+	createdAt         int64  // Unix timestamp
 	accumulatedAmount uint64 // sum of previous metadata's amount, don't include the current amount
 	isOddOverflow     bool   // true if the times of overflow is odd(e.g. 1, 3, 5, ...)
 }
@@ -351,7 +346,7 @@ func newCache(cap uint) *lrucache {
 	return &c
 }
 
-func (c *lrucache) push(txhash common.Hash, amount uint64) {
+func (c *lrucache) push(txhash common.Hash, amount uint64, now int64) {
 	var meta *metadata
 	evicting := c.items[c.head] != emptyHash
 	if evicting {
@@ -360,7 +355,7 @@ func (c *lrucache) push(txhash common.Hash, amount uint64) {
 		meta = new(metadata)
 	}
 	meta.amount = amount
-	meta.createdAt = time.Now()
+	meta.createdAt = now
 
 	// Set accumulated amount and overflow flag
 	prevSlot := (c.head + c.cap - 1) % c.cap
