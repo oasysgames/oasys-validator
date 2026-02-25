@@ -362,6 +362,76 @@ func TestCheckAmountThreshold(t *testing.T) {
 	}
 }
 
+func TestCheckCountThreshold(t *testing.T) {
+	c := newCache(5)
+	window := 1 * time.Second
+
+	// Empty cache
+	block, reason := checkCountThreshold(c, 1, window, "warning")
+	if block {
+		t.Errorf("expected no block for empty cache, reason: %s", reason)
+	}
+	if reason != "" {
+		t.Errorf("expected empty reason, got %q", reason)
+	}
+
+	c.push(hashFromIndex(0), 10)
+
+	// Threshold not reached
+	block, reason = checkCountThreshold(c, 2, window, "warning")
+	if block {
+		t.Errorf("expected no block when count is below threshold, reason: %s", reason)
+	}
+	if reason != "" {
+		t.Errorf("expected empty reason, got %q", reason)
+	}
+
+	c.push(hashFromIndex(1), 20)
+
+	// Warning threshold reached within window
+	block, reason = checkCountThreshold(c, 2, window, "warning")
+	if !block {
+		t.Errorf("expected block=true when warning threshold is reached, reason: %s", reason)
+	}
+	if reason != "over warning count threshold: 2" {
+		t.Errorf("reason = %q, want %q", reason, "over warning count threshold: 2")
+	}
+
+	// Block threshold reached within window
+	block, reason = checkCountThreshold(c, 2, window, "block")
+	if !block {
+		t.Errorf("expected block=true when block threshold is reached, reason: %s", reason)
+	}
+	if reason != "over block count threshold: 2" {
+		t.Errorf("reason = %q, want %q", reason, "over block count threshold: 2")
+	}
+
+	// Elapsed records should not match threshold
+	makeElapsedItems(c, window)
+	block, reason = checkCountThreshold(c, 2, window, "warning")
+	if block {
+		t.Errorf("expected no block for elapsed records, reason: %s", reason)
+	}
+	if reason != "" {
+		t.Errorf("expected empty reason, got %q", reason)
+	}
+
+	// Mix elapsed and fresh records
+	c.push(hashFromIndex(2), 30)
+	block, reason = checkCountThreshold(c, 2, window, "warning")
+	if block {
+		t.Errorf("expected no block with only one fresh record in window, reason: %s", reason)
+	}
+	c.push(hashFromIndex(3), 40)
+	block, reason = checkCountThreshold(c, 2, window, "warning")
+	if !block {
+		t.Errorf("expected block=true with two fresh records in window, reason: %s", reason)
+	}
+	if reason != "over warning count threshold: 2" {
+		t.Errorf("reason = %q, want %q", reason, "over warning count threshold: 2")
+	}
+}
+
 func TestCheckAmountThreshold_StressTest(t *testing.T) {
 	var (
 		cap        = uint(255)

@@ -220,50 +220,47 @@ func (c *ConfigCache) toYen(target *TargetERC20Config, value [32]byte) uint64 {
 }
 
 func isOverThreshold(config *PluginConfig, lrucache *lrucache, amount uint64) (blocks bool, reason string) {
-	if b, r := checkCountThreshold(config, lrucache); b {
-		blocks = true
-		reason = r
-		// return -> continue checking amount threshold
-	}
+	// Check warning count threshold
+	if b, r := checkCountThreshold(lrucache, config.Threshold.WarningCountThreshold, config.MeasurementWindow, "warning"); b {
+		warn(r)
 
-	// Check block amount threadhold
-	window := config.MeasurementWindow
-	if b, r, _ := checkAmountThreshold(lrucache, config.Threshold.BlockAmountThreshold, window, amount); b {
-		blocks = true
-		if reason != "" {
-			reason = fmt.Sprintf("%s, %s", reason, r)
-		} else {
+		// Continue to check block count threshold
+		if b, r := checkCountThreshold(lrucache, config.Threshold.BlockCountThreshold, config.MeasurementWindow, "block"); b {
+			blocks = true
 			reason = r
+			// return -> continue checking amount threshold
 		}
-	}
-
-	if blocks {
-		return
 	}
 
 	// Check warning amount threadhold
+	window := config.MeasurementWindow
 	if b, r, _ := checkAmountThreshold(lrucache, config.Threshold.WarningAmountThreshold, window, amount); b {
 		warn(r)
-	}
-	return
-}
 
-func checkCountThreshold(config *PluginConfig, c *lrucache) (blocks bool, reason string) {
-	n := c.len()
-	windowStart := time.Now().Add(-config.MeasurementWindow)
-
-	if n >= config.Threshold.WarningCountThreshold {
-		meta := c.get(n - config.Threshold.WarningCountThreshold)
-		if meta != nil && !meta.createdAt.Before(windowStart) {
-			warn(fmt.Sprintf("over warning count threshold: %d", config.Threshold.WarningCountThreshold))
+		// Continue to check block amount threshold
+		if b, r, _ := checkAmountThreshold(lrucache, config.Threshold.BlockAmountThreshold, window, amount); b {
+			blocks = true
+			if reason != "" {
+				reason = fmt.Sprintf("%s, %s", reason, r)
+			} else {
+				reason = r
+			}
+			return true, reason
 		}
 	}
 
-	if n >= config.Threshold.BlockCountThreshold {
-		meta := c.get(n - config.Threshold.BlockCountThreshold)
+	return
+}
+
+func checkCountThreshold(c *lrucache, threshold uint, window time.Duration, level string) (blocks bool, reason string) {
+	n := c.len()
+	windowStart := time.Now().Add(-window)
+
+	if n >= threshold {
+		meta := c.get(n - threshold)
 		if meta != nil && !meta.createdAt.Before(windowStart) {
 			blocks = true
-			reason = fmt.Sprintf("over block count threshold: %d", config.Threshold.BlockCountThreshold)
+			reason = fmt.Sprintf("over %s count threshold: %d", level, threshold)
 			return
 		}
 	}
