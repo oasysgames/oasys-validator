@@ -77,7 +77,7 @@ func FilterTransaction(txhash common.Hash, from, to common.Address, value [32]by
 
 	// Check the count and amount thresholds
 	now := time.Now().Unix()
-	blocks, reason := isOverThreshold(&configCache.Config, countedTxs, accumulatedAmount, now)
+	blocks, reason := isOverThreshold(&configCache.Config, accumulatedAmount, now)
 	if blocks {
 		return block(reason)
 	}
@@ -218,14 +218,14 @@ func amountFromRaw(value [32]byte, decimals uint8) uint64 {
 	return result
 }
 
-func isOverThreshold(config *PluginConfig, lrucache *lrucache, amount uint64, now int64) (blocks bool, reason string) {
+func isOverThreshold(config *PluginConfig, amount uint64, now int64) (blocks bool, reason string) {
 	// Check warning count threshold
 	startTime := now - int64(config.MeasurementWindow/time.Second)
-	if b, r := checkCountThreshold(lrucache, config.Threshold.WarningCountThreshold, startTime); b {
+	if b, r := checkCountThreshold(config.Threshold.WarningCountThreshold, startTime); b {
 		warn(r)
 
 		// Continue to check block count threshold
-		if b, r := checkCountThreshold(lrucache, config.Threshold.BlockCountThreshold, startTime); b {
+		if b, r := checkCountThreshold(config.Threshold.BlockCountThreshold, startTime); b {
 			blocks = true
 			reason = r
 			// return -> continue checking amount threshold
@@ -233,11 +233,11 @@ func isOverThreshold(config *PluginConfig, lrucache *lrucache, amount uint64, no
 	}
 
 	// Check warning amount threadhold
-	if b, r, _ := checkAmountThreshold(lrucache, config.Threshold.WarningAmountThreshold, startTime, amount); b {
+	if b, r, _ := checkAmountThreshold(config.Threshold.WarningAmountThreshold, startTime, amount); b {
 		warn(r)
 
 		// Continue to check block amount threshold
-		if b, r, _ := checkAmountThreshold(lrucache, config.Threshold.BlockAmountThreshold, startTime, amount); b {
+		if b, r, _ := checkAmountThreshold(config.Threshold.BlockAmountThreshold, startTime, amount); b {
 			blocks = true
 			if reason != "" {
 				reason = fmt.Sprintf("%s, %s", reason, r)
@@ -251,7 +251,8 @@ func isOverThreshold(config *PluginConfig, lrucache *lrucache, amount uint64, no
 	return
 }
 
-func checkCountThreshold(c *lrucache, threshold uint, startTime int64) (blocks bool, reason string) {
+func checkCountThreshold(threshold uint, startTime int64) (blocks bool, reason string) {
+	c := countedTxs
 	n := c.len()
 	if n >= threshold {
 		meta := c.get(n - threshold)
@@ -265,7 +266,9 @@ func checkCountThreshold(c *lrucache, threshold uint, startTime int64) (blocks b
 	return
 }
 
-func checkAmountThreshold(c *lrucache, threshold uint64, startTime int64, currentAmount uint64) (block bool, reason string, midindex uint /* <- midindex is used for testing */) {
+func checkAmountThreshold(threshold uint64, startTime int64, currentAmount uint64) (block bool, reason string, midindex uint /* <- midindex is used for testing */) {
+	c := countedTxs
+
 	// Check if the current tx exceeds the threshold
 	if threshold < currentAmount {
 		return true, fmt.Sprintf("over block amount threshold: %d (single tx)", threshold), 0
@@ -278,7 +281,7 @@ func checkAmountThreshold(c *lrucache, threshold uint64, startTime int64, curren
 	}
 
 	// Check if the sum of all doesn't exceed the threshold
-	if computeTotal(c, c.getOldest(), currentAmount) <= threshold {
+	if computeTotal(c.getOldest(), currentAmount) <= threshold {
 		return
 	}
 
@@ -290,7 +293,7 @@ func checkAmountThreshold(c *lrucache, threshold uint64, startTime int64, curren
 			break
 		}
 		midMeta := c.get(midindex)
-		sum := computeTotal(c, midMeta, currentAmount)
+		sum := computeTotal(midMeta, currentAmount)
 		if sum <= threshold { // not exceed threshold
 			if midMeta.createdAt < startTime {
 				// Window elapsed, no need to check further
@@ -309,7 +312,8 @@ func checkAmountThreshold(c *lrucache, threshold uint64, startTime int64, curren
 	return
 }
 
-func computeTotal(c *lrucache, target *metadata, currentAmount uint64) uint64 {
+func computeTotal(target *metadata, currentAmount uint64) uint64 {
+	c := countedTxs
 	newestMeta := c.getNewest()
 	accumulatedAmountIncludeCurrent := newestMeta.accumulatedAmount + newestMeta.amount + currentAmount
 	isOddOverflow := newestMeta.isOddOverflow

@@ -27,15 +27,15 @@ func makeElapsedItems(c *lrucache, window time.Duration) {
 	}
 }
 
-func checkLinearSearch(c *lrucache, threshold uint64, startTime int64, currentAmount uint64) (block bool, reason string, index uint) {
+func checkLinearSearch(threshold uint64, startTime int64, currentAmount uint64) (block bool, reason string, index uint) {
 	// Check if the current tx exceeds the threshold
 	if threshold < currentAmount {
 		return true, fmt.Sprintf("over block amount threshold: %d (single tx)", threshold), 0
 	}
 
-	for i := uint(0); i < c.len(); i++ {
-		meta := c.get(i)
-		sum := computeTotal(c, meta, currentAmount)
+	for i := uint(0); i < countedTxs.len(); i++ {
+		meta := countedTxs.get(i)
+		sum := computeTotal(meta, currentAmount)
 		// if bellow threadhold, exit
 		if sum <= threshold {
 			return false, "", i
@@ -47,10 +47,6 @@ func checkLinearSearch(c *lrucache, threshold uint64, startTime int64, currentAm
 	}
 
 	return
-}
-
-func push(c *lrucache, txhash common.Hash, amount uint64) {
-	c.push(txhash, amount, time.Now().Unix())
 }
 
 func rawFromString256(s string) [32]byte {
@@ -134,13 +130,6 @@ func TestAmountFromRaw(t *testing.T) {
 }
 
 func TestConfigCache(t *testing.T) {
-	originalConfigURL := configURL
-	originalCountedTxs := countedTxs
-	defer func() {
-		configURL = originalConfigURL
-		countedTxs = originalCountedTxs
-	}()
-
 	whitelistA := common.HexToAddress("0x1000000000000000000000000000000000000001")
 	whitelistB := common.HexToAddress("0x1000000000000000000000000000000000000002")
 	targetA := common.HexToAddress("0x2000000000000000000000000000000000000001")
@@ -280,12 +269,13 @@ func TestConfigCache(t *testing.T) {
 }
 
 func TestLruCache_push(t *testing.T) {
-	c := newCache(5)
+	countedTxs = newCache(5)
+	c := countedTxs
 
 	// Push 3 items
-	push(c, hashFromIndex(0), 10)
-	push(c, hashFromIndex(1), 20)
-	push(c, hashFromIndex(2), 30)
+	c.push(hashFromIndex(0), 10, time.Now().Unix())
+	c.push(hashFromIndex(1), 20, time.Now().Unix())
+	c.push(hashFromIndex(2), 30, time.Now().Unix())
 
 	if c.len() != 3 {
 		t.Errorf("len() = %d, want 3", c.len())
@@ -326,9 +316,9 @@ func TestLruCache_push(t *testing.T) {
 	}
 
 	// push more items, should evict the oldest
-	push(c, hashFromIndex(3), 40)
-	push(c, hashFromIndex(4), 50)
-	push(c, hashFromIndex(5), 60)
+	c.push(hashFromIndex(3), 40, time.Now().Unix())
+	c.push(hashFromIndex(4), 50, time.Now().Unix())
+	c.push(hashFromIndex(5), 60, time.Now().Unix())
 	if c.len() != 5 {
 		t.Errorf("len() = %d, want 5", c.len())
 	}
@@ -349,8 +339,8 @@ func TestLruCache_push(t *testing.T) {
 	}
 
 	// overflow check
-	push(c, hashFromIndex(6), math.MaxUint64-100)
-	push(c, hashFromIndex(7), 80)
+	c.push(hashFromIndex(6), math.MaxUint64-100, time.Now().Unix())
+	c.push(hashFromIndex(7), 80, time.Now().Unix())
 	newest := c.getNewest()
 	if newest.isOddOverflow != true {
 		t.Errorf("newest.isOddOverflow = %t, want true", newest.isOddOverflow)
@@ -362,15 +352,16 @@ func TestLruCache_push(t *testing.T) {
 }
 
 func TestLruCache_expandCap(t *testing.T) {
-	c := newCache(5)
+	countedTxs := newCache(5)
+	c := countedTxs
 
 	// push 6 items
-	push(c, hashFromIndex(0), 10)
-	push(c, hashFromIndex(1), 20)
-	push(c, hashFromIndex(2), 30)
-	push(c, hashFromIndex(3), 40)
-	push(c, hashFromIndex(4), 50)
-	push(c, hashFromIndex(5), 60)
+	c.push(hashFromIndex(0), 10, time.Now().Unix())
+	c.push(hashFromIndex(1), 20, time.Now().Unix())
+	c.push(hashFromIndex(2), 30, time.Now().Unix())
+	c.push(hashFromIndex(3), 40, time.Now().Unix())
+	c.push(hashFromIndex(4), 50, time.Now().Unix())
+	c.push(hashFromIndex(5), 60, time.Now().Unix())
 
 	// expand cap to 6
 	c.expandCap(6)
@@ -406,8 +397,8 @@ func TestLruCache_expandCap(t *testing.T) {
 	}
 
 	// push 2 more items, should evict the oldest
-	push(c, hashFromIndex(6), 70)
-	push(c, hashFromIndex(7), 80)
+	c.push(hashFromIndex(6), 70, time.Now().Unix())
+	c.push(hashFromIndex(7), 80, time.Now().Unix())
 	if c.len() != 6 {
 		t.Errorf("after more pushes: len = %d, want 6", c.len())
 	}
@@ -427,45 +418,47 @@ func TestLruCache_expandCap(t *testing.T) {
 
 func TestComputeTotal(t *testing.T) {
 	// Non-overflow case
-	c := newCache(5)
-	push(c, hashFromIndex(0), 10)
-	push(c, hashFromIndex(1), 20)
-	push(c, hashFromIndex(2), 30)
-	if got := computeTotal(c, c.get(0), 5); got != 10+20+30+5 {
+	countedTxs = newCache(5)
+	c := countedTxs
+	c.push(hashFromIndex(0), 10, time.Now().Unix())
+	c.push(hashFromIndex(1), 20, time.Now().Unix())
+	c.push(hashFromIndex(2), 30, time.Now().Unix())
+	if got := computeTotal(c.get(0), 5); got != 10+20+30+5 {
 		t.Errorf("computeTotal(c, 0, 5) = %d, want %d", got, 10+20+30+5)
 	}
-	if got := computeTotal(c, c.get(1), 5); got != 20+30+5 {
+	if got := computeTotal(c.get(1), 5); got != 20+30+5 {
 		t.Errorf("computeTotal(c, 1, 5) = %d, want %d", got, 20+30+5)
 	}
-	if got := computeTotal(c, c.get(2), 5); got != 30+5 {
+	if got := computeTotal(c.get(2), 5); got != 30+5 {
 		t.Errorf("computeTotal(c, 2, 5) = %d, want %d", got, 30+5)
 	}
 
 	// Overflow case
-	push(c, hashFromIndex(3), math.MaxUint64-100)
-	push(c, hashFromIndex(4), 50)
-	if got := computeTotal(c, c.get(2), 5); got != 30+math.MaxUint64-100+50+5 {
+	c.push(hashFromIndex(3), math.MaxUint64-100, time.Now().Unix())
+	c.push(hashFromIndex(4), 50, time.Now().Unix())
+	if got := computeTotal(c.get(2), 5); got != 30+math.MaxUint64-100+50+5 {
 		t.Errorf("computeTotal(c, 3, 5) = %d, want %d", got, uint64(math.MaxUint64-100+50+5))
 	}
-	if got := computeTotal(c, c.get(3), 5); got != math.MaxUint64-100+50+5 {
+	if got := computeTotal(c.get(3), 5); got != math.MaxUint64-100+50+5 {
 		t.Errorf("computeTotal(c, 3, 5) = %d, want %d", got, uint64(math.MaxUint64-100+50+5))
 	}
-	if got := computeTotal(c, c.get(4), 5); got != 50+5 {
+	if got := computeTotal(c.get(4), 5); got != 50+5 {
 		t.Errorf("computeTotal(c, 4, 5) = %d, want %d", got, 50+5)
 	}
 }
 
 func TestCheckAmountThreshold(t *testing.T) {
-	c := newCache(5)
-	push(c, hashFromIndex(0), 10)
-	push(c, hashFromIndex(1), 20)
-	push(c, hashFromIndex(2), 30)
+	countedTxs = newCache(5)
+	c := countedTxs
+	c.push(hashFromIndex(0), 10, time.Now().Unix())
+	c.push(hashFromIndex(1), 20, time.Now().Unix())
+	c.push(hashFromIndex(2), 30, time.Now().Unix())
 	window := 1 * time.Second
 	startTime := time.Now().Unix() - int64(window/time.Second)
 
 	// Single tx exceeds threshold
 	threshold := uint64(100)
-	block, reason, index := checkAmountThreshold(c, threshold, startTime, threshold+1)
+	block, reason, index := checkAmountThreshold(threshold, startTime, threshold+1)
 	if !block {
 		t.Errorf("expected block when single tx exceeds threshold, reason: %s", reason)
 	}
@@ -477,7 +470,7 @@ func TestCheckAmountThreshold(t *testing.T) {
 	}
 
 	// Sum of all below threshold
-	block, reason, index = checkAmountThreshold(c, threshold, startTime, 40)
+	block, reason, index = checkAmountThreshold(threshold, startTime, 40)
 	if block {
 		t.Errorf("expected no block when sum of all below threshold, reason: %s", reason)
 	}
@@ -486,7 +479,7 @@ func TestCheckAmountThreshold(t *testing.T) {
 	}
 
 	// Sum of all exceeds threshold
-	block, reason, index = checkAmountThreshold(c, threshold, startTime, 41)
+	block, reason, index = checkAmountThreshold(threshold, startTime, 41)
 	if !block {
 		t.Errorf("expected block when sum of all exceeds threshold, reason: %s", reason)
 	}
@@ -496,19 +489,19 @@ func TestCheckAmountThreshold(t *testing.T) {
 
 	makeElapsedItems(c, window)
 	startTime = time.Now().Unix() - int64(window/time.Second)
-	push(c, hashFromIndex(3), 40)
-	push(c, hashFromIndex(4), 50)
+	c.push(hashFromIndex(3), 40, time.Now().Unix())
+	c.push(hashFromIndex(4), 50, time.Now().Unix())
 
 	// not exceed thresholds
 	threshold = uint64(30 + 40 + 50 + 1)
-	block, reason, index = checkAmountThreshold(c, threshold, startTime, 1)
+	block, reason, index = checkAmountThreshold(threshold, startTime, 1)
 	if block {
 		t.Errorf("expected no block, reason: %s", reason)
 	}
 	if index != 2 {
 		t.Errorf("expected index 2, got %d", index)
 	}
-	block, reason, index = checkAmountThreshold(c, threshold, startTime, 30+1)
+	block, reason, index = checkAmountThreshold(threshold, startTime, 30+1)
 	if block {
 		t.Errorf("expected no block, reason: %s", reason)
 	}
@@ -517,14 +510,14 @@ func TestCheckAmountThreshold(t *testing.T) {
 	}
 
 	// exceed thresholds
-	block, _, index = checkAmountThreshold(c, threshold, startTime, 30+2)
+	block, _, index = checkAmountThreshold(threshold, startTime, 30+2)
 	if !block {
 		t.Error("expected block")
 	}
 	if index != 3 {
 		t.Errorf("expected index 3, got %d", index)
 	}
-	block, _, index = checkAmountThreshold(c, threshold, startTime, 30+40+2)
+	block, _, index = checkAmountThreshold(threshold, startTime, 30+40+2)
 	if !block {
 		t.Error("expected block")
 	}
@@ -532,11 +525,11 @@ func TestCheckAmountThreshold(t *testing.T) {
 		t.Errorf("expected index 4, got %d", index)
 	}
 
-	push(c, hashFromIndex(5), 60) // evic the oldest item
+	c.push(hashFromIndex(5), 60, time.Now().Unix()) // evic the oldest item
 
 	// not exceed thresholds
 	threshold = uint64(40 + 50 + 60 + 1)
-	block, reason, index = checkAmountThreshold(c, threshold, startTime, 1)
+	block, reason, index = checkAmountThreshold(threshold, startTime, 1)
 	if block {
 		t.Errorf("expected no block, reason: %s", reason)
 	}
@@ -545,7 +538,7 @@ func TestCheckAmountThreshold(t *testing.T) {
 	}
 
 	// exceed thresholds
-	block, _, index = checkAmountThreshold(c, threshold, startTime, 2)
+	block, _, index = checkAmountThreshold(threshold, startTime, 2)
 	if !block {
 		t.Error("expected block")
 	}
@@ -556,17 +549,17 @@ func TestCheckAmountThreshold(t *testing.T) {
 	makeElapsedItems(c, window)
 	startTime = time.Now().Unix() - int64(window/time.Second)
 	startTimeDoubleWindow := time.Now().Unix() - int64(window*2/time.Second)
-	push(c, hashFromIndex(6), 70)
+	c.push(hashFromIndex(6), 70, time.Now().Unix())
 
 	// not exceed thresholds
-	block, reason, index = checkAmountThreshold(c, uint64(60+70+1), startTime, 1)
+	block, reason, index = checkAmountThreshold(uint64(60+70+1), startTime, 1)
 	if block {
 		t.Errorf("expected no block, reason: %s", reason)
 	}
 	if index != 3 {
 		t.Errorf("expected index 3, got %d", index)
 	}
-	block, reason, index = checkAmountThreshold(c, uint64(40+50+60+70+1), startTimeDoubleWindow, 1)
+	block, reason, index = checkAmountThreshold(uint64(40+50+60+70+1), startTimeDoubleWindow, 1)
 	if block {
 		t.Errorf("expected no block, reason: %s", reason)
 	}
@@ -575,21 +568,21 @@ func TestCheckAmountThreshold(t *testing.T) {
 	}
 
 	// exceed thresholds
-	block, _, index = checkAmountThreshold(c, uint64(70+1), startTime, 2)
+	block, _, index = checkAmountThreshold(uint64(70+1), startTime, 2)
 	if !block {
 		t.Error("expected block")
 	}
 	if index != 4 {
 		t.Errorf("expected index 4, got %d", index)
 	}
-	block, _, index = checkAmountThreshold(c, uint64(50+60+70+1), startTimeDoubleWindow, 2)
+	block, _, index = checkAmountThreshold(uint64(50+60+70+1), startTimeDoubleWindow, 2)
 	if !block {
 		t.Error("expected block")
 	}
 	if index != 2 {
 		t.Errorf("expected index 2, got %d", index)
 	}
-	block, _, index = checkAmountThreshold(c, uint64(50+60+70+1), startTimeDoubleWindow, 1)
+	block, _, index = checkAmountThreshold(uint64(50+60+70+1), startTimeDoubleWindow, 1)
 	if !block {
 		t.Error("expected block")
 	}
@@ -599,12 +592,13 @@ func TestCheckAmountThreshold(t *testing.T) {
 }
 
 func TestCheckCountThreshold(t *testing.T) {
-	c := newCache(5)
+	countedTxs = newCache(5)
+	c := countedTxs
 	window := 1 * time.Second
 	startTime := time.Now().Unix() - int64(window/time.Second)
 
 	// Empty cache
-	block, reason := checkCountThreshold(c, 1, startTime)
+	block, reason := checkCountThreshold(1, startTime)
 	if block {
 		t.Errorf("expected no block for empty cache, reason: %s", reason)
 	}
@@ -612,10 +606,10 @@ func TestCheckCountThreshold(t *testing.T) {
 		t.Errorf("expected empty reason, got %q", reason)
 	}
 
-	push(c, hashFromIndex(0), 10)
+	c.push(hashFromIndex(0), 10, time.Now().Unix())
 
 	// Threshold not reached
-	block, reason = checkCountThreshold(c, 2, startTime)
+	block, reason = checkCountThreshold(2, startTime)
 	if block {
 		t.Errorf("expected no block when count is below threshold, reason: %s", reason)
 	}
@@ -623,10 +617,10 @@ func TestCheckCountThreshold(t *testing.T) {
 		t.Errorf("expected empty reason, got %q", reason)
 	}
 
-	push(c, hashFromIndex(1), 20)
+	c.push(hashFromIndex(1), 20, time.Now().Unix())
 
 	// Threshold reached within window
-	block, reason = checkCountThreshold(c, 2, startTime)
+	block, reason = checkCountThreshold(2, startTime)
 	if !block {
 		t.Errorf("expected block=true when threshold is reached, reason: %s", reason)
 	}
@@ -637,7 +631,7 @@ func TestCheckCountThreshold(t *testing.T) {
 	// Elapsed records should not match threshold
 	makeElapsedItems(c, window)
 	startTime = time.Now().Unix() - int64(window/time.Second)
-	block, reason = checkCountThreshold(c, 2, startTime)
+	block, reason = checkCountThreshold(2, startTime)
 	if block {
 		t.Errorf("expected no block for elapsed records, reason: %s", reason)
 	}
@@ -646,13 +640,13 @@ func TestCheckCountThreshold(t *testing.T) {
 	}
 
 	// Mix elapsed and fresh records
-	push(c, hashFromIndex(2), 30)
-	block, reason = checkCountThreshold(c, 2, startTime)
+	c.push(hashFromIndex(2), 30, time.Now().Unix())
+	block, reason = checkCountThreshold(2, startTime)
 	if block {
 		t.Errorf("expected no block with only one fresh record in window, reason: %s", reason)
 	}
-	push(c, hashFromIndex(3), 40)
-	block, reason = checkCountThreshold(c, 2, startTime)
+	c.push(hashFromIndex(3), 40, time.Now().Unix())
+	block, reason = checkCountThreshold(2, startTime)
 	if !block {
 		t.Errorf("expected block=true with two fresh records in window, reason: %s", reason)
 	}
@@ -667,13 +661,14 @@ func TestCheckAmountThreshold_StressTest(t *testing.T) {
 		iterations = cap * 1000
 		window     = 1 * time.Hour
 		threadhold = uint64(cap)
-		c          = newCache(cap)
 	)
+	countedTxs = newCache(cap)
+	c := countedTxs
 
 	for i := uint(0); i < iterations; i++ {
 		// amout between 1 and threadhold / 10
 		amount := uint64(rand.Intn(int(threadhold/10)) + 1)
-		push(c, hashFromIndex(uint64(i)), amount)
+		c.push(hashFromIndex(uint64(i)), amount, time.Now().Unix())
 
 		// Randomly make some items elapsed
 		if rand.Intn(int(cap/2)) == 0 {
@@ -682,8 +677,8 @@ func TestCheckAmountThreshold_StressTest(t *testing.T) {
 
 		// Check with both algorithms
 		startTime := time.Now().Unix() - int64(window/time.Second)
-		block, reason, index := checkAmountThreshold(c, threadhold, startTime, amount)
-		expectedBlock, expectedReason, expectedIndex := checkLinearSearch(c, threadhold, startTime, amount)
+		block, reason, index := checkAmountThreshold(threadhold, startTime, amount)
+		expectedBlock, expectedReason, expectedIndex := checkLinearSearch(threadhold, startTime, amount)
 		if block != expectedBlock {
 			t.Errorf("expected block %t, got %t, expected reason %s, got reason %s, expected index %d, got index %d", expectedBlock, block, expectedReason, reason, expectedIndex, index)
 		}
