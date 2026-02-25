@@ -41,7 +41,8 @@ func FilterTransaction(txhash common.Hash, from, to common.Address, value [32]by
 	if configCache.isExpired() {
 		if err := configCache.update(); err != nil {
 			if configCache.isEmptyConfig() {
-				return block(fmt.Sprintf("config is empty: %s", err))
+				// No block, just return error to not block chain execution but notify the error to the caller
+				return false, "", fmt.Errorf("failed to fetch config: %w", err)
 			}
 			// Just log the error, keep using the old config
 			log.Error("failed to fetch config", "error", err, "url", configURL)
@@ -66,8 +67,15 @@ func FilterTransaction(txhash common.Hash, from, to common.Address, value [32]by
 		if !ok {
 			continue
 		}
+		// The amount is stored in `log.Data` as a 32-byte value.
+		// sanity check: this should not occur in a standard ERC20 transfer
+		if len(log.Data) != 32 {
+			continue
+		}
 		// Add accumulated amount by ERC20 token amount
-		accumulatedAmount += configCache.toYen(target, log.Topics[2])
+		var amount [32]byte
+		copy(amount[:], log.Data)
+		accumulatedAmount += configCache.toYen(target, amount)
 	}
 
 	// Skip if the accumulated amount is zero or smaller than 1 yen
@@ -77,8 +85,7 @@ func FilterTransaction(txhash common.Hash, from, to common.Address, value [32]by
 
 	// Check the count and amount thresholds
 	now := time.Now().Unix()
-	blocks, reason := isOverThreshold(&configCache.Config, accumulatedAmount, now)
-	if blocks {
+	if blocks, reason := isOverThreshold(&configCache.Config, accumulatedAmount, now); blocks {
 		return block(reason)
 	}
 

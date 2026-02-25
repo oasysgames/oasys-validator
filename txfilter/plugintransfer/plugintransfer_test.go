@@ -13,6 +13,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	gethmath "github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -266,6 +267,196 @@ func TestConfigCache(t *testing.T) {
 	if !c.isWhitelisted(whitelistB) {
 		t.Fatal("expected whitelistB to be whitelisted in v2")
 	}
+}
+
+func TestFilterTransaction(t *testing.T) {
+	from := common.HexToAddress("0x1000000000000000000000000000000000000001")
+	to := common.HexToAddress("0x2000000000000000000000000000000000000001")
+	erc20 := common.HexToAddress("0x2000000000000000000000000000000000000001")
+	tx0 := hashFromIndex(1000)
+	tx1 := hashFromIndex(1001)
+	tx2 := hashFromIndex(1002)
+	tx3 := hashFromIndex(1003)
+	tx4 := hashFromIndex(1004)
+	oneOAS := rawFromString256("1000000000000000000")     // 1 OAS
+	belowOneOAS := rawFromString256("999999999999999999") // 0.99 OAS
+	fiveOAS := rawFromString256("5000000000000000000")    // 5 OAS
+
+	// Case 1: expired + empty config + update error => blocked
+	configURL = "http://127.0.0.1:1/plugintransfer.json"
+	configCache = ConfigCache{
+		Config:    PluginConfig{},
+		updatedAt: time.Time{},
+		ttl:       1 * time.Hour,
+		client:    http.Client{Timeout: 200 * time.Millisecond},
+	}
+	countedTxs = newCache(4)
+	blocked, reason, err := FilterTransaction(tx0, from, to, oneOAS, nil)
+	if err == nil {
+		t.Fatalf("expected err, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to fetch config") {
+		t.Fatalf("expected error to contain 'failed to fetch config', got: %s", err.Error())
+	}
+	if blocked || reason != "" {
+		t.Fatalf("expected not blocked when config is empty and update fails, reason: %s", reason)
+	}
+
+	// Prepare stable in-memory config for the remaining scenario.
+
+	configCache = ConfigCache{
+		Config: PluginConfig{
+			MeasurementWindow: 10 * time.Second,
+			Threshold: ThresholdConfig{
+				WarningCountThreshold:  1,
+				BlockCountThreshold:    2,
+				WarningAmountThreshold: 2,
+				BlockAmountThreshold:   5,
+			},
+			NativeToken: NativeTokenConfig{
+				ToYenRate: 1,
+			},
+			Whitelists: map[common.Address]bool{},
+		},
+		updatedAt: time.Now(),
+		ttl:       1 * time.Hour,
+	}
+	countedTxs = newCache(4)
+
+	// Case 2: disabled => allowed and not counted
+	configCache.Config.Disabled = true
+	blocked, reason, err = FilterTransaction(tx1, from, to, oneOAS, nil)
+	if err != nil || blocked || reason != "" {
+		t.Fatalf("disabled path expected allow, got blocked=%t reason=%q err=%v", blocked, reason, err)
+	}
+	if countedTxs.len() != 0 {
+		t.Fatalf("expected no count in disabled path, got len=%d", countedTxs.len())
+	}
+	configCache.Config.Disabled = false
+
+	// Case 3: whitelisted sender => allowed and not counted
+	configCache.Config.Whitelists[from] = true
+	blocked, reason, err = FilterTransaction(tx1, from, to, oneOAS, nil)
+	if err != nil || blocked || reason != "" {
+		t.Fatalf("whitelist path expected allow, got blocked=%t reason=%q err=%v", blocked, reason, err)
+	}
+	if countedTxs.len() != 0 {
+		t.Fatalf("expected no count in whitelist path, got len=%d", countedTxs.len())
+	}
+	configCache.Config.Whitelists = map[common.Address]bool{}
+
+	// Case 4: bellow one yen => allowed and not counted
+	blocked, reason, err = FilterTransaction(tx1, from, to, belowOneOAS, nil)
+	if err != nil || blocked || reason != "" {
+		t.Fatalf("bellow one yen path expected allow, got blocked=%t reason=%q err=%v", blocked, reason, err)
+	}
+	if countedTxs.len() != 0 {
+		t.Fatalf("expected no count in zero-amount path, got len=%d", countedTxs.len())
+	}
+
+	// Case 5: normal tx under thresholds => allowed and counted
+	blocked, reason, err = FilterTransaction(tx1, from, to, oneOAS, nil)
+	if err != nil || blocked || reason != "" {
+		t.Fatalf("normal path expected allow, got blocked=%t reason=%q err=%v", blocked, reason, err)
+	}
+	if !countedTxs.contains(tx1) || countedTxs.len() != 1 {
+		t.Fatalf("expected tx1 counted once, contains=%t len=%d", countedTxs.contains(tx1), countedTxs.len())
+	}
+
+	// Case 6: duplicate tx => allowed and count unchanged
+	blocked, reason, err = FilterTransaction(tx1, from, to, oneOAS, nil)
+	if err != nil || blocked || reason != "" {
+		t.Fatalf("duplicate path expected allow, got blocked=%t reason=%q err=%v", blocked, reason, err)
+	}
+	if countedTxs.len() != 1 {
+		t.Fatalf("expected count unchanged for duplicate tx, got len=%d", countedTxs.len())
+	}
+
+	// Case 7: amount block (single tx pushes amount over block threshold)
+	blocked, reason, err = FilterTransaction(tx2, from, to, fiveOAS, nil)
+	if err != nil {
+		t.Fatalf("unexpected err in amount-block path: %v", err)
+	}
+	if !blocked {
+		t.Fatalf("expected block by amount threshold, reason: %s", reason)
+	}
+	if !strings.Contains(reason, "over block amount threshold") {
+		t.Fatalf("expected amount-threshold reason, got: %s", reason)
+	}
+	if countedTxs.contains(tx2) {
+		t.Fatal("blocked tx should not be counted")
+	}
+
+	// Case 8: count block (third tx within window should block by count)
+	// Keep amount thresholds high so only count threshold can trigger.
+	// configCache.Config.Threshold.WarningAmountThreshold = math.MaxUint64
+	// configCache.Config.Threshold.BlockAmountThreshold = math.MaxUint64
+	countedTxs = newCache(4)
+	blocked, reason, err = FilterTransaction(tx2, from, to, oneOAS, nil)
+	if err != nil || blocked {
+		t.Fatalf("first count-sequence tx expected allow, got blocked=%t reason=%q err=%v", blocked, reason, err)
+	}
+	blocked, reason, err = FilterTransaction(tx3, from, to, oneOAS, nil)
+	if err != nil || blocked {
+		t.Fatalf("second count-sequence tx expected allow, got blocked=%t reason=%q err=%v", blocked, reason, err)
+	}
+	blocked, reason, err = FilterTransaction(tx4, from, to, oneOAS, nil)
+	if err != nil {
+		t.Fatalf("unexpected err in count-block path: %v", err)
+	}
+	if !blocked {
+		t.Fatalf("expected block by count threshold, reason: %s", reason)
+	}
+	if !strings.Contains(reason, "over count threshold: 2") {
+		t.Fatalf("expected count-threshold reason, got: %s", reason)
+	}
+
+	// Case 9: erc20 amount block (third tx within window should block by amount)
+	configCache.Config.Threshold.WarningCountThreshold = 100
+	configCache.Config.Threshold.BlockCountThreshold = 100
+	configCache.Config.Threshold.WarningAmountThreshold = 1
+	configCache.Config.Threshold.BlockAmountThreshold = 2
+	configCache.Config.TargetERC20s = []TargetERC20Config{
+		{
+			Address:   erc20,
+			Decimals:  18,
+			ToYenRate: 1,
+		},
+	}
+	countedTxs = newCache(4)
+	logs := []types.Log{
+		{
+			Address: erc20,
+			Topics: []common.Hash{
+				transferEventTopic,
+				common.HexToHash("0x1"),
+				common.HexToHash("0x2"),
+			},
+			Data: oneOAS[:],
+		},
+	}
+	blocked, reason, err = FilterTransaction(tx2, from, to, [32]byte{}, logs)
+	if err != nil || blocked {
+		t.Fatalf("first erc20-sequence tx expected allow, got blocked=%t reason=%q err=%v", blocked, reason, err)
+	}
+	blocked, reason, err = FilterTransaction(tx3, from, to, oneOAS, nil)
+	if err != nil || blocked {
+		t.Fatalf("second erc20-sequence tx expected allow, got blocked=%t reason=%q err=%v", blocked, reason, err)
+	}
+	blocked, reason, err = FilterTransaction(tx4, from, to, [32]byte{}, logs)
+	if err != nil {
+		t.Fatalf("unexpected err in erc20 amount-block path: %v", err)
+	}
+	if !blocked {
+		t.Fatalf("expected block by erc20 amount threshold, reason: %s", reason)
+	}
+	if !strings.Contains(reason, "over block amount threshold") {
+		t.Fatalf("expected amount-threshold reason, got: %s", reason)
+	}
+	if countedTxs.contains(tx4) {
+		t.Fatal("blocked tx should not be counted")
+	}
+
 }
 
 func TestLruCache_push(t *testing.T) {
