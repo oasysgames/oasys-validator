@@ -13,25 +13,33 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+// Set version at build time using -ldflags "-X main.version=1.0.0"
+var version = "1.0.0"
+
+// Set config URL at build time using -ldflags "-X main.configURL=https://cdn.oasys.games/suspicious_txfilter/plugintransfer.json"
+var configURL = "http://localhost:3030/plugintransfer.json"
+
 var (
+	// Zero value marker for common.Hash.
+	emptyHash common.Hash
+
+	// ERC20 Transfer(address,address,uint256) event signature.
 	transferEventTopic = common.HexToHash("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")
-	configCache        = ConfigCache{
+
+	// Runtime config cache shared by plugin entrypoints.
+	configCache = ConfigCache{
 		Config:    PluginConfig{},
 		updatedAt: time.Time{},
 		ttl:       1 * time.Hour,
 		client:    http.Client{Timeout: 30 * time.Second},
 	}
-	emptyHash common.Hash
 
+	// Recent counted transactions used for threshold/window checks.
 	countedTxs *lrucache
 )
 
-// Set config URL at build time using -ldflags "-X main.configURL=https://cdn.oasys.games/suspicious_txfilter/plugintransfer.json"
-var configURL = "http://localhost:3030/plugintransfer.json"
-
-// Set version at build time using -ldflags "-X main.version=1.0.0"
-var version = "1.0.0"
-
+// Version returns the version of the plugin.
+// Used to verify the plugin version matches the host version.
 func Version() string {
 	return version
 }
@@ -45,6 +53,9 @@ func Clear() error {
 	return nil
 }
 
+// FilterTransaction is the plugin entrypoint invoked by the host.
+// It refreshes config when needed, accumulates tx amount in JPY, and
+// blocks only when configured count/amount thresholds are exceeded.
 func FilterTransaction(txhash common.Hash, from, to common.Address, value [32]byte, logs []types.Log) (isBlocked bool, reason string, err error) {
 	// Initialize or update it if it's expired
 	if configCache.isExpired() {
@@ -114,14 +125,17 @@ func allow() (bool, string, error) {
 	return false, "", nil
 }
 
+// block returns "blocked" with a textual reason expected by host code.
 func block(reason string) (bool, string, error) {
 	return true, reason, nil
 }
 
+// logWarn records threshold warnings without blocking.
 func logWarn(reason string) {
 	log.Warn("Exceed warning threshold", "plugin", "plugintransfer", "reason", reason)
 }
 
+// PluginConfig is loaded from remote JSON and controls all filter behavior.
 type PluginConfig struct {
 	Version           uint64                  `json:"version"`
 	Whitelists        map[common.Address]bool `json:"whitelists"`
@@ -157,14 +171,17 @@ type ConfigCache struct {
 	client    http.Client
 }
 
+// isExpired returns true when cached config should be refreshed.
 func (c *ConfigCache) isExpired() bool {
 	return c.updatedAt.Before(time.Now().Add(-c.ttl))
 }
 
+// isEmptyConfig guards against acting on incomplete config.
 func (c *ConfigCache) isEmptyConfig() bool {
 	return c.Config.MeasurementWindow == 0 || c.Config.Threshold.BlockCountThreshold == 0 || c.Config.Threshold.BlockAmountThreshold == 0
 }
 
+// update fetches and decodes config JSON, then initializes/expands cache capacity.
 func (c *ConfigCache) update() error {
 	oldVersion := c.Config.Version
 	resp, err := c.client.Get(configURL)
@@ -201,6 +218,7 @@ func (c *ConfigCache) isWhitelisted(address common.Address) bool {
 	return c.Config.Whitelists[address]
 }
 
+// isTargetERC20 returns target token config by contract address.
 func (c *ConfigCache) isTargetERC20(address common.Address) (*TargetERC20Config, bool) {
 	for i := range c.Config.TargetERC20s {
 		if c.Config.TargetERC20s[i].Address == address {
@@ -210,6 +228,7 @@ func (c *ConfigCache) isTargetERC20(address common.Address) (*TargetERC20Config,
 	return nil, false
 }
 
+// toYen converts token raw amount to integer JPY units (truncating fractional part).
 func (c *ConfigCache) toYen(target *TargetERC20Config, value [32]byte) uint64 {
 	if target == nil { // native token
 		return uint64(float64(amountFromRaw(value, 18)) * c.Config.NativeToken.ToYenRate)
@@ -217,6 +236,8 @@ func (c *ConfigCache) toYen(target *TargetERC20Config, value [32]byte) uint64 {
 	return uint64(float64(amountFromRaw(value, target.Decimals)) * target.ToYenRate)
 }
 
+// amountFromRaw converts a 256-bit big-endian integer to a uint64 token amount,
+// applying decimal scaling by integer division and saturating on overflow.
 func amountFromRaw(value [32]byte, decimals uint8) uint64 {
 	divisor := uint64(1)
 	for i := uint8(0); i < decimals; i++ {
@@ -240,6 +261,8 @@ func amountFromRaw(value [32]byte, decimals uint8) uint64 {
 	return result
 }
 
+// isOverThreshold checks both count and amount thresholds within measurement window.
+// Warning thresholds only emit logs; block thresholds return block=true.
 func isOverThreshold(config *PluginConfig, amount uint64, now int64) (blocks bool, reason string) {
 	// Check warning count threshold
 	startTime := now - int64(config.MeasurementWindow/time.Second)
@@ -272,6 +295,7 @@ func isOverThreshold(config *PluginConfig, amount uint64, now int64) (blocks boo
 	return
 }
 
+// checkCountThreshold reports true when at least `threshold` txs exist in window.
 func checkCountThreshold(threshold uint, startTime int64) (blocks bool, reason string) {
 	c := countedTxs
 	n := c.len()
@@ -287,6 +311,8 @@ func checkCountThreshold(threshold uint, startTime int64) (blocks bool, reason s
 	return
 }
 
+// checkAmountThreshold reports true when cumulative in-window amount exceeds threshold.
+// midindex is returned for tests to validate binary-search behavior.
 func checkAmountThreshold(threshold uint64, startTime int64, currentAmount uint64) (block bool, reason string, midindex uint /* <- midindex is used for testing */) {
 	c := countedTxs
 
@@ -334,6 +360,8 @@ func checkAmountThreshold(threshold uint64, startTime int64, currentAmount uint6
 	return
 }
 
+// computeTotal computes window sum from target item to newest + current tx amount.
+// It tracks uint64 wraparound using per-record overflow parity.
 func computeTotal(target metadata, currentAmount uint64) uint64 {
 	c := countedTxs
 	newestMeta, ok := c.getNewest()
@@ -351,6 +379,7 @@ func computeTotal(target metadata, currentAmount uint64) uint64 {
 	return math.MaxUint64 - target.accumulatedAmount + accumulatedAmountIncludeCurrent + 1
 }
 
+// metadata keeps per-tx amount plus accumulated amount and overflow flag
 type metadata struct {
 	amount            uint64
 	createdAt         int64  // Unix timestamp
@@ -358,10 +387,11 @@ type metadata struct {
 	isOddOverflow     bool   // true if the times of overflow is odd(e.g. 1, 3, 5, ...)
 }
 
+// lrucache is a first-in-first-out cache with a fixed size,
 type lrucache struct {
-	head  uint // index of the next slot to be used
-	cap   uint // capacity of the lrucache
-	items []common.Hash
+	head  uint          // index of the next slot to be used
+	cap   uint          // capacity of the lrucache
+	items []common.Hash // ring-buffer of txhash
 	txMap map[common.Hash]metadata
 }
 
@@ -375,10 +405,14 @@ func newCache(cap uint) *lrucache {
 	return &c
 }
 
+// push inserts/replaces newest entry and evicts oldest when full.
 func (c *lrucache) push(txhash common.Hash, amount uint64, now int64) {
-	meta, evicting := c.txMap[c.items[c.head]] // reuse the will-be-evicted item
-	if !evicting {
-		meta = metadata{} // create a new metadata, items array is not full yet
+	var meta metadata
+	evicting := c.items[c.head] != emptyHash
+	if evicting {
+		meta = c.txMap[c.items[c.head]] // reuse the will-be-evicted item
+	} else {
+		meta = metadata{}
 	}
 	meta.amount = amount
 	meta.createdAt = now
@@ -411,6 +445,8 @@ func (c *lrucache) contains(txhash common.Hash) bool {
 	return ok
 }
 
+// get returns metadata by logical index (0=oldest) and false when out of range.
+// Logical index 0 is oldest, len-1 is newest.
 func (c *lrucache) get(index uint) (metadata, bool) {
 	n := c.len()
 	if index >= n {
@@ -441,6 +477,7 @@ func (c *lrucache) getNewest() (metadata, bool) {
 	return c.get(n - 1)
 }
 
+// len returns number of active entries in the ring buffer.
 func (c *lrucache) len() uint {
 	if c.items[c.head] == emptyHash {
 		return c.head
