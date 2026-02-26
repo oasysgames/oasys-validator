@@ -31,15 +31,15 @@ func makeElapsedItems(c *lrucache, window time.Duration) {
 	}
 }
 
-func checkLinearSearch(threshold uint64, startTime int64, currentAmount uint64) (block bool, reason string, index uint) {
+func checkLinearSearch(c *lrucache, threshold uint64, startTime int64, currentAmount uint64) (block bool, reason string, index uint) {
 	// Check if the current tx exceeds the threshold
 	if threshold < currentAmount {
 		return true, fmt.Sprintf("over block amount threshold: %d (single tx)", threshold), 0
 	}
 
-	for i := uint(0); i < countedTxs.len(); i++ {
-		meta, _ := countedTxs.get(i)
-		sum := computeTotal(meta, currentAmount)
+	for i := uint(0); i < c.len(); i++ {
+		meta, _ := c.get(i)
+		sum := computeTotal(c, meta, currentAmount)
 		// if bellow threadhold, exit
 		if sum <= threshold {
 			return false, "", i
@@ -134,10 +134,10 @@ func TestAmountFromRaw(t *testing.T) {
 }
 
 func TestConfigCache(t *testing.T) {
+	var countedTxs *lrucache
 	whitelistA := common.HexToAddress("0x1000000000000000000000000000000000000001")
 	whitelistB := common.HexToAddress("0x1000000000000000000000000000000000000002")
 	targetA := common.HexToAddress("0x2000000000000000000000000000000000000001")
-
 	configs := []PluginConfig{
 		{
 			Version:           1,
@@ -199,7 +199,6 @@ func TestConfigCache(t *testing.T) {
 	defer srv.Close()
 
 	configURL = srv.URL
-	countedTxs = nil
 
 	c := ConfigCache{
 		ttl:    1 * time.Hour,
@@ -214,7 +213,7 @@ func TestConfigCache(t *testing.T) {
 	}
 
 	// 1st update: initialize config and countedTxs
-	if err := c.update(); err != nil {
+	if err := c.update(&countedTxs); err != nil {
 		t.Fatalf("update(v1) failed: %v", err)
 	}
 
@@ -261,7 +260,7 @@ func TestConfigCache(t *testing.T) {
 	}
 
 	// 2nd update: version bump should expand countedTxs cap.
-	if err := c.update(); err != nil {
+	if err := c.update(&countedTxs); err != nil {
 		t.Fatalf("update(v2) failed: %v", err)
 	}
 	if countedTxs.cap != configs[1].Threshold.BlockCountThreshold {
@@ -273,7 +272,8 @@ func TestConfigCache(t *testing.T) {
 }
 
 func TestFilterTransaction(t *testing.T) {
-	defer Clear()
+	p := &Plugin
+	defer p.Clear()
 
 	from := common.HexToAddress("0x1000000000000000000000000000000000000001")
 	to := common.HexToAddress("0x2000000000000000000000000000000000000001")
@@ -289,14 +289,14 @@ func TestFilterTransaction(t *testing.T) {
 
 	// Case 1: expired + empty config + update error => blocked
 	configURL = "http://127.0.0.1:1/plugintransfer.json"
-	configCache = ConfigCache{
+	p.configCache = ConfigCache{
 		Config:    PluginConfig{},
 		updatedAt: time.Time{},
 		ttl:       1 * time.Hour,
 		client:    http.Client{Timeout: 200 * time.Millisecond},
 	}
-	countedTxs = newCache(4)
-	blocked, reason, err := FilterTransaction(tx0, from, to, oneOAS, nil)
+	p.countedTxs = newCache(4)
+	blocked, reason, err := p.FilterTransaction(tx0, from, to, oneOAS, nil)
 	if err == nil {
 		t.Fatalf("expected err, got nil")
 	}
@@ -309,7 +309,7 @@ func TestFilterTransaction(t *testing.T) {
 
 	// Prepare stable in-memory config for the remaining scenario.
 
-	configCache = ConfigCache{
+	p.configCache = ConfigCache{
 		Config: PluginConfig{
 			MeasurementWindow: 10 * time.Second,
 			Threshold: ThresholdConfig{
@@ -326,59 +326,59 @@ func TestFilterTransaction(t *testing.T) {
 		updatedAt: time.Now(),
 		ttl:       1 * time.Hour,
 	}
-	countedTxs = newCache(4)
+	p.countedTxs = newCache(4)
 
 	// Case 2: disabled => allowed and not counted
-	configCache.Config.Disabled = true
-	blocked, reason, err = FilterTransaction(tx1, from, to, oneOAS, nil)
+	p.configCache.Config.Disabled = true
+	blocked, reason, err = p.FilterTransaction(tx1, from, to, oneOAS, nil)
 	if err != nil || blocked || reason != "" {
 		t.Fatalf("disabled path expected allow, got blocked=%t reason=%q err=%v", blocked, reason, err)
 	}
-	if countedTxs.len() != 0 {
-		t.Fatalf("expected no count in disabled path, got len=%d", countedTxs.len())
+	if p.countedTxs.len() != 0 {
+		t.Fatalf("expected no count in disabled path, got len=%d", p.countedTxs.len())
 	}
-	configCache.Config.Disabled = false
+	p.configCache.Config.Disabled = false
 
 	// Case 3: whitelisted sender => allowed and not counted
-	configCache.Config.Whitelists[from] = true
-	blocked, reason, err = FilterTransaction(tx1, from, to, oneOAS, nil)
+	p.configCache.Config.Whitelists[from] = true
+	blocked, reason, err = p.FilterTransaction(tx1, from, to, oneOAS, nil)
 	if err != nil || blocked || reason != "" {
 		t.Fatalf("whitelist path expected allow, got blocked=%t reason=%q err=%v", blocked, reason, err)
 	}
-	if countedTxs.len() != 0 {
-		t.Fatalf("expected no count in whitelist path, got len=%d", countedTxs.len())
+	if p.countedTxs.len() != 0 {
+		t.Fatalf("expected no count in whitelist path, got len=%d", p.countedTxs.len())
 	}
-	configCache.Config.Whitelists = map[common.Address]bool{}
+	p.configCache.Config.Whitelists = map[common.Address]bool{}
 
 	// Case 4: bellow one yen => allowed and not counted
-	blocked, reason, err = FilterTransaction(tx1, from, to, belowOneOAS, nil)
+	blocked, reason, err = p.FilterTransaction(tx1, from, to, belowOneOAS, nil)
 	if err != nil || blocked || reason != "" {
 		t.Fatalf("bellow one yen path expected allow, got blocked=%t reason=%q err=%v", blocked, reason, err)
 	}
-	if countedTxs.len() != 0 {
-		t.Fatalf("expected no count in zero-amount path, got len=%d", countedTxs.len())
+	if p.countedTxs.len() != 0 {
+		t.Fatalf("expected no count in zero-amount path, got len=%d", p.countedTxs.len())
 	}
 
 	// Case 5: normal tx under thresholds => allowed and counted
-	blocked, reason, err = FilterTransaction(tx1, from, to, oneOAS, nil)
+	blocked, reason, err = p.FilterTransaction(tx1, from, to, oneOAS, nil)
 	if err != nil || blocked || reason != "" {
 		t.Fatalf("normal path expected allow, got blocked=%t reason=%q err=%v", blocked, reason, err)
 	}
-	if !countedTxs.contains(tx1) || countedTxs.len() != 1 {
-		t.Fatalf("expected tx1 counted once, contains=%t len=%d", countedTxs.contains(tx1), countedTxs.len())
+	if !p.countedTxs.contains(tx1) || p.countedTxs.len() != 1 {
+		t.Fatalf("expected tx1 counted once, contains=%t len=%d", p.countedTxs.contains(tx1), p.countedTxs.len())
 	}
 
 	// Case 6: duplicate tx => allowed and count unchanged
-	blocked, reason, err = FilterTransaction(tx1, from, to, oneOAS, nil)
+	blocked, reason, err = p.FilterTransaction(tx1, from, to, oneOAS, nil)
 	if err != nil || blocked || reason != "" {
 		t.Fatalf("duplicate path expected allow, got blocked=%t reason=%q err=%v", blocked, reason, err)
 	}
-	if countedTxs.len() != 1 {
-		t.Fatalf("expected count unchanged for duplicate tx, got len=%d", countedTxs.len())
+	if p.countedTxs.len() != 1 {
+		t.Fatalf("expected count unchanged for duplicate tx, got len=%d", p.countedTxs.len())
 	}
 
 	// Case 7: amount block (single tx pushes amount over block threshold)
-	blocked, reason, err = FilterTransaction(tx2, from, to, fiveOAS, nil)
+	blocked, reason, err = p.FilterTransaction(tx2, from, to, fiveOAS, nil)
 	if err != nil {
 		t.Fatalf("unexpected err in amount-block path: %v", err)
 	}
@@ -388,7 +388,7 @@ func TestFilterTransaction(t *testing.T) {
 	if !strings.Contains(reason, "over block amount threshold") {
 		t.Fatalf("expected amount-threshold reason, got: %s", reason)
 	}
-	if countedTxs.contains(tx2) {
+	if p.countedTxs.contains(tx2) {
 		t.Fatal("blocked tx should not be counted")
 	}
 
@@ -396,16 +396,16 @@ func TestFilterTransaction(t *testing.T) {
 	// Keep amount thresholds high so only count threshold can trigger.
 	// configCache.Config.Threshold.WarningAmountThreshold = math.MaxUint64
 	// configCache.Config.Threshold.BlockAmountThreshold = math.MaxUint64
-	countedTxs = newCache(4)
-	blocked, reason, err = FilterTransaction(tx2, from, to, oneOAS, nil)
+	p.countedTxs = newCache(4)
+	blocked, reason, err = p.FilterTransaction(tx2, from, to, oneOAS, nil)
 	if err != nil || blocked {
 		t.Fatalf("first count-sequence tx expected allow, got blocked=%t reason=%q err=%v", blocked, reason, err)
 	}
-	blocked, reason, err = FilterTransaction(tx3, from, to, oneOAS, nil)
+	blocked, reason, err = p.FilterTransaction(tx3, from, to, oneOAS, nil)
 	if err != nil || blocked {
 		t.Fatalf("second count-sequence tx expected allow, got blocked=%t reason=%q err=%v", blocked, reason, err)
 	}
-	blocked, reason, err = FilterTransaction(tx4, from, to, oneOAS, nil)
+	blocked, reason, err = p.FilterTransaction(tx4, from, to, oneOAS, nil)
 	if err != nil {
 		t.Fatalf("unexpected err in count-block path: %v", err)
 	}
@@ -417,18 +417,18 @@ func TestFilterTransaction(t *testing.T) {
 	}
 
 	// Case 9: erc20 amount block (third tx within window should block by amount)
-	configCache.Config.Threshold.WarningCountThreshold = 100
-	configCache.Config.Threshold.BlockCountThreshold = 100
-	configCache.Config.Threshold.WarningAmountThreshold = 1
-	configCache.Config.Threshold.BlockAmountThreshold = 2
-	configCache.Config.TargetERC20s = []TargetERC20Config{
+	p.configCache.Config.Threshold.WarningCountThreshold = 100
+	p.configCache.Config.Threshold.BlockCountThreshold = 100
+	p.configCache.Config.Threshold.WarningAmountThreshold = 1
+	p.configCache.Config.Threshold.BlockAmountThreshold = 2
+	p.configCache.Config.TargetERC20s = []TargetERC20Config{
 		{
 			Address:   erc20,
 			Decimals:  18,
 			ToYenRate: 1,
 		},
 	}
-	countedTxs = newCache(4)
+	p.countedTxs = newCache(4)
 	logs := []types.Log{
 		{
 			Address: erc20,
@@ -440,15 +440,15 @@ func TestFilterTransaction(t *testing.T) {
 			Data: oneOAS[:],
 		},
 	}
-	blocked, reason, err = FilterTransaction(tx2, from, to, [32]byte{}, logs)
+	blocked, reason, err = p.FilterTransaction(tx2, from, to, [32]byte{}, logs)
 	if err != nil || blocked {
 		t.Fatalf("first erc20-sequence tx expected allow, got blocked=%t reason=%q err=%v", blocked, reason, err)
 	}
-	blocked, reason, err = FilterTransaction(tx3, from, to, oneOAS, nil)
+	blocked, reason, err = p.FilterTransaction(tx3, from, to, oneOAS, nil)
 	if err != nil || blocked {
 		t.Fatalf("second erc20-sequence tx expected allow, got blocked=%t reason=%q err=%v", blocked, reason, err)
 	}
-	blocked, reason, err = FilterTransaction(tx4, from, to, [32]byte{}, logs)
+	blocked, reason, err = p.FilterTransaction(tx4, from, to, [32]byte{}, logs)
 	if err != nil {
 		t.Fatalf("unexpected err in erc20 amount-block path: %v", err)
 	}
@@ -458,13 +458,13 @@ func TestFilterTransaction(t *testing.T) {
 	if !strings.Contains(reason, "over block amount threshold") {
 		t.Fatalf("expected amount-threshold reason, got: %s", reason)
 	}
-	if countedTxs.contains(tx4) {
+	if p.countedTxs.contains(tx4) {
 		t.Fatal("blocked tx should not be counted")
 	}
 }
 
 func TestLruCache_push(t *testing.T) {
-	countedTxs = newCache(5)
+	countedTxs := newCache(5)
 	c := countedTxs
 
 	// Push 3 items
@@ -547,8 +547,7 @@ func TestLruCache_push(t *testing.T) {
 }
 
 func TestLruCache_expandCap(t *testing.T) {
-	countedTxs := newCache(5)
-	c := countedTxs
+	c := newCache(5)
 
 	// push 6 items
 	c.push(hashFromIndex(0), 10, time.Now().Unix())
@@ -612,22 +611,22 @@ func TestLruCache_expandCap(t *testing.T) {
 }
 
 func TestComputeTotal(t *testing.T) {
+	c := newCache(5)
+
 	// Non-overflow case
-	countedTxs = newCache(5)
-	c := countedTxs
 	c.push(hashFromIndex(0), 10, time.Now().Unix())
 	c.push(hashFromIndex(1), 20, time.Now().Unix())
 	c.push(hashFromIndex(2), 30, time.Now().Unix())
 	meta0, _ := c.get(0)
-	if got := computeTotal(meta0, 5); got != 10+20+30+5 {
+	if got := computeTotal(c, meta0, 5); got != 10+20+30+5 {
 		t.Errorf("computeTotal(c, 0, 5) = %d, want %d", got, 10+20+30+5)
 	}
 	meta1, _ := c.get(1)
-	if got := computeTotal(meta1, 5); got != 20+30+5 {
+	if got := computeTotal(c, meta1, 5); got != 20+30+5 {
 		t.Errorf("computeTotal(c, 1, 5) = %d, want %d", got, 20+30+5)
 	}
 	meta2, _ := c.get(2)
-	if got := computeTotal(meta2, 5); got != 30+5 {
+	if got := computeTotal(c, meta2, 5); got != 30+5 {
 		t.Errorf("computeTotal(c, 2, 5) = %d, want %d", got, 30+5)
 	}
 
@@ -635,22 +634,22 @@ func TestComputeTotal(t *testing.T) {
 	c.push(hashFromIndex(3), math.MaxUint64-100, time.Now().Unix())
 	c.push(hashFromIndex(4), 50, time.Now().Unix())
 	meta2, _ = c.get(2)
-	if got := computeTotal(meta2, 5); got != 30+math.MaxUint64-100+50+5 {
+	if got := computeTotal(c, meta2, 5); got != 30+math.MaxUint64-100+50+5 {
 		t.Errorf("computeTotal(c, 3, 5) = %d, want %d", got, uint64(math.MaxUint64-100+50+5))
 	}
 	meta3, _ := c.get(3)
-	if got := computeTotal(meta3, 5); got != math.MaxUint64-100+50+5 {
+	if got := computeTotal(c, meta3, 5); got != math.MaxUint64-100+50+5 {
 		t.Errorf("computeTotal(c, 3, 5) = %d, want %d", got, uint64(math.MaxUint64-100+50+5))
 	}
 	meta4, _ := c.get(4)
-	if got := computeTotal(meta4, 5); got != 50+5 {
+	if got := computeTotal(c, meta4, 5); got != 50+5 {
 		t.Errorf("computeTotal(c, 4, 5) = %d, want %d", got, 50+5)
 	}
 }
 
 func TestCheckAmountThreshold(t *testing.T) {
-	countedTxs = newCache(5)
-	c := countedTxs
+	c := newCache(5)
+
 	c.push(hashFromIndex(0), 10, time.Now().Unix())
 	c.push(hashFromIndex(1), 20, time.Now().Unix())
 	c.push(hashFromIndex(2), 30, time.Now().Unix())
@@ -659,7 +658,7 @@ func TestCheckAmountThreshold(t *testing.T) {
 
 	// Single tx exceeds threshold
 	threshold := uint64(100)
-	block, reason, index := checkAmountThreshold(threshold, startTime, threshold+1)
+	block, reason, index := checkAmountThreshold(c, threshold, startTime, threshold+1)
 	if !block {
 		t.Errorf("expected block when single tx exceeds threshold, reason: %s", reason)
 	}
@@ -671,7 +670,7 @@ func TestCheckAmountThreshold(t *testing.T) {
 	}
 
 	// Sum of all below threshold
-	block, reason, index = checkAmountThreshold(threshold, startTime, 40)
+	block, reason, index = checkAmountThreshold(c, threshold, startTime, 40)
 	if block {
 		t.Errorf("expected no block when sum of all below threshold, reason: %s", reason)
 	}
@@ -680,7 +679,7 @@ func TestCheckAmountThreshold(t *testing.T) {
 	}
 
 	// Sum of all exceeds threshold
-	block, reason, index = checkAmountThreshold(threshold, startTime, 41)
+	block, reason, index = checkAmountThreshold(c, threshold, startTime, 41)
 	if !block {
 		t.Errorf("expected block when sum of all exceeds threshold, reason: %s", reason)
 	}
@@ -695,14 +694,14 @@ func TestCheckAmountThreshold(t *testing.T) {
 
 	// not exceed thresholds
 	threshold = uint64(30 + 40 + 50 + 1)
-	block, reason, index = checkAmountThreshold(threshold, startTime, 1)
+	block, reason, index = checkAmountThreshold(c, threshold, startTime, 1)
 	if block {
 		t.Errorf("expected no block, reason: %s", reason)
 	}
 	if index != 2 {
 		t.Errorf("expected index 2, got %d", index)
 	}
-	block, reason, index = checkAmountThreshold(threshold, startTime, 30+1)
+	block, reason, index = checkAmountThreshold(c, threshold, startTime, 30+1)
 	if block {
 		t.Errorf("expected no block, reason: %s", reason)
 	}
@@ -711,14 +710,14 @@ func TestCheckAmountThreshold(t *testing.T) {
 	}
 
 	// exceed thresholds
-	block, _, index = checkAmountThreshold(threshold, startTime, 30+2)
+	block, _, index = checkAmountThreshold(c, threshold, startTime, 30+2)
 	if !block {
 		t.Error("expected block")
 	}
 	if index != 3 {
 		t.Errorf("expected index 3, got %d", index)
 	}
-	block, _, index = checkAmountThreshold(threshold, startTime, 30+40+2)
+	block, _, index = checkAmountThreshold(c, threshold, startTime, 30+40+2)
 	if !block {
 		t.Error("expected block")
 	}
@@ -730,7 +729,7 @@ func TestCheckAmountThreshold(t *testing.T) {
 
 	// not exceed thresholds
 	threshold = uint64(40 + 50 + 60 + 1)
-	block, reason, index = checkAmountThreshold(threshold, startTime, 1)
+	block, reason, index = checkAmountThreshold(c, threshold, startTime, 1)
 	if block {
 		t.Errorf("expected no block, reason: %s", reason)
 	}
@@ -739,7 +738,7 @@ func TestCheckAmountThreshold(t *testing.T) {
 	}
 
 	// exceed thresholds
-	block, _, index = checkAmountThreshold(threshold, startTime, 2)
+	block, _, index = checkAmountThreshold(c, threshold, startTime, 2)
 	if !block {
 		t.Error("expected block")
 	}
@@ -753,14 +752,14 @@ func TestCheckAmountThreshold(t *testing.T) {
 	c.push(hashFromIndex(6), 70, time.Now().Unix())
 
 	// not exceed thresholds
-	block, reason, index = checkAmountThreshold(uint64(60+70+1), startTime, 1)
+	block, reason, index = checkAmountThreshold(c, threshold, startTime, 1)
 	if block {
 		t.Errorf("expected no block, reason: %s", reason)
 	}
 	if index != 3 {
 		t.Errorf("expected index 3, got %d", index)
 	}
-	block, reason, index = checkAmountThreshold(uint64(40+50+60+70+1), startTimeDoubleWindow, 1)
+	block, reason, index = checkAmountThreshold(c, uint64(40+50+60+70+1), startTimeDoubleWindow, 1)
 	if block {
 		t.Errorf("expected no block, reason: %s", reason)
 	}
@@ -769,21 +768,21 @@ func TestCheckAmountThreshold(t *testing.T) {
 	}
 
 	// exceed thresholds
-	block, _, index = checkAmountThreshold(uint64(70+1), startTime, 2)
+	block, _, index = checkAmountThreshold(c, uint64(70+1), startTime, 2)
 	if !block {
 		t.Error("expected block")
 	}
 	if index != 4 {
 		t.Errorf("expected index 4, got %d", index)
 	}
-	block, _, index = checkAmountThreshold(uint64(50+60+70+1), startTimeDoubleWindow, 2)
+	block, _, index = checkAmountThreshold(c, uint64(50+60+70+1), startTimeDoubleWindow, 2)
 	if !block {
 		t.Error("expected block")
 	}
 	if index != 2 {
 		t.Errorf("expected index 2, got %d", index)
 	}
-	block, _, index = checkAmountThreshold(uint64(50+60+70+1), startTimeDoubleWindow, 1)
+	block, _, index = checkAmountThreshold(c, uint64(50+60+70+1), startTimeDoubleWindow, 1)
 	if !block {
 		t.Error("expected block")
 	}
@@ -793,13 +792,12 @@ func TestCheckAmountThreshold(t *testing.T) {
 }
 
 func TestCheckCountThreshold(t *testing.T) {
-	countedTxs = newCache(5)
-	c := countedTxs
+	c := newCache(5)
 	window := 1 * time.Second
 	startTime := time.Now().Unix() - int64(window/time.Second)
 
 	// Empty cache
-	block, reason := checkCountThreshold(1, startTime)
+	block, reason := checkCountThreshold(c, 1, startTime)
 	if block {
 		t.Errorf("expected no block for empty cache, reason: %s", reason)
 	}
@@ -810,7 +808,7 @@ func TestCheckCountThreshold(t *testing.T) {
 	c.push(hashFromIndex(0), 10, time.Now().Unix())
 
 	// Threshold not reached
-	block, reason = checkCountThreshold(2, startTime)
+	block, reason = checkCountThreshold(c, 2, startTime)
 	if block {
 		t.Errorf("expected no block when count is below threshold, reason: %s", reason)
 	}
@@ -821,7 +819,7 @@ func TestCheckCountThreshold(t *testing.T) {
 	c.push(hashFromIndex(1), 20, time.Now().Unix())
 
 	// Threshold reached within window
-	block, reason = checkCountThreshold(2, startTime)
+	block, reason = checkCountThreshold(c, 2, startTime)
 	if !block {
 		t.Errorf("expected block=true when threshold is reached, reason: %s", reason)
 	}
@@ -832,7 +830,7 @@ func TestCheckCountThreshold(t *testing.T) {
 	// Elapsed records should not match threshold
 	makeElapsedItems(c, window)
 	startTime = time.Now().Unix() - int64(window/time.Second)
-	block, reason = checkCountThreshold(2, startTime)
+	block, reason = checkCountThreshold(c, 2, startTime)
 	if block {
 		t.Errorf("expected no block for elapsed records, reason: %s", reason)
 	}
@@ -842,12 +840,12 @@ func TestCheckCountThreshold(t *testing.T) {
 
 	// Mix elapsed and fresh records
 	c.push(hashFromIndex(2), 30, time.Now().Unix())
-	block, reason = checkCountThreshold(2, startTime)
+	block, reason = checkCountThreshold(c, 2, startTime)
 	if block {
 		t.Errorf("expected no block with only one fresh record in window, reason: %s", reason)
 	}
 	c.push(hashFromIndex(3), 40, time.Now().Unix())
-	block, reason = checkCountThreshold(2, startTime)
+	block, reason = checkCountThreshold(c, 2, startTime)
 	if !block {
 		t.Errorf("expected block=true with two fresh records in window, reason: %s", reason)
 	}
@@ -863,8 +861,7 @@ func TestCheckAmountThreshold_StressTest(t *testing.T) {
 		window     = 1 * time.Hour
 		threadhold = uint64(cap)
 	)
-	countedTxs = newCache(cap)
-	c := countedTxs
+	c := newCache(cap)
 
 	for i := uint(0); i < iterations; i++ {
 		// amout between 1 and threadhold / 10
@@ -878,8 +875,8 @@ func TestCheckAmountThreshold_StressTest(t *testing.T) {
 
 		// Check with both algorithms
 		startTime := time.Now().Unix() - int64(window/time.Second)
-		block, reason, index := checkAmountThreshold(threadhold, startTime, amount)
-		expectedBlock, expectedReason, expectedIndex := checkLinearSearch(threadhold, startTime, amount)
+		block, reason, index := checkAmountThreshold(c, threadhold, startTime, amount)
+		expectedBlock, expectedReason, expectedIndex := checkLinearSearch(c, threadhold, startTime, amount)
 		if block != expectedBlock {
 			t.Errorf("expected block %t, got %t, expected reason %s, got reason %s, expected index %d, got index %d", expectedBlock, block, expectedReason, reason, expectedIndex, index)
 		}

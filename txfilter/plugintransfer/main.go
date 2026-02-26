@@ -9,58 +9,73 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 )
 
-// Set version at build time using -ldflags "-X main.version=1.0.0"
-var version = "1.0.0"
-
-// Set config URL at build time using -ldflags "-X main.configURL=https://cdn.oasys.games/suspicious_txfilter/plugintransfer.json"
-var configURL = "http://localhost:3030/plugintransfer.json"
-
 var (
+	// Set version at build time using -ldflags "-X main.version=1.0.0"
+	version = "1.0.0"
+
+	// Set config URL at build time using -ldflags "-X main.configURL=https://cdn.oasys.games/suspicious_txfilter/plugintransfer.json"
+	configURL = "http://localhost:3030/plugintransfer.json"
+
+	// Don't change the name of the variable
+	// Host will use this variable to load the plugin.
+	Plugin = transferPlugin{
+		version: &version,
+		configCache: ConfigCache{
+			Config:    PluginConfig{},
+			updatedAt: time.Time{},
+			ttl:       1 * time.Hour,
+			client:    http.Client{Timeout: 30 * time.Second},
+		},
+		countedTxs: nil,
+	}
+
+	// Set version at build time using -ldflags "-X main.version=1.0.0"
 	// Zero value marker for common.Hash.
 	emptyHash common.Hash
 
 	// ERC20 Transfer(address,address,uint256) event signature.
 	transferEventTopic = common.HexToHash("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")
 
-	// Runtime config cache shared by plugin entrypoints.
-	configCache = ConfigCache{
-		Config:    PluginConfig{},
-		updatedAt: time.Time{},
-		ttl:       1 * time.Hour,
-		client:    http.Client{Timeout: 30 * time.Second},
-	}
-
-	// Recent counted transactions used for threshold/window checks.
-	countedTxs *lrucache
+	// transferPlugin implements core.Plugin interface.
+	_ core.SuspiciousTxfilterPlugin = (*transferPlugin)(nil)
 )
+
+// transferPlugin is the long-lived plugin runtime state.
+// This struct exists so host can interact through a single exported Plugin instance.
+type transferPlugin struct {
+	version     *string
+	configCache ConfigCache
+	countedTxs  *lrucache // Recent counted transactions used for threshold/window checks.
+}
 
 // Version returns the version of the plugin.
 // Used to verify the plugin version matches the host version.
-func Version() string {
-	return version
+func (p *transferPlugin) Version() string {
+	return *p.version
 }
 
 // Call before loading a new plugin instance.
 // Clear drops references to runtime state so GC can reclaim memory
-func Clear() error {
-	countedTxs = nil
-	configCache.Config = PluginConfig{}
-	configCache.updatedAt = time.Time{}
+func (p *transferPlugin) Clear() error {
+	p.configCache.Config = PluginConfig{}
+	p.configCache.updatedAt = time.Time{}
+	p.countedTxs = nil
 	return nil
 }
 
 // FilterTransaction is the plugin entrypoint invoked by the host.
 // It refreshes config when needed, accumulates tx amount in JPY, and
 // blocks only when configured count/amount thresholds are exceeded.
-func FilterTransaction(txhash common.Hash, from, to common.Address, value [32]byte, logs []types.Log) (isBlocked bool, reason string, err error) {
+func (p *transferPlugin) FilterTransaction(txhash common.Hash, from, to common.Address, value [32]byte, logs []types.Log) (isBlocked bool, reason string, err error) {
 	// Initialize or update it if it's expired
-	if configCache.isExpired() {
-		if err := configCache.update(); err != nil {
-			if configCache.isEmptyConfig() {
+	if p.configCache.isExpired() {
+		if err := p.configCache.update(&p.countedTxs); err != nil {
+			if p.configCache.isEmptyConfig() {
 				// No block, just return error to not block chain execution but notify the error to the caller
 				return false, "", fmt.Errorf("failed to fetch config: %w", err)
 			}
@@ -70,18 +85,18 @@ func FilterTransaction(txhash common.Hash, from, to common.Address, value [32]by
 	}
 
 	// Exit if the config is empty
-	if countedTxs == nil || configCache.isEmptyConfig() {
+	if p.countedTxs == nil || p.configCache.isEmptyConfig() {
 		// No block, but notify the error to the caller
 		return false, "", fmt.Errorf("config is empty")
 	}
 
 	// Skip if the plugin is disabled, or whitelisted, or already counted
-	if configCache.Config.Disabled || configCache.isWhitelisted(from) || countedTxs.contains(txhash) {
+	if p.configCache.Config.Disabled || p.configCache.isWhitelisted(from) || p.countedTxs.contains(txhash) {
 		return allow()
 	}
 
 	// initialize accumulated amount by native token amount
-	accumulatedAmount := configCache.toYen(nil, value)
+	accumulatedAmount := p.configCache.toYen(nil, value)
 
 	for i := range logs {
 		// Skip if the log is not a transfer event
@@ -89,7 +104,7 @@ func FilterTransaction(txhash common.Hash, from, to common.Address, value [32]by
 			continue
 		}
 		// Skip if the log is not a target ERC20
-		target, ok := configCache.isTargetERC20(logs[i].Address)
+		target, ok := p.configCache.isTargetERC20(logs[i].Address)
 		if !ok {
 			continue
 		}
@@ -101,7 +116,7 @@ func FilterTransaction(txhash common.Hash, from, to common.Address, value [32]by
 		// Add accumulated amount by ERC20 token amount
 		var amount [32]byte
 		copy(amount[:], logs[i].Data)
-		accumulatedAmount += configCache.toYen(target, amount)
+		accumulatedAmount += p.configCache.toYen(target, amount)
 	}
 
 	// Skip if the accumulated amount is zero or smaller than 1 yen
@@ -111,12 +126,12 @@ func FilterTransaction(txhash common.Hash, from, to common.Address, value [32]by
 
 	// Check the count and amount thresholds
 	now := time.Now().Unix()
-	if blocks, reason := isOverThreshold(&configCache.Config, accumulatedAmount, now); blocks {
+	if blocks, reason := isOverThreshold(p.countedTxs, &p.configCache.Config, accumulatedAmount, now); blocks {
 		return block(reason)
 	}
 
 	// Count the transaction
-	countedTxs.push(txhash, accumulatedAmount, now)
+	p.countedTxs.push(txhash, accumulatedAmount, now)
 
 	return allow()
 }
@@ -182,7 +197,9 @@ func (c *ConfigCache) isEmptyConfig() bool {
 }
 
 // update fetches and decodes config JSON, then initializes/expands cache capacity.
-func (c *ConfigCache) update() error {
+// countedTxs is a double pointer because this function may allocate a new cache
+// and must write that pointer back to the caller (e.g. when caller's cache is nil).
+func (c *ConfigCache) update(countedTxs **lrucache) error {
 	oldVersion := c.Config.Version
 	resp, err := c.client.Get(configURL)
 	if err != nil {
@@ -202,12 +219,12 @@ func (c *ConfigCache) update() error {
 	c.updatedAt = time.Now()
 
 	// Initialize or expand the countedTxs cache
-	if oldVersion != c.Config.Version || countedTxs == nil {
+	if oldVersion != c.Config.Version || *countedTxs == nil {
 		newCap := c.Config.Threshold.BlockCountThreshold
-		if countedTxs == nil {
-			countedTxs = newCache(newCap)
-		} else if newCap > countedTxs.cap {
-			countedTxs.expandCap(newCap)
+		if *countedTxs == nil {
+			*countedTxs = newCache(newCap)
+		} else if newCap > (*countedTxs).cap {
+			(*countedTxs).expandCap(newCap)
 		}
 	}
 
@@ -263,14 +280,14 @@ func amountFromRaw(value [32]byte, decimals uint8) uint64 {
 
 // isOverThreshold checks both count and amount thresholds within measurement window.
 // Warning thresholds only emit logs; block thresholds return block=true.
-func isOverThreshold(config *PluginConfig, amount uint64, now int64) (blocks bool, reason string) {
+func isOverThreshold(countedTxs *lrucache, config *PluginConfig, amount uint64, now int64) (blocks bool, reason string) {
 	// Check warning count threshold
 	startTime := now - int64(config.MeasurementWindow/time.Second)
-	if b, r := checkCountThreshold(config.Threshold.WarningCountThreshold, startTime); b {
+	if b, r := checkCountThreshold(countedTxs, config.Threshold.WarningCountThreshold, startTime); b {
 		logWarn(r)
 
 		// Continue to check block count threshold
-		if b, r := checkCountThreshold(config.Threshold.BlockCountThreshold, startTime); b {
+		if b, r := checkCountThreshold(countedTxs, config.Threshold.BlockCountThreshold, startTime); b {
 			blocks = true
 			reason = r
 			// return -> continue checking amount threshold
@@ -278,11 +295,11 @@ func isOverThreshold(config *PluginConfig, amount uint64, now int64) (blocks boo
 	}
 
 	// Check warning amount threadhold
-	if b, r, _ := checkAmountThreshold(config.Threshold.WarningAmountThreshold, startTime, amount); b {
+	if b, r, _ := checkAmountThreshold(countedTxs, config.Threshold.WarningAmountThreshold, startTime, amount); b {
 		logWarn(r)
 
 		// Continue to check block amount threshold
-		if b, r, _ := checkAmountThreshold(config.Threshold.BlockAmountThreshold, startTime, amount); b {
+		if b, r, _ := checkAmountThreshold(countedTxs, config.Threshold.BlockAmountThreshold, startTime, amount); b {
 			if reason != "" {
 				reason = fmt.Sprintf("%s, %s", reason, r)
 			} else {
@@ -296,8 +313,7 @@ func isOverThreshold(config *PluginConfig, amount uint64, now int64) (blocks boo
 }
 
 // checkCountThreshold reports true when at least `threshold` txs exist in window.
-func checkCountThreshold(threshold uint, startTime int64) (blocks bool, reason string) {
-	c := countedTxs
+func checkCountThreshold(c *lrucache, threshold uint, startTime int64) (blocks bool, reason string) {
 	n := c.len()
 	if n >= threshold {
 		meta, ok := c.get(n - threshold)
@@ -313,9 +329,7 @@ func checkCountThreshold(threshold uint, startTime int64) (blocks bool, reason s
 
 // checkAmountThreshold reports true when cumulative in-window amount exceeds threshold.
 // midindex is returned for tests to validate binary-search behavior.
-func checkAmountThreshold(threshold uint64, startTime int64, currentAmount uint64) (block bool, reason string, midindex uint /* <- midindex is used for testing */) {
-	c := countedTxs
-
+func checkAmountThreshold(c *lrucache, threshold uint64, startTime int64, currentAmount uint64) (block bool, reason string, midindex uint /* <- midindex is used for testing */) {
 	// Check if the current tx exceeds the threshold
 	if threshold < currentAmount {
 		return true, fmt.Sprintf("over block amount threshold: %d (single tx)", threshold), 0
@@ -329,7 +343,7 @@ func checkAmountThreshold(threshold uint64, startTime int64, currentAmount uint6
 
 	// Check if the sum of all doesn't exceed the threshold
 	oldestMeta, _ := c.getOldest()
-	if computeTotal(oldestMeta, currentAmount) <= threshold {
+	if computeTotal(c, oldestMeta, currentAmount) <= threshold {
 		return
 	}
 
@@ -341,7 +355,7 @@ func checkAmountThreshold(threshold uint64, startTime int64, currentAmount uint6
 		if !ok {
 			break // mid is out of range
 		}
-		sum := computeTotal(midMeta, currentAmount)
+		sum := computeTotal(c, midMeta, currentAmount)
 		if sum <= threshold { // not exceed threshold
 			if midMeta.createdAt < startTime {
 				// Window elapsed, no need to check further
@@ -362,8 +376,7 @@ func checkAmountThreshold(threshold uint64, startTime int64, currentAmount uint6
 
 // computeTotal computes window sum from target item to newest + current tx amount.
 // It tracks uint64 wraparound using per-record overflow parity.
-func computeTotal(target metadata, currentAmount uint64) uint64 {
-	c := countedTxs
+func computeTotal(c *lrucache, target metadata, currentAmount uint64) uint64 {
 	newestMeta, ok := c.getNewest()
 	if !ok {
 		return currentAmount
