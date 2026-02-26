@@ -36,8 +36,17 @@ func Version() string {
 	return version
 }
 
+// Call before loading a new plugin instance.
+// Clear drops references to runtime state so GC can reclaim memory
+func Clear() error {
+	countedTxs = nil
+	configCache.Config = PluginConfig{}
+	configCache.updatedAt = time.Time{}
+	return nil
+}
+
 func FilterTransaction(txhash common.Hash, from, to common.Address, value [32]byte, logs []types.Log) (isBlocked bool, reason string, err error) {
-	// Update config if it's expired
+	// Initialize or update it if it's expired
 	if configCache.isExpired() {
 		if err := configCache.update(); err != nil {
 			if configCache.isEmptyConfig() {
@@ -49,6 +58,12 @@ func FilterTransaction(txhash common.Hash, from, to common.Address, value [32]by
 		}
 	}
 
+	// Exit if the config is empty
+	if countedTxs == nil || configCache.isEmptyConfig() {
+		// No block, but notify the error to the caller
+		return false, "", fmt.Errorf("config is empty")
+	}
+
 	// Skip if the plugin is disabled, or whitelisted, or already counted
 	if configCache.Config.Disabled || configCache.isWhitelisted(from) || countedTxs.contains(txhash) {
 		return allow()
@@ -57,24 +72,24 @@ func FilterTransaction(txhash common.Hash, from, to common.Address, value [32]by
 	// initialize accumulated amount by native token amount
 	accumulatedAmount := configCache.toYen(nil, value)
 
-	for _, log := range logs {
+	for i := range logs {
 		// Skip if the log is not a transfer event
-		if len(log.Topics) != 3 || log.Topics[0] != transferEventTopic {
+		if len(logs[i].Topics) != 3 || logs[i].Topics[0] != transferEventTopic {
 			continue
 		}
 		// Skip if the log is not a target ERC20
-		target, ok := configCache.isTargetERC20(log.Address)
+		target, ok := configCache.isTargetERC20(logs[i].Address)
 		if !ok {
 			continue
 		}
 		// The amount is stored in `log.Data` as a 32-byte value.
 		// sanity check: this should not occur in a standard ERC20 transfer
-		if len(log.Data) != 32 {
+		if len(logs[i].Data) != 32 {
 			continue
 		}
 		// Add accumulated amount by ERC20 token amount
 		var amount [32]byte
-		copy(amount[:], log.Data)
+		copy(amount[:], logs[i].Data)
 		accumulatedAmount += configCache.toYen(target, amount)
 	}
 
@@ -99,12 +114,12 @@ func allow() (bool, string, error) {
 	return false, "", nil
 }
 
-func warn(reason string) {
-	log.Warn("Exceed warning threshold", "plugin", "plugintransfer", "reason", reason)
-}
-
 func block(reason string) (bool, string, error) {
 	return true, reason, nil
+}
+
+func logWarn(reason string) {
+	log.Warn("Exceed warning threshold", "plugin", "plugintransfer", "reason", reason)
 }
 
 type PluginConfig struct {
@@ -147,7 +162,7 @@ func (c *ConfigCache) isExpired() bool {
 }
 
 func (c *ConfigCache) isEmptyConfig() bool {
-	return c.Config.MeasurementWindow == 0
+	return c.Config.MeasurementWindow == 0 || c.Config.Threshold.BlockCountThreshold == 0 || c.Config.Threshold.BlockAmountThreshold == 0
 }
 
 func (c *ConfigCache) update() error {
@@ -187,9 +202,9 @@ func (c *ConfigCache) isWhitelisted(address common.Address) bool {
 }
 
 func (c *ConfigCache) isTargetERC20(address common.Address) (*TargetERC20Config, bool) {
-	for _, target := range c.Config.TargetERC20s {
-		if target.Address == address {
-			return &target, true
+	for i := range c.Config.TargetERC20s {
+		if c.Config.TargetERC20s[i].Address == address {
+			return &c.Config.TargetERC20s[i], true
 		}
 	}
 	return nil, false
@@ -210,10 +225,10 @@ func amountFromRaw(value [32]byte, decimals uint8) uint64 {
 	const maxResult = (math.MaxUint64 - 255) / 256 // overflow threshold for result*256 + quotient
 	var remHi, remLo uint64                        // 128-bit remainder
 	var result uint64
-	for _, b := range value {
+	for i := range value {
 		// val = remainder*256 + b (128-bit)
 		valHi := remHi<<8 | remLo>>56
-		valLo := remLo<<8 | uint64(b)
+		valLo := remLo<<8 | uint64(value[i])
 		quotient, remainder := bits.Div64(valHi, valLo, divisor)
 		remHi, remLo = 0, remainder // remainder < divisor, fits in 64 bits
 
@@ -229,7 +244,7 @@ func isOverThreshold(config *PluginConfig, amount uint64, now int64) (blocks boo
 	// Check warning count threshold
 	startTime := now - int64(config.MeasurementWindow/time.Second)
 	if b, r := checkCountThreshold(config.Threshold.WarningCountThreshold, startTime); b {
-		warn(r)
+		logWarn(r)
 
 		// Continue to check block count threshold
 		if b, r := checkCountThreshold(config.Threshold.BlockCountThreshold, startTime); b {
@@ -241,11 +256,10 @@ func isOverThreshold(config *PluginConfig, amount uint64, now int64) (blocks boo
 
 	// Check warning amount threadhold
 	if b, r, _ := checkAmountThreshold(config.Threshold.WarningAmountThreshold, startTime, amount); b {
-		warn(r)
+		logWarn(r)
 
 		// Continue to check block amount threshold
 		if b, r, _ := checkAmountThreshold(config.Threshold.BlockAmountThreshold, startTime, amount); b {
-			blocks = true
 			if reason != "" {
 				reason = fmt.Sprintf("%s, %s", reason, r)
 			} else {
@@ -262,8 +276,8 @@ func checkCountThreshold(threshold uint, startTime int64) (blocks bool, reason s
 	c := countedTxs
 	n := c.len()
 	if n >= threshold {
-		meta := c.get(n - threshold)
-		if meta != nil && meta.createdAt >= startTime {
+		meta, ok := c.get(n - threshold)
+		if ok && meta.createdAt >= startTime {
 			blocks = true
 			reason = fmt.Sprintf("over count threshold: %d", threshold)
 			return
@@ -288,7 +302,8 @@ func checkAmountThreshold(threshold uint64, startTime int64, currentAmount uint6
 	}
 
 	// Check if the sum of all doesn't exceed the threshold
-	if computeTotal(c.getOldest(), currentAmount) <= threshold {
+	oldestMeta, _ := c.getOldest()
+	if computeTotal(oldestMeta, currentAmount) <= threshold {
 		return
 	}
 
@@ -296,10 +311,10 @@ func checkAmountThreshold(threshold uint64, startTime int64, currentAmount uint6
 	low, high := uint(0), n
 	for low <= high {
 		midindex = (low + high) / 2
-		if n <= midindex { // mid is out of range
-			break
+		midMeta, ok := c.get(midindex)
+		if !ok {
+			break // mid is out of range
 		}
-		midMeta := c.get(midindex)
 		sum := computeTotal(midMeta, currentAmount)
 		if sum <= threshold { // not exceed threshold
 			if midMeta.createdAt < startTime {
@@ -319,9 +334,12 @@ func checkAmountThreshold(threshold uint64, startTime int64, currentAmount uint6
 	return
 }
 
-func computeTotal(target *metadata, currentAmount uint64) uint64 {
+func computeTotal(target metadata, currentAmount uint64) uint64 {
 	c := countedTxs
-	newestMeta := c.getNewest()
+	newestMeta, ok := c.getNewest()
+	if !ok {
+		return currentAmount
+	}
 	accumulatedAmountIncludeCurrent := newestMeta.accumulatedAmount + newestMeta.amount + currentAmount
 	isOddOverflow := newestMeta.isOddOverflow
 	if math.MaxUint64-newestMeta.accumulatedAmount < newestMeta.amount+currentAmount {
@@ -344,7 +362,7 @@ type lrucache struct {
 	head  uint // index of the next slot to be used
 	cap   uint // capacity of the lrucache
 	items []common.Hash
-	txMap map[common.Hash]*metadata
+	txMap map[common.Hash]metadata
 }
 
 func newCache(cap uint) *lrucache {
@@ -352,26 +370,23 @@ func newCache(cap uint) *lrucache {
 		head:  0,
 		cap:   cap,
 		items: make([]common.Hash, cap),
-		txMap: make(map[common.Hash]*metadata, cap),
+		txMap: make(map[common.Hash]metadata, cap),
 	}
 	return &c
 }
 
 func (c *lrucache) push(txhash common.Hash, amount uint64, now int64) {
-	var meta *metadata
-	evicting := c.items[c.head] != emptyHash
-	if evicting {
-		meta = c.txMap[c.items[c.head]] // reuse the will-be-evicted item
-	} else {
-		meta = new(metadata)
+	meta, evicting := c.txMap[c.items[c.head]] // reuse the will-be-evicted item
+	if !evicting {
+		meta = metadata{} // create a new metadata, items array is not full yet
 	}
 	meta.amount = amount
 	meta.createdAt = now
 
 	// Set accumulated amount and overflow flag
 	prevSlot := (c.head + c.cap - 1) % c.cap
-	if c.len() > 0 && c.txMap[c.items[prevSlot]] != nil {
-		prevRecord := c.txMap[c.items[prevSlot]]
+	prevRecord, ok := c.txMap[c.items[prevSlot]]
+	if c.len() > 0 && ok {
 		meta.accumulatedAmount = prevRecord.accumulatedAmount + prevRecord.amount
 		if math.MaxUint64-prevRecord.accumulatedAmount < prevRecord.amount {
 			// overflow, flip the overflow flag
@@ -396,14 +411,14 @@ func (c *lrucache) contains(txhash common.Hash) bool {
 	return ok
 }
 
-func (c *lrucache) get(index uint) *metadata {
+func (c *lrucache) get(index uint) (metadata, bool) {
 	n := c.len()
 	if index >= n {
-		return nil
+		return metadata{}, false
 	}
-	// When not full: data at slots 0..head-1 (oldest=0). When full: oldest at head.
-	physicalSlot := c.physicalSlot(index)
-	return c.txMap[c.items[physicalSlot]]
+	slot := c.physicalSlot(index)
+	meta, ok := c.txMap[c.items[slot]]
+	return meta, ok
 }
 
 // physicalSlot returns the items slice index for logical index i (0=oldest).
@@ -414,14 +429,14 @@ func (c *lrucache) physicalSlot(logicalIndex uint) uint {
 	return (c.head + logicalIndex) % c.cap
 }
 
-func (c *lrucache) getOldest() *metadata {
+func (c *lrucache) getOldest() (metadata, bool) {
 	return c.get(0)
 }
 
-func (c *lrucache) getNewest() *metadata {
+func (c *lrucache) getNewest() (metadata, bool) {
 	n := c.len()
 	if n == 0 {
-		return nil
+		return metadata{}, false
 	}
 	return c.get(n - 1)
 }

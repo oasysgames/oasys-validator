@@ -23,8 +23,11 @@ func hashFromIndex(i uint64) common.Hash {
 
 func makeElapsedItems(c *lrucache, window time.Duration) {
 	for i := uint(0); i < c.len(); i++ {
-		meta := c.get(i)
+		slot := c.physicalSlot(i)
+		h := c.items[slot]
+		meta := c.txMap[h]
 		meta.createdAt -= int64(window/time.Second) + 1
+		c.txMap[h] = meta // write back
 	}
 }
 
@@ -35,7 +38,7 @@ func checkLinearSearch(threshold uint64, startTime int64, currentAmount uint64) 
 	}
 
 	for i := uint(0); i < countedTxs.len(); i++ {
-		meta := countedTxs.get(i)
+		meta, _ := countedTxs.get(i)
 		sum := computeTotal(meta, currentAmount)
 		// if bellow threadhold, exit
 		if sum <= threshold {
@@ -270,6 +273,8 @@ func TestConfigCache(t *testing.T) {
 }
 
 func TestFilterTransaction(t *testing.T) {
+	defer Clear()
+
 	from := common.HexToAddress("0x1000000000000000000000000000000000000001")
 	to := common.HexToAddress("0x2000000000000000000000000000000000000001")
 	erc20 := common.HexToAddress("0x2000000000000000000000000000000000000001")
@@ -456,7 +461,6 @@ func TestFilterTransaction(t *testing.T) {
 	if countedTxs.contains(tx4) {
 		t.Fatal("blocked tx should not be counted")
 	}
-
 }
 
 func TestLruCache_push(t *testing.T) {
@@ -474,8 +478,8 @@ func TestLruCache_push(t *testing.T) {
 
 	// Verify order: index 0=oldest (amount 10), index 1 (20), index 2=newest (30)
 	for i := uint64(0); i < 3; i++ {
-		meta := c.get(uint(i))
-		if meta == nil {
+		meta, ok := c.get(uint(i))
+		if !ok {
 			t.Fatalf("get(%d) returned nil", i)
 		}
 		if meta.amount != 10*(i+1) {
@@ -492,7 +496,7 @@ func TestLruCache_push(t *testing.T) {
 	}
 
 	// Out of range
-	if c.get(5) != nil {
+	if _, ok := c.get(5); ok {
 		t.Error("get(5) should return nil")
 	}
 
@@ -519,20 +523,20 @@ func TestLruCache_push(t *testing.T) {
 	if !c.contains(hashFromIndex(1)) || !c.contains(hashFromIndex(2)) || !c.contains(hashFromIndex(3)) || !c.contains(hashFromIndex(4)) || !c.contains(hashFromIndex(5)) {
 		t.Error("hashes 1,2,3,4,5 should be present")
 	}
-	if oldest := c.getOldest(); oldest == nil || oldest.amount != 20 {
+	if oldest, ok := c.getOldest(); !ok || oldest.amount != 20 {
 		t.Errorf("oldest.amount = %d, want 20", oldest.amount)
 	}
-	if newest := c.getNewest(); newest == nil || newest.amount != 60 {
+	if newest, ok := c.getNewest(); !ok || newest.amount != 60 {
 		t.Errorf("newest.amount = %d, want 60", newest.amount)
 	}
-	if newest := c.getNewest(); newest == nil || newest.accumulatedAmount != (10+20+30+40+50) {
+	if newest, ok := c.getNewest(); !ok || newest.accumulatedAmount != (10+20+30+40+50) {
 		t.Errorf("newest.accumulatedAmount = %d, want 150", newest.accumulatedAmount)
 	}
 
 	// overflow check
 	c.push(hashFromIndex(6), math.MaxUint64-100, time.Now().Unix())
 	c.push(hashFromIndex(7), 80, time.Now().Unix())
-	newest := c.getNewest()
+	newest, _ := c.getNewest()
 	if newest.isOddOverflow != true {
 		t.Errorf("newest.isOddOverflow = %t, want true", newest.isOddOverflow)
 	}
@@ -568,7 +572,7 @@ func TestLruCache_expandCap(t *testing.T) {
 	// check order and data preserved
 	accumulatedAmount := uint64(10)
 	for i := uint(0); i < 5; i++ {
-		meta := c.get(i)
+		meta, _ := c.get(i)
 		expectedAmount := uint64(10 * (i + 2))
 		if meta.amount != expectedAmount {
 			t.Errorf("after expand get(%d): got %v", i, meta)
@@ -583,7 +587,7 @@ func TestLruCache_expandCap(t *testing.T) {
 	}
 
 	// check out of range
-	if meta := c.get(6); meta != nil {
+	if meta, ok := c.get(6); ok {
 		t.Errorf("after expand get(6): got %v, want nil", meta)
 	}
 
@@ -599,10 +603,10 @@ func TestLruCache_expandCap(t *testing.T) {
 	if !c.contains(hashFromIndex(2)) || !c.contains(hashFromIndex(3)) || !c.contains(hashFromIndex(4)) || !c.contains(hashFromIndex(5)) || !c.contains(hashFromIndex(6)) {
 		t.Error("hashes 2,3,4,5,6 should be present")
 	}
-	if oldest := c.getOldest(); oldest == nil || oldest.amount != 30 {
+	if oldest, ok := c.getOldest(); !ok || oldest.amount != 30 {
 		t.Errorf("oldest.amount = %d, want 30", oldest.amount)
 	}
-	if newest := c.getNewest(); newest == nil || newest.amount != 80 {
+	if newest, ok := c.getNewest(); !ok || newest.amount != 80 {
 		t.Errorf("newest.amount = %d, want 80", newest.amount)
 	}
 }
@@ -614,26 +618,32 @@ func TestComputeTotal(t *testing.T) {
 	c.push(hashFromIndex(0), 10, time.Now().Unix())
 	c.push(hashFromIndex(1), 20, time.Now().Unix())
 	c.push(hashFromIndex(2), 30, time.Now().Unix())
-	if got := computeTotal(c.get(0), 5); got != 10+20+30+5 {
+	meta0, _ := c.get(0)
+	if got := computeTotal(meta0, 5); got != 10+20+30+5 {
 		t.Errorf("computeTotal(c, 0, 5) = %d, want %d", got, 10+20+30+5)
 	}
-	if got := computeTotal(c.get(1), 5); got != 20+30+5 {
+	meta1, _ := c.get(1)
+	if got := computeTotal(meta1, 5); got != 20+30+5 {
 		t.Errorf("computeTotal(c, 1, 5) = %d, want %d", got, 20+30+5)
 	}
-	if got := computeTotal(c.get(2), 5); got != 30+5 {
+	meta2, _ := c.get(2)
+	if got := computeTotal(meta2, 5); got != 30+5 {
 		t.Errorf("computeTotal(c, 2, 5) = %d, want %d", got, 30+5)
 	}
 
 	// Overflow case
 	c.push(hashFromIndex(3), math.MaxUint64-100, time.Now().Unix())
 	c.push(hashFromIndex(4), 50, time.Now().Unix())
-	if got := computeTotal(c.get(2), 5); got != 30+math.MaxUint64-100+50+5 {
+	meta2, _ = c.get(2)
+	if got := computeTotal(meta2, 5); got != 30+math.MaxUint64-100+50+5 {
 		t.Errorf("computeTotal(c, 3, 5) = %d, want %d", got, uint64(math.MaxUint64-100+50+5))
 	}
-	if got := computeTotal(c.get(3), 5); got != math.MaxUint64-100+50+5 {
+	meta3, _ := c.get(3)
+	if got := computeTotal(meta3, 5); got != math.MaxUint64-100+50+5 {
 		t.Errorf("computeTotal(c, 3, 5) = %d, want %d", got, uint64(math.MaxUint64-100+50+5))
 	}
-	if got := computeTotal(c.get(4), 5); got != 50+5 {
+	meta4, _ := c.get(4)
+	if got := computeTotal(meta4, 5); got != 50+5 {
 		t.Errorf("computeTotal(c, 4, 5) = %d, want %d", got, 50+5)
 	}
 }
