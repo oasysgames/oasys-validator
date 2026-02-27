@@ -171,7 +171,7 @@ type TargetERC20Config struct {
 	ToYenRate float64        `json:"to_yen_rate"`
 }
 
-// Ok, if the amout is same as the threshold
+// Ok, if the amount is same as the threshold
 type ThresholdConfig struct {
 	WarningCountThreshold  uint   `json:"warning_tx_count_threshold"`
 	BlockCountThreshold    uint   `json:"block_count_threshold"`
