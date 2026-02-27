@@ -96,7 +96,7 @@ func (p *transferPlugin) FilterTransaction(txhash common.Hash, from, to common.A
 	}
 
 	// initialize accumulated amount by native token amount
-	accumulatedAmount := p.configCache.toYen(nil, value)
+	accumulatedYen := p.configCache.toYen(nil, value)
 
 	for i := range logs {
 		// Skip if the log is not a transfer event
@@ -116,22 +116,22 @@ func (p *transferPlugin) FilterTransaction(txhash common.Hash, from, to common.A
 		// Add accumulated amount by ERC20 token amount
 		var amount [32]byte
 		copy(amount[:], logs[i].Data)
-		accumulatedAmount += p.configCache.toYen(target, amount)
+		accumulatedYen += p.configCache.toYen(target, amount)
 	}
 
 	// Skip if the accumulated amount is zero or smaller than 1 yen
-	if accumulatedAmount == 0 {
+	if accumulatedYen == 0 {
 		return allow()
 	}
 
 	// Check the count and amount thresholds
 	now := time.Now().Unix()
-	if blocks, reason := isOverThreshold(p.countedTxs, &p.configCache.Config, accumulatedAmount, now); blocks {
+	if blocks, reason := isOverThreshold(p.countedTxs, &p.configCache.Config, accumulatedYen, now); blocks {
 		return block(reason)
 	}
 
 	// Count the transaction
-	p.countedTxs.push(txhash, accumulatedAmount, now)
+	p.countedTxs.push(txhash, accumulatedYen, now)
 
 	return allow()
 }
