@@ -294,7 +294,7 @@ func isOverThreshold(countedTxs *lrucache, config *PluginConfig, amount uint64, 
 		}
 	}
 
-	// Check warning amount threadhold
+	// Check warning amount threshold
 	if b, r, _ := checkAmountThreshold(countedTxs, config.Threshold.WarningAmountThreshold, startTime, amount); b {
 		logWarn(r)
 
