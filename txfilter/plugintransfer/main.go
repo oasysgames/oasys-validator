@@ -332,7 +332,7 @@ func checkCountThreshold(c *lrucache, threshold uint, startTime int64) (blocks b
 func checkAmountThreshold(c *lrucache, threshold uint64, startTime int64, currentAmount uint64) (block bool, reason string, midindex uint /* <- midindex is used for testing */) {
 	// Check if the current tx exceeds the threshold
 	if threshold < currentAmount {
-		return true, fmt.Sprintf("over block amount threshold: %d (single tx)", threshold), 0
+		return true, fmt.Sprintf("over amount threshold: %d (single tx)", threshold), 0
 	}
 
 	// Skip if the cache is empty
@@ -365,7 +365,7 @@ func checkAmountThreshold(c *lrucache, threshold uint64, startTime int64, curren
 		} else { // exceed threshold
 			if midMeta.createdAt >= startTime {
 				// Within window, found!
-				return true, fmt.Sprintf("over block amount threshold: %d, window sum: %d, current tx amount: %d", threshold, sum, currentAmount), midindex
+				return true, fmt.Sprintf("over amount threshold: %d, window sum: %d, current tx amount: %d", threshold, sum, currentAmount), midindex
 			}
 			low = midindex + 1 // move to the right (go newer items)
 		}
