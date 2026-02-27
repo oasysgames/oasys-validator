@@ -361,7 +361,7 @@ func checkAmountThreshold(c *lrucache, threshold uint64, startTime int64, curren
 				// Window elapsed, no need to check further
 				return
 			}
-			high = midindex - 1 // move to the leff (go older items)
+			high = midindex - 1 // move to the left (go older items)
 		} else { // exceed threshold
 			if midMeta.createdAt >= startTime {
 				// Within window, found!
