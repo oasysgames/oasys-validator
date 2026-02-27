@@ -41,8 +41,8 @@ const (
 	// The suspicious txfilter plugin metadata file name
 	PluginMetadataFileName = "suspicious_txfilter.json"
 
-	pluginFunctionName       = "FilterTransaction"
-	pluginFuncNameGetVersion = "Version"
+	// Exported symbol name in the plugin .so.
+	pluginSymbolName = "Plugin"
 )
 
 var (
@@ -54,6 +54,16 @@ var (
 	// would significantly increase the merge conflict effort.
 	SuspiciousTxfilterGlobal *SuspiciousTxfilter
 )
+
+// SuspiciousTxfilterPlugin is the interface that a loaded plugin must implement.
+type SuspiciousTxfilterPlugin interface {
+	// Version returns the plugin version string, used to verify compatibility with the host.
+	Version() string
+	// Clear drops runtime state so the host can load a new plugin instance; called before plugin reload.
+	Clear() error
+	// FilterTransaction decides whether to block the transaction.
+	FilterTransaction(txhash common.Hash, from, to common.Address, value [32]byte, logs []types.Log) (isBlocked bool, reason string, err error)
+}
 
 type SuspiciousTxfilterPluginMetadata struct {
 	Version             string  `json:"version"`
@@ -122,13 +132,13 @@ func (s *SuspiciousTxfilter) IsReady() bool {
 	return true
 }
 
-func (s *SuspiciousTxfilter) VerifyPluginVersion(plugin *plugin.Plugin) error {
+func (s *SuspiciousTxfilter) VerifyPluginVersion(p *plugin.Plugin) error {
 	metadata := s.metadata.Load()
 	if metadata == nil || metadata.Version == "" {
 		return fmt.Errorf("plugin metadata not found")
 	}
 
-	pluginVersion, err := pluginVersion(plugin)
+	pluginVersion, err := pluginVersion(p)
 	if err != nil {
 		return fmt.Errorf("failed to get plugin version: %w", err)
 	}
@@ -148,6 +158,10 @@ func (s *SuspiciousTxfilter) FilterTransaction(txhash common.Hash, msg *Message,
 	plugin := s.plugin.Load()
 	if plugin == nil {
 		return false, "", fmt.Errorf("plugin not loaded")
+	}
+	impl, err := loadPluginImpl(plugin)
+	if err != nil {
+		return false, "", fmt.Errorf("failed to load plugin implementation: %w", err)
 	}
 
 	// Copy data to call the plugin function
@@ -171,16 +185,7 @@ func (s *SuspiciousTxfilter) FilterTransaction(txhash common.Hash, msg *Message,
 		copy(copiedLogs[i].Data, log.Data)
 	}
 
-	// Call the plugin function
-	f, err := plugin.Lookup(pluginFunctionName)
-	if err != nil {
-		return false, "", fmt.Errorf("failed to lookup plugin function: %w", err)
-	}
-	process, ok := f.(func(common.Hash, common.Address, common.Address, [32]byte, []types.Log) (bool, string, error))
-	if !ok {
-		return false, "", fmt.Errorf("plugin function has incorrect signature")
-	}
-	return process(txhash, from, to, value, copiedLogs)
+	return impl.FilterTransaction(txhash, from, to, value, copiedLogs)
 }
 
 func (s *SuspiciousTxfilter) fetchPlugin() error {
@@ -304,7 +309,18 @@ func (s *SuspiciousTxfilter) loadPlugin() error {
 		return fmt.Errorf("failed to verify plugin version: %w", err)
 	}
 
+	// Clear the current plugin so it can release runtime state before we load the new instance.
+	if current := s.plugin.Load(); current != nil {
+		if impl, err := loadPluginImpl(current); err == nil {
+			if err = impl.Clear(); err != nil {
+				log.Warn("Suspicious txfilter plugin Clear failed", "err", err)
+			}
+		}
+	}
+
+	// Store the new plugin instance
 	s.plugin.Store(loadedPlugin)
+
 	return nil
 }
 
@@ -478,19 +494,26 @@ func (s *SuspiciousTxfilter) fetch(url string) (io.ReadCloser, error) {
 	return resp.Body, nil
 }
 
-func pluginVersion(plugin *plugin.Plugin) (string, error) {
-	if plugin == nil {
+func pluginVersion(p *plugin.Plugin) (string, error) {
+	if p == nil {
 		return "", fmt.Errorf("plugin is nil")
 	}
-	f, err := plugin.Lookup(pluginFuncNameGetVersion)
+	impl, err := loadPluginImpl(p)
 	if err != nil {
-		return "", fmt.Errorf("failed to lookup plugin function: %w", err)
+		return "", err
 	}
-	version, ok := f.(func() string)
-	if !ok {
-		return "", fmt.Errorf("plugin function has incorrect signature")
+	return impl.Version(), nil
+}
+
+func loadPluginImpl(p *plugin.Plugin) (SuspiciousTxfilterPlugin, error) {
+	symbol, err := p.Lookup(pluginSymbolName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to lookup plugin symbol: %w", err)
 	}
-	return version(), nil
+	if impl, ok := symbol.(SuspiciousTxfilterPlugin); ok {
+		return impl, nil
+	}
+	return nil, fmt.Errorf("plugin symbol has incorrect type: %T", symbol)
 }
 
 type nonExpiringVerifier struct {
