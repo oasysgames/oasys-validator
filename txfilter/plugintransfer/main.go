@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
+	// "github.com/ethereum/go-ethereum/core" -> Avoid to import core package to reduce binary size and prevent unknown errors.
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -42,7 +42,7 @@ var (
 	transferEventTopic = common.HexToHash("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")
 
 	// transferPlugin implements core.Plugin interface.
-	_ core.SuspiciousTxfilterPlugin = (*transferPlugin)(nil)
+	// _ core.SuspiciousTxfilterPlugin = (*transferPlugin)(nil)
 )
 
 // transferPlugin is the long-lived plugin runtime state.
