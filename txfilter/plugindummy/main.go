@@ -6,6 +6,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
+	// "github.com/ethereum/go-ethereum/core" -> Avoid to import core package to reduce binary size and prevent unknown errors.
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -27,7 +29,24 @@ type ReasonJSON struct {
 	Logs  []LogEntry `json:"logs"`
 }
 
-func FilterTransaction(txhash common.Hash, from, to common.Address, value [32]byte, logs []types.Log) (isBlocked bool, reason string, err error) {
+type dummyPlugin struct {
+	version         *string
+	blockedByPlugin *string
+}
+
+var (
+	// Don't change the name of the variable
+	// Host will use this variable to load the plugin.
+	Plugin = dummyPlugin{
+		version:         &version,
+		blockedByPlugin: &blockedByPlugin,
+	}
+
+	// dummyPlugin implements core.SuspiciousTxfilterPlugin interface.
+	// _ core.SuspiciousTxfilterPlugin = (*dummyPlugin)(nil)
+)
+
+func (p *dummyPlugin) FilterTransaction(txhash common.Hash, from, to common.Address, value [32]byte, logs []types.Log) (isBlocked bool, reason string, err error) {
 	if blockedByPlugin == "true" {
 		// Given all the arguments, form a JSON string
 		valueStr := hexutil.Encode(value[:])
@@ -58,6 +77,10 @@ func FilterTransaction(txhash common.Hash, from, to common.Address, value [32]by
 	return false, "", nil
 }
 
-func Version() string {
-	return version
+func (p *dummyPlugin) Version() string {
+	return *p.version
+}
+
+func (*dummyPlugin) Clear() error {
+	return nil
 }
