@@ -12,6 +12,7 @@ import (
 	// "github.com/ethereum/go-ethereum/core" -> Avoid to import core package to reduce binary size and prevent unknown errors.
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/txfilter/plugintransfer/config"
 )
 
 var (
@@ -26,7 +27,7 @@ var (
 	Plugin = transferPlugin{
 		version: &version,
 		configCache: ConfigCache{
-			Config:    PluginConfig{},
+			Config:    config.PluginConfig{},
 			updatedAt: time.Time{},
 			ttl:       1 * time.Hour,
 			client:    http.Client{Timeout: 30 * time.Second},
@@ -62,7 +63,7 @@ func (p *transferPlugin) Version() string {
 // Call before loading a new plugin instance.
 // Clear drops references to runtime state so GC can reclaim memory
 func (p *transferPlugin) Clear() error {
-	p.configCache.Config = PluginConfig{}
+	p.configCache.Config = config.PluginConfig{}
 	p.configCache.updatedAt = time.Time{}
 	p.countedTxs = nil
 	return nil
@@ -150,37 +151,8 @@ func logWarn(reason string) {
 	log.Warn("Exceed warning threshold", "plugin", "plugintransfer", "reason", reason)
 }
 
-// PluginConfig is loaded from remote JSON and controls all filter behavior.
-type PluginConfig struct {
-	Version           uint64                  `json:"version"`
-	Whitelists        map[common.Address]bool `json:"whitelists"`
-	MeasurementWindow time.Duration           `json:"measurement_window"`
-	Threshold         ThresholdConfig         `json:"threshold"`
-	NativeToken       NativeTokenConfig       `json:"native_token"`
-	TargetERC20s      []TargetERC20Config     `json:"target_erc20s"`
-	Disabled          bool                    `json:"disabled"`
-}
-
-type NativeTokenConfig struct {
-	ToYenRate float64 `json:"to_yen_rate"`
-}
-
-type TargetERC20Config struct {
-	Address   common.Address `json:"address"`
-	Decimals  uint8          `json:"decimals"`
-	ToYenRate float64        `json:"to_yen_rate"`
-}
-
-// Ok, if the amount is same as the threshold
-type ThresholdConfig struct {
-	WarningCountThreshold  uint   `json:"warning_tx_count_threshold"`
-	BlockCountThreshold    uint   `json:"block_count_threshold"`
-	WarningAmountThreshold uint64 `json:"warning_amount_threshold"`
-	BlockAmountThreshold   uint64 `json:"block_amount_threshold"`
-}
-
 type ConfigCache struct {
-	Config    PluginConfig
+	Config    config.PluginConfig
 	updatedAt time.Time
 	ttl       time.Duration
 	client    http.Client
@@ -236,7 +208,7 @@ func (c *ConfigCache) isWhitelisted(address common.Address) bool {
 }
 
 // isTargetERC20 returns target token config by contract address.
-func (c *ConfigCache) isTargetERC20(address common.Address) (*TargetERC20Config, bool) {
+func (c *ConfigCache) isTargetERC20(address common.Address) (*config.TargetERC20Config, bool) {
 	for i := range c.Config.TargetERC20s {
 		if c.Config.TargetERC20s[i].Address == address {
 			return &c.Config.TargetERC20s[i], true
@@ -246,7 +218,7 @@ func (c *ConfigCache) isTargetERC20(address common.Address) (*TargetERC20Config,
 }
 
 // toYen converts token raw amount to integer JPY units (truncating fractional part).
-func (c *ConfigCache) toYen(target *TargetERC20Config, value [32]byte) uint64 {
+func (c *ConfigCache) toYen(target *config.TargetERC20Config, value [32]byte) uint64 {
 	if target == nil { // native token
 		return uint64(float64(amountFromRaw(value, 18)) * c.Config.NativeToken.ToYenRate)
 	}
@@ -280,7 +252,7 @@ func amountFromRaw(value [32]byte, decimals uint8) uint64 {
 
 // isOverThreshold checks both count and amount thresholds within measurement window.
 // Warning thresholds only emit logs; block thresholds return block=true.
-func isOverThreshold(countedTxs *lrucache, config *PluginConfig, amount uint64, now int64) (blocks bool, reason string) {
+func isOverThreshold(countedTxs *lrucache, config *config.PluginConfig, amount uint64, now int64) (blocks bool, reason string) {
 	// Check warning count threshold
 	startTime := now - int64(config.MeasurementWindow/time.Second)
 	if b, r := checkCountThreshold(countedTxs, config.Threshold.WarningCountThreshold, startTime); b {

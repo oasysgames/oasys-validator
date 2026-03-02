@@ -15,6 +15,7 @@ import (
 	gethmath "github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/txfilter/plugintransfer/config"
 )
 
 func hashFromIndex(i uint64) common.Hash {
@@ -138,21 +139,21 @@ func TestConfigCache(t *testing.T) {
 	whitelistA := common.HexToAddress("0x1000000000000000000000000000000000000001")
 	whitelistB := common.HexToAddress("0x1000000000000000000000000000000000000002")
 	targetA := common.HexToAddress("0x2000000000000000000000000000000000000001")
-	configs := []PluginConfig{
+	configs := []config.PluginConfig{
 		{
 			Version:           1,
 			Whitelists:        map[common.Address]bool{whitelistA: true},
 			MeasurementWindow: 2 * time.Second,
-			Threshold: ThresholdConfig{
+			Threshold: config.ThresholdConfig{
 				WarningCountThreshold:  2,
 				BlockCountThreshold:    3,
 				WarningAmountThreshold: 100,
 				BlockAmountThreshold:   200,
 			},
-			NativeToken: NativeTokenConfig{
+			NativeToken: config.NativeTokenConfig{
 				ToYenRate: 0.123,
 			},
-			TargetERC20s: []TargetERC20Config{
+			TargetERC20s: []config.TargetERC20Config{
 				{
 					Address:   targetA,
 					Decimals:  6,
@@ -165,16 +166,16 @@ func TestConfigCache(t *testing.T) {
 			Version:           2,
 			Whitelists:        map[common.Address]bool{whitelistB: true},
 			MeasurementWindow: 3 * time.Second,
-			Threshold: ThresholdConfig{
+			Threshold: config.ThresholdConfig{
 				WarningCountThreshold:  3,
 				BlockCountThreshold:    5, // higher than v1 to verify expandCap
 				WarningAmountThreshold: 150,
 				BlockAmountThreshold:   300,
 			},
-			NativeToken: NativeTokenConfig{
+			NativeToken: config.NativeTokenConfig{
 				ToYenRate: 200,
 			},
-			TargetERC20s: []TargetERC20Config{
+			TargetERC20s: []config.TargetERC20Config{
 				{
 					Address:   targetA,
 					Decimals:  6,
@@ -290,7 +291,7 @@ func TestFilterTransaction(t *testing.T) {
 	// Case 1: expired + empty config + update error => blocked
 	configURL = "http://127.0.0.1:1/plugintransfer.json"
 	p.configCache = ConfigCache{
-		Config:    PluginConfig{},
+		Config:    config.PluginConfig{},
 		updatedAt: time.Time{},
 		ttl:       1 * time.Hour,
 		client:    http.Client{Timeout: 200 * time.Millisecond},
@@ -310,15 +311,15 @@ func TestFilterTransaction(t *testing.T) {
 	// Prepare stable in-memory config for the remaining scenario.
 
 	p.configCache = ConfigCache{
-		Config: PluginConfig{
+		Config: config.PluginConfig{
 			MeasurementWindow: 10 * time.Second,
-			Threshold: ThresholdConfig{
+			Threshold: config.ThresholdConfig{
 				WarningCountThreshold:  1,
 				BlockCountThreshold:    2,
 				WarningAmountThreshold: 2,
 				BlockAmountThreshold:   5,
 			},
-			NativeToken: NativeTokenConfig{
+			NativeToken: config.NativeTokenConfig{
 				ToYenRate: 1,
 			},
 			Whitelists: map[common.Address]bool{},
@@ -385,7 +386,7 @@ func TestFilterTransaction(t *testing.T) {
 	if !blocked {
 		t.Fatalf("expected block by amount threshold, reason: %s", reason)
 	}
-	if !strings.Contains(reason, "over block amount threshold") {
+	if !strings.Contains(reason, "over amount threshold") {
 		t.Fatalf("expected amount-threshold reason, got: %s", reason)
 	}
 	if p.countedTxs.contains(tx2) {
@@ -421,7 +422,7 @@ func TestFilterTransaction(t *testing.T) {
 	p.configCache.Config.Threshold.BlockCountThreshold = 100
 	p.configCache.Config.Threshold.WarningAmountThreshold = 1
 	p.configCache.Config.Threshold.BlockAmountThreshold = 2
-	p.configCache.Config.TargetERC20s = []TargetERC20Config{
+	p.configCache.Config.TargetERC20s = []config.TargetERC20Config{
 		{
 			Address:   erc20,
 			Decimals:  18,
@@ -455,7 +456,7 @@ func TestFilterTransaction(t *testing.T) {
 	if !blocked {
 		t.Fatalf("expected block by erc20 amount threshold, reason: %s", reason)
 	}
-	if !strings.Contains(reason, "over block amount threshold") {
+	if !strings.Contains(reason, "over amount threshold") {
 		t.Fatalf("expected amount-threshold reason, got: %s", reason)
 	}
 	if p.countedTxs.contains(tx4) {
