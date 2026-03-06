@@ -16,7 +16,7 @@ geth:
 	$(GORUN) build/ci.go install ./cmd/geth
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/geth\" to launch geth."
-	@$(MAKE) plugin
+	# @$(MAKE) plugin
 
 #? plugin: Build the suspicious txfilter plugin.
 # The plugin must be built with the exact same Go version, build tags, and go.mod as the test binary.

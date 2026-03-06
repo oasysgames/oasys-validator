@@ -223,13 +223,13 @@ func ApplyTransactionWithEVM(msg *Message, gp *GasPool, statedb *state.StateDB, 
 	// Run txfilter before StateDB.Finalise (Finalise clears the journal, making revert impossible).
 	if txfilter != nil {
 		logs := statedb.GetLogs(tx.Hash(), blockNumber.Uint64(), blockHash, blockTime)
-		txHash, _ := statedb.GetTxContext()
-		isBlocked, reason, filterErr := txfilter.FilterTransaction(txHash, msg, logs)
+		isBlocked, reason, filterErr := txfilter.FilterTransaction(tx.Hash(), msg, logs)
 		if filterErr != nil {
 			log.Warn("Suspicious txfilter failed", "error", filterErr)
 			// return nil, filterErr // Don't block execution by any error from the plugin
 		} else if isBlocked {
 			// No need to revert — tx that throw errors will be reverted by worker.applyTransaction.
+			log.Warn("Suspicious txfilter blocked", "txhash", tx.Hash().Hex(), "reason", reason)
 			return nil, fmt.Errorf("%w: %s", ErrSuspiciousTxfilter, reason)
 		}
 	}
