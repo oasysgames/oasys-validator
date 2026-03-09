@@ -17,73 +17,15 @@ import (
 // MarshalTOML marshals as TOML.
 func (c Config) MarshalTOML() (interface{}, error) {
 	type Config struct {
-<<<<<<< HEAD
-		Genesis                 *core.Genesis `toml:",omitempty"`
-		NetworkId               uint64
-		SyncMode                SyncMode
-		DisablePeerTxBroadcast  bool
-		HistoryMode             history.HistoryMode
-		EthDiscoveryURLs        []string
-		SnapDiscoveryURLs       []string
-		NoPruning               bool
-		NoPrefetch              bool
-		DirectBroadcast         bool
-		DisableSnapProtocol     bool
-		RangeLimit              bool
-		TxLookupLimit           uint64 `toml:",omitempty"`
-		TransactionHistory      uint64 `toml:",omitempty"`
-		BlockHistory            uint64 `toml:",omitempty"`
-		LogHistory              uint64 `toml:",omitempty"`
-		LogNoHistory            bool   `toml:",omitempty"`
-		LogExportCheckpoints    string
-		StateHistory            uint64 `toml:",omitempty"`
-		StateScheme             string `toml:",omitempty"`
-		PathSyncFlush           bool   `toml:",omitempty"`
-		JournalFileEnabled      bool
-		DisableTxIndexer        bool                   `toml:",omitempty"`
-		RequiredBlocks          map[uint64]common.Hash `toml:"-"`
-		SkipBcVersionCheck      bool                   `toml:"-"`
-		DatabaseHandles         int                    `toml:"-"`
-		DatabaseCache           int
-		DatabaseFreezer         string
-		DatabaseEra             string
-		PruneAncientData        bool
-		TrieCleanCache          int
-		TrieDirtyCache          int
-		TrieTimeout             time.Duration
-		SnapshotCache           int
-		TriesInMemory           uint64
-		TriesVerifyMode         core.VerifyMode
-		Preimages               bool
-		FilterLogCacheSize      int
-		Miner                   minerconfig.Config
-		TxPool                  legacypool.Config
-		BlobPool                blobpool.Config
-		GPO                     gasprice.Config
-		EnablePreimageRecording bool
-		VMTrace                 string
-		VMTraceJsonConfig       string
-		RPCGasCap               uint64
-		RPCEVMTimeout           time.Duration
-		RPCTxFeeCap             float64
-		OverridePassedForkTime  *uint64 `toml:",omitempty"`
-		OverrideOsaka           *uint64 `toml:",omitempty"`
-		OverrideVerkle          *uint64 `toml:",omitempty"`
-		BlobExtraReserve        uint64
-=======
 		Genesis                   *core.Genesis `toml:",omitempty"`
 		NetworkId                 uint64
 		SyncMode                  SyncMode
 		DisablePeerTxBroadcast    bool
-		EVNNodeIDsToAdd           []enode.ID
-		EVNNodeIDsToRemove        []enode.ID
 		HistoryMode               history.HistoryMode
 		EthDiscoveryURLs          []string
 		SnapDiscoveryURLs         []string
-		BscDiscoveryURLs          []string
 		NoPruning                 bool
 		NoPrefetch                bool
-		EnableBAL                 bool
 		DirectBroadcast           bool
 		DisableSnapProtocol       bool
 		RangeLimit                bool
@@ -124,11 +66,7 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		RPCEVMTimeout             time.Duration
 		RPCTxFeeCap               float64
 		OverridePassedForkTime    *uint64 `toml:",omitempty"`
-		OverrideLorentz           *uint64 `toml:",omitempty"`
-		OverrideMaxwell           *uint64 `toml:",omitempty"`
-		OverrideFermi             *uint64 `toml:",omitempty"`
 		OverrideOsaka             *uint64 `toml:",omitempty"`
-		OverrideMendel            *uint64 `toml:",omitempty"`
 		OverrideVerkle            *uint64 `toml:",omitempty"`
 		BlobExtraReserve          uint64
 		EnableOpcodeOptimizing    bool
@@ -139,7 +77,6 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		IncrSnapshotKeptBlocks    uint64
 		UseRemoteIncrSnapshot     bool
 		RemoteIncrSnapshotURL     string
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	}
 	var enc Config
 	enc.Genesis = c.Genesis
@@ -210,73 +147,15 @@ func (c Config) MarshalTOML() (interface{}, error) {
 // UnmarshalTOML unmarshals from TOML.
 func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	type Config struct {
-<<<<<<< HEAD
-		Genesis                 *core.Genesis `toml:",omitempty"`
-		NetworkId               *uint64
-		SyncMode                *SyncMode
-		DisablePeerTxBroadcast  *bool
-		HistoryMode             *history.HistoryMode
-		EthDiscoveryURLs        []string
-		SnapDiscoveryURLs       []string
-		NoPruning               *bool
-		NoPrefetch              *bool
-		DirectBroadcast         *bool
-		DisableSnapProtocol     *bool
-		RangeLimit              *bool
-		TxLookupLimit           *uint64 `toml:",omitempty"`
-		TransactionHistory      *uint64 `toml:",omitempty"`
-		BlockHistory            *uint64 `toml:",omitempty"`
-		LogHistory              *uint64 `toml:",omitempty"`
-		LogNoHistory            *bool   `toml:",omitempty"`
-		LogExportCheckpoints    *string
-		StateHistory            *uint64 `toml:",omitempty"`
-		StateScheme             *string `toml:",omitempty"`
-		PathSyncFlush           *bool   `toml:",omitempty"`
-		JournalFileEnabled      *bool
-		DisableTxIndexer        *bool                  `toml:",omitempty"`
-		RequiredBlocks          map[uint64]common.Hash `toml:"-"`
-		SkipBcVersionCheck      *bool                  `toml:"-"`
-		DatabaseHandles         *int                   `toml:"-"`
-		DatabaseCache           *int
-		DatabaseFreezer         *string
-		DatabaseEra             *string
-		PruneAncientData        *bool
-		TrieCleanCache          *int
-		TrieDirtyCache          *int
-		TrieTimeout             *time.Duration
-		SnapshotCache           *int
-		TriesInMemory           *uint64
-		TriesVerifyMode         *core.VerifyMode
-		Preimages               *bool
-		FilterLogCacheSize      *int
-		Miner                   *minerconfig.Config
-		TxPool                  *legacypool.Config
-		BlobPool                *blobpool.Config
-		GPO                     *gasprice.Config
-		EnablePreimageRecording *bool
-		VMTrace                 *string
-		VMTraceJsonConfig       *string
-		RPCGasCap               *uint64
-		RPCEVMTimeout           *time.Duration
-		RPCTxFeeCap             *float64
-		OverridePassedForkTime  *uint64 `toml:",omitempty"`
-		OverrideOsaka           *uint64 `toml:",omitempty"`
-		OverrideVerkle          *uint64 `toml:",omitempty"`
-		BlobExtraReserve        *uint64
-=======
 		Genesis                   *core.Genesis `toml:",omitempty"`
 		NetworkId                 *uint64
 		SyncMode                  *SyncMode
 		DisablePeerTxBroadcast    *bool
-		EVNNodeIDsToAdd           []enode.ID
-		EVNNodeIDsToRemove        []enode.ID
 		HistoryMode               *history.HistoryMode
 		EthDiscoveryURLs          []string
 		SnapDiscoveryURLs         []string
-		BscDiscoveryURLs          []string
 		NoPruning                 *bool
 		NoPrefetch                *bool
-		EnableBAL                 *bool
 		DirectBroadcast           *bool
 		DisableSnapProtocol       *bool
 		RangeLimit                *bool
@@ -317,11 +196,7 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		RPCEVMTimeout             *time.Duration
 		RPCTxFeeCap               *float64
 		OverridePassedForkTime    *uint64 `toml:",omitempty"`
-		OverrideLorentz           *uint64 `toml:",omitempty"`
-		OverrideMaxwell           *uint64 `toml:",omitempty"`
-		OverrideFermi             *uint64 `toml:",omitempty"`
 		OverrideOsaka             *uint64 `toml:",omitempty"`
-		OverrideMendel            *uint64 `toml:",omitempty"`
 		OverrideVerkle            *uint64 `toml:",omitempty"`
 		BlobExtraReserve          *uint64
 		EnableOpcodeOptimizing    *bool
@@ -332,7 +207,6 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		IncrSnapshotKeptBlocks    *uint64
 		UseRemoteIncrSnapshot     *bool
 		RemoteIncrSnapshotURL     *string
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	}
 	var dec Config
 	if err := unmarshal(&dec); err != nil {
