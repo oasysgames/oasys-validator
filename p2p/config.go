@@ -89,21 +89,6 @@ type Config struct {
 	// allowed to connect, even above the peer limit.
 	TrustedNodes []*enode.Node
 
-<<<<<<< HEAD
-=======
-	// EVNNodeIdsWhitelist is a list of NodeIDs that should be directly broadcast block to
-	// the list is another choice for non-validator nodes to get block quickly
-	EVNNodeIdsWhitelist []enode.ID `toml:",omitempty"`
-
-	// ProxyedValidatorAddresses is a list of validator addresses that the local node proxies,
-	// it usually used for sentry nodes
-	ProxyedValidatorAddresses []common.Address `toml:",omitempty"`
-
-	// ProxyedNodeIds lists node IDs that receive direct broadcasts of blocks and votes,
-	// excluding transactions, to prevent delays in block and vote propagation.
-	ProxyedNodeIds []enode.ID `toml:",omitempty"`
-
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	// Connectivity can be restricted to certain IP networks.
 	// If this option is set to a non-nil value, only hosts which match one of the
 	// IP networks contained in the list are considered.
