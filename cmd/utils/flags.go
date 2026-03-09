@@ -43,6 +43,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/fdlimit"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/opcodeCompiler/compiler"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/txpool/blobpool"
 	"github.com/ethereum/go-ethereum/core/txpool/legacypool"
@@ -193,6 +194,11 @@ var (
 		Usage:    "Oasys testnet",
 		Category: flags.EthCategory,
 	}
+	EnableBALFlag = &cli.BoolFlag{
+		Name:     "enablebal",
+		Usage:    "Enable block access list feature, validator will generate BAL for each block",
+		Category: flags.EthCategory,
+	}
 	// Dev mode
 	DeveloperFlag = &cli.BoolFlag{
 		Name:     "dev",
@@ -300,6 +306,34 @@ var (
 		Usage:    "Manually specify the hard fork timestamps which have passed on the mainnet, overriding the bundled setting",
 		Category: flags.EthCategory,
 	}
+<<<<<<< HEAD
+=======
+	OverrideLorentz = &cli.Uint64Flag{
+		Name:     "override.lorentz",
+		Usage:    "Manually specify the Lorentz fork timestamp, overriding the bundled setting",
+		Category: flags.EthCategory,
+	}
+	OverrideMaxwell = &cli.Uint64Flag{
+		Name:     "override.maxwell",
+		Usage:    "Manually specify the Maxwell fork timestamp, overriding the bundled setting",
+		Category: flags.EthCategory,
+	}
+	OverrideFermi = &cli.Uint64Flag{
+		Name:     "override.fermi",
+		Usage:    "Manually specify the Fermi fork timestamp, overriding the bundled setting",
+		Category: flags.EthCategory,
+	}
+	OverrideOsaka = &cli.Uint64Flag{
+		Name:     "override.osaka",
+		Usage:    "Manually specify the Osaka fork timestamp, overriding the bundled setting",
+		Category: flags.EthCategory,
+	}
+	OverrideMendel = &cli.Uint64Flag{
+		Name:     "override.mendel",
+		Usage:    "Manually specify the Mendel fork timestamp, overriding the bundled setting",
+		Category: flags.EthCategory,
+	}
+>>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	OverrideVerkle = &cli.Uint64Flag{
 		Name:     "override.verkle",
 		Usage:    "Manually specify the Verkle fork timestamp, overriding the bundled setting",
@@ -331,7 +365,7 @@ var (
 	}
 	GCModeFlag = &cli.StringFlag{
 		Name:     "gcmode",
-		Usage:    `Blockchain garbage collection mode, only relevant in state.scheme=hash ("full", "archive")`,
+		Usage:    `Blockchain garbage collection mode ("full", "archive")`,
 		Value:    "full",
 		Category: flags.StateCategory,
 	}
@@ -348,13 +382,18 @@ var (
 	}
 	JournalFileFlag = &cli.BoolFlag{
 		Name:     "journalfile",
+<<<<<<< HEAD
 		Usage:    "Enable using journal file to store the TrieJournal instead of KVDB in pbss (default = false)",
 		Value:    bscFeaturesDefaultBool,
+=======
+		Usage:    "Enable using journal file to store the TrieJournal instead of KVDB in pbss (default = true)",
+		Value:    true,
+>>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 		Category: flags.StateCategory,
 	}
 	StateHistoryFlag = &cli.Uint64Flag{
 		Name:     "history.state",
-		Usage:    "Number of recent blocks to retain state history for, only relevant in state.scheme=path (default = 90,000 blocks, 0 = entire chain)",
+		Usage:    "Number of recent blocks to retain state history for, only relevant in state.scheme=path (default = 600,000 blocks, 0 = entire chain)",
 		Value:    ethconfig.Defaults.StateHistory,
 		Category: flags.StateCategory,
 	}
@@ -526,6 +565,11 @@ var (
 		Usage:    "Duration for announcing local pending transactions again (default = 10 years, minimum = 1 minute)",
 		Value:    ethconfig.Defaults.TxPool.ReannounceTime,
 		Category: flags.TxPoolCategory,
+	}
+	MinerTxGasLimitFlag = &cli.Uint64Flag{
+		Name:     "miner.txgaslimit",
+		Usage:    fmt.Sprintf("Maximum gas allowed per transaction (default = 0, disabled; min = %d)", params.MinTxGasLimitCap),
+		Category: flags.MinerCategory,
 	}
 	// Blob transaction pool settings
 	BlobPoolDataDirFlag = &cli.StringFlag{
@@ -1129,6 +1173,12 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 		Category: flags.MetricsCategory,
 	}
 
+	VMOpcodeOptimizeFlag = &cli.BoolFlag{
+		Name:     "vm.opcode.optimize",
+		Usage:    "enable opcode optimization",
+		Category: flags.VMCategory,
+	}
+
 	CheckSnapshotWithMPT = &cli.BoolFlag{
 		Name:     "check-snapshot-with-mpt",
 		Usage:    "Enable checking between snapshot and MPT ",
@@ -1214,6 +1264,50 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 		Usage:    "HTTP-RPC server listening port of fake-beacon",
 		Value:    fakebeacon.DefaultPort,
 		Category: flags.APICategory,
+	}
+
+	// incremental snapshot related flags
+	EnableIncrSnapshotFlag = &cli.BoolFlag{
+		Name:     "incr.enable",
+		Usage:    "Enable incremental snapshot generation",
+		Value:    false,
+		Category: flags.StateCategory,
+	}
+	IncrSnapshotPathFlag = &flags.DirectoryFlag{
+		Name:     "incr.datadir",
+		Usage:    "Data directory for storing incremental snapshot data: can be used to store generated or downloaded incremental snapshot",
+		Value:    "",
+		Category: flags.StateCategory,
+	}
+	IncrSnapshotBlockIntervalFlag = &cli.Uint64Flag{
+		Name:     "incr.block-interval",
+		Usage:    "Set how many blocks interval are stored into one incremental snapshot",
+		Value:    pathdb.DefaultBlockInterval,
+		Category: flags.StateCategory,
+	}
+	IncrSnapshotStateBufferFlag = &cli.Uint64Flag{
+		Name:     "incr.state-buffer",
+		Usage:    "Set the incr state memory buffer to aggregate MPT trie nodes. The larger the setting, the smaller the incr snapshot size",
+		Value:    pathdb.DefaultIncrStateBufferSize,
+		Category: flags.StateCategory,
+	}
+	IncrSnapshotKeptBlocksFlag = &cli.Uint64Flag{
+		Name:     "incr.kept-blocks",
+		Usage:    "Set how many blocks are kept in incr snapshot. At least is 1024 blocks",
+		Value:    pathdb.DefaultKeptBlocks,
+		Category: flags.StateCategory,
+	}
+	UseRemoteIncrSnapshotFlag = &cli.BoolFlag{
+		Name:     "incr.use-remote",
+		Usage:    "Enable download and merge incremental snapshots into local data",
+		Value:    false,
+		Category: flags.StateCategory,
+	}
+	RemoteIncrSnapshotURLFlag = &cli.StringFlag{
+		Name:     "incr.remote-url",
+		Usage:    "Set from which remote url is used to download incremental snapshots",
+		Value:    "",
+		Category: flags.StateCategory,
 	}
 )
 
@@ -1689,6 +1783,9 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	if ctx.IsSet(DisableSnapProtocolFlag.Name) {
 		cfg.DisableSnapProtocol = ctx.Bool(DisableSnapProtocolFlag.Name)
 	}
+	if ctx.IsSet(EnableBALFlag.Name) {
+		cfg.EnableBAL = ctx.Bool(EnableBALFlag.Name)
+	}
 	if ctx.IsSet(RangeLimitFlag.Name) {
 		cfg.RangeLimit = ctx.Bool(RangeLimitFlag.Name)
 	}
@@ -1870,8 +1967,17 @@ func setMiner(ctx *cli.Context, cfg *minerconfig.Config) {
 	if ctx.Bool(DisableVoteAttestationFlag.Name) {
 		cfg.DisableVoteAttestation = true
 	}
+<<<<<<< HEAD
 	if ctx.Bool(DisableSuspiciousTxFilterFlag.Name) {
 		cfg.DisableSuspiciousTxFilter = true
+=======
+	if ctx.IsSet(MinerTxGasLimitFlag.Name) {
+		limit := ctx.Uint64(MinerTxGasLimitFlag.Name)
+		if limit != 0 && limit < params.MinTxGasLimitCap {
+			Fatalf("Invalid --miner.txgaslimit: %d (must be >= %d or 0)", limit, params.MinTxGasLimitCap)
+		}
+		cfg.TxGasLimit = limit
+>>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	}
 }
 
@@ -1994,6 +2100,9 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	if ctx.IsSet(CacheNoPrefetchFlag.Name) {
 		cfg.NoPrefetch = ctx.Bool(CacheNoPrefetchFlag.Name)
 	}
+	if ctx.IsSet(EnableBALFlag.Name) {
+		cfg.EnableBAL = ctx.Bool(EnableBALFlag.Name)
+	}
 	// Read the value from the flag no matter if it's set or not.
 	cfg.Preimages = ctx.Bool(CachePreimagesFlag.Name)
 	if cfg.NoPruning && !cfg.Preimages {
@@ -2030,9 +2139,8 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	if ctx.IsSet(PathDBSyncFlag.Name) {
 		cfg.PathSyncFlush = true
 	}
-	if ctx.IsSet(JournalFileFlag.Name) {
-		cfg.JournalFileEnabled = true
-	}
+
+	cfg.JournalFileEnabled = ctx.Bool(JournalFileFlag.Name)
 
 	if ctx.String(GCModeFlag.Name) == "archive" {
 		if cfg.TransactionHistory != 0 {
@@ -2100,6 +2208,13 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	}
 	if ctx.IsSet(VMEnableDebugFlag.Name) {
 		cfg.EnablePreimageRecording = ctx.Bool(VMEnableDebugFlag.Name)
+	}
+
+	if ctx.IsSet(VMOpcodeOptimizeFlag.Name) {
+		cfg.EnableOpcodeOptimizing = ctx.Bool(VMOpcodeOptimizeFlag.Name)
+		if cfg.EnableOpcodeOptimizing {
+			compiler.EnableOptimization()
+		}
 	}
 
 	if ctx.IsSet(RPCGlobalGasCapFlag.Name) {
@@ -2258,6 +2373,38 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		if name := ctx.String(VMTraceFlag.Name); name != "" {
 			cfg.VMTrace = name
 			cfg.VMTraceJsonConfig = ctx.String(VMTraceJsonConfigFlag.Name)
+		}
+	}
+
+	// Download and merge incremental snapshot config
+	if ctx.IsSet(UseRemoteIncrSnapshotFlag.Name) {
+		cfg.UseRemoteIncrSnapshot = true
+		if !ctx.IsSet(RemoteIncrSnapshotURLFlag.Name) {
+			Fatalf("Must provide a remote increment snapshot URL")
+		} else {
+			cfg.RemoteIncrSnapshotURL = ctx.String(RemoteIncrSnapshotURLFlag.Name)
+		}
+		if ctx.IsSet(IncrSnapshotPathFlag.Name) {
+			cfg.IncrSnapshotPath = ctx.String(IncrSnapshotPathFlag.Name)
+		} else {
+			Fatalf("Must provide a path to store downloaded incr snapshot")
+		}
+	}
+
+	// enable incremental snapshot generation config
+	if ctx.IsSet(EnableIncrSnapshotFlag.Name) {
+		cfg.EnableIncrSnapshots = true
+		if ctx.IsSet(IncrSnapshotPathFlag.Name) {
+			cfg.IncrSnapshotPath = ctx.String(IncrSnapshotPathFlag.Name)
+		}
+		if ctx.IsSet(IncrSnapshotBlockIntervalFlag.Name) {
+			cfg.IncrSnapshotBlockInterval = ctx.Uint64(IncrSnapshotBlockIntervalFlag.Name)
+		}
+		if ctx.IsSet(IncrSnapshotStateBufferFlag.Name) {
+			cfg.IncrSnapshotStateBuffer = ctx.Uint64(IncrSnapshotStateBufferFlag.Name)
+		}
+		if ctx.IsSet(IncrSnapshotKeptBlocksFlag.Name) {
+			cfg.IncrSnapshotKeptBlocks = ctx.Uint64(IncrSnapshotKeptBlocksFlag.Name)
 		}
 	}
 }
@@ -2644,6 +2791,7 @@ func MakeChain(ctx *cli.Context, stack *node.Node, readonly bool) (*core.BlockCh
 	options := &core.BlockChainConfig{
 		TrieCleanLimit: ethconfig.Defaults.TrieCleanCache,
 		NoPrefetch:     ctx.Bool(CacheNoPrefetchFlag.Name),
+		EnableBAL:      ctx.Bool(EnableBALFlag.Name),
 		TrieDirtyLimit: ethconfig.Defaults.TrieDirtyCache,
 		ArchiveMode:    ctx.String(GCModeFlag.Name) == "archive",
 		TrieTimeLimit:  ethconfig.Defaults.TrieTimeout,
@@ -2679,7 +2827,12 @@ func MakeChain(ctx *cli.Context, stack *node.Node, readonly bool) (*core.BlockCh
 		options.TriesInMemory = ctx.Uint64(TriesInMemoryFlag.Name)
 	}
 	vmcfg := vm.Config{
-		EnablePreimageRecording: ctx.Bool(VMEnableDebugFlag.Name),
+		EnablePreimageRecording:   ctx.Bool(VMEnableDebugFlag.Name),
+		EnableOpcodeOptimizations: ctx.Bool(VMOpcodeOptimizeFlag.Name),
+	}
+
+	if vmcfg.EnableOpcodeOptimizations {
+		compiler.EnableOptimization()
 	}
 	if ctx.IsSet(VMTraceFlag.Name) {
 		if name := ctx.String(VMTraceFlag.Name); name != "" {
@@ -2718,7 +2871,7 @@ func MakeConsolePreloads(ctx *cli.Context) []string {
 }
 
 // MakeTrieDatabase constructs a trie database based on the configured scheme.
-func MakeTrieDatabase(ctx *cli.Context, stack *node.Node, disk ethdb.Database, preimage bool, readOnly bool, isVerkle bool) *triedb.Database {
+func MakeTrieDatabase(ctx *cli.Context, stack *node.Node, disk ethdb.Database, preimage bool, readOnly bool, isVerkle bool, mergeIncr bool) *triedb.Database {
 	config := &triedb.Config{
 		Preimages: preimage,
 		IsVerkle:  isVerkle,
@@ -2738,6 +2891,9 @@ func MakeTrieDatabase(ctx *cli.Context, stack *node.Node, disk ethdb.Database, p
 		config.PathDB = pathdb.ReadOnly
 	} else {
 		config.PathDB = pathdb.Defaults
+		if mergeIncr {
+			config.PathDB.MergeIncr = true
+		}
 	}
 	config.PathDB.JournalFilePath = fmt.Sprintf("%s/%s", stack.ResolvePath("chaindata"), eth.JournalFileName)
 	return triedb.NewDatabase(disk, config)

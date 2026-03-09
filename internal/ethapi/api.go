@@ -456,12 +456,12 @@ func decodeHash(s string) (h common.Hash, inputLength int, err error) {
 	if (len(s) & 1) > 0 {
 		s = "0" + s
 	}
+	if len(s) > 64 {
+		return common.Hash{}, len(s) / 2, errors.New("hex string too long, want at most 32 bytes")
+	}
 	b, err := hex.DecodeString(s)
 	if err != nil {
 		return common.Hash{}, 0, errors.New("hex string invalid")
-	}
-	if len(b) > 32 {
-		return common.Hash{}, len(b), errors.New("hex string too long, want at most 32 bytes")
 	}
 	return common.BytesToHash(b), len(b), nil
 }
@@ -630,7 +630,7 @@ func (api *BlockChainAPI) GetBlockReceipts(ctx context.Context, blockNrOrHash rp
 
 	result := make([]map[string]interface{}, len(receipts))
 	for i, receipt := range receipts {
-		result[i] = marshalReceipt(receipt, block.Hash(), block.NumberU64(), signer, txs[i], i)
+		result[i] = MarshalReceipt(receipt, block.Hash(), block.NumberU64(), signer, txs[i], i)
 	}
 
 	return result, nil
@@ -1746,6 +1746,7 @@ func (api *TransactionAPI) GetRawTransactionByHash(ctx context.Context, hash com
 // 	}
 // 	receipt := receipts[index]
 
+<<<<<<< HEAD
 // 	// Derive the sender.
 // 	header, err := api.b.HeaderByHash(ctx, blockHash)
 // 	if err != nil {
@@ -1753,6 +1754,15 @@ func (api *TransactionAPI) GetRawTransactionByHash(ctx context.Context, hash com
 // 	}
 // 	signer := types.MakeSigner(api.b.ChainConfig(), header.Number, header.Time)
 // 	fields := marshalReceipt(receipt, blockHash, blockNumber, signer, tx, int(index))
+=======
+	// Derive the sender.
+	header, err := api.b.HeaderByHash(ctx, blockHash)
+	if err != nil {
+		return nil, err
+	}
+	signer := types.MakeSigner(api.b.ChainConfig(), header.Number, header.Time)
+	fields := MarshalReceipt(receipt, blockHash, blockNumber, signer, tx, int(index))
+>>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 
 // 	// TODO use nil basefee before landon fork is enabled
 // 	rpcTransaction := newRPCTransaction(tx, blockHash, blockNumber, header.Time, index, nil, api.b.ChainConfig())
@@ -1796,11 +1806,11 @@ func (api *TransactionAPI) GetTransactionReceipt(ctx context.Context, hash commo
 		return nil, err
 	}
 	// Derive the sender.
-	return marshalReceipt(receipt, blockHash, blockNumber, api.signer, tx, int(index)), nil
+	return MarshalReceipt(receipt, blockHash, blockNumber, api.signer, tx, int(index)), nil
 }
 
-// marshalReceipt marshals a transaction receipt into a JSON object.
-func marshalReceipt(receipt *types.Receipt, blockHash common.Hash, blockNumber uint64, signer types.Signer, tx *types.Transaction, txIndex int) map[string]interface{} {
+// MarshalReceipt marshals a transaction receipt into a JSON object.
+func MarshalReceipt(receipt *types.Receipt, blockHash common.Hash, blockNumber uint64, signer types.Signer, tx *types.Transaction, txIndex int) map[string]interface{} {
 	from, _ := types.Sender(signer, tx)
 
 	fields := map[string]interface{}{

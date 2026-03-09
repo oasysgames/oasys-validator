@@ -51,6 +51,7 @@ var FullNodeGPO = gasprice.Config{
 
 // Defaults contains default settings for use on the BSC main net.
 var Defaults = Config{
+<<<<<<< HEAD
 	HistoryMode:        history.KeepAll,
 	SyncMode:           SnapSync,
 	NetworkId:          0, // enable auto configuration of networkID == chainID
@@ -74,6 +75,32 @@ var Defaults = Config{
 	GPO:                FullNodeGPO,
 	RPCTxFeeCap:        1,                                         // 1 ether
 	BlobExtraReserve:   params.DefaultExtraReserveForBlobRequests, // Extra reserve threshold for blob, blob never expires when -1 is set, default 14400
+=======
+	HistoryMode:            history.KeepAll,
+	SyncMode:               SnapSync,
+	NetworkId:              0, // enable auto configuration of networkID == chainID
+	TxLookupLimit:          2350000,
+	TransactionHistory:     2350000,
+	BlockHistory:           0,
+	StateHistory:           params.FullImmutabilityThreshold,
+	DatabaseCache:          512,
+	TrieCleanCache:         154,
+	TrieDirtyCache:         256,
+	TrieTimeout:            10 * time.Minute,
+	TriesInMemory:          128,
+	TriesVerifyMode:        core.LocalVerify,
+	SnapshotCache:          102,
+	FilterLogCacheSize:     32,
+	Miner:                  minerconfig.DefaultConfig,
+	TxPool:                 legacypool.DefaultConfig,
+	BlobPool:               blobpool.DefaultConfig,
+	RPCGasCap:              50000000,
+	RPCEVMTimeout:          5 * time.Second,
+	GPO:                    FullNodeGPO,
+	RPCTxFeeCap:            1,                                         // 1 ether
+	BlobExtraReserve:       params.DefaultExtraReserveForBlobRequests, // Extra reserve threshold for blob, blob never expires when -1 is set, default 28800
+	EnableOpcodeOptimizing: false,
+>>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 }
 
 //go:generate go run github.com/fjl/gencodec -type Config -formats toml -out gen_config.go
@@ -109,6 +136,7 @@ type Config struct {
 	NoPruning  bool // Whether to disable pruning and flush everything to disk
 	NoPrefetch bool // Whether to disable prefetching and only load state on demand
 
+	EnableBAL           bool
 	DirectBroadcast     bool
 	DisableSnapProtocol bool // Whether disable snap protocol
 	RangeLimit          bool
@@ -197,11 +225,25 @@ type Config struct {
 	// OverrideOsaka (TODO: remove after the fork)
 	OverrideOsaka *uint64 `toml:",omitempty"`
 
+	// OverrideMendel (TODO: remove after the fork)
+	OverrideMendel *uint64 `toml:",omitempty"`
+
 	// OverrideVerkle (TODO: remove after the fork)
 	OverrideVerkle *uint64 `toml:",omitempty"`
 
 	// blob setting
 	BlobExtraReserve uint64
+
+	//opcode optimization setting
+	EnableOpcodeOptimizing bool
+	// incremental snapshot config
+	EnableIncrSnapshots       bool
+	IncrSnapshotPath          string
+	IncrSnapshotBlockInterval uint64
+	IncrSnapshotStateBuffer   uint64
+	IncrSnapshotKeptBlocks    uint64
+	UseRemoteIncrSnapshot     bool
+	RemoteIncrSnapshotURL     string
 }
 
 // CreateConsensusEngine creates a consensus engine for the given chain config.

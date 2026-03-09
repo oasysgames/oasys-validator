@@ -61,10 +61,6 @@ func (db *Database) AncientRange(kind string, start, count, maxBytes uint64) ([]
 	panic("not supported")
 }
 
-func (db *Database) ItemAmountInAncient() (uint64, error) {
-	panic("not supported")
-}
-
 func (db *Database) Ancients() (uint64, error) {
 	var resp uint64
 	err := db.remote.Call(&resp, "debug_dbAncients")
@@ -97,10 +93,6 @@ func (db *Database) StateStoreReader() ethdb.Reader {
 
 func (db *Database) ReadAncients(fn func(op ethdb.AncientReaderOp) error) (err error) {
 	return fn(db)
-}
-
-func (db *Database) AncientOffSet() uint64 {
-	panic("not supported")
 }
 
 func (db *Database) Put(key []byte, value []byte) error {
@@ -138,6 +130,10 @@ func (db *Database) TruncateTableTail(kind string, tail uint64) (uint64, error) 
 
 // ResetTable will reset certain table with new start point
 func (db *Database) ResetTable(kind string, startAt uint64, onlyEmpty bool) error {
+	panic("not supported")
+}
+
+func (db *Database) ResetTableForIncr(kind string, startAt uint64, onlyEmpty bool) error {
 	panic("not supported")
 }
 
@@ -179,6 +175,10 @@ func (db *Database) Close() error {
 }
 
 func (db *Database) SetupFreezerEnv(env *ethdb.FreezerEnv, blockHistory uint64) error {
+	panic("not supported")
+}
+
+func (db *Database) CleanBlock(ethdb.KeyValueStore, uint64) error {
 	panic("not supported")
 }
 

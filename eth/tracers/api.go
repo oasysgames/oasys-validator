@@ -1003,7 +1003,7 @@ func (api *API) TraceCall(ctx context.Context, args ethapi.TransactionArgs, bloc
 
 	// Apply the customization rules if required.
 	if config != nil {
-		if config.BlockOverrides != nil && config.BlockOverrides.Number.ToInt().Uint64() == h.Number.Uint64()+1 {
+		if config.BlockOverrides != nil && config.BlockOverrides.Number != nil && config.BlockOverrides.Number.ToInt().Uint64() == h.Number.Uint64()+1 {
 			// Overriding the block number to n+1 is a common way for wallets to
 			// simulate transactions, however without the following fix, a contract
 			// can assert it is being simulated by checking if blockhash(n) == 0x0 and
@@ -1150,16 +1150,60 @@ func overrideConfig(original *params.ChainConfig, override *params.ChainConfig) 
 		copy.ShanghaiTime = timestamp
 		canon = false
 	}
+	if timestamp := override.KeplerTime; timestamp != nil {
+		copy.KeplerTime = timestamp
+		canon = false
+	}
+	if timestamp := override.FeynmanTime; timestamp != nil {
+		copy.FeynmanTime = timestamp
+		canon = false
+	}
+	if timestamp := override.FeynmanFixTime; timestamp != nil {
+		copy.FeynmanFixTime = timestamp
+		canon = false
+	}
 	if timestamp := override.CancunTime; timestamp != nil {
 		copy.CancunTime = timestamp
+		canon = false
+	}
+	if timestamp := override.HaberTime; timestamp != nil {
+		copy.HaberTime = timestamp
+		canon = false
+	}
+	if timestamp := override.HaberFixTime; timestamp != nil {
+		copy.HaberFixTime = timestamp
+		canon = false
+	}
+	if timestamp := override.BohrTime; timestamp != nil {
+		copy.BohrTime = timestamp
+		canon = false
+	}
+	if timestamp := override.PascalTime; timestamp != nil {
+		copy.PascalTime = timestamp
 		canon = false
 	}
 	if timestamp := override.PragueTime; timestamp != nil {
 		copy.PragueTime = timestamp
 		canon = false
 	}
+	if timestamp := override.LorentzTime; timestamp != nil {
+		copy.LorentzTime = timestamp
+		canon = false
+	}
+	if timestamp := override.MaxwellTime; timestamp != nil {
+		copy.MaxwellTime = timestamp
+		canon = false
+	}
+	if timestamp := override.FermiTime; timestamp != nil {
+		copy.FermiTime = timestamp
+		canon = false
+	}
 	if timestamp := override.OsakaTime; timestamp != nil {
 		copy.OsakaTime = timestamp
+		canon = false
+	}
+	if timestamp := override.MendelTime; timestamp != nil {
+		copy.MendelTime = timestamp
 		canon = false
 	}
 	if timestamp := override.VerkleTime; timestamp != nil {

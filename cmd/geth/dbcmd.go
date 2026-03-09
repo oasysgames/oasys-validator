@@ -78,22 +78,34 @@ Remove blockchain and state databases`,
 			dbCompactCmd,
 			dbGetCmd,
 			dbDeleteCmd,
+<<<<<<< HEAD
 			// dbDeleteTrieStateCmd,
 			dbInspectTrieCmd,
+=======
+>>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 			dbPutCmd,
 			dbGetSlotsCmd,
 			dbDumpFreezerIndex,
 			dbImportCmd,
 			dbExportCmd,
 			dbMetadataCmd,
-			ancientInspectCmd,
-			// no legacy stored receipts for bsc
-			// dbMigrateFreezerCmd,
 			dbCheckStateContentCmd,
+<<<<<<< HEAD
 			// dbHbss2PbssCmd,
 			dbTrieGetCmd,
 			// dbTrieDeleteCmd,
 			dbInspectHistoryCmd,
+=======
+			dbInspectHistoryCmd,
+
+			// only defined in bsc
+			dbInspectTrieCmd,
+			dbTrieGetCmd,
+			dbTrieDeleteCmd,
+			dbDeleteTrieStateCmd,
+			ancientInspectCmd,
+			incrInspectCmd,
+>>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 		},
 	}
 	dbInspectCmd = &cli.Command{
@@ -125,6 +137,7 @@ Remove blockchain and state databases`,
 For each trie node encountered, it checks that the key corresponds to the keccak256(value). If this is not true, this indicates
 a data corruption.`,
 	}
+<<<<<<< HEAD
 	//nolint:unused
 	dbHbss2PbssCmd = &cli.Command{
 		Action:    hbss2pbss,
@@ -139,6 +152,8 @@ a data corruption.`,
 		Usage:       "Convert Hash-Base to Path-Base trie node.",
 		Description: `This command iterates the entire trie node database and convert the hash-base node to path-base node.`,
 	}
+=======
+>>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	dbTrieGetCmd = &cli.Command{
 		Action:    dbTrieGet,
 		Name:      "trie-get",
@@ -291,6 +306,13 @@ of ancientStore, will also displays the reserved number of blocks in ancientStor
 			},
 		}, utils.NetworkFlags, utils.DatabaseFlags),
 		Description: "This command queries the history of the account or storage slot within the specified block range",
+	}
+	incrInspectCmd = &cli.Command{
+		Action:      inspectIncrSnapshot,
+		Name:        "inspect-incr-snapshot",
+		Flags:       []cli.Flag{utils.IncrSnapshotPathFlag},
+		Usage:       "Inspect the incremental snapshot information",
+		Description: `This command reads and displays incremental store information`,
 	}
 )
 
@@ -966,7 +988,7 @@ func dbDumpTrie(ctx *cli.Context) error {
 
 	db := utils.MakeChainDatabase(ctx, stack, true)
 	defer db.Close()
-	triedb := utils.MakeTrieDatabase(ctx, stack, db, false, true, false)
+	triedb := utils.MakeTrieDatabase(ctx, stack, db, false, true, false, false)
 	defer triedb.Close()
 
 	var (
@@ -1208,6 +1230,7 @@ func showMetaData(ctx *cli.Context) error {
 	return nil
 }
 
+<<<<<<< HEAD
 //nolint:unused
 func hbss2pbss(ctx *cli.Context) error {
 	if ctx.NArg() > 1 {
@@ -1315,6 +1338,8 @@ func hbss2pbss(ctx *cli.Context) error {
 	return nil
 }
 
+=======
+>>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 func inspectAccount(db *triedb.Database, start uint64, end uint64, address common.Address, raw bool) error {
 	stats, err := db.AccountHistory(address, start, end)
 	if err != nil {
@@ -1407,7 +1432,7 @@ func inspectHistory(ctx *cli.Context) error {
 	db := utils.MakeChainDatabase(ctx, stack, true)
 	defer db.Close()
 
-	triedb := utils.MakeTrieDatabase(ctx, stack, db, false, false, false)
+	triedb := utils.MakeTrieDatabase(ctx, stack, db, false, false, false, false)
 	defer triedb.Close()
 
 	var (
@@ -1454,4 +1479,15 @@ func inspectHistory(ctx *cli.Context) error {
 		return inspectAccount(triedb, start, end, address, ctx.Bool("raw"))
 	}
 	return inspectStorage(triedb, start, end, address, slot, ctx.Bool("raw"))
+}
+
+func inspectIncrSnapshot(ctx *cli.Context) error {
+	if !ctx.IsSet(utils.IncrSnapshotPathFlag.Name) {
+		return errors.New("increment snapshot path is not set")
+	}
+	baseDir := ctx.String(utils.IncrSnapshotPathFlag.Name)
+	if err := rawdb.InspectIncrStore(baseDir); err != nil {
+		return err
+	}
+	return nil
 }

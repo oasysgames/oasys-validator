@@ -24,8 +24,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/metrics"
 )
 
 type tableSize struct {
@@ -101,7 +99,6 @@ func inspectFreezers(db ethdb.Database) ([]freezerInfo, error) {
 				return nil, err
 			}
 
-			// TODO(Nathan): handle VerkleStateFreezerName
 			file, err := os.Open(filepath.Join(datadir, MerkleStateFreezerName))
 			if err != nil {
 				return nil, err
@@ -132,6 +129,33 @@ func inspectFreezers(db ethdb.Database) ([]freezerInfo, error) {
 	return infos, nil
 }
 
+func inspectIncrFreezers(db *snapDBWrapper) ([]freezerInfo, error) {
+	var infos []freezerInfo
+	for _, freezer := range freezers {
+		switch freezer {
+		case ChainFreezerName:
+			info, err := inspect(ChainFreezerName, incrChainFreezerTableConfigs, db.chainFreezer)
+			if err != nil {
+				return nil, err
+			}
+			infos = append(infos, info)
+
+		case MerkleStateFreezerName:
+			info, err := inspect(freezer, incrStateFreezerTableConfigs, db.stateFreezer)
+			if err != nil {
+				return nil, err
+			}
+			infos = append(infos, info)
+		case VerkleStateFreezerName:
+			continue
+
+		default:
+			return nil, fmt.Errorf("unknown freezer, supported ones: %v", freezers)
+		}
+	}
+	return infos, nil
+}
+
 // InspectFreezerTable dumps out the index of a specific freezer table. The passed
 // ancient indicates the path of root ancient directory where the chain freezer can
 // be opened. Start and end specify the range for dumping out indexes.
@@ -143,7 +167,7 @@ func InspectFreezerTable(ancient string, freezerName string, tableName string, s
 	)
 	switch freezerName {
 	case ChainFreezerName:
-		path, tables = resolveChainFreezerDir(ancient), stateFreezerTableConfigs
+		path, tables = resolveChainFreezerDir(ancient), chainFreezerTableConfigs
 
 	case MerkleStateFreezerName, VerkleStateFreezerName:
 		if multiDatabase {
@@ -167,25 +191,5 @@ func InspectFreezerTable(ancient string, freezerName string, tableName string, s
 		return err
 	}
 	table.dumpIndexStdout(start, end)
-	return nil
-}
-
-func ResetStateFreezerTableOffset(ancient string, virtualTail uint64) error {
-	path, tables := filepath.Join(ancient, MerkleStateFreezerName), stateFreezerTableConfigs
-
-	for name, config := range tables {
-		log.Info("Handle table", "name", name, "disableSnappy", config.noSnappy, "prunable", config.prunable)
-		table, err := newTable(path, name, metrics.NewInactiveMeter(), metrics.NewInactiveMeter(), metrics.NewGauge(), freezerTableSize, config, false)
-		if err != nil {
-			log.Error("New table failed", "error", err)
-			return err
-		}
-		// Reset the metadata of the freezer table
-		err = table.ResetItemsOffset(virtualTail)
-		if err != nil {
-			log.Error("Reset items offset of the table", "name", name, "error", err)
-			return err
-		}
-	}
 	return nil
 }

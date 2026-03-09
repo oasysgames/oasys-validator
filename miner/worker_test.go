@@ -163,7 +163,11 @@ func (b *testWorkerBackend) newRandomTx(creation bool) *types.Transaction {
 func newTestWorker(t *testing.T, chainConfig *params.ChainConfig, engine consensus.Engine, db ethdb.Database, blocks int) (*worker, *testWorkerBackend) {
 	backend := newTestWorkerBackend(t, chainConfig, engine, db, blocks)
 	backend.txPool.Add(pendingTxs, true)
+<<<<<<< HEAD
 	w := newWorker(testConfig, engine, backend, new(event.TypeMux), false, "")
+=======
+	w := newWorker(testConfig, engine, backend, new(event.TypeMux))
+>>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	w.setEtherbase(testBankAddress)
 	return w, backend
 }

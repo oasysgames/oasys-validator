@@ -68,16 +68,6 @@ func (t *table) Ancients() (uint64, error) {
 	return t.db.Ancients()
 }
 
-// ItemAmountInAncient returns the actual length of current ancientDB.
-func (t *table) ItemAmountInAncient() (uint64, error) {
-	return t.db.ItemAmountInAncient()
-}
-
-// AncientOffSet returns the offset of current ancientDB.
-func (t *table) AncientOffSet() uint64 {
-	return t.db.AncientOffSet()
-}
-
 // Tail is a noop passthrough that just forwards the request to the underlying
 // database.
 func (t *table) Tail() (uint64, error) {
@@ -103,6 +93,10 @@ func (t *table) TruncateTableTail(kind string, tail uint64) (uint64, error) {
 // ResetTable will reset certain table with new start point
 func (t *table) ResetTable(kind string, startAt uint64, onlyEmpty bool) error {
 	return t.db.ResetTable(kind, startAt, onlyEmpty)
+}
+
+func (t *table) ResetTableForIncr(kind string, startAt uint64, onlyEmpty bool) error {
+	return t.db.ResetTableForIncr(kind, startAt, onlyEmpty)
 }
 
 func (t *table) ReadAncients(fn func(reader ethdb.AncientReaderOp) error) (err error) {
@@ -242,6 +236,10 @@ func (t *table) NewBatchWithSize(size int) ethdb.Batch {
 }
 
 func (t *table) SetupFreezerEnv(env *ethdb.FreezerEnv, blockHistory uint64) error {
+	return nil
+}
+
+func (t *table) CleanBlock(kvStore ethdb.KeyValueStore, start uint64) error {
 	return nil
 }
 

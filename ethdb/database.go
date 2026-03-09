@@ -132,13 +132,6 @@ type AncientReaderOp interface {
 
 	// AncientSize returns the ancient size of the specified category.
 	AncientSize(kind string) (uint64, error)
-
-	//TODO(Nathan): remove ItemAmountInAncient and AncientOffSet
-	// ItemAmountInAncient returns the actual length of current ancientDB.
-	ItemAmountInAncient() (uint64, error)
-
-	// AncientOffSet returns the offset of current ancientDB.
-	AncientOffSet() uint64
 }
 
 // AncientReader is the extended ancient reader interface including 'batched' or 'atomic' reading.
@@ -178,6 +171,8 @@ type AncientWriter interface {
 
 	// ResetTable will reset certain table with new start point
 	ResetTable(kind string, startAt uint64, onlyEmpty bool) error
+
+	ResetTableForIncr(kind string, startAt uint64, onlyEmpty bool) error
 }
 
 type FreezerEnv struct {
@@ -189,6 +184,10 @@ type FreezerEnv struct {
 type AncientFreezer interface {
 	// SetupFreezerEnv provides params.ChainConfig for checking hark forks, like isCancun.
 	SetupFreezerEnv(env *FreezerEnv, blockHistory uint64) error
+
+	// CleanBlock cleans block data in pebble and chain freezer.
+	// WARN: it's only used in the incremental snapshot situation.
+	CleanBlock(kvStore KeyValueStore, start uint64) error
 }
 
 // AncientWriteOp is given to the function argument of ModifyAncients.

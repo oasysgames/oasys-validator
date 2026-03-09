@@ -65,8 +65,17 @@ func New(eth Backend, config *minerconfig.Config, mux *event.TypeMux, engine con
 		exitCh:  make(chan struct{}),
 		startCh: make(chan struct{}),
 		stopCh:  make(chan struct{}),
+<<<<<<< HEAD
 		worker:  newWorker(config, engine, eth, mux, false, datadir),
 	}
+=======
+		worker:  newWorker(config, engine, eth, mux),
+	}
+
+	miner.bidSimulator = newBidSimulator(&config.Mev, config.DelayLeftOver, config.GasPrice, config.TxGasLimit, eth, eth.BlockChain().Config(), engine, miner.worker)
+	miner.worker.setBestBidFetcher(miner.bidSimulator)
+
+>>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	miner.wg.Add(1)
 	go miner.update()
 	return miner
@@ -158,17 +167,22 @@ func (miner *Miner) Mining() bool {
 	return miner.worker.isRunning()
 }
 
+<<<<<<< HEAD
 // Pending returns the currently pending block and associated receipts, logs
+=======
+func (miner *Miner) InTurn() bool {
+	return miner.worker.inTurn()
+}
+
+func (miner *Miner) TryWaitProposalDoneWhenStopping() {
+	miner.worker.tryWaitProposalDoneWhenStopping()
+}
+
+// Pending returns the latest block and associated receipts, logs
+>>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 // and statedb. The returned values can be nil in case the pending block is
 // not initialized.
 func (miner *Miner) Pending() (*types.Block, types.Receipts, *state.StateDB) {
-	if miner.worker.isRunning() {
-		pendingBlock, pendingReceipts, pendingState := miner.worker.pending()
-		if pendingState != nil && pendingBlock != nil {
-			return pendingBlock, pendingReceipts, pendingState
-		}
-	}
-	// fallback to latest block
 	block := miner.worker.chain.CurrentBlock()
 	if block == nil {
 		return nil, nil, nil
@@ -214,12 +228,6 @@ func (miner *Miner) SetGasCeil(ceil uint64) {
 	miner.worker.setGasCeil(ceil)
 }
 
-// SubscribePendingLogs starts delivering logs from pending transactions
-// to the given channel.
-func (miner *Miner) SubscribePendingLogs(ch chan<- []*types.Log) event.Subscription {
-	return miner.worker.pendingLogsFeed.Subscribe(ch)
-}
-
 // BuildPayload builds the payload according to the provided parameters.
 func (miner *Miner) BuildPayload(args *BuildPayloadArgs, witness bool) (*Payload, error) {
 	return miner.worker.buildPayload(args, witness)
@@ -227,4 +235,8 @@ func (miner *Miner) BuildPayload(args *BuildPayloadArgs, witness bool) (*Payload
 
 func (miner *Miner) GasCeil() uint64 {
 	return miner.worker.getGasCeil()
+}
+
+func (miner *Miner) TxGasLimit() uint64 {
+	return miner.worker.getTxGasLimit()
 }

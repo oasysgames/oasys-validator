@@ -79,9 +79,32 @@ type Decoder interface {
 }
 
 var bsc1 = map[uint64]msgHandler{
-	VotesMsg: handleVotes,
+	BscCapMsg: handleBscCap, // ignore capability message for backward compatibility
+	VotesMsg:  handleVotes,
 }
 
+<<<<<<< HEAD
+=======
+var bsc2 = map[uint64]msgHandler{
+	BscCapMsg:           handleBscCap, // ignore capability message for backward compatibility
+	VotesMsg:            handleVotes,
+	GetBlocksByRangeMsg: handleGetBlocksByRange,
+	BlocksByRangeMsg:    handleBlocksByRange,
+}
+
+// handleBscCap ignores the capability message for backward compatibility.
+// Old nodes send BscCapMsg as part of their handshake, we just ignore it
+// since P2P layer already negotiated the protocol version.
+func handleBscCap(backend Backend, msg Decoder, peer *Peer) error {
+	// Decode the message to consume it, but ignore the content
+	var cap BscCapPacket
+	if err := msg.Decode(&cap); err != nil {
+		return nil // ignore decode errors for backward compatibility
+	}
+	return nil
+}
+
+>>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 // handleMessage is invoked whenever an inbound message is received from a
 // remote peer on the `bsc` protocol. The remote connection is torn down upon
 // returning any error.
@@ -126,6 +149,66 @@ func handleVotes(backend Backend, msg Decoder, peer *Peer) error {
 	return backend.Handle(peer, ann)
 }
 
+<<<<<<< HEAD
+=======
+func handleGetBlocksByRange(backend Backend, msg Decoder, peer *Peer) error {
+	req := new(GetBlocksByRangePacket)
+	if err := msg.Decode(req); err != nil {
+		return fmt.Errorf("msg %v, decode err: %v", GetBlocksByRangeMsg, err)
+	}
+
+	log.Debug("receive GetBlocksByRange request", "from", peer.id, "req", req)
+	// Validate request parameters
+	if req.Count == 0 || req.Count > MaxRequestRangeBlocksCount { // Limit maximum request count
+		return fmt.Errorf("msg %v, invalid count: %v", GetBlocksByRangeMsg, req.Count)
+	}
+
+	// Get requested blocks
+	blocks := make([]*BlockData, 0, req.Count)
+	var block *types.Block
+	// Prioritize blockHash query, get block & sidecars from db
+	if req.StartBlockHash != (common.Hash{}) {
+		block = backend.Chain().GetBlockByHash(req.StartBlockHash)
+	} else {
+		block = backend.Chain().GetBlockByNumber(req.StartBlockHeight)
+	}
+	if block == nil {
+		return fmt.Errorf("msg %v, cannot get start block: %v, %v", GetBlocksByRangeMsg, req.StartBlockHeight, req.StartBlockHash)
+	}
+	blocks = append(blocks, NewBlockData(block))
+	balSize := block.BALSize()
+	for i := uint64(1); i < req.Count; i++ {
+		block = backend.Chain().GetBlockByHash(block.ParentHash())
+		if block == nil {
+			break
+		}
+		balSize += block.BALSize()
+		blocks = append(blocks, NewBlockData(block))
+	}
+
+	log.Debug("reply GetBlocksByRange msg", "from", peer.id, "req", req.Count, "blocks", len(blocks), "balSize", balSize)
+	return p2p.Send(peer.rw, BlocksByRangeMsg, &BlocksByRangePacket{
+		RequestId: req.RequestId,
+		Blocks:    blocks,
+	})
+}
+
+func handleBlocksByRange(backend Backend, msg Decoder, peer *Peer) error {
+	res := new(BlocksByRangePacket)
+	if err := msg.Decode(res); err != nil {
+		return fmt.Errorf("%w: message %v: %v", errDecode, msg, err)
+	}
+
+	err := peer.dispatcher.DispatchResponse(&Response{
+		requestID: res.RequestId,
+		data:      res,
+		code:      BlocksByRangeMsg,
+	})
+	log.Debug("receive BlocksByRange response", "from", peer.id, "requestId", res.RequestId, "blocks", len(res.Blocks), "err", err)
+	return nil
+}
+
+>>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 // NodeInfo represents a short summary of the `bsc` sub-protocol metadata
 // known about the host peer.
 type NodeInfo struct{}

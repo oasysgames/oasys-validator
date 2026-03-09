@@ -96,6 +96,15 @@ type Config struct {
 	// DisableSnapProtocol disable the snap protocol
 	DisableSnapProtocol bool `toml:",omitempty"`
 
+<<<<<<< HEAD
+=======
+	// EnableQuickBlockFetching indicates whether to fetch new blocks using new messages.
+	EnableQuickBlockFetching bool `toml:",omitempty"`
+
+	// EnableBAL enables the block access list feature
+	EnableBAL bool `toml:",omitempty"`
+
+>>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	// RangeLimit enable 5000 blocks limit when handle range query
 	RangeLimit bool `toml:",omitempty"`
 

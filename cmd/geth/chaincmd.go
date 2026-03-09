@@ -68,6 +68,14 @@ var (
 		Flags: slices.Concat([]cli.Flag{
 			utils.CachePreimagesFlag,
 			utils.OverridePassedForkTime,
+<<<<<<< HEAD
+=======
+			utils.OverrideLorentz,
+			utils.OverrideMaxwell,
+			utils.OverrideFermi,
+			utils.OverrideOsaka,
+			utils.OverrideMendel,
+>>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 			utils.OverrideVerkle,
 			// utils.MultiDataBaseFlag,
 		}, utils.DatabaseFlags),
@@ -316,6 +324,29 @@ func initGenesis(ctx *cli.Context) error {
 		v := ctx.Uint64(utils.OverridePassedForkTime.Name)
 		overrides.OverridePassedForkTime = &v
 	}
+<<<<<<< HEAD
+=======
+	if ctx.IsSet(utils.OverrideLorentz.Name) {
+		v := ctx.Uint64(utils.OverrideLorentz.Name)
+		overrides.OverrideLorentz = &v
+	}
+	if ctx.IsSet(utils.OverrideMaxwell.Name) {
+		v := ctx.Uint64(utils.OverrideMaxwell.Name)
+		overrides.OverrideMaxwell = &v
+	}
+	if ctx.IsSet(utils.OverrideFermi.Name) {
+		v := ctx.Uint64(utils.OverrideFermi.Name)
+		overrides.OverrideFermi = &v
+	}
+	if ctx.IsSet(utils.OverrideOsaka.Name) {
+		v := ctx.Uint64(utils.OverrideOsaka.Name)
+		overrides.OverrideOsaka = &v
+	}
+	if ctx.IsSet(utils.OverrideMendel.Name) {
+		v := ctx.Uint64(utils.OverrideMendel.Name)
+		overrides.OverrideMendel = &v
+	}
+>>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	if ctx.IsSet(utils.OverrideVerkle.Name) {
 		v := ctx.Uint64(utils.OverrideVerkle.Name)
 		overrides.OverrideVerkle = &v
@@ -335,7 +366,7 @@ func initGenesis(ctx *cli.Context) error {
 		log.Warn("Multi-database is an experimental feature")
 	}
 
-	triedb := utils.MakeTrieDatabase(ctx, stack, chaindb, ctx.Bool(utils.CachePreimagesFlag.Name), false, genesis.IsVerkle())
+	triedb := utils.MakeTrieDatabase(ctx, stack, chaindb, ctx.Bool(utils.CachePreimagesFlag.Name), false, genesis.IsVerkle(), false)
 	defer triedb.Close()
 
 	_, hash, compatErr, err := core.SetupGenesisBlockWithOverride(chaindb, triedb, genesis, &overrides)
@@ -421,9 +452,13 @@ func createPorts(ipStr string, port int, size int) []int {
 }
 
 // Create config for node i in the cluster
+<<<<<<< HEAD
 //
 //nolint:unused
 func createNodeConfig(baseConfig gethConfig, ip string, port int, enodes []*enode.Node, index int, staticConnect bool) gethConfig {
+=======
+func createNodeConfig(baseConfig gethConfig, prefix string, ip string, port int, enodes []*enode.Node, index int) gethConfig {
+>>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	baseConfig.Node.HTTPHost = ip
 	baseConfig.Node.P2P.ListenAddr = fmt.Sprintf(":%d", port)
 	connectEnodes := make([]*enode.Node, 0, len(enodes)-1)
@@ -434,9 +469,10 @@ func createNodeConfig(baseConfig gethConfig, ip string, port int, enodes []*enod
 		connectEnodes = append(connectEnodes, enodes[j])
 	}
 	// Set the P2P connections between this node and the other nodes
-	if staticConnect {
-		baseConfig.Node.P2P.StaticNodes = connectEnodes
-	} else {
+	baseConfig.Node.P2P.StaticNodes = connectEnodes
+	if prefix == "fullnode" {
+		// Fullnodes may reside in different regions than the `enodes`.
+		// StaticNodes cannot connect to them directly, but can still discover them.
 		baseConfig.Node.P2P.BootstrapNodes = connectEnodes
 	}
 	return baseConfig
@@ -494,12 +530,71 @@ func initNetwork(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
+<<<<<<< HEAD
 
 	configs, _, _, err := createConfigs(config, initDir, "node", ips, ports, []*enode.Node{}, false, false)
+=======
+	enableSentryNode := ctx.Int(utils.InitSentryNodeSize.Name) > 0
+	var (
+		sentryConfigs         []gethConfig
+		sentryEnodes          []*enode.Node
+		sentryNodeIDs         []enode.ID
+		connectOneExtraEnodes bool
+	)
+	if enableSentryNode {
+		sentryConfigs, sentryEnodes, err = createSentryNodeConfigs(ctx, config, initDir)
+		if err != nil {
+			utils.Fatalf("Failed to create sentry node configs: %v", err)
+		}
+		sentryNodeIDs = make([]enode.ID, len(sentryEnodes))
+		for i := 0; i < len(sentryEnodes); i++ {
+			sentryNodeIDs[i] = sentryEnodes[i].ID()
+		}
+		connectOneExtraEnodes = true
+	}
+
+	configs, enodes, accounts, err := createConfigs(config, initDir, "node", ips, ports, sentryEnodes, connectOneExtraEnodes)
+>>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	if err != nil {
 		utils.Fatalf("Failed to create node configs: %v", err)
 	}
 
+<<<<<<< HEAD
+=======
+	nodeIDs := make([]enode.ID, len(enodes))
+	for i := 0; i < len(enodes); i++ {
+		nodeIDs[i] = enodes[i].ID()
+	}
+	// add more feature configs
+	if enableSentryNode {
+		for i := 0; i < len(sentryConfigs); i++ {
+			sentryConfigs[i].Node.P2P.ProxyedValidatorAddresses = accounts[i]
+			sentryConfigs[i].Node.P2P.ProxyedNodeIds = []enode.ID{nodeIDs[i]}
+		}
+	}
+	if ctx.Bool(utils.InitEVNValidatorWhitelist.Name) {
+		for i := 0; i < size; i++ {
+			configs[i].Node.P2P.EVNNodeIdsWhitelist = nodeIDs
+		}
+	}
+	if ctx.Bool(utils.InitEVNValidatorRegister.Name) {
+		for i := 0; i < size; i++ {
+			configs[i].Eth.EVNNodeIDsToAdd = []enode.ID{nodeIDs[i]}
+		}
+	}
+	if enableSentryNode && ctx.Bool(utils.InitEVNSentryWhitelist.Name) {
+		for i := 0; i < len(sentryConfigs); i++ {
+			sentryConfigs[i].Node.P2P.EVNNodeIdsWhitelist = append([]enode.ID{}, sentryNodeIDs...)
+			sentryConfigs[i].Node.P2P.EVNNodeIdsWhitelist[i] = nodeIDs[i]
+		}
+	}
+	if enableSentryNode && ctx.Bool(utils.InitEVNSentryRegister.Name) {
+		for i := 0; i < size; i++ {
+			configs[i].Eth.EVNNodeIDsToAdd = append(configs[i].Eth.EVNNodeIDsToAdd, sentryNodeIDs[i])
+		}
+	}
+
+>>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	// write node & sentry configs
 	for i, config := range configs {
 		err = writeConfig(inGenesisFile, config, path.Join(initDir, fmt.Sprintf("node%d", i)))
@@ -507,12 +602,89 @@ func initNetwork(ctx *cli.Context) error {
 			return err
 		}
 	}
+<<<<<<< HEAD
+=======
+	for i, config := range sentryConfigs {
+		err = writeConfig(inGenesisFile, config, path.Join(initDir, fmt.Sprintf("sentry%d", i)))
+		if err != nil {
+			return err
+		}
+	}
+
+	if ctx.Int(utils.InitFullNodeSize.Name) > 0 {
+		extraEnodes := enodes
+		if enableSentryNode {
+			extraEnodes = sentryEnodes
+		}
+		_, _, err := createAndSaveFullNodeConfigs(ctx, inGenesisFile, config, initDir, extraEnodes)
+		if err != nil {
+			utils.Fatalf("Failed to create full node configs: %v", err)
+		}
+	}
+>>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 
 	return nil
 }
 
+<<<<<<< HEAD
 //nolint:unused
 func createConfigs(base gethConfig, initDir string, prefix string, ips []string, ports []int, extraEnodes []*enode.Node, connectOneExtraEnodes bool, staticConnect bool) ([]gethConfig, []*enode.Node, [][]common.Address, error) {
+=======
+func createSentryNodeConfigs(ctx *cli.Context, baseConfig gethConfig, initDir string) ([]gethConfig, []*enode.Node, error) {
+	size := ctx.Int(utils.InitSentryNodeSize.Name)
+	if size <= 0 {
+		utils.Fatalf("size should be greater than 0")
+	}
+	ipStr := ctx.String(utils.InitSentryNodeIPs.Name)
+	portStr := ctx.String(utils.InitSentryNodePorts.Name)
+	ips, err := parseIps(ipStr, size)
+	if err != nil {
+		utils.Fatalf("Failed to parse ips: %v", err)
+	}
+	ports, err := parsePorts(portStr, DefaultSentryP2PPort, size)
+	if err != nil {
+		utils.Fatalf("Failed to parse ports: %v", err)
+	}
+	configs, enodes, _, err := createConfigs(baseConfig, initDir, "sentry", ips, ports, nil, false)
+	if err != nil {
+		utils.Fatalf("Failed to create config: %v", err)
+	}
+	return configs, enodes, nil
+}
+
+func createAndSaveFullNodeConfigs(ctx *cli.Context, inGenesisFile *os.File, baseConfig gethConfig, initDir string, extraEnodes []*enode.Node) ([]gethConfig, []*enode.Node, error) {
+	size := ctx.Int(utils.InitFullNodeSize.Name)
+	if size <= 0 {
+		utils.Fatalf("size should be greater than 0")
+	}
+	ipStr := ctx.String(utils.InitFullNodeIPs.Name)
+	portStr := ctx.String(utils.InitFullNodePorts.Name)
+	ips, err := parseIps(ipStr, size)
+	if err != nil {
+		utils.Fatalf("Failed to parse ips: %v", err)
+	}
+	ports, err := parsePorts(portStr, DefaultFullNodeP2PPort, size)
+	if err != nil {
+		utils.Fatalf("Failed to parse ports: %v", err)
+	}
+
+	configs, enodes, _, err := createConfigs(baseConfig, initDir, "fullnode", ips, ports, extraEnodes, false)
+	if err != nil {
+		utils.Fatalf("Failed to create config: %v", err)
+	}
+
+	// write configs
+	for i := 0; i < len(configs); i++ {
+		err := writeConfig(inGenesisFile, configs[i], path.Join(initDir, fmt.Sprintf("fullnode%d", i)))
+		if err != nil {
+			utils.Fatalf("Failed to write config: %v", err)
+		}
+	}
+	return configs, enodes, nil
+}
+
+func createConfigs(base gethConfig, initDir string, prefix string, ips []string, ports []int, extraEnodes []*enode.Node, connectOneExtraEnodes bool) ([]gethConfig, []*enode.Node, [][]common.Address, error) {
+>>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	if len(ips) != len(ports) {
 		return nil, nil, nil, errors.New("mismatch of size and length of ports")
 	}
@@ -543,7 +715,7 @@ func createConfigs(base gethConfig, initDir string, prefix string, ips []string,
 			allEnodes = []*enode.Node{enodes[i], extraEnodes[i]}
 			index = 0
 		}
-		configs[i] = createNodeConfig(base, ips[i], ports[i], allEnodes, index, staticConnect)
+		configs[i] = createNodeConfig(base, prefix, ips[i], ports[i], allEnodes, index)
 	}
 	return configs, enodes, accounts, nil
 }
@@ -949,7 +1121,7 @@ func dump(ctx *cli.Context) error {
 		return err
 	}
 	defer db.Close()
-	triedb := utils.MakeTrieDatabase(ctx, stack, db, true, true, false) // always enable preimage lookup
+	triedb := utils.MakeTrieDatabase(ctx, stack, db, true, true, false, false) // always enable preimage lookup
 	defer triedb.Close()
 
 	state, err := state.New(root, state.NewDatabase(triedb, nil))

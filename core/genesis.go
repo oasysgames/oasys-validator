@@ -168,7 +168,11 @@ func hashAlloc(ga *types.GenesisAlloc, isVerkle bool) (common.Hash, error) {
 func flushAlloc(ga *types.GenesisAlloc, triedb *triedb.Database) (common.Hash, error) {
 	triedbConfig := triedb.Config()
 	if triedbConfig != nil {
+		origin := triedbConfig.NoTries
 		triedbConfig.NoTries = false
+		defer func() {
+			triedbConfig.NoTries = origin
+		}()
 	}
 
 	emptyRoot := types.EmptyRootHash
@@ -264,6 +268,14 @@ func (e *GenesisMismatchError) Error() string {
 // Typically, these modifications involve hardforks that are not enabled on the BSC mainnet, intended for testing purposes.
 type ChainOverrides struct {
 	OverridePassedForkTime *uint64
+<<<<<<< HEAD
+=======
+	OverrideLorentz        *uint64
+	OverrideMaxwell        *uint64
+	OverrideFermi          *uint64
+	OverrideOsaka          *uint64
+	OverrideMendel         *uint64
+>>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	OverrideVerkle         *uint64
 }
 
@@ -275,6 +287,12 @@ func (o *ChainOverrides) apply(cfg *params.ChainConfig) error {
 	if o.OverridePassedForkTime != nil {
 		cfg.ShanghaiTime = o.OverridePassedForkTime
 		cfg.CancunTime = o.OverridePassedForkTime
+	}
+	if o.OverrideOsaka != nil {
+		cfg.OsakaTime = o.OverrideOsaka
+	}
+	if o.OverrideMendel != nil {
+		cfg.MendelTime = o.OverrideMendel
 	}
 	if o.OverrideVerkle != nil {
 		cfg.VerkleTime = o.OverrideVerkle
