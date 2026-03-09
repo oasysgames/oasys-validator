@@ -1746,23 +1746,13 @@ func (api *TransactionAPI) GetRawTransactionByHash(ctx context.Context, hash com
 // 	}
 // 	receipt := receipts[index]
 
-<<<<<<< HEAD
-// 	// Derive the sender.
-// 	header, err := api.b.HeaderByHash(ctx, blockHash)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	signer := types.MakeSigner(api.b.ChainConfig(), header.Number, header.Time)
-// 	fields := marshalReceipt(receipt, blockHash, blockNumber, signer, tx, int(index))
-=======
-	// Derive the sender.
-	header, err := api.b.HeaderByHash(ctx, blockHash)
-	if err != nil {
-		return nil, err
-	}
-	signer := types.MakeSigner(api.b.ChainConfig(), header.Number, header.Time)
-	fields := MarshalReceipt(receipt, blockHash, blockNumber, signer, tx, int(index))
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
+//	// Derive the sender.
+//	header, err := api.b.HeaderByHash(ctx, blockHash)
+//	if err != nil {
+//		return nil, err
+//	}
+//	signer := types.MakeSigner(api.b.ChainConfig(), header.Number, header.Time)
+//	fields := MarshalReceipt(receipt, blockHash, blockNumber, signer, tx, int(index))
 
 // 	// TODO use nil basefee before landon fork is enabled
 // 	rpcTransaction := newRPCTransaction(tx, blockHash, blockNumber, header.Time, index, nil, api.b.ChainConfig())
