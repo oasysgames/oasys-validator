@@ -188,199 +188,6 @@ var (
 		},
 	}
 
-<<<<<<< HEAD
-=======
-	BSCChainConfig = &ChainConfig{
-		ChainID:             big.NewInt(56),
-		HomesteadBlock:      big.NewInt(0),
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(0),
-		PetersburgBlock:     big.NewInt(0),
-		IstanbulBlock:       big.NewInt(0),
-		MuirGlacierBlock:    big.NewInt(0),
-		RamanujanBlock:      big.NewInt(0),
-		NielsBlock:          big.NewInt(0),
-		MirrorSyncBlock:     big.NewInt(5184000),
-		BrunoBlock:          big.NewInt(13082000),
-		EulerBlock:          big.NewInt(18907621),
-		NanoBlock:           big.NewInt(21962149),
-		MoranBlock:          big.NewInt(22107423),
-		GibbsBlock:          big.NewInt(23846001),
-		PlanckBlock:         big.NewInt(27281024),
-		LubanBlock:          big.NewInt(29020050),
-		PlatoBlock:          big.NewInt(30720096),
-		BerlinBlock:         big.NewInt(31302048),
-		LondonBlock:         big.NewInt(31302048),
-		HertzBlock:          big.NewInt(31302048),
-		HertzfixBlock:       big.NewInt(34140700),
-		ShanghaiTime:        newUint64(1705996800), // 2024-01-23 08:00:00 AM UTC
-		KeplerTime:          newUint64(1705996800), // 2024-01-23 08:00:00 AM UTC
-		FeynmanTime:         newUint64(1713419340), // 2024-04-18 05:49:00 AM UTC
-		FeynmanFixTime:      newUint64(1713419340), // 2024-04-18 05:49:00 AM UTC
-		CancunTime:          newUint64(1718863500), // 2024-06-20 06:05:00 AM UTC
-		HaberTime:           newUint64(1718863500), // 2024-06-20 06:05:00 AM UTC
-		HaberFixTime:        newUint64(1727316120), // 2024-09-26 02:02:00 AM UTC
-		BohrTime:            newUint64(1727317200), // 2024-09-26 02:20:00 AM UTC
-		PascalTime:          newUint64(1742436600), // 2025-03-20 02:10:00 AM UTC
-		PragueTime:          newUint64(1742436600), // 2025-03-20 02:10:00 AM UTC
-		LorentzTime:         newUint64(1745903100), // 2025-04-29 05:05:00 AM UTC
-		MaxwellTime:         newUint64(1751250600), // 2025-06-30 02:30:00 AM UTC
-		FermiTime:           newUint64(1768357800), // 2026-01-14 02:30:00 AM UTC
-		OsakaTime:           nil,
-		MendelTime:          nil,
-
-		Parlia: &ParliaConfig{},
-		BlobScheduleConfig: &BlobScheduleConfig{
-			Cancun: DefaultCancunBlobConfig,
-			Prague: DefaultPragueBlobConfigBSC,
-			Osaka:  DefaultOsakaBlobConfigBSC,
-		},
-	}
-
-	ChapelChainConfig = &ChainConfig{
-		ChainID:             big.NewInt(97),
-		HomesteadBlock:      big.NewInt(0),
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(0),
-		PetersburgBlock:     big.NewInt(0),
-		IstanbulBlock:       big.NewInt(0),
-		MuirGlacierBlock:    big.NewInt(0),
-		RamanujanBlock:      big.NewInt(1010000),
-		NielsBlock:          big.NewInt(1014369),
-		MirrorSyncBlock:     big.NewInt(5582500),
-		BrunoBlock:          big.NewInt(13837000),
-		EulerBlock:          big.NewInt(19203503),
-		GibbsBlock:          big.NewInt(22800220),
-		NanoBlock:           big.NewInt(23482428),
-		MoranBlock:          big.NewInt(23603940),
-		PlanckBlock:         big.NewInt(28196022),
-		LubanBlock:          big.NewInt(29295050),
-		PlatoBlock:          big.NewInt(29861024),
-		BerlinBlock:         big.NewInt(31103030),
-		LondonBlock:         big.NewInt(31103030),
-		HertzBlock:          big.NewInt(31103030),
-		HertzfixBlock:       big.NewInt(35682300),
-		ShanghaiTime:        newUint64(1702972800), // 2023-12-19 8:00:00 AM UTC
-		KeplerTime:          newUint64(1702972800),
-		FeynmanTime:         newUint64(1710136800), // 2024-03-11 6:00:00 AM UTC
-		FeynmanFixTime:      newUint64(1711342800), // 2024-03-25 5:00:00 AM UTC
-		CancunTime:          newUint64(1713330442), // 2024-04-17 05:07:22 AM UTC
-		HaberTime:           newUint64(1716962820), // 2024-05-29 06:07:00 AM UTC
-		HaberFixTime:        newUint64(1719986788), // 2024-07-03 06:06:28 AM UTC
-		BohrTime:            newUint64(1724116996), // 2024-08-20 01:23:16 AM UTC
-		PascalTime:          newUint64(1740452880), // 2025-02-25 03:08:00 AM UTC
-		PragueTime:          newUint64(1740452880), // 2025-02-25 03:08:00 AM UTC
-		LorentzTime:         newUint64(1744097580), // 2025-04-08 07:33:00 AM UTC
-		MaxwellTime:         newUint64(1748243100), // 2025-05-26 07:05:00 AM UTC
-		FermiTime:           newUint64(1762741500), // 2025-11-10 02:25:00 AM UTC
-		OsakaTime:           nil,
-		MendelTime:          nil,
-
-		Parlia: &ParliaConfig{},
-		BlobScheduleConfig: &BlobScheduleConfig{
-			Cancun: DefaultCancunBlobConfig,
-			Prague: DefaultPragueBlobConfigBSC,
-			Osaka:  DefaultOsakaBlobConfigBSC,
-		},
-	}
-
-	// used to test hard fork upgrade, following https://github.com/bnb-chain/bsc-genesis-contract/blob/master/genesis.json
-	RialtoChainConfig = &ChainConfig{
-		ChainID:             big.NewInt(714),
-		HomesteadBlock:      big.NewInt(0),
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(0),
-		PetersburgBlock:     big.NewInt(0),
-		IstanbulBlock:       big.NewInt(0),
-		MuirGlacierBlock:    big.NewInt(0),
-		RamanujanBlock:      big.NewInt(0),
-		NielsBlock:          big.NewInt(0),
-		MirrorSyncBlock:     big.NewInt(1),
-		BrunoBlock:          big.NewInt(1),
-		EulerBlock:          big.NewInt(2),
-		NanoBlock:           big.NewInt(3),
-		MoranBlock:          big.NewInt(3),
-		GibbsBlock:          big.NewInt(4),
-		PlanckBlock:         big.NewInt(5),
-		LubanBlock:          big.NewInt(6),
-		PlatoBlock:          big.NewInt(7),
-		BerlinBlock:         big.NewInt(8),
-		LondonBlock:         big.NewInt(8),
-		HertzBlock:          big.NewInt(8),
-		HertzfixBlock:       big.NewInt(8),
-		ShanghaiTime:        newUint64(0),
-		KeplerTime:          newUint64(0),
-		FeynmanTime:         newUint64(0),
-		FeynmanFixTime:      newUint64(0),
-		CancunTime:          newUint64(0),
-		HaberTime:           newUint64(0),
-		HaberFixTime:        newUint64(0),
-		BohrTime:            newUint64(0),
-		PascalTime:          newUint64(0),
-		PragueTime:          newUint64(0),
-		LorentzTime:         newUint64(0),
-		MaxwellTime:         newUint64(0),
-		// TODO: set them to `0` when passed on the mainnet
-		FermiTime:  nil,
-		OsakaTime:  nil,
-		MendelTime: nil,
-
-		Parlia: &ParliaConfig{},
-		BlobScheduleConfig: &BlobScheduleConfig{
-			Cancun: DefaultCancunBlobConfig,
-			Prague: DefaultPragueBlobConfigBSC,
-			Osaka:  DefaultOsakaBlobConfigBSC,
-		},
-	}
-
-	ParliaTestChainConfig = &ChainConfig{
-		ChainID:             big.NewInt(2),
-		HomesteadBlock:      big.NewInt(0),
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(0),
-		PetersburgBlock:     big.NewInt(0),
-		IstanbulBlock:       big.NewInt(0),
-		MuirGlacierBlock:    big.NewInt(0),
-		RamanujanBlock:      big.NewInt(0),
-		NielsBlock:          big.NewInt(0),
-		MirrorSyncBlock:     big.NewInt(0),
-		BrunoBlock:          big.NewInt(0),
-		EulerBlock:          big.NewInt(0),
-		NanoBlock:           big.NewInt(0),
-		MoranBlock:          big.NewInt(0),
-		GibbsBlock:          big.NewInt(0),
-		PlanckBlock:         big.NewInt(0),
-		LubanBlock:          big.NewInt(0),
-		PlatoBlock:          big.NewInt(0),
-		BerlinBlock:         big.NewInt(0),
-		LondonBlock:         big.NewInt(0),
-		HertzBlock:          big.NewInt(0),
-		HertzfixBlock:       big.NewInt(0),
-		ShanghaiTime:        newUint64(0),
-		KeplerTime:          newUint64(0),
-		FeynmanTime:         newUint64(0),
-		FeynmanFixTime:      newUint64(0),
-		CancunTime:          newUint64(0),
-
-		Parlia: &ParliaConfig{},
-		BlobScheduleConfig: &BlobScheduleConfig{
-			Cancun: DefaultCancunBlobConfig,
-		},
-	}
-
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	// AllEthashProtocolChanges contains every protocol change (EIPs) introduced
 	// and accepted by the Ethereum core developers into the Ethash consensus.
 	AllEthashProtocolChanges = &ChainConfig{
@@ -689,12 +496,6 @@ var (
 		Prague: DefaultPragueBlobConfig,
 		Osaka:  DefaultOsakaBlobConfig,
 	}
-<<<<<<< HEAD
-=======
-
-	DefaultPragueBlobConfigBSC = DefaultCancunBlobConfig
-	DefaultOsakaBlobConfigBSC  = DefaultCancunBlobConfig
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 )
 
 // NetworkNames are user friendly names to use in the chain spec banner.
@@ -735,30 +536,11 @@ type ChainConfig struct {
 
 	// Fork scheduling was switched from blocks to timestamps here
 
-<<<<<<< HEAD
 	ShanghaiTime *uint64 `json:"shanghaiTime,omitempty"` // Shanghai switch time (nil = no fork, 0 = already on shanghai)
 	CancunTime   *uint64 `json:"cancunTime,omitempty"`   // Cancun switch time (nil = no fork, 0 = already on cancun)
 	PragueTime   *uint64 `json:"pragueTime,omitempty"`   // Prague switch time (nil = no fork, 0 = already on prague)
 	OsakaTime    *uint64 `json:"osakaTime,omitempty"`    // Osaka switch time (nil = no fork, 0 = already on osaka)
 	VerkleTime   *uint64 `json:"verkleTime,omitempty"`   // Verkle switch time (nil = no fork, 0 = already on verkle)
-=======
-	ShanghaiTime   *uint64 `json:"shanghaiTime,omitempty"`   // Shanghai switch time (nil = no fork, 0 = already on shanghai)
-	KeplerTime     *uint64 `json:"keplerTime,omitempty"`     // Kepler switch time (nil = no fork, 0 = already activated)
-	FeynmanTime    *uint64 `json:"feynmanTime,omitempty"`    // Feynman switch time (nil = no fork, 0 = already activated)
-	FeynmanFixTime *uint64 `json:"feynmanFixTime,omitempty"` // FeynmanFix switch time (nil = no fork, 0 = already activated)
-	CancunTime     *uint64 `json:"cancunTime,omitempty"`     // Cancun switch time (nil = no fork, 0 = already on cancun)
-	HaberTime      *uint64 `json:"haberTime,omitempty"`      // Haber switch time (nil = no fork, 0 = already on haber)
-	HaberFixTime   *uint64 `json:"haberFixTime,omitempty"`   // HaberFix switch time (nil = no fork, 0 = already on haberFix)
-	BohrTime       *uint64 `json:"bohrTime,omitempty"`       // Bohr switch time (nil = no fork, 0 = already on bohr)
-	PascalTime     *uint64 `json:"pascalTime,omitempty"`     // Pascal switch time (nil = no fork, 0 = already on pascal)
-	PragueTime     *uint64 `json:"pragueTime,omitempty"`     // Prague switch time (nil = no fork, 0 = already on prague)
-	LorentzTime    *uint64 `json:"lorentzTime,omitempty"`    // Lorentz switch time (nil = no fork, 0 = already on lorentz)
-	MaxwellTime    *uint64 `json:"maxwellTime,omitempty"`    // Maxwell switch time (nil = no fork, 0 = already on maxwell)
-	FermiTime      *uint64 `json:"fermiTime,omitempty"`      // Fermi switch time (nil = no fork, 0 = already on fermi)
-	OsakaTime      *uint64 `json:"osakaTime,omitempty"`      // Osaka switch time (nil = no fork, 0 = already on osaka)
-	MendelTime     *uint64 `json:"mendelTime,omitempty"`     // Mendel switch time (nil = no fork, 0 = already on mendel)
-	VerkleTime     *uint64 `json:"verkleTime,omitempty"`     // Verkle switch time (nil = no fork, 0 = already on verkle)
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 
 	// TerminalTotalDifficulty is the amount of total difficulty reached by
 	// the network that triggers the consensus upgrade.
@@ -928,39 +710,7 @@ func (c *ChainConfig) String() string {
 		PragueTime = big.NewInt(0).SetUint64(*c.PragueTime)
 	}
 
-<<<<<<< HEAD
-	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, ArrowGlacier: %v, MergeFork:%v, ShanghaiTime: %v, CancunTime: %v, PragueTime: %v, Engine: %v}",
-=======
-	var LorentzTime *big.Int
-	if c.LorentzTime != nil {
-		LorentzTime = big.NewInt(0).SetUint64(*c.LorentzTime)
-	}
-
-	var MaxwellTime *big.Int
-	if c.MaxwellTime != nil {
-		MaxwellTime = big.NewInt(0).SetUint64(*c.MaxwellTime)
-	}
-
-	var FermiTime *big.Int
-	if c.FermiTime != nil {
-		FermiTime = big.NewInt(0).SetUint64(*c.FermiTime)
-	}
-
-	var OsakaTime *big.Int
-	if c.OsakaTime != nil {
-		OsakaTime = big.NewInt(0).SetUint64(*c.OsakaTime)
-	}
-
-	var MendelTime *big.Int
-	if c.MendelTime != nil {
-		MendelTime = big.NewInt(0).SetUint64(*c.MendelTime)
-	}
-
-	return fmt.Sprintf("{ChainID: %v, Engine: %v, Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Ramanujan: %v, Niels: %v, "+
-		"MirrorSync: %v, Bruno: %v, Berlin: %v, YOLO v3: %v, CatalystBlock: %v, London: %v, ArrowGlacier: %v, MergeFork:%v, Euler: %v, Gibbs: %v, Nano: %v, Moran: %v, Planck: %v,Luban: %v, Plato: %v, Hertz: %v, Hertzfix: %v, "+
-		"ShanghaiTime: %v, KeplerTime: %v, FeynmanTime: %v, FeynmanFixTime: %v, CancunTime: %v, HaberTime: %v, HaberFixTime: %v, BohrTime: %v, PascalTime: %v, PragueTime: %v, LorentzTime: %v, MaxwellTime: %v, FermiTime: %v, "+
-		"OsakaTime: %v, MendelTime: %v}",
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
+	return fmt.Sprintf("{ChainID: %v Engine: %v, Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, ArrowGlacier: %v, MergeFork:%v, ShanghaiTime: %v, CancunTime: %v, PragueTime: %v, OsakaTime: %v}",
 		c.ChainID,
 		engine,
 		c.HomesteadBlock,
@@ -981,14 +731,7 @@ func (c *ChainConfig) String() string {
 		ShanghaiTime,
 		CancunTime,
 		PragueTime,
-<<<<<<< HEAD
-=======
-		LorentzTime,
-		MaxwellTime,
-		FermiTime,
 		OsakaTime,
-		MendelTime,
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	)
 }
 
@@ -1322,21 +1065,8 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "mergeNetsplitBlock", block: c.MergeNetsplitBlock, optional: true},
 		{name: "shanghaiTime", timestamp: c.ShanghaiTime},
 		{name: "cancunTime", timestamp: c.CancunTime},
-<<<<<<< HEAD
 		{name: "pragueTime", timestamp: c.PragueTime, optional: true},
 		{name: "osakaTime", timestamp: c.OsakaTime, optional: true},
-=======
-		{name: "haberTime", timestamp: c.HaberTime},
-		{name: "haberFixTime", timestamp: c.HaberFixTime},
-		{name: "bohrTime", timestamp: c.BohrTime},
-		{name: "pascalTime", timestamp: c.PascalTime},
-		{name: "pragueTime", timestamp: c.PragueTime},
-		{name: "lorentzTime", timestamp: c.LorentzTime},
-		{name: "maxwellTime", timestamp: c.MaxwellTime},
-		{name: "fermiTime", timestamp: c.FermiTime},
-		{name: "osakaTime", timestamp: c.OsakaTime},
-		{name: "mendelTime", timestamp: c.MendelTime},
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 		{name: "verkleTime", timestamp: c.VerkleTime, optional: true},
 	} {
 		if lastFork.name != "" {
@@ -1481,27 +1211,9 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headNumber *big.Int, 
 	if isForkTimestampIncompatible(c.PragueTime, newcfg.PragueTime, headTimestamp) {
 		return newTimestampCompatError("Prague fork timestamp", c.PragueTime, newcfg.PragueTime)
 	}
-<<<<<<< HEAD
 	if isForkTimestampIncompatible(c.OsakaTime, newcfg.OsakaTime, headTimestamp) {
 		return newTimestampCompatError("Osaka fork timestamp", c.OsakaTime, newcfg.OsakaTime)
 	}
-=======
-	if isForkTimestampIncompatible(c.LorentzTime, newcfg.LorentzTime, headTimestamp) {
-		return newTimestampCompatError("Lorentz fork timestamp", c.LorentzTime, newcfg.LorentzTime)
-	}
-	if isForkTimestampIncompatible(c.MaxwellTime, newcfg.MaxwellTime, headTimestamp) {
-		return newTimestampCompatError("Maxwell fork timestamp", c.MaxwellTime, newcfg.MaxwellTime)
-	}
-	if isForkTimestampIncompatible(c.FermiTime, newcfg.FermiTime, headTimestamp) {
-		return newTimestampCompatError("FermiTime fork timestamp", c.FermiTime, newcfg.FermiTime)
-	}
-	if isForkTimestampIncompatible(c.OsakaTime, newcfg.OsakaTime, headTimestamp) {
-		return newTimestampCompatError("Osaka fork timestamp", c.OsakaTime, newcfg.OsakaTime)
-	}
-	if isForkTimestampIncompatible(c.MendelTime, newcfg.MendelTime, headTimestamp) {
-		return newTimestampCompatError("Mendel fork timestamp", c.MendelTime, newcfg.MendelTime)
-	}
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	if isForkTimestampIncompatible(c.VerkleTime, newcfg.VerkleTime, headTimestamp) {
 		return newTimestampCompatError("Verkle fork timestamp", c.VerkleTime, newcfg.VerkleTime)
 	}
@@ -1699,22 +1411,8 @@ type Rules struct {
 	IsEIP2929, IsEIP4762                                    bool
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
 	IsBerlin, IsLondon                                      bool
-<<<<<<< HEAD
 	IsMerge, IsShanghai, IsCancun, IsPrague, IsOsaka        bool
 	IsVerkle                                                bool
-=======
-	IsMerge                                                 bool
-	IsNano                                                  bool
-	IsMoran                                                 bool
-	IsPlanck                                                bool
-	IsLuban                                                 bool
-	IsPlato                                                 bool
-	IsHertz                                                 bool
-	IsHertzfix                                              bool
-	IsShanghai, IsKepler, IsFeynman, IsCancun, IsHaber      bool
-	IsBohr, IsPascal, IsPrague, IsLorentz, IsMaxwell        bool
-	IsFermi, IsOsaka, IsMendel, IsVerkle                    bool
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 }
 
 // Rules ensures c's ChainID is not nil.
