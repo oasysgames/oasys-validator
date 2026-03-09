@@ -306,34 +306,11 @@ var (
 		Usage:    "Manually specify the hard fork timestamps which have passed on the mainnet, overriding the bundled setting",
 		Category: flags.EthCategory,
 	}
-<<<<<<< HEAD
-=======
-	OverrideLorentz = &cli.Uint64Flag{
-		Name:     "override.lorentz",
-		Usage:    "Manually specify the Lorentz fork timestamp, overriding the bundled setting",
-		Category: flags.EthCategory,
-	}
-	OverrideMaxwell = &cli.Uint64Flag{
-		Name:     "override.maxwell",
-		Usage:    "Manually specify the Maxwell fork timestamp, overriding the bundled setting",
-		Category: flags.EthCategory,
-	}
-	OverrideFermi = &cli.Uint64Flag{
-		Name:     "override.fermi",
-		Usage:    "Manually specify the Fermi fork timestamp, overriding the bundled setting",
-		Category: flags.EthCategory,
-	}
 	OverrideOsaka = &cli.Uint64Flag{
 		Name:     "override.osaka",
 		Usage:    "Manually specify the Osaka fork timestamp, overriding the bundled setting",
 		Category: flags.EthCategory,
 	}
-	OverrideMendel = &cli.Uint64Flag{
-		Name:     "override.mendel",
-		Usage:    "Manually specify the Mendel fork timestamp, overriding the bundled setting",
-		Category: flags.EthCategory,
-	}
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	OverrideVerkle = &cli.Uint64Flag{
 		Name:     "override.verkle",
 		Usage:    "Manually specify the Verkle fork timestamp, overriding the bundled setting",
@@ -382,13 +359,8 @@ var (
 	}
 	JournalFileFlag = &cli.BoolFlag{
 		Name:     "journalfile",
-<<<<<<< HEAD
 		Usage:    "Enable using journal file to store the TrieJournal instead of KVDB in pbss (default = false)",
 		Value:    bscFeaturesDefaultBool,
-=======
-		Usage:    "Enable using journal file to store the TrieJournal instead of KVDB in pbss (default = true)",
-		Value:    true,
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 		Category: flags.StateCategory,
 	}
 	StateHistoryFlag = &cli.Uint64Flag{
@@ -1967,17 +1939,15 @@ func setMiner(ctx *cli.Context, cfg *minerconfig.Config) {
 	if ctx.Bool(DisableVoteAttestationFlag.Name) {
 		cfg.DisableVoteAttestation = true
 	}
-<<<<<<< HEAD
 	if ctx.Bool(DisableSuspiciousTxFilterFlag.Name) {
 		cfg.DisableSuspiciousTxFilter = true
-=======
+	}
 	if ctx.IsSet(MinerTxGasLimitFlag.Name) {
 		limit := ctx.Uint64(MinerTxGasLimitFlag.Name)
 		if limit != 0 && limit < params.MinTxGasLimitCap {
 			Fatalf("Invalid --miner.txgaslimit: %d (must be >= %d or 0)", limit, params.MinTxGasLimitCap)
 		}
 		cfg.TxGasLimit = limit
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	}
 }
 

@@ -70,14 +70,7 @@ var (
 		utils.USBFlag,
 		utils.SmartCardDaemonPathFlag,
 		utils.OverridePassedForkTime,
-<<<<<<< HEAD
-=======
-		utils.OverrideLorentz,
-		utils.OverrideMaxwell,
-		utils.OverrideFermi,
 		utils.OverrideOsaka,
-		utils.OverrideMendel,
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 		utils.OverrideVerkle,
 		utils.OverrideFullImmutabilityThreshold,
 		utils.OverrideMinBlocksForBlobRequests,
@@ -95,12 +88,8 @@ var (
 		utils.TxPoolGlobalQueueFlag,
 		// utils.TxPoolOverflowPoolSlotsFlag,
 		utils.TxPoolLifetimeFlag,
-<<<<<<< HEAD
 		// utils.TxPoolReannounceTimeFlag,
-=======
-		utils.TxPoolReannounceTimeFlag,
 		utils.MinerTxGasLimitFlag,
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 		utils.BlobPoolDataDirFlag,
 		utils.BlobPoolDataCapFlag,
 		utils.BlobPoolPriceBumpFlag,
@@ -150,12 +139,8 @@ var (
 		utils.MinerExtraDataFlag,
 		utils.MinerRecommitIntervalFlag,
 		utils.MinerNewPayloadTimeoutFlag, // deprecated
-<<<<<<< HEAD
 		// utils.MinerDelayLeftoverFlag,
-=======
-		utils.MinerDelayLeftoverFlag,
-		utils.EnableBALFlag,
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
+		// utils.EnableBALFlag,
 		// utils.MinerNewPayloadTimeout,
 		utils.NATFlag,
 		utils.NoDiscoverFlag,
@@ -462,14 +447,9 @@ func startNode(ctx *cli.Context, stack *node.Node, backend ethapi.Backend, isCon
 	}
 
 	// Start auxiliary services if enabled
-<<<<<<< HEAD
-=======
 	ethBackend, ok := backend.(*eth.EthAPIBackend)
 	gasCeil := ethBackend.Miner().GasCeil()
 	maxTxGas := uint64(0)
-	if gasCeil > params.SystemTxsGasSoftLimit {
-		maxTxGas = gasCeil - params.SystemTxsGasSoftLimit
-	}
 	if txGasLimit := ethBackend.Miner().TxGasLimit(); txGasLimit > 0 {
 		if maxTxGas == 0 || txGasLimit < maxTxGas {
 			maxTxGas = txGasLimit
@@ -479,7 +459,6 @@ func startNode(ctx *cli.Context, stack *node.Node, backend ethapi.Backend, isCon
 		ethBackend.TxPool().SetMaxGas(maxTxGas)
 	}
 
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	if ctx.Bool(utils.MiningEnabledFlag.Name) {
 		// Mining only makes sense if a full Ethereum node is running
 		if ctx.String(utils.SyncModeFlag.Name) == "light" {
