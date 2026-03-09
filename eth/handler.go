@@ -124,7 +124,6 @@ type votePool interface {
 // handlerConfig is the collection of initialization parameters to create a full
 // node network handler.
 type handlerConfig struct {
-<<<<<<< HEAD
 	NodeID                 enode.ID         // P2P node ID used for tx propagation topology
 	Database               ethdb.Database   // Database for direct sync insertions
 	Chain                  *core.BlockChain // Blockchain to serve data from
@@ -144,38 +143,6 @@ type handler struct {
 	nodeID                 enode.ID
 	networkID              uint64
 	disablePeerTxBroadcast bool
-=======
-	NodeID                    enode.ID         // P2P node ID used for tx propagation topology
-	Database                  ethdb.Database   // Database for direct sync insertions
-	Chain                     *core.BlockChain // Blockchain to serve data from
-	TxPool                    txPool           // Transaction pool to propagate from
-	VotePool                  votePool
-	Network                   uint64                 // Network identifier to adfvertise
-	Sync                      ethconfig.SyncMode     // Whether to snap or full sync
-	BloomCache                uint64                 // Megabytes to alloc for snap sync bloom
-	EventMux                  *event.TypeMux         // Legacy event mux, deprecate for `feed`
-	RequiredBlocks            map[uint64]common.Hash // Hard coded map of required block hashes for sync challenges
-	DirectBroadcast           bool
-	DisablePeerTxBroadcast    bool
-	PeerSet                   *peerSet
-	EnableQuickBlockFetching  bool
-	EnableEVNFeatures         bool
-	EnableBAL                 bool
-	EVNNodeIdsWhitelist       []enode.ID
-	ProxyedValidatorAddresses []common.Address
-	ProxyedNodeIds            []enode.ID
-}
-
-type handler struct {
-	nodeID                     enode.ID
-	networkID                  uint64
-	disablePeerTxBroadcast     bool
-	enableEVNFeatures          bool
-	enableBAL                  bool
-	evnNodeIdsWhitelistMap     map[enode.ID]struct{}
-	proxyedValidatorAddressMap map[common.Address]struct{}
-	proxyedNodeIdsMap          map[enode.ID]struct{}
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 
 	snapSync        atomic.Bool // Flag whether snap sync is enabled (gets disabled if we already have blocks)
 	synced          atomic.Bool // Flag whether we're considered synchronised (enables transaction processing)
@@ -235,7 +202,6 @@ func newHandler(config *handlerConfig) (*handler, error) {
 		config.PeerSet = newPeerSet() // Nicety initialization for tests
 	}
 	h := &handler{
-<<<<<<< HEAD
 		nodeID:                 config.NodeID,
 		networkID:              config.Network,
 		disablePeerTxBroadcast: config.DisablePeerTxBroadcast,
@@ -252,35 +218,6 @@ func newHandler(config *handlerConfig) (*handler, error) {
 		handlerDoneCh:          make(chan struct{}),
 		handlerStartCh:         make(chan struct{}),
 		stopCh:                 make(chan struct{}),
-=======
-		nodeID:                     config.NodeID,
-		networkID:                  config.Network,
-		disablePeerTxBroadcast:     config.DisablePeerTxBroadcast,
-		eventMux:                   config.EventMux,
-		database:                   config.Database,
-		txpool:                     config.TxPool,
-		votepool:                   config.VotePool,
-		chain:                      config.Chain,
-		peers:                      config.PeerSet,
-		peersPerIP:                 make(map[string]int),
-		requiredBlocks:             config.RequiredBlocks,
-		directBroadcast:            config.DirectBroadcast,
-		enableEVNFeatures:          config.EnableEVNFeatures,
-		enableBAL:                  config.EnableBAL,
-		evnNodeIdsWhitelistMap:     make(map[enode.ID]struct{}),
-		proxyedValidatorAddressMap: make(map[common.Address]struct{}),
-		proxyedNodeIdsMap:          make(map[enode.ID]struct{}),
-		quitSync:                   make(chan struct{}),
-		handlerDoneCh:              make(chan struct{}),
-		handlerStartCh:             make(chan struct{}),
-		stopCh:                     make(chan struct{}),
-	}
-	for _, nodeID := range config.EVNNodeIdsWhitelist {
-		h.evnNodeIdsWhitelistMap[nodeID] = struct{}{}
-	}
-	for _, address := range config.ProxyedValidatorAddresses {
-		h.proxyedValidatorAddressMap[address] = struct{}{}
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	}
 	for _, nodeID := range config.ProxyedNodeIds {
 		h.proxyedNodeIdsMap[nodeID] = struct{}{}
@@ -372,51 +309,6 @@ func newHandler(config *handlerConfig) (*handler, error) {
 		h.BroadcastBlock(block, propagate)
 	}
 
-<<<<<<< HEAD
-=======
-	fetchRangeBlocks := func(peer string, startHeight uint64, startHash common.Hash, count uint64) ([]*types.Block, error) {
-		p := h.peers.peer(peer)
-		if p == nil {
-			return nil, errors.New("peer not found")
-		}
-		if p.bscExt == nil {
-			return nil, fmt.Errorf("peer does not support bsc protocol, peer: %v", p.ID())
-		}
-		if p.bscExt.Version() < bsc.Bsc2 {
-			return nil, fmt.Errorf("remote peer does not support the required Bsc2 protocol version, peer: %v", p.ID())
-		}
-		res, err := p.bscExt.RequestBlocksByRange(startHeight, startHash, count)
-		if err != nil {
-			return nil, err
-		}
-
-		blocks := make([]*types.Block, len(res))
-		for i, item := range res {
-			block := types.NewBlockWithHeader(item.Header).WithBody(types.Body{Transactions: item.Txs, Uncles: item.Uncles})
-			block = block.WithSidecars(item.Sidecars)
-			block = block.WithBAL(item.BAL)
-			block.ReceivedAt = time.Now()
-			block.ReceivedFrom = p.ID()
-			if err := block.SanityCheck(); err != nil {
-				return nil, err
-			}
-			if len(block.Sidecars()) > 0 {
-				for _, sidecar := range block.Sidecars() {
-					if err := sidecar.SanityCheck(block.Number(), block.Hash()); err != nil {
-						return nil, err
-					}
-				}
-			}
-			blocks[i] = block
-		}
-		return blocks, err
-	}
-
-	if !config.EnableQuickBlockFetching {
-		fetchRangeBlocks = nil
-	}
-
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	h.blockFetcher = fetcher.NewBlockFetcher(h.chain.GetBlockByHash, validator, broadcastBlockWithCheck,
 		heighter, finalizeHeighter, inserter, h.removePeer)
 
@@ -451,16 +343,7 @@ func newHandler(config *handlerConfig) (*handler, error) {
 // protoTracker tracks the number of active protocol handlers.
 func (h *handler) protoTracker() {
 	defer h.wg.Done()
-<<<<<<< HEAD
-=======
 
-	h.peers.setProxyedPeers(h.proxyedNodeIdsMap)
-	if h.enableEVNFeatures && h.synced.Load() {
-		h.peers.enableEVNFeatures(h.queryValidatorNodeIDsMap(), h.evnNodeIdsWhitelistMap)
-	}
-	updateTicker := time.NewTicker(10 * time.Second)
-	defer updateTicker.Stop()
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	var active int
 	for {
 		select {
@@ -468,16 +351,6 @@ func (h *handler) protoTracker() {
 			active++
 		case <-h.handlerDoneCh:
 			active--
-<<<<<<< HEAD
-=======
-		case <-updateTicker.C:
-			h.peers.setProxyedPeers(h.proxyedNodeIdsMap)
-			if h.enableEVNFeatures && h.synced.Load() {
-				// add onchain validator p2p node list later, it will enable the direct broadcast + no tx broadcast feature
-				// here check & enable peer broadcast features periodically, and it's a simple way to handle the peer change and the list change scenarios.
-				h.peers.enableEVNFeatures(h.queryValidatorNodeIDsMap(), h.evnNodeIdsWhitelistMap)
-			}
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 		case <-h.quitSync:
 			// Wait for all active handlers to finish.
 			for ; active > 0; active-- {
@@ -889,75 +762,19 @@ func (h *handler) BroadcastBlock(block *types.Block, propagate bool) {
 			!(h.networkID == 714 /*RialtoChainConfig.ChainID*/ && block.NumberU64() == 1) { // Populate TD from every receiver on startup to establish proper sync.
 			limit = int(math.Sqrt(float64(totalPeers)))
 		}
-<<<<<<< HEAD
-		for _, peer := range transfer {
-			peer.AsyncSendNewBlock(block, td)
-		}
-		log.Debug("Propagated block", "hash", hash, "recipients", len(transfer), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
-=======
 
 		// Step 2: Broadcast to selected peers.
 		transferPeersCnt := limit
 		for _, peer := range peers[:limit] {
-			log.Debug("Broadcast block to peer",
-				"hash", hash, "peer", peer.ID(),
-				"EVNPeerFlag", peer.EVNPeerFlag.Load(),
-				"CanHandleBAL", peer.CanHandleBAL.Load(),
-			)
 			peer.AsyncSendNewBlock(block, td)
 		}
 
-		// Step 3: Handle proxyed peers.
-		proxyedPeersCnt := 0
-		if len(h.proxyedNodeIdsMap) > 0 {
-			for _, peer := range peers[limit:] {
-				if peer.ProxyedPeerFlag.Load() {
-					log.Debug("Broadcast block to proxyed peer",
-						"hash", hash, "peer", peer.ID(),
-						"EVNPeerFlag", peer.EVNPeerFlag.Load(),
-						"CanHandleBAL", peer.CanHandleBAL.Load(),
-					)
-					peer.AsyncSendNewBlock(block, td)
-					proxyedPeersCnt++
-				}
-			}
-		}
-
-		// Step 4: Handle EVN peers if full broadcast is required.
-		evnPeersCnt := 0
-		if h.needFullBroadcastInEVN(block) {
-			for _, peer := range peers[limit:] {
-				if !peer.ProxyedPeerFlag.Load() && peer.EVNPeerFlag.Load() {
-					log.Debug("Broadcast block to EVN peer",
-						"hash", hash, "peer", peer.ID(),
-						"EVNPeerFlag", peer.EVNPeerFlag.Load(),
-						"CanHandleBAL", peer.CanHandleBAL.Load(),
-					)
-					peer.AsyncSendNewBlock(block, td)
-					evnPeersCnt++
-				}
-			}
-		}
-
-		// Step 5: Log summary.
-		log.Debug("Propagated block",
-			"hash", hash,
-			"recipients", transferPeersCnt,
-			"proxyed", proxyedPeersCnt,
-			"evn", evnPeersCnt,
-			"duration", common.PrettyDuration(time.Since(block.ReceivedAt)),
-		)
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
+		log.Debug("Propagated block", "hash", hash, "recipients", len(transfer), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
 		return
 	}
 	// Otherwise if the block is indeed in our own chain, announce it
 	if h.chain.HasBlock(hash, block.NumberU64()) {
 		for _, peer := range peers {
-<<<<<<< HEAD
-=======
-			log.Debug("Announced block to peer", "hash", hash, "peer", peer.ID(),
-				"EVNPeerFlag", peer.EVNPeerFlag.Load(), "CanHandleBAL", peer.CanHandleBAL.Load())
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 			peer.AsyncSendNewBlockHash(block)
 		}
 		log.Debug("Announced block", "hash", hash, "recipients", len(peers), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
@@ -1091,16 +908,12 @@ func (h *handler) BroadcastVote(vote *types.VoteEnvelope) {
 		}
 		_, peerTD := peer.Head()
 		deltaTD := new(big.Int).Abs(new(big.Int).Sub(currentTD, peerTD))
-<<<<<<< HEAD
 		// broadcast if
 		// - bscExt is set
 		// - the first time (averageDifficulty is not set)
 		// - The total difficulty of peer is within the [+|-] range of average difficulty per block * deltaTdThreshold (blocks)
 		broadCasts := peer.bscExt != nil && (averageDifficulty == nil || deltaTD.Cmp(new(big.Int).Mul(big.NewInt(deltaTdThreshold), averageDifficulty)) < 1)
 		if broadCasts {
-=======
-		if deltaTD.Cmp(big.NewInt(deltaTdThreshold)) <= 0 {
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 			voteMap[peer] = vote
 		}
 	}

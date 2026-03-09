@@ -28,13 +28,9 @@ import (
 	"sync"
 	"time"
 
-<<<<<<< HEAD
-=======
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/params"
 
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
@@ -224,29 +220,10 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		chainConfig.CancunTime = config.OverridePassedForkTime
 		overrides.OverridePassedForkTime = config.OverridePassedForkTime
 	}
-<<<<<<< HEAD
-=======
-	if config.OverrideLorentz != nil {
-		chainConfig.LorentzTime = config.OverrideLorentz
-		overrides.OverrideLorentz = config.OverrideLorentz
-	}
-	if config.OverrideMaxwell != nil {
-		chainConfig.MaxwellTime = config.OverrideMaxwell
-		overrides.OverrideMaxwell = config.OverrideMaxwell
-	}
-	if config.OverrideFermi != nil {
-		chainConfig.FermiTime = config.OverrideFermi
-		overrides.OverrideFermi = config.OverrideFermi
-	}
 	if config.OverrideOsaka != nil {
 		chainConfig.OsakaTime = config.OverrideOsaka
 		overrides.OverrideOsaka = config.OverrideOsaka
 	}
-	if config.OverrideMendel != nil {
-		chainConfig.MendelTime = config.OverrideMendel
-		overrides.OverrideMendel = config.OverrideMendel
-	}
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	if config.OverrideVerkle != nil {
 		chainConfig.VerkleTime = config.OverrideVerkle
 		overrides.OverrideVerkle = config.OverrideVerkle
@@ -424,7 +401,6 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	// Permit the downloader to use the trie cache allowance during fast sync
 	cacheLimit := options.TrieCleanLimit + options.TrieDirtyLimit + options.SnapshotLimit
 	if eth.handler, err = newHandler(&handlerConfig{
-<<<<<<< HEAD
 		NodeID:                 eth.p2pServer.Self().ID(),
 		Database:               chainDb,
 		Chain:                  eth.blockchain,
@@ -437,26 +413,6 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		DirectBroadcast:        config.DirectBroadcast,
 		DisablePeerTxBroadcast: config.DisablePeerTxBroadcast,
 		PeerSet:                newPeerSet(),
-=======
-		NodeID:                    eth.p2pServer.Self().ID(),
-		Database:                  chainDb,
-		Chain:                     eth.blockchain,
-		TxPool:                    eth.txPool,
-		Network:                   networkID,
-		Sync:                      config.SyncMode,
-		BloomCache:                uint64(cacheLimit),
-		EventMux:                  eth.eventMux,
-		RequiredBlocks:            config.RequiredBlocks,
-		DirectBroadcast:           config.DirectBroadcast,
-		EnableEVNFeatures:         stack.Config().EnableEVNFeatures,
-		EnableBAL:                 config.EnableBAL,
-		EVNNodeIdsWhitelist:       stack.Config().P2P.EVNNodeIdsWhitelist,
-		ProxyedValidatorAddresses: stack.Config().P2P.ProxyedValidatorAddresses,
-		ProxyedNodeIds:            stack.Config().P2P.ProxyedNodeIds,
-		DisablePeerTxBroadcast:    config.DisablePeerTxBroadcast,
-		PeerSet:                   newPeerSet(),
-		EnableQuickBlockFetching:  stack.Config().EnableQuickBlockFetching,
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	}); err != nil {
 		return nil, err
 	}
