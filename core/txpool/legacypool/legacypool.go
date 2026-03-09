@@ -174,14 +174,10 @@ var DefaultConfig = Config{
 	GlobalQueue:       4000,
 	OverflowPoolSlots: 0,
 
-<<<<<<< HEAD
 	// Set the default to true. This change disables local tx tracking.
 	// Tx tracker will resubmit filtered suspicious txs to the pool. <- we want to stop this
 	NoLocals:       true,
 	Lifetime:       3 * time.Minute, // Reduce the default 10 minutes to evict suspicious txs from the pool.
-=======
-	Lifetime:       3 * time.Hour,
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	ReannounceTime: 10 * 365 * 24 * time.Hour,
 }
 

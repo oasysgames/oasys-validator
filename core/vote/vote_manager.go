@@ -23,11 +23,7 @@ import (
 // the new node may cast votes for the same block height that the previous node already voted on.
 // To avoid double-voting issues, the node should wait for a few blocks
 // before participating in voting after it starts mining.
-<<<<<<< HEAD
-const blocksNumberSinceMining = 20 * params.MaxwellBlockTimeReductionFactorForBSC
-=======
-const blocksNumberSinceMining = 40
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
+const blocksNumberSinceMining = 40 * params.MaxwellBlockTimeReductionFactorForBSC
 
 var diffInTurn = big.NewInt(2) // Block difficulty for in-turn signatures
 var votesManagerCounter = metrics.NewRegisteredCounter("votesManager/local", nil)
@@ -157,17 +153,6 @@ func (voteManager *VoteManager) loop() {
 			}
 
 			curHead := cHead.Header
-<<<<<<< HEAD
-			if o, ok := voteManager.engine.(*oasys.Oasys); ok {
-				nextBlockMinedTime := time.Unix(int64((curHead.Time + o.Period(voteManager.chain, curHead))), 0)
-				timeForBroadcast := 50 * time.Millisecond // enough to broadcast a vote
-				if time.Now().Add(timeForBroadcast).After(nextBlockMinedTime) {
-					log.Warn("too late to vote", "Head.Time(Second)", curHead.Time, "Now(Millisecond)", time.Now().UnixMilli())
-					continue
-				}
-			}
-=======
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 
 			// Check if cur validator is within the validatorSet at curHead
 			if !voteManager.engine.IsActiveValidatorAt(voteManager.chain, curHead,

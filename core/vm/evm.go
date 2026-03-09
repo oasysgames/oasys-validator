@@ -24,11 +24,8 @@ import (
 	"github.com/holiman/uint256"
 
 	"github.com/ethereum/go-ethereum/common"
-<<<<<<< HEAD
 	"github.com/ethereum/go-ethereum/contracts/oasys"
-=======
 	"github.com/ethereum/go-ethereum/core/opcodeCompiler/compiler"
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"

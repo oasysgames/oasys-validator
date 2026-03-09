@@ -268,14 +268,7 @@ func (e *GenesisMismatchError) Error() string {
 // Typically, these modifications involve hardforks that are not enabled on the BSC mainnet, intended for testing purposes.
 type ChainOverrides struct {
 	OverridePassedForkTime *uint64
-<<<<<<< HEAD
-=======
-	OverrideLorentz        *uint64
-	OverrideMaxwell        *uint64
-	OverrideFermi          *uint64
 	OverrideOsaka          *uint64
-	OverrideMendel         *uint64
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	OverrideVerkle         *uint64
 }
 

@@ -284,11 +284,7 @@ func testVotePool(t *testing.T, isValidRules bool) {
 	// Test future votes scenario: votes number within latestBlockHeader ~ latestBlockHeader + 11
 	futureVote := &types.VoteEnvelope{
 		Data: &types.VoteData{
-<<<<<<< HEAD
-			TargetNumber: 294 - (blocksNumberSinceMining / params.MaxwellBlockTimeReductionFactorForBSC) - blocksNumberSinceMining,
-=======
-			TargetNumber: 314,
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
+			TargetNumber: 314 - (blocksNumberSinceMining / params.MaxwellBlockTimeReductionFactorForBSC) - blocksNumberSinceMining,
 		},
 	}
 	if err := voteManager.signer.SignVote(futureVote); err != nil {
