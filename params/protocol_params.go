@@ -27,11 +27,7 @@ const (
 	MinGasLimit          uint64 = 5000               // Minimum the gas limit may ever be.
 	MaxGasLimit          uint64 = 0x7fffffffffffffff // Maximum the gas limit (2^63-1).
 	GenesisGasLimit      uint64 = 4712388            // Gas limit of the Genesis block.
-<<<<<<< HEAD
-=======
-	PayBidTxGasLimit     uint64 = 25000              // Gas limit of the PayBidTx in the types.BidArgs.
 	MinTxGasLimitCap     uint64 = 1 << 24            // Minimum the transaction gas limit cap.
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 
 	MaximumExtraDataSize  uint64 = 32    // Maximum size extra data may be after Genesis.
 	ExpByteGas            uint64 = 10    // Times ceil(log256(exponent)) for the EXP instruction.
@@ -193,17 +189,10 @@ const (
 )
 
 var (
-<<<<<<< HEAD
 	// it keeps blob data available for ~18.2 days in local, ref: https://github.com/bnb-chain/BEPs/blob/master/BEPs/BEP-336.md#51-parameters.
 	// Same as the default blob reserve period in Ethereum (4096 epochs).
 	MinTimeDurationForBlobRequests uint64 = uint64(float64(24*3600) * 18.2)
 	MinBlocksForBlobRequests       uint64 = uint64(float64(MinTimeDurationForBlobRequests)/0.75) / divisionFactorForOasys
-=======
-	// fermiBlockInterval                        = 0.45
-	MinTimeDurationForBlobRequests     uint64 = uint64(float64(24*3600) * 18.2)                        // it keeps blob data available for 18.2 days in local
-	MinBlocksForBlobRequests           uint64 = uint64(float64(MinTimeDurationForBlobRequests) / 0.45) // ref: https://github.com/bnb-chain/BEPs/blob/master/BEPs/BEP-524.md#421-change-table.
-	DefaultExtraReserveForBlobRequests uint64 = uint64(24 * 3600 / 0.45)                               // it adds more time for expired blobs for some request cases, like expiry blob when remote peer is syncing, default 1 day.
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 
 	// it adds more time for expired blobs for some request cases, like expiry blob when remote peer is syncing, default 1 day.
 	DefaultExtraReserveForBlobRequests uint64 = uint64(24*3600/0.75) / divisionFactorForOasys
