@@ -65,17 +65,8 @@ func New(eth Backend, config *minerconfig.Config, mux *event.TypeMux, engine con
 		exitCh:  make(chan struct{}),
 		startCh: make(chan struct{}),
 		stopCh:  make(chan struct{}),
-<<<<<<< HEAD
-		worker:  newWorker(config, engine, eth, mux, false, datadir),
+		worker:  newWorker(config, engine, eth, mux, datadir),
 	}
-=======
-		worker:  newWorker(config, engine, eth, mux),
-	}
-
-	miner.bidSimulator = newBidSimulator(&config.Mev, config.DelayLeftOver, config.GasPrice, config.TxGasLimit, eth, eth.BlockChain().Config(), engine, miner.worker)
-	miner.worker.setBestBidFetcher(miner.bidSimulator)
-
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	miner.wg.Add(1)
 	go miner.update()
 	return miner
@@ -165,17 +156,6 @@ func (miner *Miner) Close() {
 
 func (miner *Miner) Mining() bool {
 	return miner.worker.isRunning()
-}
-
-<<<<<<< HEAD
-// Pending returns the currently pending block and associated receipts, logs
-=======
-func (miner *Miner) InTurn() bool {
-	return miner.worker.inTurn()
-}
-
-func (miner *Miner) TryWaitProposalDoneWhenStopping() {
-	miner.worker.tryWaitProposalDoneWhenStopping()
 }
 
 // Pending returns the latest block and associated receipts, logs

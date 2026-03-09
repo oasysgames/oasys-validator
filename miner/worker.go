@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -32,6 +31,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
+	"github.com/ethereum/go-ethereum/consensus/parlia"
 	contracts "github.com/ethereum/go-ethereum/contracts/oasys"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -71,21 +71,11 @@ const (
 )
 
 var (
-<<<<<<< HEAD
 	writeBlockTimer    = metrics.NewRegisteredTimer("worker/writeblock", nil)
 	finalizeBlockTimer = metrics.NewRegisteredTimer("worker/finalizeblock", nil)
-=======
-	bidExistGauge        = metrics.NewRegisteredGauge("worker/bidExist", nil)
-	bidWinGauge          = metrics.NewRegisteredGauge("worker/bidWin", nil)
-	inturnBlocksGauge    = metrics.NewRegisteredGauge("worker/inturnBlocks", nil)
-	bestBidGasUsedGauge  = metrics.NewRegisteredGauge("worker/bestBidGasUsed", nil)  // MGas
-	bestWorkGasUsedGauge = metrics.NewRegisteredGauge("worker/bestWorkGasUsed", nil) // MGas
 
-	writeBlockTimer      = metrics.NewRegisteredTimer("worker/writeblock", nil)
-	finalizeBlockTimer   = metrics.NewRegisteredTimer("worker/finalizeblock", nil)
 	pendingPlainTxsTimer = metrics.NewRegisteredTimer("worker/pendingPlainTxs", nil)
 	pendingBlobTxsTimer  = metrics.NewRegisteredTimer("worker/pendingBlobTxs", nil)
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 
 	errBlockInterruptedByNewHead  = errors.New("new head arrived while building block")
 	errBlockInterruptedByRecommit = errors.New("recommit interrupt while building block")
@@ -222,11 +212,7 @@ type worker struct {
 	resubmitHook func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
 }
 
-<<<<<<< HEAD
-func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend, mux *event.TypeMux, init bool, datadir string) *worker {
-=======
-func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend, mux *event.TypeMux) *worker {
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
+func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend, mux *event.TypeMux, datadir string) *worker {
 	chainConfig := eth.BlockChain().Config()
 	worker := &worker{
 		prefetcher:         core.NewStatePrefetcher(chainConfig, eth.BlockChain().HeadChain()),
@@ -587,7 +573,6 @@ func (w *worker) resultLoop() {
 				logs = append(logs, receipt.Logs...)
 			}
 
-<<<<<<< HEAD
 			// Final safety to prevent double signing.
 			if w.isDoubleSign(header, true) {
 				log.Error("Reject Double Sign!!", "block", block.NumberU64(),
@@ -595,27 +580,6 @@ func (w *worker) resultLoop() {
 					"root", block.Root(),
 					"ParentHash", block.ParentHash())
 				continue
-=======
-			if prev, ok := w.recentMinedBlocks.Get(block.NumberU64()); ok {
-				doubleSign := false
-				prevParents := prev
-				if slices.Contains(prevParents, block.ParentHash()) {
-					log.Error("Reject Double Sign!!", "block", block.NumberU64(),
-						"hash", block.Hash(),
-						"root", block.Root(),
-						"ParentHash", block.ParentHash())
-					doubleSign = true
-				}
-				if doubleSign {
-					continue
-				}
-				prevParents = append(prevParents, block.ParentHash())
-				w.recentMinedBlocks.Add(block.NumberU64(), prevParents)
-			} else {
-				// Add() will call removeOldest internally to remove the oldest element
-				// if the LRU Cache is full
-				w.recentMinedBlocks.Add(block.NumberU64(), []common.Hash{block.ParentHash()})
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 			}
 
 			// add BAL to the block
@@ -640,13 +604,8 @@ func (w *worker) resultLoop() {
 			stats := w.chain.GetBlockStats(block.Hash())
 			stats.SendBlockTime.Store(time.Now().UnixMilli())
 			stats.StartMiningTime.Store(task.miningStartAt.UnixMilli())
-<<<<<<< HEAD
-			log.Info("Successfully sealed new block", "number", block.Number(), "sealhash", sealhash, "hash", hash,
-				"timestamp", block.Time(), "elapsed", common.PrettyDuration(time.Since(task.createdAt)))
-=======
 			log.Info("Successfully seal and write new block", "number", block.Number(), "hash", hash, "time", block.Header().MilliTimestamp(), "sealhash", sealhash,
 				"block size(noBal)", block.Size(), "balSize", block.BALSize(), "elapsed", common.PrettyDuration(time.Since(task.createdAt)))
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 			w.mux.Post(core.NewMinedBlockEvent{Block: block})
 
 		case <-w.exitCh:
@@ -1381,11 +1340,6 @@ LOOP:
 		log.Warn("Failed to commit work", "in", "commitWork", "err", err)
 	}
 
-<<<<<<< HEAD
-=======
-	w.commit(bestWork, w.fullTaskHook, start)
-
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 	// Swap out the old work with the new one, terminating any leftover
 	// prefetcher processes in the mean time and starting a new one.
 	if w.current != nil {
@@ -1428,13 +1382,8 @@ func (w *worker) commit(env *environment, interval func(), start time.Time) erro
 
 		select {
 		case w.taskCh <- &task{receipts: receipts, state: env.state, block: block, createdAt: time.Now(), miningStartAt: start}:
-<<<<<<< HEAD
 			log.Info("Commit new sealing work", "number", block.Number(), "sealhash", w.engine.SealHash(block.Header()), "timestamp", block.Time(),
-				"txs", env.tcount, "blobs", env.blobs, "gas", block.GasUsed(), "elapsed", common.PrettyDuration(time.Since(start)))
-=======
-			log.Info("Commit new sealing work", "number", block.Number(), "sealhash", w.engine.SealHash(block.Header()),
 				"txs", len(env.txs), "blobs", env.blobs, "gas", block.GasUsed(), "fees", feesInEther, "elapsed", common.PrettyDuration(time.Since(start)))
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 
 		case <-w.exitCh:
 			log.Info("Worker has exited")
@@ -1483,17 +1432,6 @@ func (w *worker) isDoubleSign(header *types.Header, store bool) (doubleSign bool
 	return doubleSign
 }
 
-<<<<<<< HEAD
-// copyReceipts makes a deep copy of the given receipts.
-func copyReceipts(receipts []*types.Receipt) []*types.Receipt {
-	result := make([]*types.Receipt, len(receipts))
-	for i, l := range receipts {
-		cpy := *l
-		result[i] = &cpy
-	}
-	return result
-}
-
 // totalFees computes total consumed miner fees in Wei. Block transactions and receipts have to have the same order.
 func totalFees(block *types.Block, receipts []*types.Receipt) *big.Int {
 	feesWei := new(big.Int)
@@ -1504,8 +1442,6 @@ func totalFees(block *types.Block, receipts []*types.Receipt) *big.Int {
 	return feesWei
 }
 
-=======
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 // signalToErr converts the interruption signal to a concrete error type for return.
 // The given signal must be a valid interruption signal.
 func signalToErr(signal int32) error {
