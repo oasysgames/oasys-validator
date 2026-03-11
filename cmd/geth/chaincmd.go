@@ -426,6 +426,8 @@ func createPorts(ipStr string, port int, size int) []int {
 }
 
 // Create config for node i in the cluster
+//
+//nolint:unused
 func createNodeConfig(baseConfig gethConfig, prefix string, ip string, port int, enodes []*enode.Node, index int) gethConfig {
 	baseConfig.Node.HTTPHost = ip
 	baseConfig.Node.P2P.ListenAddr = fmt.Sprintf(":%d", port)
@@ -515,6 +517,7 @@ func initNetwork(ctx *cli.Context) error {
 	return nil
 }
 
+//nolint:unused
 func createConfigs(base gethConfig, initDir string, prefix string, ips []string, ports []int, extraEnodes []*enode.Node, connectOneExtraEnodes bool) ([]gethConfig, []*enode.Node, [][]common.Address, error) {
 	if len(ips) != len(ports) {
 		return nil, nil, nil, errors.New("mismatch of size and length of ports")
