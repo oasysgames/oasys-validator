@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/params"
+
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/cmd/utils"
@@ -450,6 +452,9 @@ func startNode(ctx *cli.Context, stack *node.Node, backend ethapi.Backend, isCon
 	ethBackend, ok := backend.(*eth.EthAPIBackend)
 	gasCeil := ethBackend.Miner().GasCeil()
 	maxTxGas := uint64(0)
+	if gasCeil > params.SystemTxsGasSoftLimit {
+		maxTxGas = gasCeil - params.SystemTxsGasSoftLimit
+	}
 	if txGasLimit := ethBackend.Miner().TxGasLimit(); txGasLimit > 0 {
 		if maxTxGas == 0 || txGasLimit < maxTxGas {
 			maxTxGas = txGasLimit
@@ -464,7 +469,7 @@ func startNode(ctx *cli.Context, stack *node.Node, backend ethapi.Backend, isCon
 		if ctx.String(utils.SyncModeFlag.Name) == "light" {
 			utils.Fatalf("Light clients do not support mining")
 		}
-		ethBackend, ok := backend.(*eth.EthAPIBackend)
+
 		if !ok {
 			utils.Fatalf("Ethereum service not running")
 		}
