@@ -130,7 +130,6 @@ func (c Config) MarshalTOML() (interface{}, error) {
 	enc.RPCTxFeeCap = c.RPCTxFeeCap
 	enc.OverridePassedForkTime = c.OverridePassedForkTime
 	enc.OverrideOsaka = c.OverrideOsaka
-	enc.OverrideMendel = c.OverrideMendel
 	enc.OverrideVerkle = c.OverrideVerkle
 	enc.BlobExtraReserve = c.BlobExtraReserve
 	enc.EnableOpcodeOptimizing = c.EnableOpcodeOptimizing
@@ -364,9 +363,6 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	}
 	if dec.OverrideOsaka != nil {
 		c.OverrideOsaka = dec.OverrideOsaka
-	}
-	if dec.OverrideMendel != nil {
-		c.OverrideMendel = dec.OverrideMendel
 	}
 	if dec.OverrideVerkle != nil {
 		c.OverrideVerkle = dec.OverrideVerkle

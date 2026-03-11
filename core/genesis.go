@@ -284,9 +284,6 @@ func (o *ChainOverrides) apply(cfg *params.ChainConfig) error {
 	if o.OverrideOsaka != nil {
 		cfg.OsakaTime = o.OverrideOsaka
 	}
-	if o.OverrideMendel != nil {
-		cfg.MendelTime = o.OverrideMendel
-	}
 	if o.OverrideVerkle != nil {
 		cfg.VerkleTime = o.OverrideVerkle
 	}

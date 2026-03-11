@@ -970,20 +970,6 @@ func (c *ChainConfig) IsOnOsaka(currentBlockNumber *big.Int, lastBlockTime uint6
 	return !c.IsOsaka(lastBlockNumber, lastBlockTime) && c.IsOsaka(currentBlockNumber, currentBlockTime)
 }
 
-// IsMendel returns whether time is either equal to the Mendel fork time or greater.
-func (c *ChainConfig) IsMendel(num *big.Int, time uint64) bool {
-	return c.IsLondon(num) && isTimestampForked(c.MendelTime, time)
-}
-
-// IsOnMendel eturns whether currentBlockTime is either equal to the Mendel fork time or greater firstly.
-func (c *ChainConfig) IsOnMendel(currentBlockNumber *big.Int, lastBlockTime uint64, currentBlockTime uint64) bool {
-	lastBlockNumber := new(big.Int)
-	if currentBlockNumber.Cmp(big.NewInt(1)) >= 0 {
-		lastBlockNumber.Sub(currentBlockNumber, big.NewInt(1))
-	}
-	return !c.IsMendel(lastBlockNumber, lastBlockTime) && c.IsMendel(currentBlockNumber, currentBlockTime)
-}
-
 // IsVerkle returns whether time is either equal to the Verkle fork time or greater.
 func (c *ChainConfig) IsVerkle(num *big.Int, time uint64) bool {
 	return c.IsLondon(num) && isTimestampForked(c.VerkleTime, time)
@@ -1237,8 +1223,6 @@ func (c *ChainConfig) LatestFork(time uint64) forks.Fork {
 	london := c.LondonBlock
 
 	switch {
-	case c.IsMendel(london, time):
-		return forks.Mendel
 	case c.IsOsaka(london, time):
 		return forks.Osaka
 	case c.IsPrague(london, time):
@@ -1256,8 +1240,6 @@ func (c *ChainConfig) LatestFork(time uint64) forks.Fork {
 // the fork isn't defined or isn't a time-based fork.
 func (c *ChainConfig) Timestamp(fork forks.Fork) *uint64 {
 	switch {
-	case fork == forks.Mendel:
-		return c.MendelTime
 	case fork == forks.Osaka:
 		return c.OsakaTime
 	case fork == forks.Prague:
@@ -1442,7 +1424,6 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 		IsCancun:         c.IsCancun(num, timestamp),
 		IsPrague:         c.IsPrague(num, timestamp),
 		IsOsaka:          c.IsOsaka(num, timestamp),
-		IsMendel:         c.IsMendel(num, timestamp),
 		IsVerkle:         c.IsVerkle(num, timestamp),
 		IsEIP4762:        isVerkle,
 	}
