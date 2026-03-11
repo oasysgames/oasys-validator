@@ -159,7 +159,6 @@ func (miner *Miner) Mining() bool {
 }
 
 // Pending returns the latest block and associated receipts, logs
->>>>>>> bf0283af9fdec4daff9512e95020fb3dd9d7d4c9
 // and statedb. The returned values can be nil in case the pending block is
 // not initialized.
 func (miner *Miner) Pending() (*types.Block, types.Receipts, *state.StateDB) {

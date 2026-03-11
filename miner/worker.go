@@ -1314,7 +1314,7 @@ LOOP:
 	metrics.GetOrRegisterCounter(fmt.Sprintf("block/from/%v", from), nil).Inc(1)
 
 	// Submit the generated block for consensus sealing.
-	if err := w.commit(bestWork, w.fullTaskHook, true, start); err != nil {
+	if err := w.commit(bestWork, w.fullTaskHook, start); err != nil {
 		log.Warn("Failed to commit work", "in", "commitWork", "err", err)
 	}
 
@@ -1361,7 +1361,7 @@ func (w *worker) commit(env *environment, interval func(), start time.Time) erro
 		select {
 		case w.taskCh <- &task{receipts: receipts, state: env.state, block: block, createdAt: time.Now(), miningStartAt: start}:
 			log.Info("Commit new sealing work", "number", block.Number(), "sealhash", w.engine.SealHash(block.Header()), "timestamp", block.Time(),
-				"txs", len(env.txs), "blobs", env.blobs, "gas", block.GasUsed(), "fees", feesInEther, "elapsed", common.PrettyDuration(time.Since(start)))
+				"txs", len(env.txs), "blobs", env.blobs, "gas", block.GasUsed(), "elapsed", common.PrettyDuration(time.Since(start)))
 
 		case <-w.exitCh:
 			log.Info("Worker has exited")

@@ -1971,6 +1971,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 			// warn the user that the system is becoming unstable.
 			if chosen < bc.lastWrite+state.TriesInMemory && bc.gcproc >= 2*flushInterval {
 				log.Info("State in memory for too long, committing", "time", bc.gcproc, "allowance", flushInterval, "optimum", float64(chosen-bc.lastWrite)/state.TriesInMemory)
+			}
 			// Flush an entire trie and restart the counters
 			bc.triedb.Commit(header.Root, true)
 			bc.lastWrite = chosen

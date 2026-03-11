@@ -710,6 +710,11 @@ func (c *ChainConfig) String() string {
 		PragueTime = big.NewInt(0).SetUint64(*c.PragueTime)
 	}
 
+	var OsakaTime *big.Int
+	if c.OsakaTime != nil {
+		OsakaTime = big.NewInt(0).SetUint64(*c.OsakaTime)
+	}
+
 	return fmt.Sprintf("{ChainID: %v Engine: %v, Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, ArrowGlacier: %v, MergeFork:%v, ShanghaiTime: %v, CancunTime: %v, PragueTime: %v, OsakaTime: %v}",
 		c.ChainID,
 		engine,
