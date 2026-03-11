@@ -394,10 +394,6 @@ func (h *handler) runEthPeer(peer *eth.Peer, handler eth.Handler) error {
 		peer.Log().Error("Bsc extension barrier failed", "err", err)
 		return err
 	}
-	if bscExt != nil && bscExt.Version() == bsc.Bsc3 {
-		peer.CanHandleBAL.Store(true)
-		log.Debug("runEthPeer", "bscExt.Version", bscExt.Version(), "CanHandleBAL", peer.CanHandleBAL.Load())
-	}
 	// Execute the Ethereum handshake
 	var (
 		head   = h.chain.CurrentHeader()
