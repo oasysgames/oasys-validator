@@ -751,8 +751,7 @@ func (h *handler) BroadcastBlock(block *types.Block, propagate bool) {
 
 		// Step 1: Select target peers for initial broadcast.
 		limit := totalPeers
-		if !h.directBroadcast &&
-			!(h.networkID == 714 /*RialtoChainConfig.ChainID*/ && block.NumberU64() == 1) { // Populate TD from every receiver on startup to establish proper sync.
+		if !h.directBroadcast { // Populate TD from every receiver on startup to establish proper sync.
 			limit = int(math.Sqrt(float64(totalPeers)))
 		}
 
@@ -762,7 +761,7 @@ func (h *handler) BroadcastBlock(block *types.Block, propagate bool) {
 			peer.AsyncSendNewBlock(block, td)
 		}
 
-		log.Debug("Propagated block", "hash", hash, "recipients", len(transfer), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
+		log.Debug("Propagated block", "hash", hash, "recipients", transferPeersCnt, "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
 		return
 	}
 	// Otherwise if the block is indeed in our own chain, announce it
