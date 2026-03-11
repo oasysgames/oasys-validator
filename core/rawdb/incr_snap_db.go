@@ -232,13 +232,13 @@ func (idb *IncrSnapDB) WriteIncrContractCodes(codes map[common.Address]ContractC
 	return nil
 }
 
-// WriteParliaSnapshot stores parlia snapshot into pebble.
-func (idb *IncrSnapDB) WriteParliaSnapshot(hash common.Hash, blob []byte) {
+// WriteOasysSnapshot stores oasys snapshot into pebble.
+func (idb *IncrSnapDB) WriteOasysSnapshot(hash common.Hash, blob []byte) {
 	idb.lock.Lock()
 	defer idb.lock.Unlock()
 
-	if err := idb.currSnapDB.kvDB.Put(append(ParliaSnapshotPrefix, hash[:]...), blob); err != nil {
-		log.Crit("Failed to write parlia snapshot", "error", err)
+	if err := idb.currSnapDB.kvDB.Put(append(OasysSnapshotPrefix, hash[:]...), blob); err != nil {
+		log.Crit("Failed to write oasys snapshot", "error", err)
 	}
 }
 

@@ -21,8 +21,8 @@ const (
 	// The default kept blocks in incremental chain freezer: 1024.
 	DefaultKeptBlocks = 1024
 
-	// Number of blocks after which to save the parlia snapshot to the database
-	parliaSnapCheckpointInterval = 1024
+	// Number of blocks after which to save the oasys snapshot to the database
+	oasysSnapCheckpointInterval = 1024
 
 	// The default number of blocks and state history stored in incr freezer db
 	DefaultBlockInterval = 100000
@@ -552,14 +552,14 @@ func (im *incrManager) writeIncrBlock(reader ethdb.Reader, blockNumber, stateID 
 		return err
 	}
 
-	if blockNumber%parliaSnapCheckpointInterval == 0 {
-		blob, err := reader.Get(append(rawdb.ParliaSnapshotPrefix, blockHash[:]...))
+	if blockNumber%oasysSnapCheckpointInterval == 0 {
+		blob, err := reader.Get(append(rawdb.OasysSnapshotPrefix, blockHash[:]...))
 		if err != nil {
-			log.Error("Failed to get parlia snapshot", "error", err)
+			log.Error("Failed to get oasys snapshot", "error", err)
 			return err
 		}
-		im.incrDB.WriteParliaSnapshot(blockHash, blob)
-		log.Debug("Writing parlia snapshot into incremental", "blockNumber", blockNumber)
+		im.incrDB.WriteOasysSnapshot(blockHash, blob)
+		log.Debug("Writing oasys snapshot into incremental", "blockNumber", blockNumber)
 	}
 
 	log.Debug("Write one block data into incr chain freezer", "block", blockNumber, "hash", blockHash.Hex())

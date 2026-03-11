@@ -180,7 +180,7 @@ func (voteManager *VoteManager) loop() {
 					continue
 				}
 
-				if p, ok := voteManager.engine.(*parlia.Parlia); ok {
+				if p, ok := voteManager.engine.(*oasys.Oasys); ok {
 					// Approximately equal to the block interval of next block, except for the switch block.
 					blockInterval, err := p.BlockInterval(voteManager.chain, curHead)
 					if err != nil {

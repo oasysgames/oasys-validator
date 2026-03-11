@@ -991,7 +991,7 @@ func InspectIncrStore(baseDir string) error {
 			return err
 		}
 		var (
-			codes, parliaSnaps stat
+			codes, oasysSnaps stat
 		)
 		it := db.kvDB.NewIterator(nil, nil)
 		for it.Next() {
@@ -1000,8 +1000,8 @@ func InspectIncrStore(baseDir string) error {
 				size = common.StorageSize(len(key) + len(it.Value()))
 			)
 			switch {
-			case bytes.HasPrefix(key, ParliaSnapshotPrefix) && len(key) == 7+common.HashLength:
-				parliaSnaps.Add(size)
+			case bytes.HasPrefix(key, OasysSnapshotPrefix) && len(key) == 7+common.HashLength:
+				oasysSnaps.Add(size)
 			case bytes.HasPrefix(key, CodePrefix) && len(key) == len(CodePrefix)+common.HashLength:
 				codes.Add(size)
 			default:
@@ -1011,7 +1011,7 @@ func InspectIncrStore(baseDir string) error {
 		title := fmt.Sprintf("%s/KV store", dir.Name)
 		stats = append(stats, [][]string{
 			{title, "Contract codes", codes.Size(), codes.Count()},
-			{title, "Parlia snapshots", parliaSnaps.Size(), parliaSnaps.Count()},
+			{title, "Oasys snapshots", oasysSnaps.Size(), oasysSnaps.Count()},
 		}...)
 
 		ancients, err := inspectIncrFreezers(db)

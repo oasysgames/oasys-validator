@@ -151,7 +151,7 @@ func mergeIncrBlock(incrDir string, chainDB ethdb.Database) error {
 	return nil
 }
 
-// mergeIncrKV merges incr kv: contract codes, parlia snapshot, chain config and genesis state spec..
+// mergeIncrKV merges incr kv: contract codes, oasys snapshot, chain config and genesis state spec..
 func mergeIncrKV(incrDir string, chainDB ethdb.Database) error {
 	newDB, err := pebble.New(incrDir, 10, 10, "incremental", true)
 	if err != nil {
@@ -188,9 +188,9 @@ func mergeIncrKV(incrDir string, chainDB ethdb.Database) error {
 		return err
 	}
 
-	// Merge Parlia snapshots from incremental snapshot to local data
-	if err = mergeParliaSnapshots(chainDB, newDB); err != nil {
-		log.Error("Failed to merge Parlia snapshots", "err", err)
+	// Merge Oasys snapshots from incremental snapshot to local data
+	if err = mergeOasysSnapshots(chainDB, newDB); err != nil {
+		log.Error("Failed to merge Oasys snapshots", "err", err)
 		return err
 	}
 
@@ -203,10 +203,10 @@ func mergeIncrKV(incrDir string, chainDB ethdb.Database) error {
 	return nil
 }
 
-// mergeParliaSnapshots merges Parlia consensus snapshots from incremental snapshot into local data
-func mergeParliaSnapshots(chainDB ethdb.Database, incrKV *pebble.Database) error {
-	log.Info("Starting Parlia snapshots import from incremental snapshot")
-	iter := incrKV.NewIterator(rawdb.ParliaSnapshotPrefix, nil)
+// mergeOasysSnapshots merges Oasys consensus snapshots from incremental snapshot into local data
+func mergeOasysSnapshots(chainDB ethdb.Database, incrKV *pebble.Database) error {
+	log.Info("Starting Oasys snapshots import from incremental snapshot")
+	iter := incrKV.NewIterator(rawdb.OasysSnapshotPrefix, nil)
 	defer iter.Release()
 
 	count := 0
@@ -214,18 +214,18 @@ func mergeParliaSnapshots(chainDB ethdb.Database, incrKV *pebble.Database) error
 		key := iter.Key()
 		value := iter.Value()
 		if err := chainDB.Put(key, value); err != nil {
-			log.Error("Failed to store Parlia snapshot in main DB", "key", common.Bytes2Hex(key), "err", err)
+			log.Error("Failed to store Oasys snapshot in main DB", "key", common.Bytes2Hex(key), "err", err)
 			return err
 		}
 		count++
 	}
 
 	if iter.Error() != nil {
-		log.Error("Failed to iterate Parlia snapshot", "error", iter.Error())
+		log.Error("Failed to iterate Oasys snapshot", "error", iter.Error())
 		return iter.Error()
 	}
 
-	log.Info("Completed Parlia snapshots merging", "total_snapshots", count)
+	log.Info("Completed Oasys snapshots merging", "total_snapshots", count)
 	return nil
 }
 
