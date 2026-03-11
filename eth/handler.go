@@ -219,9 +219,6 @@ func newHandler(config *handlerConfig) (*handler, error) {
 		handlerStartCh:         make(chan struct{}),
 		stopCh:                 make(chan struct{}),
 	}
-	for _, nodeID := range config.ProxyedNodeIds {
-		h.proxyedNodeIdsMap[nodeID] = struct{}{}
-	}
 	if h.chain.NoTries() {
 	} else if config.Sync == ethconfig.FullSync {
 		// The database seems empty as the current block is the genesis. Yet the snap
@@ -900,10 +897,6 @@ func (h *handler) BroadcastVote(vote *types.VoteEnvelope) {
 	}
 	for _, peer := range peers {
 		if peer.bscExt == nil {
-			continue
-		}
-		if peer.ProxyedPeerFlag.Load() || peer.EVNPeerFlag.Load() {
-			voteMap[peer] = vote
 			continue
 		}
 		_, peerTD := peer.Head()
