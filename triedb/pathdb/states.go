@@ -330,12 +330,6 @@ func (s *stateSet) updateSize(delta int) {
 	s.size = 0
 }
 
-type statesData struct {
-	RawStorageKey bool
-	Acc           accounts
-	Storages      []storage
-}
-
 type accounts struct {
 	AddrHashes []common.Hash
 	Accounts   [][]byte

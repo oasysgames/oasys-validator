@@ -93,7 +93,6 @@ Remove blockchain and state databases`,
 			dbTrieDeleteCmd,
 			dbDeleteTrieStateCmd,
 			ancientInspectCmd,
-			incrInspectCmd,
 		},
 	}
 	dbInspectCmd = &cli.Command{
@@ -277,13 +276,6 @@ of ancientStore, will also displays the reserved number of blocks in ancientStor
 			},
 		}, utils.NetworkFlags, utils.DatabaseFlags),
 		Description: "This command queries the history of the account or storage slot within the specified block range",
-	}
-	incrInspectCmd = &cli.Command{
-		Action:      inspectIncrSnapshot,
-		Name:        "inspect-incr-snapshot",
-		Flags:       []cli.Flag{utils.IncrSnapshotPathFlag},
-		Usage:       "Inspect the incremental snapshot information",
-		Description: `This command reads and displays incremental store information`,
 	}
 )
 
@@ -959,7 +951,7 @@ func dbDumpTrie(ctx *cli.Context) error {
 
 	db := utils.MakeChainDatabase(ctx, stack, true)
 	defer db.Close()
-	triedb := utils.MakeTrieDatabase(ctx, stack, db, false, true, false, false)
+	triedb := utils.MakeTrieDatabase(ctx, stack, db, false, true, false)
 	defer triedb.Close()
 
 	var (
@@ -1293,7 +1285,7 @@ func inspectHistory(ctx *cli.Context) error {
 	db := utils.MakeChainDatabase(ctx, stack, true)
 	defer db.Close()
 
-	triedb := utils.MakeTrieDatabase(ctx, stack, db, false, false, false, false)
+	triedb := utils.MakeTrieDatabase(ctx, stack, db, false, false, false)
 	defer triedb.Close()
 
 	var (
@@ -1340,15 +1332,4 @@ func inspectHistory(ctx *cli.Context) error {
 		return inspectAccount(triedb, start, end, address, ctx.Bool("raw"))
 	}
 	return inspectStorage(triedb, start, end, address, slot, ctx.Bool("raw"))
-}
-
-func inspectIncrSnapshot(ctx *cli.Context) error {
-	if !ctx.IsSet(utils.IncrSnapshotPathFlag.Name) {
-		return errors.New("increment snapshot path is not set")
-	}
-	baseDir := ctx.String(utils.IncrSnapshotPathFlag.Name)
-	if err := rawdb.InspectIncrStore(baseDir); err != nil {
-		return err
-	}
-	return nil
 }

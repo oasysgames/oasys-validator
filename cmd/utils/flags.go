@@ -1243,43 +1243,43 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 	EnableIncrSnapshotFlag = &cli.BoolFlag{
 		Name:     "incr.enable",
 		Usage:    "Enable incremental snapshot generation",
-		Value:    false,
+		Value:    bscFeaturesDefaultBool,
 		Category: flags.StateCategory,
 	}
 	IncrSnapshotPathFlag = &flags.DirectoryFlag{
 		Name:     "incr.datadir",
 		Usage:    "Data directory for storing incremental snapshot data: can be used to store generated or downloaded incremental snapshot",
-		Value:    "",
+		Value:    bscFeaturesDefaultString,
 		Category: flags.StateCategory,
 	}
 	IncrSnapshotBlockIntervalFlag = &cli.Uint64Flag{
 		Name:     "incr.block-interval",
 		Usage:    "Set how many blocks interval are stored into one incremental snapshot",
-		Value:    pathdb.DefaultBlockInterval,
+		Value:    bscFeaturesDefaultInt,
 		Category: flags.StateCategory,
 	}
 	IncrSnapshotStateBufferFlag = &cli.Uint64Flag{
 		Name:     "incr.state-buffer",
 		Usage:    "Set the incr state memory buffer to aggregate MPT trie nodes. The larger the setting, the smaller the incr snapshot size",
-		Value:    pathdb.DefaultIncrStateBufferSize,
+		Value:    bscFeaturesDefaultInt,
 		Category: flags.StateCategory,
 	}
 	IncrSnapshotKeptBlocksFlag = &cli.Uint64Flag{
 		Name:     "incr.kept-blocks",
 		Usage:    "Set how many blocks are kept in incr snapshot. At least is 1024 blocks",
-		Value:    pathdb.DefaultKeptBlocks,
+		Value:    bscFeaturesDefaultInt,
 		Category: flags.StateCategory,
 	}
 	UseRemoteIncrSnapshotFlag = &cli.BoolFlag{
 		Name:     "incr.use-remote",
 		Usage:    "Enable download and merge incremental snapshots into local data",
-		Value:    false,
+		Value:    bscFeaturesDefaultBool,
 		Category: flags.StateCategory,
 	}
 	RemoteIncrSnapshotURLFlag = &cli.StringFlag{
 		Name:     "incr.remote-url",
 		Usage:    "Set from which remote url is used to download incremental snapshots",
-		Value:    "",
+		Value:    bscFeaturesDefaultString,
 		Category: flags.StateCategory,
 	}
 )
@@ -2340,38 +2340,6 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 			cfg.VMTraceJsonConfig = ctx.String(VMTraceJsonConfigFlag.Name)
 		}
 	}
-
-	// Download and merge incremental snapshot config
-	if ctx.IsSet(UseRemoteIncrSnapshotFlag.Name) {
-		cfg.UseRemoteIncrSnapshot = true
-		if !ctx.IsSet(RemoteIncrSnapshotURLFlag.Name) {
-			Fatalf("Must provide a remote increment snapshot URL")
-		} else {
-			cfg.RemoteIncrSnapshotURL = ctx.String(RemoteIncrSnapshotURLFlag.Name)
-		}
-		if ctx.IsSet(IncrSnapshotPathFlag.Name) {
-			cfg.IncrSnapshotPath = ctx.String(IncrSnapshotPathFlag.Name)
-		} else {
-			Fatalf("Must provide a path to store downloaded incr snapshot")
-		}
-	}
-
-	// enable incremental snapshot generation config
-	if ctx.IsSet(EnableIncrSnapshotFlag.Name) {
-		cfg.EnableIncrSnapshots = true
-		if ctx.IsSet(IncrSnapshotPathFlag.Name) {
-			cfg.IncrSnapshotPath = ctx.String(IncrSnapshotPathFlag.Name)
-		}
-		if ctx.IsSet(IncrSnapshotBlockIntervalFlag.Name) {
-			cfg.IncrSnapshotBlockInterval = ctx.Uint64(IncrSnapshotBlockIntervalFlag.Name)
-		}
-		if ctx.IsSet(IncrSnapshotStateBufferFlag.Name) {
-			cfg.IncrSnapshotStateBuffer = ctx.Uint64(IncrSnapshotStateBufferFlag.Name)
-		}
-		if ctx.IsSet(IncrSnapshotKeptBlocksFlag.Name) {
-			cfg.IncrSnapshotKeptBlocks = ctx.Uint64(IncrSnapshotKeptBlocksFlag.Name)
-		}
-	}
 }
 
 // SetDNSDiscoveryDefaults configures DNS discovery with the given URL if
@@ -2835,7 +2803,7 @@ func MakeConsolePreloads(ctx *cli.Context) []string {
 }
 
 // MakeTrieDatabase constructs a trie database based on the configured scheme.
-func MakeTrieDatabase(ctx *cli.Context, stack *node.Node, disk ethdb.Database, preimage bool, readOnly bool, isVerkle bool, mergeIncr bool) *triedb.Database {
+func MakeTrieDatabase(ctx *cli.Context, stack *node.Node, disk ethdb.Database, preimage bool, readOnly bool, isVerkle bool) *triedb.Database {
 	config := &triedb.Config{
 		Preimages: preimage,
 		IsVerkle:  isVerkle,
@@ -2855,9 +2823,6 @@ func MakeTrieDatabase(ctx *cli.Context, stack *node.Node, disk ethdb.Database, p
 		config.PathDB = pathdb.ReadOnly
 	} else {
 		config.PathDB = pathdb.Defaults
-		if mergeIncr {
-			config.PathDB.MergeIncr = true
-		}
 	}
 	config.PathDB.JournalFilePath = fmt.Sprintf("%s/%s", stack.ResolvePath("chaindata"), eth.JournalFileName)
 	return triedb.NewDatabase(disk, config)
