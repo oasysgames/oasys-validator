@@ -311,8 +311,7 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 			ChainHistoryMode: config.HistoryMode,
 			TxLookupLimit:    int64(min(config.TransactionHistory, math.MaxInt64)),
 			VmConfig: vm.Config{
-				EnablePreimageRecording:   config.EnablePreimageRecording,
-				EnableOpcodeOptimizations: config.EnableOpcodeOptimizing,
+				EnablePreimageRecording: config.EnablePreimageRecording,
 			},
 		}
 	)
