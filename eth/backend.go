@@ -465,24 +465,12 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 
 func makeExtraData(extra []byte) []byte {
 	if len(extra) == 0 {
-		// For version >= 1.6.4, use compact format: [version(uint32), commitID, go_version, os]
-		commitID := ""
-		git, ok := version.VCS()
-		if ok && len(git.Commit) >= 8 {
-			commitID = git.Commit[:8]
-		}
-
-		osName := runtime.GOOS
-		if len(osName) > 3 {
-			osName = osName[:3]
-		}
-
-		versionWord := uint32(gethversion.Major<<16 | gethversion.Minor<<8 | gethversion.Patch)
+		// create default extradata
 		extra, _ = rlp.EncodeToBytes([]interface{}{
-			versionWord,
-			commitID,
+			uint(gethversion.Major<<16 | gethversion.Minor<<8 | gethversion.Patch),
+			"geth",
 			runtime.Version(),
-			osName,
+			runtime.GOOS,
 		})
 	}
 	if uint64(len(extra)) > params.MaximumExtraDataSize {
