@@ -375,43 +375,6 @@ func (s *StateDB) GetNonce(addr common.Address) uint64 {
 	return 0
 }
 
-func (s *StateDB) PreloadAccount(addr common.Address) {
-	if s.Empty(addr) {
-		return
-	}
-	s.GetCode(addr)
-}
-
-func (s *StateDB) PreloadStorage(addr common.Address, key common.Hash) {
-	if s.Empty(addr) {
-		return
-	}
-	s.GetState(addr, key)
-}
-func (s *StateDB) PreloadAccountTrie(addr common.Address) {
-	if s.prefetcher == nil {
-		return
-	}
-
-	addressesToPrefetch := []common.Address{addr}
-	if err := s.prefetcher.prefetch(common.Hash{}, s.originalRoot, common.Address{}, addressesToPrefetch, nil, false); err != nil {
-		log.Error("Failed to prefetch addresses", "addresses", len(addressesToPrefetch), "err", err)
-	}
-}
-
-func (s *StateDB) PreloadStorageTrie(addr common.Address, key common.Hash) {
-	if s.prefetcher == nil {
-		return
-	}
-	obj := s.getStateObject(addr)
-	if obj == nil {
-		return
-	}
-	if err := s.prefetcher.prefetch(obj.addrHash, obj.origin.Root, obj.address, nil, []common.Hash{key}, true); err != nil {
-		log.Error("Failed to prefetch storage slot", "addr", obj.address, "key", key, "err", err)
-	}
-}
-
 // GetStorageRoot retrieves the storage root from the given address or empty
 // if object not found.
 func (s *StateDB) GetStorageRoot(addr common.Address) common.Hash {

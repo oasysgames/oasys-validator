@@ -73,10 +73,6 @@ type chainFreezer struct {
 	freezeEnv    atomic.Value
 	blockHistory atomic.Uint64
 	waitEnvTimes int
-
-	// used to reset chain freezer in the incremental case
-	datadir string
-	opener  freezerOpenFunc
 }
 
 // newChainFreezer initializes the freezer for ancient chain segment.
@@ -89,15 +85,11 @@ func newChainFreezer(datadir string, eraDir string, namespace string, readonly b
 	var (
 		err     error
 		freezer ethdb.AncientStore
-		opener  freezerOpenFunc
 	)
 	if datadir == "" {
 		freezer = NewMemoryFreezer(readonly, chainFreezerTableConfigs)
 	} else {
 		freezer, err = NewFreezer(datadir, namespace, readonly, freezerTableSize, chainFreezerTableConfigs)
-		opener = func() (*Freezer, error) {
-			return NewFreezer(datadir, namespace, readonly, freezerTableSize, chainFreezerTableConfigs)
-		}
 	}
 	if err != nil {
 		return nil, err
@@ -111,10 +103,6 @@ func newChainFreezer(datadir string, eraDir string, namespace string, readonly b
 		eradb:    edb,
 		quit:     make(chan struct{}),
 		trigger:  make(chan chan struct{}),
-		datadir:  datadir,
-	}
-	if opener != nil {
-		cf.opener = opener
 	}
 	// After enabling pruneAncient, the ancient data is not retained. In some specific scenarios where it is
 	// necessary to roll back to blocks prior to the finalized block, it is mandatory to keep the most recent 90,000 blocks in the database to ensure proper functionality and rollback capability.
