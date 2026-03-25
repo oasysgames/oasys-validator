@@ -300,26 +300,28 @@ func (s *SuspiciousTxfilter) loadPlugin() error {
 		return err
 	}
 
-	loadedPlugin, err := plugin.Open(s.pluginPath())
+	newPlugin, err := plugin.Open(s.pluginPath())
 	if err != nil {
 		return fmt.Errorf("failed to open plugin: %w", err)
 	}
 
-	if err = s.VerifyPluginVersion(loadedPlugin); err != nil {
+	if err = s.VerifyPluginVersion(newPlugin); err != nil {
 		return fmt.Errorf("failed to verify plugin version: %w", err)
 	}
 
-	// Clear the current plugin so it can release runtime state before we load the new instance.
-	if current := s.plugin.Load(); current != nil {
-		if impl, err := loadPluginImpl(current); err == nil {
+	oldPlugin := s.plugin.Load()
+
+	// Replace or store the newly loaded plugin instance
+	s.plugin.Store(newPlugin)
+
+	// Clear the old plugin so it can release runtime outdated state
+	if oldPlugin != nil {
+		if impl, err := loadPluginImpl(oldPlugin); err == nil {
 			if err = impl.Clear(); err != nil {
-				log.Warn("Suspicious txfilter plugin Clear failed", "err", err)
+				log.Warn("failed to clear suspicious txfilter plugin", "err", err)
 			}
 		}
 	}
-
-	// Store the new plugin instance
-	s.plugin.Store(loadedPlugin)
 
 	return nil
 }
