@@ -1735,7 +1735,7 @@ func benchmarkPoolPending(b *testing.B, datacap uint64) {
 	// Avoid validation - verifying all blob proofs take significant time
 	// when the capacity is large. The purpose of this bench is to measure assembling
 	// the lazies, not the kzg verifications.
-	pool.txValidationFn = func(tx *types.Transaction, head *types.Header, signer types.Signer, opts *txpool.ValidationOptions, state *state.StateDB) error {
+	pool.txValidationFn = func(tx *types.Transaction, head *types.Header, signer types.Signer, opts *txpool.ValidationOptions) error {
 		return nil // accept all
 	}
 	// Fill the pool up with one random transaction from each account with the
