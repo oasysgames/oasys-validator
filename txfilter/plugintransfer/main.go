@@ -183,7 +183,9 @@ func (c *ConfigCache) update(countedTxs **lrucache) error {
 	}
 	defer resp.Body.Close()
 
-	if err = json.NewDecoder(resp.Body).Decode(&c.Config); err != nil {
+	jsonDecoder := json.NewDecoder(resp.Body)
+	jsonDecoder.DisallowUnknownFields() // Disallow unknown fields to prevent unexpected fields from being parsed
+	if err = jsonDecoder.Decode(&c.Config); err != nil {
 		return fmt.Errorf("failed to decode config: %w, url: %s", err, configURL)
 	}
 
