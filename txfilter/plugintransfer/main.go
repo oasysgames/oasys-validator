@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"math/bits"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -75,13 +78,16 @@ func (p *transferPlugin) Clear() error {
 func (p *transferPlugin) FilterTransaction(txhash common.Hash, from, to common.Address, value [32]byte, logs []types.Log) (isBlocked bool, reason string, err error) {
 	// Initialize or update it if it's expired
 	if p.configCache.isExpired() {
+		// Asychronously download config, to avoid blocking the chain execution
+		p.configCache.asyncDownloadConfig()
+		// Update the config, if downloading finished
 		if err := p.configCache.update(&p.countedTxs); err != nil {
 			if p.configCache.isEmptyConfig() {
 				// No block, just return error to not block chain execution but notify the error to the caller
 				return false, "", fmt.Errorf("failed to fetch config: %w", err)
 			}
 			// Just log the error, keep using the old config
-			log.Error("failed to fetch config", "error", err, "url", configURL)
+			log.Error("failed to update config", "error", err, "url", configURL)
 		}
 	}
 
@@ -152,10 +158,12 @@ func logWarn(reason string) {
 }
 
 type ConfigCache struct {
-	Config    config.PluginConfig
-	updatedAt time.Time
-	ttl       time.Duration
-	client    http.Client
+	Config      config.PluginConfig
+	updatedAt   time.Time
+	ttl         time.Duration
+	client      http.Client
+	downloading atomic.Bool
+	newConfig   []byte
 }
 
 // isExpired returns true when cached config should be refreshed.
@@ -168,26 +176,66 @@ func (c *ConfigCache) isEmptyConfig() bool {
 	return c.Config.MeasurementWindow == 0 || c.Config.Threshold.BlockCountThreshold == 0 || c.Config.Threshold.BlockAmountThreshold == 0
 }
 
-// update fetches and decodes config JSON, then initializes/expands cache capacity.
-// countedTxs is a double pointer because this function may allocate a new cache
-// and must write that pointer back to the caller (e.g. when caller's cache is nil).
-func (c *ConfigCache) update(countedTxs **lrucache) error {
-	oldVersion := c.Config.Version
-	resp, err := c.client.Get(configURL)
-	if err != nil {
-		return fmt.Errorf("failed to download config: url: %s, err: %w", configURL, err)
+// asyncDownloadConfig starts a background download of the latest config JSON.
+// If a download is already in-flight, this is a no-op.
+func (c *ConfigCache) asyncDownloadConfig() {
+	// Skip if the config is downloading
+	if c.downloading.Load() {
+		return
 	}
-	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
-		return fmt.Errorf("download error: status %d, url: %s", resp.StatusCode, configURL)
-	}
-	defer resp.Body.Close()
 
-	jsonDecoder := json.NewDecoder(resp.Body)
-	jsonDecoder.DisallowUnknownFields() // Disallow unknown fields to prevent unexpected fields from being parsed
-	if err = jsonDecoder.Decode(&c.Config); err != nil {
+	// Set the downloading flag to true
+	c.downloading.Store(true)
+
+	// Async download config
+	go func() {
+		defer c.downloading.Store(false)
+
+		resp, err := c.client.Get(configURL)
+		if err != nil {
+			log.Error("failed to download config", "error", err, "url", configURL)
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			log.Error("download error", "status", resp.StatusCode, "url", configURL)
+			return
+		}
+
+		newConfig, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.Error("failed to read config body", "error", err, "url", configURL)
+			return
+		}
+		c.newConfig = newConfig
+	}()
+}
+
+// update applies the most recently downloaded config JSON (if any) and refreshes
+// internal state. It may initialize or grow the caller's `countedTxs` cache when
+// the config version changes or when the cache has not been created yet.
+func (c *ConfigCache) update(countedTxs **lrucache) error {
+	// Skip if the config is downloading
+	if c.downloading.Load() {
+		return nil
+	}
+
+	if len(c.newConfig) == 0 {
+		return fmt.Errorf("new config is empty")
+	}
+
+	oldVersion := c.Config.Version
+
+	// Decode the new config with strictly checking the fields
+	jsonDecoder := json.NewDecoder(bytes.NewReader(c.newConfig))
+	jsonDecoder.DisallowUnknownFields()
+	if err := jsonDecoder.Decode(&c.Config); err != nil {
 		return fmt.Errorf("failed to decode config: %w, url: %s", err, configURL)
 	}
+
+	// Clear the new config
+	c.newConfig = nil
 
 	// Update the last updated time
 	c.updatedAt = time.Now()
