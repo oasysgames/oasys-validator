@@ -1117,7 +1117,7 @@ func (p *BlobPool) ValidateTxBasics(tx *types.Transaction) error {
 		MaxBlobCount: maxBlobsPerTx,
 		MaxGas:       p.GetMaxGas(),
 	}
-	return txpool.ValidateTransaction(tx, p.head, p.signer, opts, p.state)
+	return txpool.ValidateTransaction(tx, p.head, p.signer, opts)
 }
 
 // checkDelegationLimit determines if the tx sender is delegated or has a
@@ -1191,6 +1191,9 @@ func (p *BlobPool) validateTx(tx *types.Transaction) error {
 		},
 	}
 	if err := txpool.ValidateTransactionWithState(tx, p.signer, stateOpts); err != nil {
+		return err
+	}
+	if err := txpool.ValidateTransactionWithOasysState(tx, p.signer, p.chain.Config(), p.state); err != nil {
 		return err
 	}
 	if err := p.checkDelegationLimit(tx); err != nil {

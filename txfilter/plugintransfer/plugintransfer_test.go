@@ -214,10 +214,18 @@ func TestConfigCache(t *testing.T) {
 	}
 
 	// 1st update: initialize config and countedTxs
+	c.asyncDownloadConfig()
+	time.Sleep(100 * time.Millisecond)
+	if len(c.newConfig) == 0 {
+		t.Fatal("expected new config to be downloaded")
+	}
 	if err := c.update(&countedTxs); err != nil {
 		t.Fatalf("update(v1) failed: %v", err)
 	}
 
+	if len(c.newConfig) != 0 {
+		t.Fatal("expected new config to be cleared after update")
+	}
 	if c.isExpired() {
 		t.Fatal("expected cache to be fresh right after update")
 	}
@@ -261,6 +269,11 @@ func TestConfigCache(t *testing.T) {
 	}
 
 	// 2nd update: version bump should expand countedTxs cap.
+	c.asyncDownloadConfig()
+	time.Sleep(100 * time.Millisecond)
+	if len(c.newConfig) == 0 {
+		t.Fatal("expected new config to be downloaded")
+	}
 	if err := c.update(&countedTxs); err != nil {
 		t.Fatalf("update(v2) failed: %v", err)
 	}
@@ -301,7 +314,7 @@ func TestFilterTransaction(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected err, got nil")
 	}
-	if !strings.Contains(err.Error(), "failed to fetch config") {
+	if !strings.Contains(err.Error(), "config is empty") {
 		t.Fatalf("expected error to contain 'failed to fetch config', got: %s", err.Error())
 	}
 	if blocked || reason != "" {

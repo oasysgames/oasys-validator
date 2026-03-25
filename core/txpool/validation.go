@@ -54,7 +54,7 @@ type ValidationOptions struct {
 // ValidationFunction is an method type which the pools use to perform the tx-validations which do not
 // require state access. Production code typically uses ValidateTransaction, whereas testing-code
 // might choose to instead use something else, e.g. to always fail or avoid heavy cpu usage.
-type ValidationFunction func(tx *types.Transaction, head *types.Header, signer types.Signer, opts *ValidationOptions, state *state.StateDB) error
+type ValidationFunction func(tx *types.Transaction, head *types.Header, signer types.Signer, opts *ValidationOptions) error
 
 // ValidateTransaction is a helper method to check whether a transaction is valid
 // according to the consensus rules, but does not check state-dependent validation
@@ -62,7 +62,7 @@ type ValidationFunction func(tx *types.Transaction, head *types.Header, signer t
 //
 // This check is public to allow different transaction pools to check the basic
 // rules without duplicating code and running the risk of missed updates.
-func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types.Signer, opts *ValidationOptions, state *state.StateDB) error {
+func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types.Signer, opts *ValidationOptions) error {
 	// Ensure transactions not implemented by the calling pool are rejected
 	if opts.Accept&(1<<tx.Type()) == 0 {
 		return fmt.Errorf("%w: tx type %v not supported by this pool", core.ErrTxTypeNotSupported, tx.Type())
@@ -120,28 +120,9 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 		return core.ErrTipAboveFeeCap
 	}
 	// Make sure the transaction is signed properly
-	sender, err := types.Sender(signer, tx)
+	_, err := types.Sender(signer, tx)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrInvalidSender, err)
-	}
-	if opts.Config.Oasys != nil {
-		// Make sure the sender is allowed to create contract
-		// Create2 built-in deployment proxy is only allowed to call by the allowed addresses.
-		if (tx.To() == nil || tx.To().Cmp(oasys.DeterministicDeploymentProxy) == 0) && !vm.IsAllowedToCreate(state, sender) {
-			return fmt.Errorf("%w: the sender is not allowed to create contract. Please contact the Oasys team. sender: %s", vm.ErrUnauthorizedCreate, sender.Hex())
-		}
-		// Make sure the sender is not blocked
-		if vm.IsBlockedAddress(state, sender) {
-			return fmt.Errorf("%w: the sender is blocked. sender: %s", vm.ErrAddressBlocked, sender.Hex())
-		}
-		// Make sure the destination is not in denylist
-		if tx.To() != nil && vm.IsDeniedToCall(state, *tx.To()) {
-			return fmt.Errorf("%w: the destination is in denylist. destination: %s", vm.ErrUnauthorizedCall, tx.To().Hex())
-		}
-		// Make sure the destination is not blocked
-		if tx.To() != nil && vm.IsBlockedAddress(state, *tx.To()) {
-			return fmt.Errorf("%w: the destination is blocked. destination: %s", vm.ErrAddressBlocked, tx.To().Hex())
-		}
 	}
 	// Ensure the transaction has more gas than the bare minimum needed to cover
 	// the transaction metadata
@@ -167,14 +148,7 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 		return fmt.Errorf("%w: gas tip cap %v, minimum needed %v", ErrTxGasPriceTooLow, tx.GasTipCap(), opts.MinTip)
 	}
 	if tx.Type() == types.BlobTxType {
-		return validateBlobTx(tx, head, opts, state)
-	}
-	// Ensure the transaction is not blocked
-	if opts.Config.Oasys != nil && vm.IsBlockedAll(state) {
-		// Bypass the blocked check for the transaction to the transaction blocker contract
-		if tx.To() == nil || tx.To().Cmp(vm.TransactionBlockerContract) != 0 {
-			return vm.ErrAllTransactionBlocked
-		}
+		return validateBlobTx(tx, head, opts)
 	}
 	if tx.Type() == types.SetCodeTxType {
 		if len(tx.SetCodeAuthorizations()) == 0 {
@@ -184,15 +158,56 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 	return nil
 }
 
-// validateBlobTx implements the blob-transaction specific validations.
-func validateBlobTx(tx *types.Transaction, head *types.Header, opts *ValidationOptions, state *state.StateDB) error {
-	// Ensure the value is zero and data is empty if all transactions are blocked
-	if opts.Config.Oasys != nil && vm.IsBlockedAll(state) {
-		if tx.Value().Sign() != 0 || len(tx.Data()) > 0 {
-			return fmt.Errorf("%w: only transactions with zero value and empty tx data are allowed for blob-type transactions. value: %v, data: %v", vm.ErrAllTransactionBlocked, tx.Value(), tx.Data())
+// ValidateTransactionWithOasysState performs Oasys-only transaction checks that
+// require state access.
+func ValidateTransactionWithOasysState(tx *types.Transaction, signer types.Signer, config *params.ChainConfig, state *state.StateDB) error {
+	if config.Oasys == nil {
+		return nil
+	}
+	// Ensure Oasys state checks always have state context.
+	if state == nil {
+		return errors.New("missing state for Oasys transaction validation")
+	}
+	sender, err := types.Sender(signer, tx)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrInvalidSender, err)
+	}
+	// Make sure the sender is allowed to create contract.
+	// Create2 built-in deployment proxy is only allowed to call by the allowed addresses.
+	if (tx.To() == nil || tx.To().Cmp(oasys.DeterministicDeploymentProxy) == 0) && !vm.IsAllowedToCreate(state, sender) {
+		return fmt.Errorf("%w: the sender is not allowed to create contract. Please contact the Oasys team. sender: %s", vm.ErrUnauthorizedCreate, sender.Hex())
+	}
+	// Make sure the sender is not blocked.
+	if vm.IsBlockedAddress(state, sender) {
+		return fmt.Errorf("%w: the sender is blocked. sender: %s", vm.ErrAddressBlocked, sender.Hex())
+	}
+	// Make sure the destination is not in denylist.
+	if tx.To() != nil && vm.IsDeniedToCall(state, *tx.To()) {
+		return fmt.Errorf("%w: the destination is in denylist. destination: %s", vm.ErrUnauthorizedCall, tx.To().Hex())
+	}
+	// Make sure the destination is not blocked.
+	if tx.To() != nil && vm.IsBlockedAddress(state, *tx.To()) {
+		return fmt.Errorf("%w: the destination is blocked. destination: %s", vm.ErrAddressBlocked, tx.To().Hex())
+	}
+	// Ensure the transaction is not blocked.
+	if vm.IsBlockedAll(state) {
+		if tx.Type() == types.BlobTxType {
+			// Blob txs are only allowed if value is zero and tx data is empty.
+			if tx.Value().Sign() != 0 || len(tx.Data()) > 0 {
+				return fmt.Errorf("%w: only transactions with zero value and empty tx data are allowed for blob-type transactions. value: %v, data: %v", vm.ErrAllTransactionBlocked, tx.Value(), tx.Data())
+			}
+			return nil
+		}
+		// Bypass the blocked check for the transaction to the transaction blocker contract.
+		if tx.To() == nil || tx.To().Cmp(vm.TransactionBlockerContract) != 0 {
+			return vm.ErrAllTransactionBlocked
 		}
 	}
+	return nil
+}
 
+// validateBlobTx implements the blob-transaction specific validations.
+func validateBlobTx(tx *types.Transaction, head *types.Header, opts *ValidationOptions) error {
 	sidecar := tx.BlobTxSidecar()
 	if sidecar == nil {
 		return errors.New("missing sidecar in blob transaction")
