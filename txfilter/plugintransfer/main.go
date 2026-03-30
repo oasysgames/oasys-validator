@@ -184,6 +184,11 @@ func (c *ConfigCache) asyncDownloadConfig() {
 		return
 	}
 
+	// Already new config is downloaded
+	if len(c.newConfig) > 0 {
+		return
+	}
+
 	// Set the downloading flag to true
 	c.downloading.Store(true)
 
@@ -225,6 +230,11 @@ func (c *ConfigCache) update(countedTxs **lrucache) error {
 		return fmt.Errorf("new config is empty")
 	}
 
+	// Clear the new config if any error occurs to be able to download the config again
+	defer func() {
+		c.newConfig = nil
+	}()
+
 	oldVersion := c.Config.Version
 
 	// Decode the new config with strictly checking the fields
@@ -233,9 +243,6 @@ func (c *ConfigCache) update(countedTxs **lrucache) error {
 	if err := jsonDecoder.Decode(&c.Config); err != nil {
 		return fmt.Errorf("failed to decode config: %w, url: %s", err, configURL)
 	}
-
-	// Clear the new config
-	c.newConfig = nil
 
 	// Update the last updated time
 	c.updatedAt = time.Now()
