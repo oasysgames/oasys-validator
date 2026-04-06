@@ -6,9 +6,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-
+	txfilterlog "github.com/ethereum/go-ethereum/txfilter/log"
 	// "github.com/ethereum/go-ethereum/core" -> Avoid to import core package to reduce binary size and prevent unknown errors.
-	"github.com/ethereum/go-ethereum/core/types"
+	// "github.com/ethereum/go-ethereum/core/types" -> Avoid to import core/types package to bypass the AMD plugin build error.
 )
 
 // version can be set at build time using -ldflags "-X main.version=1.0.0"
@@ -46,7 +46,7 @@ var (
 	// _ core.SuspiciousTxfilterPlugin = (*dummyPlugin)(nil)
 )
 
-func (p *dummyPlugin) FilterTransaction(txhash common.Hash, from, to common.Address, value [32]byte, logs []types.Log) (isBlocked bool, reason string, err error) {
+func (p *dummyPlugin) FilterTransaction(txhash common.Hash, from, to common.Address, value [32]byte, logs []txfilterlog.Log) (isBlocked bool, reason string, err error) {
 	if blockedByPlugin == "true" {
 		// Given all the arguments, form a JSON string
 		valueStr := hexutil.Encode(value[:])

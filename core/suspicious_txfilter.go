@@ -20,6 +20,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/log"
+	txfilterlog "github.com/ethereum/go-ethereum/txfilter/log"
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	sigverify "github.com/sigstore/sigstore-go/pkg/verify"
@@ -62,7 +63,7 @@ type SuspiciousTxfilterPlugin interface {
 	// Clear drops runtime state so the host can load a new plugin instance; called before plugin reload.
 	Clear() error
 	// FilterTransaction decides whether to block the transaction.
-	FilterTransaction(txhash common.Hash, from, to common.Address, value [32]byte, logs []types.Log) (isBlocked bool, reason string, err error)
+	FilterTransaction(txhash common.Hash, from, to common.Address, value [32]byte, logs []txfilterlog.Log) (isBlocked bool, reason string, err error)
 }
 
 type SuspiciousTxfilterPluginMetadata struct {
@@ -168,7 +169,7 @@ func (s *SuspiciousTxfilter) FilterTransaction(txhash common.Hash, msg *Message,
 	var (
 		from, to   common.Address
 		value      [32]byte
-		copiedLogs = make([]types.Log, len(logs))
+		copiedLogs = make([]txfilterlog.Log, len(logs))
 	)
 	from = msg.From
 	if msg.To != nil {

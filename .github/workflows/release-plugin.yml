@@ -63,7 +63,7 @@ jobs:
         run: |
           out="suspicious_txfilter-linux-${{ matrix.goarch }}.so"
           plugin_version="${GITHUB_REF_NAME#plugin-v}"
-          go build -buildmode=plugin -trimpath -v -tags urfave_cli_no_docs,ckzg,purego,gnark_noasm \
+          go build -buildmode=plugin -trimpath -v -tags urfave_cli_no_docs,ckzg,purego \
             -ldflags "-X main.version=${plugin_version}" \
             -o "$out" \
             txfilter/plugindummy/main.go
