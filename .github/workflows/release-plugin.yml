@@ -41,7 +41,9 @@ jobs:
           CGO_ENABLED: 1
         run: |
           out="suspicious_txfilter-linux-${{ matrix.goarch }}.so"
-          go build -buildmode=plugin -trimpath -tags urfave_cli_no_docs,ckzg \
+          plugin_version="${GITHUB_REF_NAME#plugin-v}"
+          go build -buildmode=plugin -trimpath -tags urfave_cli_no_docs,ckzg,purego \
+            -ldflags "-X main.version=${plugin_version}" \
             -o "$out" \
             txfilter/plugindummy/main.go
 

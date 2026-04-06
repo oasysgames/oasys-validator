@@ -22,7 +22,7 @@ geth:
 # The plugin must be built with the exact same Go version, build tags, and go.mod as the test binary.
 plugin:
 	@echo "Building suspicious txfilter plugin..."
-	@go build -buildmode=plugin -trimpath -tags urfave_cli_no_docs,ckzg -o ./build/bin/suspicious_txfilter.so txfilter/plugindummy/main.go
+	@go build -buildmode=plugin -trimpath -tags urfave_cli_no_docs,ckzg,purego -o ./build/bin/suspicious_txfilter.so txfilter/plugindummy/main.go
 	@echo "Plugin built successfully."
 
 #? plugin-test: Build / sign / create metadata for the suspicious txfilter plugin for testing.
