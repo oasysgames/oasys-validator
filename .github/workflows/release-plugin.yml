@@ -1,0 +1,62 @@
+name: Release plugin
+
+on:
+  push:
+    tags:
+      - "plugin-v*"
+
+jobs:
+  build-and-sign:
+    name: Build and sign (${{ matrix.goarch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goarch: amd64
+            runner: ubuntu-latest
+          - goarch: arm64
+            runner: ubuntu-24.04-arm
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build plugin
+        env:
+          GOOS: linux
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 1
+        run: |
+          out="suspicious_txfilter-linux-${{ matrix.goarch }}.so"
+          go build -buildmode=plugin -trimpath -tags urfave_cli_no_docs,ckzg \
+            -o "$out" \
+            txfilter/plugindummy/main.go
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Cosign sign blob (keyless)
+        run: |
+          so="suspicious_txfilter-linux-${{ matrix.goarch }}.so"
+          cosign sign-blob --yes --new-bundle-format --bundle "${so}.bundle" "$so"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: suspicious_txfilter-linux-${{ matrix.goarch }}
+          path: |
+            suspicious_txfilter-linux-${{ matrix.goarch }}.so
+            suspicious_txfilter-linux-${{ matrix.goarch }}.so.bundle
