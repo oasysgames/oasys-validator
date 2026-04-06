@@ -63,7 +63,7 @@ jobs:
         run: |
           out="suspicious_txfilter-linux-${{ matrix.goarch }}.so"
           plugin_version="${GITHUB_REF_NAME#plugin-v}"
-          go build -buildmode=plugin -trimpath -v -tags urfave_cli_no_docs,ckzg,purego \
+          go build -buildmode=plugin -trimpath -v -tags urfave_cli_no_docs,ckzg,purego,gnark_nocgo \
             -ldflags "-X main.version=${plugin_version}" \
             -o "$out" \
             txfilter/plugindummy/main.go
@@ -83,3 +83,32 @@ jobs:
           path: |
             suspicious_txfilter-linux-${{ matrix.goarch }}.so
             suspicious_txfilter-linux-${{ matrix.goarch }}.so.bundle
+
+  release:
+    name: Publish GitHub Release
+    needs: build-and-sign
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: suspicious_txfilter-linux-*
+          merge-multiple: true
+
+      - name: Create sha256sums.txt
+        run: (cd artifacts && sha256sum *) > sha256sums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ github.ref_name }}
+          name: Plugin ${{ github.ref_name }}
+          draft: true
+          files: |
+            artifacts/*
+            sha256sums.txt
