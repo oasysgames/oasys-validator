@@ -33,7 +33,7 @@ var deployments15 = []*deployment{
 							params.OasysTestnetGenesisHash: &mapping{
 								keyFn: addressKeyFn,
 								values: map[string]interface{}{
-									"0xA2ba4B8c26761be292fd189BA8Edbe0D6C495626": "0x1",
+									"0xA2ba4B8c26761be292fd189BA8Edbe0D6C495626": "0x1", // L1 Testnet Operation
 								},
 							},
 							// // For local development

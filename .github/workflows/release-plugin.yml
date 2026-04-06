@@ -23,15 +23,34 @@ jobs:
       contents: read
 
     steps:
+      - name: Cleanup
+        run: |
+          echo "Before cleanup"
+          df -h
+
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo apt-get clean
+          sudo apt-get autoremove -y
+          sudo docker system prune -af
+
+          echo "After cleanup"
+          df -h
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: true
 
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y git ca-certificates
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: "1.24.10"
           cache: true
 
       - name: Build plugin
@@ -39,10 +58,12 @@ jobs:
           GOOS: linux
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 1
+          CGO_CFLAGS: -O -D__BLST_PORTABLE__
+          CGO_CFLAGS_ALLOW: -O -D__BLST_PORTABLE__
         run: |
           out="suspicious_txfilter-linux-${{ matrix.goarch }}.so"
           plugin_version="${GITHUB_REF_NAME#plugin-v}"
-          go build -buildmode=plugin -trimpath -tags urfave_cli_no_docs,ckzg,purego \
+          go build -buildmode=plugin -trimpath -v -tags urfave_cli_no_docs,ckzg,purego \
             -ldflags "-X main.version=${plugin_version}" \
             -o "$out" \
             txfilter/plugindummy/main.go
