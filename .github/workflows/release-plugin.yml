@@ -7,96 +7,101 @@ on:
 
 jobs:
   build-and-sign:
-    name: Build and sign (${{ matrix.goarch }})
+    name: Build and sign (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - goarch: amd64
+          - arch: amd64
             runner: ubuntu-latest
-          - goarch: arm64
+          - arch: arm64
             runner: ubuntu-24.04-arm
-
     permissions:
       id-token: write
       contents: read
-
     steps:
-      - name: Cleanup
-        run: |
-          echo "Before cleanup"
-          df -h
-
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo apt-get clean
-          sudo apt-get autoremove -y
-          sudo docker system prune -af
-
-          echo "After cleanup"
-          df -h
-
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v4
         with:
           submodules: true
 
-      - name: Install build dependencies
-        run: sudo apt-get update && sudo apt-get install -y git ca-certificates
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24.10"
+          go-version-file: go.mod
           cache: true
 
+      - name: Compute plugin version
+        id: plugin-version
+        run: echo "value=${GITHUB_REF_NAME#plugin-v}" >> "$GITHUB_OUTPUT"
+
       - name: Build plugin
+        uses: docker/bake-action@v6
         env:
-          GOOS: linux
-          GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: 1
-          CGO_CFLAGS: -O -D__BLST_PORTABLE__
-          CGO_CFLAGS_ALLOW: -O -D__BLST_PORTABLE__
+          GIT_COMMIT: ${{ github.sha }}
+          GIT_VERSION: ${{ github.ref_name }}
+          PLUGIN_VERSION: ${{ steps.plugin-version.outputs.value }}
+        with:
+          files: docker-bake.hcl
+          targets: plugin-binaries
+          set: |
+            *.cache-from=type=gha,scope=plugin-${{ matrix.arch }}
+            *.cache-to=type=gha,scope=plugin-${{ matrix.arch }},mode=max
+            plugin-binaries.output=type=local,dest=./binaries
+
+      - name: Rename plugin binary to match CDN naming convention
         run: |
-          out="suspicious_txfilter-linux-${{ matrix.goarch }}.so"
-          plugin_version="${GITHUB_REF_NAME#plugin-v}"
-          go build -buildmode=plugin -trimpath -v -tags urfave_cli_no_docs,ckzg,purego \
-            -ldflags "-X main.version=${plugin_version}" \
-            -o "$out" \
-            txfilter/plugindummy/main.go
+          mv binaries/suspicious_txfilter.so binaries/suspicious_txfilter_linux_${{ matrix.arch }}.so
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3
 
-      - name: Cosign sign blob (keyless)
+      - name: Sign plugin
         run: |
-          so="suspicious_txfilter-linux-${{ matrix.goarch }}.so"
-          cosign sign-blob --yes --new-bundle-format --bundle "${so}.bundle" "$so"
+          cosign sign-blob --yes --new-bundle-format \
+            --bundle binaries/suspicious_txfilter_linux_${{ matrix.arch }}.so.bundle \
+            binaries/suspicious_txfilter_linux_${{ matrix.arch }}.so
 
-      - name: Upload artifact
+      - name: Create plugin metadata
+        run: |
+          go run txfilter/cmd/createmeta/metadata_creator.go \
+            binaries/suspicious_txfilter_linux_${{ matrix.arch }}.so.bundle \
+            - \
+            binaries/suspicious_txfilter_linux_${{ matrix.arch }}.json \
+            "${{ steps.plugin-version.outputs.value }}" \
+            "https://github.com/${{ github.repository }}/.github/workflows/release-plugin.yml@refs/tags/${{ github.ref_name }}" \
+            "https://token.actions.githubusercontent.com"
+
+      - name: Compress plugin binaries
+        run: |
+          cd binaries && zip -q - \
+            suspicious_txfilter_linux_${{ matrix.arch }}.so \
+            suspicious_txfilter_linux_${{ matrix.arch }}.so.bundle \
+            suspicious_txfilter_linux_${{ matrix.arch }}.json \
+            > ../suspicious_txfilter-${{ github.ref_name }}-linux-${{ matrix.arch }}.zip
+
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: suspicious_txfilter-linux-${{ matrix.goarch }}
-          path: |
-            suspicious_txfilter-linux-${{ matrix.goarch }}.so
-            suspicious_txfilter-linux-${{ matrix.goarch }}.so.bundle
+          name: ${{ github.ref_name }}-${{ matrix.arch }}
+          path: suspicious_txfilter-*.zip
 
   release:
-    name: Publish GitHub Release
+    name: Release
     needs: build-and-sign
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
-      - name: Download build artifacts
+      - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-          pattern: suspicious_txfilter-linux-*
+          pattern: "${{ github.ref_name }}-*"
           merge-multiple: true
 
       - name: Create sha256sums.txt

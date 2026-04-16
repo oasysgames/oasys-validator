@@ -18,6 +18,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/internal/version"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
@@ -401,7 +402,7 @@ func TestSuspiciousTxfilter_buildPluginURL(t *testing.T) {
 		},
 	}
 	url := filter.buildPluginURL(PluginFileName)
-	expectedURL := fmt.Sprintf("https://cdn.mainnet.oasys.games/suspicious_txfilter/suspicious_txfilter_%s_%s.so", runtime.GOOS, runtime.GOARCH)
+	expectedURL := fmt.Sprintf("https://cdn.mainnet.oasys.games/suspicious_txfilter/%s/suspicious_txfilter_%s_%s.so", version.WithMeta, runtime.GOOS, runtime.GOARCH)
 	if url != expectedURL {
 		t.Errorf("Expected URL: %s, got: %s", expectedURL, url)
 	}
