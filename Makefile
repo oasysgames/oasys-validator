@@ -16,28 +16,32 @@ geth:
 	$(GORUN) build/ci.go install ./cmd/geth
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/geth\" to launch geth."
-	# @$(MAKE) plugin
 
 #? plugin: Build the suspicious txfilter plugin.
-# The plugin must be built with the exact same Go version, build tags, and go.mod as the test binary.
+# Uses build/ci.go to share toolchain setup and build tags with the main binary.
 plugin:
 	@echo "Building suspicious txfilter plugin..."
-	@go build -buildmode=plugin -trimpath -tags urfave_cli_no_docs,ckzg,purego -o ./build/bin/suspicious_txfilter.so txfilter/plugindummy/main.go
+	@$(GORUN) build/ci.go plugin
 	@echo "Plugin built successfully."
 
 #? plugin-test: Build / sign / create metadata for the suspicious txfilter plugin for testing.
+#?              Usage: make plugin-test [BLOCKED=true]
+BLOCKED ?= false
+PLUGIN_TEST_DIR = ./txfilter/testdata
+PLUGIN_TEST_SO = $(PLUGIN_TEST_DIR)/suspicious_txfilter.so
+PLUGIN_TEST_BUNDLE = $(PLUGIN_TEST_SO).bundle
+PLUGIN_TEST_JSON = $(PLUGIN_TEST_DIR)/suspicious_txfilter.json
 plugin-test:
-	@echo "Building suspicious txfilter plugin for testing..."
-	@go build -buildmode=plugin -ldflags "-X main.version=1.0.0 -X main.blockedByPlugin=false" -o ./txfilter/testdata/suspicious_txfilter-v1.so ./txfilter/plugindummy/main.go
-	@go build -buildmode=plugin -ldflags "-X main.version=2.0.0 -X main.blockedByPlugin=true" -o ./txfilter/testdata/suspicious_txfilter-v2.so ./txfilter/plugindummy/main.go
-	@echo "Plugin for testing built successfully."
-	@echo "Sign the plugin...(the key password is empty)"
-	@cosign sign-blob --key ./txfilter/testdata/cosign-test.key --bundle ./txfilter/testdata/suspicious_txfilter-v1.so.bundle ./txfilter/testdata/suspicious_txfilter-v1.so
-	@cosign sign-blob --key ./txfilter/testdata/cosign-test.key --bundle ./txfilter/testdata/suspicious_txfilter-v2.so.bundle ./txfilter/testdata/suspicious_txfilter-v2.so
+	@echo "Building suspicious txfilter plugin (blocked=$(BLOCKED))..."
+	@$(GORUN) build/ci.go plugin -version 1.0.0 $(if $(filter true,$(BLOCKED)),-blocked) -o $(PLUGIN_TEST_SO)
+	@echo "Plugin built successfully."
+
+	@echo "Signing plugin...(the key password is empty)"
+	@COSIGN_PASSWORD="" cosign sign-blob --yes --new-bundle-format --tlog-upload=false --key $(PLUGIN_TEST_DIR)/cosign-test.key --bundle $(PLUGIN_TEST_BUNDLE) $(PLUGIN_TEST_SO)
 	@echo "Plugin signed successfully."
-	@echo "Create plugin metadata..."
-	@go run txfilter/cmd/createmeta/metadata_creator.go ./txfilter/testdata/suspicious_txfilter-v1.so.bundle ./txfilter/testdata/cosign-test.pub ./txfilter/testdata/suspicious_txfilter-v1.json 1.0.0
-	@go run txfilter/cmd/createmeta/metadata_creator.go ./txfilter/testdata/suspicious_txfilter-v2.so.bundle ./txfilter/testdata/cosign-test.pub ./txfilter/testdata/suspicious_txfilter-v2.json 2.0.0
+
+	@echo "Creating plugin metadata..."
+	@go run txfilter/cmd/createmeta/metadata_creator.go $(PLUGIN_TEST_BUNDLE) $(PLUGIN_TEST_DIR)/cosign-test.pub $(PLUGIN_TEST_JSON) 1.0.0
 	@echo "Plugin metadata created successfully."
 
 #? faucet: Build faucet

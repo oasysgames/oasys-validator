@@ -401,7 +401,7 @@ func TestSuspiciousTxfilter_buildPluginURL(t *testing.T) {
 		},
 	}
 	url := filter.buildPluginURL(PluginFileName)
-	expectedURL := fmt.Sprintf("https://cdn.mainnet.oasys.games/suspicious_txfilter/suspicious_txfilter_%s_%s.so", runtime.GOOS, runtime.GOARCH)
+	expectedURL := fmt.Sprintf("https://cdn.mainnet.oasys.games/suspicious_txfilter/%s/%s/%s/suspicious_txfilter.so", runtime.GOOS, runtime.GOARCH, pluginBuildFingerprint)
 	if url != expectedURL {
 		t.Errorf("Expected URL: %s, got: %s", expectedURL, url)
 	}
