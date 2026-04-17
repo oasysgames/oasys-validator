@@ -38,6 +38,9 @@ plugin-test:
 	@go run txfilter/cmd/createmeta/metadata_creator.go ./txfilter/testdata/suspicious_txfilter-v1.so.bundle ./txfilter/testdata/cosign-test.pub ./txfilter/testdata/suspicious_txfilter-v1.json 1.0.0
 	@go run txfilter/cmd/createmeta/metadata_creator.go ./txfilter/testdata/suspicious_txfilter-v2.so.bundle ./txfilter/testdata/cosign-test.pub ./txfilter/testdata/suspicious_txfilter-v2.json 2.0.0
 	@echo "Plugin metadata created successfully."
+	@echo "Delete the bundle files..."
+	@rm ./txfilter/testdata/suspicious_txfilter-v1.so.bundle
+	@rm ./txfilter/testdata/suspicious_txfilter-v2.so.bundle
 
 #? faucet: Build faucet
 faucet:
