@@ -117,17 +117,15 @@ func NewSuspiciousTxfilter(config *params.ChainConfig, datadir string, exitCh ch
 
 		// Try to load existing plugin, fetch if missing or invalid
 		pluginPath := s.pluginPath()
-		if _, err := os.Stat(pluginPath); os.IsNotExist(err) {
-			log.Info("Plugin not found locally", "path", pluginPath)
-		} else if err := s.loadPlugin(); err != nil {
-			log.Warn("Failed to load existing plugin, re-downloading", "path", pluginPath, "err", err)
-		} else {
-			return // loaded successfully
-		}
-		if err := s.fetchPlugin(); err != nil {
-			log.Error("Failed to download suspicious txfilter plugin", "err", err)
-		} else if err := s.loadPlugin(); err != nil {
-			log.Error("Failed to load suspicious txfilter plugin", "err", err)
+		if _, err := os.Stat(pluginPath); os.IsNotExist(err) || s.loadPlugin() != nil {
+			if err := s.fetchPlugin(); err != nil {
+				log.Error("Failed to download suspicious txfilter plugin", "err", err)
+				return
+			}
+			if err := s.loadPlugin(); err != nil {
+				log.Error("Failed to load suspicious txfilter plugin", "err", err)
+				return
+			}
 		}
 	}()
 
@@ -139,48 +137,6 @@ func (s *SuspiciousTxfilter) IsReady() bool {
 		return false
 	}
 	return true
-}
-
-// verifyPluginIntegrity verifies that the plugin .so file has not been tampered
-// with by checking its Cosign signature bundle against the expected identity.
-func (s *SuspiciousTxfilter) verifyPluginIntegrity(bundle bundle.Bundle, metadata *SuspiciousTxfilterPluginMetadata) error {
-	if s.verifier == nil {
-		return fmt.Errorf("verifier not initialized")
-	}
-
-	pluginPath := s.pluginPath()
-	file, err := os.Open(pluginPath)
-	if err != nil {
-		return fmt.Errorf("failed to open plugin file: %w", err)
-	}
-	defer file.Close()
-
-	artifactPolicy := sigverify.WithArtifact(file)
-
-	if metadata.IsKeyless {
-		// Execute the verification
-		// - WithArtifact: The artifact to verify
-		// - WithCertificateIdentity: The identity of the certificate that signed the artifact
-		if _, err := s.verifier.Verify(&bundle, sigverify.NewPolicy(
-			artifactPolicy,
-			sigverify.WithCertificateIdentity(sigverify.CertificateIdentity{
-				SubjectAlternativeName: sigverify.SubjectAlternativeNameMatcher{
-					SubjectAlternativeName: *metadata.CertificateIdentity,
-				},
-				Issuer: sigverify.IssuerMatcher{
-					Issuer: *metadata.CertificateIssuer,
-				},
-			}),
-		)); err != nil {
-			return fmt.Errorf("failed to verify bundle: %w", err)
-		}
-		return nil
-	}
-
-	if _, err := s.verifier.Verify(&bundle, sigverify.NewPolicy(artifactPolicy, sigverify.WithKey())); err != nil {
-		return fmt.Errorf("failed to verify bundle: %w", err)
-	}
-	return nil
 }
 
 // verifyPluginBuild checks that the plugin was built with the same go.mod,
@@ -449,6 +405,48 @@ func (s *SuspiciousTxfilter) updateVerifier(metadata *SuspiciousTxfilterPluginMe
 		sigverify.WithNoObserverTimestamps(),
 	); err != nil {
 		return fmt.Errorf("failed to create verifier: %w", err)
+	}
+	return nil
+}
+
+// verifyPluginIntegrity verifies that the plugin .so file has not been tampered
+// with by checking its Cosign signature bundle against the expected identity.
+func (s *SuspiciousTxfilter) verifyPluginIntegrity(bundle bundle.Bundle, metadata *SuspiciousTxfilterPluginMetadata) error {
+	if s.verifier == nil {
+		return fmt.Errorf("verifier not initialized")
+	}
+
+	pluginPath := s.pluginPath()
+	file, err := os.Open(pluginPath)
+	if err != nil {
+		return fmt.Errorf("failed to open plugin file: %w", err)
+	}
+	defer file.Close()
+
+	artifactPolicy := sigverify.WithArtifact(file)
+
+	if metadata.IsKeyless {
+		// Execute the verification
+		// - WithArtifact: The artifact to verify
+		// - WithCertificateIdentity: The identity of the certificate that signed the artifact
+		if _, err := s.verifier.Verify(&bundle, sigverify.NewPolicy(
+			artifactPolicy,
+			sigverify.WithCertificateIdentity(sigverify.CertificateIdentity{
+				SubjectAlternativeName: sigverify.SubjectAlternativeNameMatcher{
+					SubjectAlternativeName: *metadata.CertificateIdentity,
+				},
+				Issuer: sigverify.IssuerMatcher{
+					Issuer: *metadata.CertificateIssuer,
+				},
+			}),
+		)); err != nil {
+			return fmt.Errorf("failed to verify bundle: %w", err)
+		}
+		return nil
+	}
+
+	if _, err := s.verifier.Verify(&bundle, sigverify.NewPolicy(artifactPolicy, sigverify.WithKey())); err != nil {
+		return fmt.Errorf("failed to verify bundle: %w", err)
 	}
 	return nil
 }
