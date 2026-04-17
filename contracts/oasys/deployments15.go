@@ -45,13 +45,13 @@ var deployments15 = []*deployment{
 							// },
 						},
 					},
-					"MANAGER_ROLE": structvalue{
+					"MANAGER_ROLE": structvalue{ // 0x241ecf16d79d0f8dbfb92cbc07fe17840425976cf0667f022fe9877caa831b08
 						// mapping(address => bool) members
 						genesismap{
 							params.OasysMainnetGenesisHash: &mapping{
 								keyFn: addressKeyFn,
 								values: map[string]interface{}{
-									"0xc0bACBDA16Bb494d8C5be6DE84540465Fd83333E": "0x1",
+									"0xeC0Dd7E1Dd06f51412490076426e2AAe4B1fFC80": "0x1", // L1 Mainnet Operation / MPC
 								},
 							},
 							params.OasysTestnetGenesisHash: &mapping{

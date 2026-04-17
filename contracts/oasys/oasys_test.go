@@ -1216,7 +1216,7 @@ func _deployments15(genesisHash common.Hash, contracts wantContracts) {
 	case params.OasysMainnetGenesisHash:
 		appends["0x520000000000000000000000000000000000004F"].storage = map[string]string{
 			"0x0bce92cc78449169524412e83bbfd32ee216dec5bba171ae073372f5ed4cecef": "0x0000000000000000000000000000000000000000000000000000000000000001",
-			"0x9d45e49a732f60a178c294b56c93b9ad5c903d62acc0d9d7d7efc850a5d71054": "0x0000000000000000000000000000000000000000000000000000000000000001",
+			"0xdce56cbff965e05b132d17e754ee948acfe7cb8c82d09d6bb12aff98b35702a0": "0x0000000000000000000000000000000000000000000000000000000000000001",
 		}
 		// DeterministicDeploymentProxy
 		appends["0x4e59b44847b379578588920ca78fbf26c0b4956c"] = &wantContract{
@@ -1302,7 +1302,7 @@ func TestDeploy(t *testing.T) {
 				{blockNumber: 5445775, deploy: []deployFn{_deployments13}},
 				{blockNumber: 8496170 - 1, blockTime: 1751590860, deploy: []deployFn{_deployEIP2935}},
 				{blockNumber: 8496170, deploy: []deployFn{_deployments14}},
-				{blockNumber: 12671918, deploy: []deployFn{_deployments15}},
+				{blockNumber: 12729520, deploy: []deployFn{_deployments15}},
 			},
 		},
 		{

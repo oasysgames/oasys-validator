@@ -43,7 +43,7 @@ var deploymentSets = map[common.Hash]map[uint64]deploymentSet{
 		4958700:  deploymentSet{deployments12},
 		5445775:  deploymentSet{deployments13},
 		8496170:  deploymentSet{deployments14, deployments14_slash_indicator_testnet}, // Fri Jul 04 2025 10:00:00 GMT+0900
-		12671918: deploymentSet{deployments15},                                        // Mon Apr 20 2026 11:00:00 GMT+0900 No `deployments15_deterministic_deployment_proxy` as it already exists in testnet.
+		12729520: deploymentSet{deployments15},                                        // Fri Apr 24 2026 11:00:00 GMT+0900 No `deployments15_deterministic_deployment_proxy` as it already exists in testnet.
 	},
 	defaultGenesisHash: {
 		2: deploymentSet{
