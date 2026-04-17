@@ -56,6 +56,7 @@ var (
 func init() {
 	testTxPoolConfig = DefaultConfig
 	testTxPoolConfig.Journal = ""
+	testTxPoolConfig.NoLocals = false
 
 	cpy := *params.TestChainConfig
 	eip1559Config = &cpy
@@ -1143,8 +1144,8 @@ func TestQueueTimeLimiting(t *testing.T) {
 	// The whole life time pass after last promotion, kick out stale transactions
 	time.Sleep(2 * config.Lifetime)
 	pending, queued = pool.Stats()
-	if pending != 1 {
-		t.Fatalf("pending transactions mismatched: have %d, want %d", pending, 1)
+	if pending != 0 {
+		t.Fatalf("pending transactions mismatched: have %d, want %d", pending, 0)
 	}
 	if queued != 0 {
 		t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 0)

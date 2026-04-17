@@ -230,6 +230,9 @@ type worker struct {
 	// payload in proof-of-stake stage.
 	recommit time.Duration
 
+	// datadir is the directory to store the suspicious tx filter plugin.
+	txfilterDatadir string
+
 	// Test hooks
 	newTaskHook       func(*task)                        // Method to call upon receiving a new sealing task.
 	skipSealHook      func(*task) bool                   // Method to decide whether skipping the sealing.
@@ -238,7 +241,7 @@ type worker struct {
 	recentMinedBlocks *lru.Cache[uint64, []common.Hash]
 }
 
-func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend, mux *event.TypeMux, init bool) *worker {
+func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend, mux *event.TypeMux, init bool, datadir string) *worker {
 	chainConfig := eth.BlockChain().Config()
 	worker := &worker{
 		prefetcher:         core.NewStatePrefetcher(chainConfig, eth.BlockChain().HeadChain()),
@@ -261,6 +264,7 @@ func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend,
 		exitCh:             make(chan struct{}),
 		resubmitIntervalCh: make(chan time.Duration),
 		recentMinedBlocks:  lru.NewCache[uint64, []common.Hash](recentMinedCacheLimit),
+		txfilterDatadir:    datadir,
 	}
 	// Subscribe events for blockchain
 	worker.chainHeadSub = eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)
@@ -360,6 +364,17 @@ func (w *worker) pending() (*types.Block, types.Receipts, *state.StateDB) {
 func (w *worker) start() {
 	w.running.Store(true)
 	w.startCh <- struct{}{}
+
+	// Create suspicious tx filter if not disabled and not already created.
+	if !w.config.DisableSuspiciousTxFilter && core.SuspiciousTxfilterGlobal == nil {
+		var err error
+		if core.SuspiciousTxfilterGlobal, err = core.NewSuspiciousTxfilter(w.chainConfig, w.txfilterDatadir, w.exitCh); err != nil {
+			// Stop execution here to avoid miner running without suspicious tx filter.
+			log.Crit("Failed to create suspicious tx filter", "err", err)
+		} else {
+			log.Info("Created suspicious tx filter", "datadir", w.txfilterDatadir)
+		}
+	}
 }
 
 // stop sets the running status as 0.

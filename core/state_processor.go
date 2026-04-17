@@ -141,7 +141,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		}
 		statedb.SetTxContext(tx.Hash(), i)
 
-		receipt, err := ApplyTransactionWithEVM(msg, gp, statedb, blockNumber, blockHash, context.Time, tx, usedGas, evm, bloomProcessors)
+		receipt, err := ApplyTransactionWithEVM(msg, gp, statedb, blockNumber, blockHash, context.Time, tx, usedGas, evm, nil, bloomProcessors)
 		if err != nil {
 			bloomProcessors.Close()
 			return nil, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
@@ -193,7 +193,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 // ApplyTransactionWithEVM attempts to apply a transaction to the given state database
 // and uses the input parameters for its environment similar to ApplyTransaction. However,
 // this method takes an already created EVM instance as input.
-func ApplyTransactionWithEVM(msg *Message, gp *GasPool, statedb *state.StateDB, blockNumber *big.Int, blockHash common.Hash, blockTime uint64, tx *types.Transaction, usedGas *uint64, evm *vm.EVM, receiptProcessors ...ReceiptProcessor) (receipt *types.Receipt, err error) {
+func ApplyTransactionWithEVM(msg *Message, gp *GasPool, statedb *state.StateDB, blockNumber *big.Int, blockHash common.Hash, blockTime uint64, tx *types.Transaction, usedGas *uint64, evm *vm.EVM, txfilter *SuspiciousTxfilter, receiptProcessors ...ReceiptProcessor) (receipt *types.Receipt, err error) {
 	// Add timing measurement
 	var result *ExecutionResult
 	if tx.Gas() > largeTxGasLimit {
@@ -219,6 +219,21 @@ func ApplyTransactionWithEVM(msg *Message, gp *GasPool, statedb *state.StateDB, 
 	if err != nil {
 		return nil, err
 	}
+
+	// Run txfilter before StateDB.Finalise (Finalise clears the journal, making revert impossible).
+	if txfilter != nil {
+		logs := statedb.GetLogs(tx.Hash(), blockNumber.Uint64(), blockHash, blockTime)
+		isBlocked, reason, filterErr := txfilter.FilterTransaction(tx.Hash(), msg, logs)
+		if filterErr != nil {
+			log.Warn("Suspicious txfilter failed", "error", filterErr)
+			// return nil, filterErr // Don't block execution by any error from the plugin
+		} else if isBlocked {
+			// No need to revert — tx that throw errors will be reverted by worker.applyTransaction.
+			log.Warn("Suspicious txfilter blocked", "txhash", tx.Hash().Hex(), "reason", reason)
+			return nil, fmt.Errorf("%w: %s", ErrSuspiciousTxfilter, reason)
+		}
+	}
+
 	// Update the state with pending changes.
 	var root []byte
 	if evm.ChainConfig().IsByzantium(blockNumber) {
@@ -280,8 +295,16 @@ func ApplyTransaction(evm *vm.EVM, gp *GasPool, statedb *state.StateDB, header *
 	if err != nil {
 		return nil, err
 	}
+	// Pass txfilter when apply suspicious txfilter
+	var txfilter *SuspiciousTxfilter
+	if SuspiciousTxfilterGlobal != nil {
+		isWriteCall := !evm.Config.NoBaseFee // not eth_call
+		if _, isStateDB := evm.StateDB.(*state.StateDB); isStateDB && isWriteCall {
+			txfilter = SuspiciousTxfilterGlobal
+		}
+	}
 	// Create a new context to be used in the EVM environment
-	return ApplyTransactionWithEVM(msg, gp, statedb, header.Number, header.Hash(), header.Time, tx, usedGas, evm, receiptProcessors...)
+	return ApplyTransactionWithEVM(msg, gp, statedb, header.Number, header.Hash(), header.Time, tx, usedGas, evm, txfilter, receiptProcessors...)
 }
 
 // ProcessBeaconBlockRoot applies the EIP-4788 system call to the beacon block root

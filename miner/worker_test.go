@@ -69,6 +69,8 @@ var (
 	testConfig = &minerconfig.Config{
 		Recommit: &oneSecond,
 		GasCeil:  params.GenesisGasLimit,
+
+		DisableSuspiciousTxFilter: true,
 	}
 )
 
@@ -161,7 +163,7 @@ func (b *testWorkerBackend) newRandomTx(creation bool) *types.Transaction {
 func newTestWorker(t *testing.T, chainConfig *params.ChainConfig, engine consensus.Engine, db ethdb.Database, blocks int) (*worker, *testWorkerBackend) {
 	backend := newTestWorkerBackend(t, chainConfig, engine, db, blocks)
 	backend.txPool.Add(pendingTxs, true)
-	w := newWorker(testConfig, engine, backend, new(event.TypeMux), false)
+	w := newWorker(testConfig, engine, backend, new(event.TypeMux), false, "")
 	w.setEtherbase(testBankAddress)
 	return w, backend
 }

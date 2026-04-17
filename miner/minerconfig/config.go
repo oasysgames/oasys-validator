@@ -44,7 +44,8 @@ type Config struct {
 	Recommit      *time.Duration // The time interval for miner to re-create mining work.
 	VoteEnable    bool           // Whether to vote when mining
 
-	DisableVoteAttestation bool // Whether to skip assembling vote attestation
+	DisableVoteAttestation    bool // Whether to skip assembling vote attestation
+	DisableSuspiciousTxFilter bool // Whether to disable suspicious tx filter
 }
 
 // DefaultConfig contains default settings for miner.

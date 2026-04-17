@@ -128,6 +128,11 @@ var (
 	// Message validation errors:
 	ErrEmptyAuthList   = errors.New("EIP-7702 transaction with empty auth list")
 	ErrSetCodeTxCreate = errors.New("EIP-7702 transaction cannot be used to create contract")
+
+	// -- Oasys errors --
+
+	// ErrSuspiciousTxfilter is returned if the transaction is blocked by the suspicious txfilter.
+	ErrSuspiciousTxfilter = errors.New("transaction blocked by suspicious txfilter")
 )
 
 // EIP-7702 state transition errors.

@@ -1042,6 +1042,12 @@ func (s *StateDB) SetTxContext(thash common.Hash, ti int) {
 	s.txIndex = ti
 }
 
+// GetTxContext returns the current transaction hash and index which are
+// used when the EVM emits new state logs.
+func (s *StateDB) GetTxContext() (common.Hash, int) {
+	return s.thash, s.txIndex
+}
+
 // StateDB.Prepare is not called before processing a system transaction, call ClearAccessList instead.
 func (s *StateDB) ClearAccessList() {
 	s.accessList = newAccessList()
