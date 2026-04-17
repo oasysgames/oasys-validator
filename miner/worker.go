@@ -700,9 +700,22 @@ func (w *worker) updateSnapshot(env *environment) {
 
 func (w *worker) commitTransaction(env *environment, tx *types.Transaction, receiptProcessors ...core.ReceiptProcessor) ([]*types.Log, error) {
 	if tx.Type() == types.BlobTxType {
+		// Fail if all transactions are blocked and value is not zero or data is not empty.
+		if w.chainConfig.Oasys != nil && vm.IsBlockedAll(env.state) {
+			if tx.Value().Sign() != 0 || len(tx.Data()) > 0 {
+				return nil, fmt.Errorf("%w: only transactions with zero value and empty tx data are allowed for blob-type transactions. value: %v, data: %v", vm.ErrAllTransactionBlocked, tx.Value(), tx.Data())
+			}
+		}
 		return w.commitBlobTransaction(env, tx, receiptProcessors...)
 	}
 
+	// Fail if all transactions are blocked
+	if w.chainConfig.Oasys != nil && vm.IsBlockedAll(env.state) {
+		// Bypass the blocked check for the transaction to the transaction blocker contract
+		if tx.To() == nil || tx.To().Cmp(vm.TransactionBlockerContract) != 0 {
+			return nil, vm.ErrAllTransactionBlocked
+		}
+	}
 	receipt, err := w.applyTransaction(env, tx, receiptProcessors...)
 	if err != nil {
 		return nil, err
