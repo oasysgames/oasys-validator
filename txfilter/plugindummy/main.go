@@ -17,6 +17,9 @@ var version = "1.0.0"
 // blockedByPlugin can be set at build time using -ldflags "-X main.blockedByPlugin=true"
 var blockedByPlugin = "false"
 
+// BuildFingerprint is the build environment fingerprint. Set by -ldflags.
+var BuildFingerprint string
+
 type LogEntry struct {
 	Address string   `json:"address"`
 	Topics  []string `json:"topics"`
