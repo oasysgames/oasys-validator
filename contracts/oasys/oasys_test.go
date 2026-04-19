@@ -1201,6 +1201,50 @@ func _deployments14(genesisHash common.Hash, contracts wantContracts) {
 	}
 }
 
+func _deployments15(genesisHash common.Hash, contracts wantContracts) {
+	// StakeManager
+	contracts["0x0000000000000000000000000000000000001001"].codeHash = "9accc809190f2fcea257a6a3fbd0bfc4"
+	// TransactionBlocker
+	appends := wantContracts{
+		"0x520000000000000000000000000000000000004F": {
+			name:     "TransactionBlocker",
+			codeHash: "1136c5c3bfce0d857fe7fa7e50098991",
+		},
+	}
+
+	switch genesisHash {
+	case params.OasysMainnetGenesisHash:
+		appends["0x520000000000000000000000000000000000004F"].storage = map[string]string{
+			"0x0bce92cc78449169524412e83bbfd32ee216dec5bba171ae073372f5ed4cecef": "0x0000000000000000000000000000000000000000000000000000000000000001",
+			"0xdce56cbff965e05b132d17e754ee948acfe7cb8c82d09d6bb12aff98b35702a0": "0x0000000000000000000000000000000000000000000000000000000000000001",
+		}
+		// DeterministicDeploymentProxy
+		appends["0x4e59b44847b379578588920ca78fbf26c0b4956c"] = &wantContract{
+			name:     "DeterministicDeploymentProxy",
+			codeHash: "5364a74988590d2ada5cb995374120b6",
+		}
+	case params.OasysTestnetGenesisHash:
+		appends["0x520000000000000000000000000000000000004F"].storage = map[string]string{
+			"0x76f845cfb706db1029035d237e233553e1b85dc6448cf8d3604db62bafdca07c": "0x0000000000000000000000000000000000000000000000000000000000000001",
+			"0x9deaf035b302af9e8d3ffb94ff3cf77718c97fca1cafc9835e08481dd6411eb5": "0x0000000000000000000000000000000000000000000000000000000000000001",
+		}
+	default:
+		// DeterministicDeploymentProxy
+		appends["0x520000000000000000000000000000000000004F"].storage = map[string]string{}
+		appends["0x4e59b44847b379578588920ca78fbf26c0b4956c"] = &wantContract{
+			name:     "DeterministicDeploymentProxy",
+			codeHash: "5364a74988590d2ada5cb995374120b6",
+		}
+	}
+
+	appends["0x520000000000000000000000000000000000004F"].storage["0xcc69885fda6bcc1a4ace058b4a62bf5e179ea78fd58a1ccd71c22cc9b688792f"] = "0x0000000000000000000000000000000000000000000000000000000000000001"
+	appends["0x520000000000000000000000000000000000004F"].storage["0xe90b7bceb6e7df5418fb78d8ee546e97c83a08bbccc01a0644d599ccd2a7c2e0"] = "0x0000000000000000000000000000000000000000000000000000000000000001"
+
+	for k, v := range appends {
+		contracts[k] = v
+	}
+}
+
 func TestDeploy(t *testing.T) {
 	type wantDeployments []struct {
 		// Block height based deployment
@@ -1235,6 +1279,7 @@ func TestDeploy(t *testing.T) {
 				{blockNumber: 5527429, deploy: []deployFn{_deployments13}},
 				{blockNumber: 8728540 - 1, blockTime: 1753761660, deploy: []deployFn{_deployEIP2935}},
 				{blockNumber: 8728540, deploy: []deployFn{_deployments14}},
+				{blockNumber: 90000000, deploy: []deployFn{_deployments15}},
 			},
 		},
 		{
@@ -1257,6 +1302,7 @@ func TestDeploy(t *testing.T) {
 				{blockNumber: 5445775, deploy: []deployFn{_deployments13}},
 				{blockNumber: 8496170 - 1, blockTime: 1751590860, deploy: []deployFn{_deployEIP2935}},
 				{blockNumber: 8496170, deploy: []deployFn{_deployments14}},
+				{blockNumber: 12729520, deploy: []deployFn{_deployments15}},
 			},
 		},
 		{
@@ -1290,6 +1336,7 @@ func TestDeploy(t *testing.T) {
 						_deployments12,
 						_deployments13,
 						_deployments14,
+						_deployments15,
 					},
 				},
 				{blockNumber: 2 + 1, blockTime: 9999999999, deploy: []deployFn{_deployEIP2935}},

@@ -297,7 +297,8 @@ func minerTestGenesisBlock(period uint64, gasLimit uint64, faucet common.Address
 func createMiner(t *testing.T) (*Miner, *event.TypeMux, func(skipMiner bool)) {
 	// Create Ethash config
 	config := minerconfig.Config{
-		Etherbase: common.HexToAddress("123456789"),
+		Etherbase:                 common.HexToAddress("123456789"),
+		DisableSuspiciousTxFilter: true,
 	}
 	// Create chainConfig
 	chainDB := rawdb.NewMemoryDatabase()
@@ -324,7 +325,7 @@ func createMiner(t *testing.T) (*Miner, *event.TypeMux, func(skipMiner bool)) {
 	// Create event Mux
 	mux := new(event.TypeMux)
 	// Create Miner
-	miner := New(backend, &config, mux, engine)
+	miner := New(backend, &config, mux, engine, "")
 	cleanup := func(skipMiner bool) {
 		bc.Stop()
 		engine.Close()

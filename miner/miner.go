@@ -57,7 +57,7 @@ type Miner struct {
 	wg sync.WaitGroup
 }
 
-func New(eth Backend, config *minerconfig.Config, mux *event.TypeMux, engine consensus.Engine) *Miner {
+func New(eth Backend, config *minerconfig.Config, mux *event.TypeMux, engine consensus.Engine, datadir string) *Miner {
 	miner := &Miner{
 		mux:     mux,
 		eth:     eth,
@@ -65,7 +65,7 @@ func New(eth Backend, config *minerconfig.Config, mux *event.TypeMux, engine con
 		exitCh:  make(chan struct{}),
 		startCh: make(chan struct{}),
 		stopCh:  make(chan struct{}),
-		worker:  newWorker(config, engine, eth, mux, false),
+		worker:  newWorker(config, engine, eth, mux, false, datadir),
 	}
 	miner.wg.Add(1)
 	go miner.update()

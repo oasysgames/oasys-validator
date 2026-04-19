@@ -24,6 +24,7 @@ import (
 	"github.com/holiman/uint256"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/contracts/oasys"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -188,11 +189,22 @@ func isSystemCall(caller common.Address) bool {
 // the necessary steps to create accounts and reverses the state in case of an
 // execution error or failed value transfer.
 func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, gas uint64, value *uint256.Int) (ret []byte, leftOverGas uint64, err error) {
-	// Fail if the address is not allowed to call
-	// Skip the check if this call is readonly (eth_call)
-	readOnly := evm.Config.NoBaseFee
-	if !readOnly && evm.chainConfig.Oasys != nil && IsDeniedToCall(evm.StateDB, addr) {
-		return nil, 0, ErrUnauthorizedCall
+	// Check the access control of the call.
+	readOnly := evm.Config.NoBaseFee // Skip the check if this call is readonly (eth_call).
+	if !readOnly && evm.chainConfig.Oasys != nil {
+		// Check if the address is denied to call
+		if IsDeniedToCall(evm.StateDB, addr) {
+			return nil, 0, ErrUnauthorizedCall
+		}
+		// Check if the caller or the callee is blocked
+		// Don't call `IsBlockedAll`; system transactions must remain unblocked.
+		if IsBlockedAddress(evm.StateDB, caller) || IsBlockedAddress(evm.StateDB, addr) {
+			return nil, 0, ErrAddressBlocked
+		}
+		// Check if the caller is allowed to create contract via the Deterministic Deployment Proxy (create2).
+		if addr.Cmp(oasys.DeterministicDeploymentProxy) == 0 && evm.StateDB.GetCodeSize(addr) > 0 && !IsAllowedToCreate(evm.StateDB, caller) {
+			return nil, 0, ErrUnauthorizedCreate
+		}
 	}
 	// Capture the tracer start/end events in debug mode
 	if evm.Config.Tracer != nil {
@@ -334,6 +346,13 @@ func (evm *EVM) CallCode(caller common.Address, addr common.Address, input []byt
 // DelegateCall differs from CallCode in the sense that it executes the given address'
 // code with the caller as context and the caller is set to the caller of the caller.
 func (evm *EVM) DelegateCall(originCaller common.Address, caller common.Address, addr common.Address, input []byte, gas uint64, value *uint256.Int) (ret []byte, leftOverGas uint64, err error) {
+	// Block unauthorized deployments via delegatecall to the Deterministic Deployment Proxy (create2).
+	readOnly := evm.Config.NoBaseFee
+	if !readOnly && evm.chainConfig.Oasys != nil {
+		if addr.Cmp(oasys.DeterministicDeploymentProxy) == 0 && evm.StateDB.GetCodeSize(addr) > 0 && !IsAllowedToCreate(evm.StateDB, caller) {
+			return nil, 0, ErrUnauthorizedCreate
+		}
+	}
 	// Invoke tracer hooks that signal entering/exiting a call frame
 	if evm.Config.Tracer != nil {
 		// DELEGATECALL inherits value from parent call
@@ -450,13 +469,18 @@ func (evm *EVM) create(caller common.Address, code []byte, gas uint64, value *ui
 		return nil, common.Address{}, gas, ErrNonceUintOverflow
 	}
 	evm.StateDB.SetNonce(caller, nonce+1, tracing.NonceChangeContractCreator)
-
-	// Fail if the caller is not allowed to create. Limited to `CREATE`
-	// because this check targets raw transactions from EOA, and `CREATE2`
-	// within internal transactions is excluded.
-	// Need to check after nonce increment to evict failed tx from the pool.
-	if evm.depth == 0 && typ == CREATE && evm.chainConfig.Oasys != nil && !IsAllowedToCreate(evm.StateDB, caller) {
-		return nil, common.Address{}, 0, ErrUnauthorizedCreate
+	if evm.chainConfig.Oasys != nil {
+		// Fail if the caller is not allowed to create. Limited to `CREATE`
+		// because this check targets raw transactions from EOA, and `CREATE2`
+		// within internal transactions is excluded.
+		// Need to check after nonce increment to evict failed tx from the pool.
+		if evm.depth == 0 && typ == CREATE && !IsAllowedToCreate(evm.StateDB, caller) {
+			return nil, common.Address{}, 0, ErrUnauthorizedCreate
+		}
+		// Fail if the caller is blocked.
+		if IsBlockedAddress(evm.StateDB, caller) {
+			return nil, common.Address{}, gas, ErrAddressBlocked
+		}
 	}
 	// Charge the contract creation init gas in verkle mode
 	if evm.chainRules.IsEIP4762 {

@@ -25,11 +25,17 @@ const (
 
 	// Address of contracts in `oasys-governance-contract`.
 	EVMAccessControl = BuiltInContractPrefix2 + "00000000000000000000003F"
+
+	// Address of TransactionBlocker contract.
+	TransactionBlocker = BuiltInContractPrefix2 + "00000000000000000000004F"
 )
 
 var (
 	GenesisHash,
 	defaultGenesisHash common.Hash
+
+	// Address of the DeterministicDeploymentProxy contract.
+	DeterministicDeploymentProxy = common.HexToAddress("0x4e59b44847b379578588920ca78fbf26c0b4956c")
 )
 
 // Interface that extracts necessary methods from vm.StateDB

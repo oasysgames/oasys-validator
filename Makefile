@@ -17,6 +17,31 @@ geth:
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/geth\" to launch geth."
 
+#? plugin: Build the suspicious txfilter plugin.
+# Uses build/ci.go to share toolchain setup and build tags with the main binary.
+plugin:
+	@echo "Building suspicious txfilter plugin..."
+	@$(GORUN) build/ci.go plugin
+	@echo "Plugin built successfully."
+
+#? plugin-test: Build / sign / create metadata for the suspicious txfilter plugin for testing.
+plugin-test:
+	@echo "Building suspicious txfilter plugin for testing..."
+	@go build -buildmode=plugin -ldflags "-X main.version=1.0.0 -X main.blockedByPlugin=false" -o ./txfilter/testdata/suspicious_txfilter-v1.so ./txfilter/plugindummy/main.go
+	@go build -buildmode=plugin -ldflags "-X main.version=2.0.0 -X main.blockedByPlugin=true" -o ./txfilter/testdata/suspicious_txfilter-v2.so ./txfilter/plugindummy/main.go
+	@echo "Plugin for testing built successfully."
+	@echo "Sign the plugin..."
+	@COSIGN_PASSWORD="" cosign sign-blob --key ./txfilter/testdata/cosign-test.key --bundle ./txfilter/testdata/suspicious_txfilter-v1.so.bundle ./txfilter/testdata/suspicious_txfilter-v1.so
+	@COSIGN_PASSWORD="" cosign sign-blob --key ./txfilter/testdata/cosign-test.key --bundle ./txfilter/testdata/suspicious_txfilter-v2.so.bundle ./txfilter/testdata/suspicious_txfilter-v2.so
+	@echo "Plugin signed successfully."
+	@echo "Create plugin metadata..."
+	@go run txfilter/cmd/createmeta/metadata_creator.go ./txfilter/testdata/suspicious_txfilter-v1.so.bundle ./txfilter/testdata/cosign-test.pub ./txfilter/testdata/suspicious_txfilter-v1.json 1.0.0
+	@go run txfilter/cmd/createmeta/metadata_creator.go ./txfilter/testdata/suspicious_txfilter-v2.so.bundle ./txfilter/testdata/cosign-test.pub ./txfilter/testdata/suspicious_txfilter-v2.json 2.0.0
+	@echo "Plugin metadata created successfully."
+	@echo "Delete the bundle files..."
+	@rm ./txfilter/testdata/suspicious_txfilter-v1.so.bundle
+	@rm ./txfilter/testdata/suspicious_txfilter-v2.so.bundle
+
 #? faucet: Build faucet
 faucet:
 	$(GORUN) build/ci.go install ./cmd/faucet

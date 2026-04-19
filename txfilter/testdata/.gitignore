@@ -1,0 +1,4 @@
+*
+!.gitignore
+!cosign-test.key
+!cosign-test.pub

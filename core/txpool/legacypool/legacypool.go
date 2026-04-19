@@ -174,7 +174,10 @@ var DefaultConfig = Config{
 	GlobalQueue:       4000,
 	OverflowPoolSlots: 0,
 
-	Lifetime:       10 * time.Minute,
+	// Set the default to true. This change disables local tx tracking.
+	// Tx tracker will resubmit filtered suspicious txs to the pool. <- we want to stop this
+	NoLocals:       true,
+	Lifetime:       3 * time.Minute, // Reduce the default 10 minutes to evict suspicious txs from the pool.
 	ReannounceTime: 10 * 365 * 24 * time.Hour,
 }
 
@@ -399,6 +402,17 @@ func (pool *LegacyPool) loop() {
 						pool.removeTx(tx.Hash(), true, true)
 					}
 					queuedEvictionMeter.Mark(int64(len(list)))
+				}
+			}
+			// Evict pending transactions by transaction timestamp to avoid suspicious txs remaining in the pool.
+			for addr := range pool.pending {
+				list := pool.pending[addr].Flatten()
+				for _, tx := range list {
+					if time.Since(tx.Time()) > pool.config.Lifetime {
+						if count := pool.removeTx(tx.Hash(), true, true); count > 0 {
+							log.Debug("Evicted pending transactions", "hash", tx.Hash(), "count", count, "txtime", tx.Time().Unix())
+						}
+					}
 				}
 			}
 			pool.mu.Unlock()
@@ -663,6 +677,9 @@ func (pool *LegacyPool) validateTx(tx *types.Transaction) error {
 		},
 	}
 	if err := txpool.ValidateTransactionWithState(tx, pool.signer, opts); err != nil {
+		return err
+	}
+	if err := txpool.ValidateTransactionWithOasysState(tx, pool.signer, pool.chainconfig, pool.currentState); err != nil {
 		return err
 	}
 	return pool.validateAuth(tx)

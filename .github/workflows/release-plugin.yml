@@ -1,0 +1,123 @@
+name: Release plugin
+
+on:
+  push:
+    tags:
+      - "plugin-v*"
+
+jobs:
+  build-and-sign:
+    name: Build and sign (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Compute plugin version
+        id: plugin-version
+        run: echo "value=${GITHUB_REF_NAME#plugin-v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build plugin
+        uses: docker/bake-action@v6
+        env:
+          GIT_COMMIT: ${{ github.sha }}
+          GIT_VERSION: ${{ github.ref_name }}
+          PLUGIN_VERSION: ${{ steps.plugin-version.outputs.value }}
+        with:
+          files: docker-bake.hcl
+          targets: plugin-binaries
+          set: |
+            *.cache-from=type=gha,scope=plugin-${{ matrix.arch }}
+            *.cache-to=type=gha,scope=plugin-${{ matrix.arch }},mode=max
+            plugin-binaries.output=type=local,dest=./binaries
+
+      - name: Read build fingerprint
+        id: fingerprint
+        run: echo "value=$(cat binaries/build_fingerprint.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign plugin
+        run: |
+          cosign sign-blob --yes --new-bundle-format \
+            --bundle binaries/suspicious_txfilter.so.bundle \
+            binaries/suspicious_txfilter.so
+
+      - name: Create plugin metadata
+        run: |
+          go run txfilter/cmd/createmeta/metadata_creator.go \
+            binaries/suspicious_txfilter.so.bundle \
+            - \
+            binaries/suspicious_txfilter.json \
+            "${{ steps.plugin-version.outputs.value }}" \
+            "https://github.com/${{ github.repository }}/.github/workflows/release-plugin.yml@refs/tags/${{ github.ref_name }}" \
+            "https://token.actions.githubusercontent.com"
+
+      # Create zip with CDN directory structure:
+      #   linux/{arch}/{fingerprint}/suspicious_txfilter.{so,so.bundle,json}
+      - name: Compress plugin binaries
+        run: |
+          fp="${{ steps.fingerprint.outputs.value }}"
+          dir="linux/${{ matrix.arch }}/${fp}"
+          mkdir -p "${dir}"
+          cp binaries/suspicious_txfilter.so "${dir}/"
+          cp binaries/suspicious_txfilter.so.bundle "${dir}/"
+          cp binaries/suspicious_txfilter.json "${dir}/"
+          zip -qr suspicious_txfilter-${{ github.ref_name }}-linux-${{ matrix.arch }}.zip linux/
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.ref_name }}-${{ matrix.arch }}
+          path: suspicious_txfilter-*.zip
+
+  release:
+    name: Release
+    needs: build-and-sign
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: "${{ github.ref_name }}-*"
+          merge-multiple: true
+
+      - name: Create sha256sums.txt
+        run: (cd artifacts && sha256sum *) > sha256sums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          draft: true
+          files: |
+            artifacts/*
+            sha256sums.txt

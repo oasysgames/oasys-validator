@@ -230,6 +230,9 @@ type worker struct {
 	// payload in proof-of-stake stage.
 	recommit time.Duration
 
+	// datadir is the directory to store the suspicious tx filter plugin.
+	txfilterDatadir string
+
 	// Test hooks
 	newTaskHook       func(*task)                        // Method to call upon receiving a new sealing task.
 	skipSealHook      func(*task) bool                   // Method to decide whether skipping the sealing.
@@ -238,7 +241,7 @@ type worker struct {
 	recentMinedBlocks *lru.Cache[uint64, []common.Hash]
 }
 
-func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend, mux *event.TypeMux, init bool) *worker {
+func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend, mux *event.TypeMux, init bool, datadir string) *worker {
 	chainConfig := eth.BlockChain().Config()
 	worker := &worker{
 		prefetcher:         core.NewStatePrefetcher(chainConfig, eth.BlockChain().HeadChain()),
@@ -261,6 +264,7 @@ func newWorker(config *minerconfig.Config, engine consensus.Engine, eth Backend,
 		exitCh:             make(chan struct{}),
 		resubmitIntervalCh: make(chan time.Duration),
 		recentMinedBlocks:  lru.NewCache[uint64, []common.Hash](recentMinedCacheLimit),
+		txfilterDatadir:    datadir,
 	}
 	// Subscribe events for blockchain
 	worker.chainHeadSub = eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)
@@ -358,6 +362,18 @@ func (w *worker) pending() (*types.Block, types.Receipts, *state.StateDB) {
 
 // start sets the running status as 1 and triggers new work submitting.
 func (w *worker) start() {
+	// Create suspicious tx filter before starting the worker to ensure
+	// transactions are filtered from the very first block.
+	if !w.config.DisableSuspiciousTxFilter && core.SuspiciousTxfilterGlobal == nil {
+		var err error
+		if core.SuspiciousTxfilterGlobal, err = core.NewSuspiciousTxfilter(w.chainConfig, w.txfilterDatadir, w.exitCh); err != nil {
+			// Stop execution here to avoid miner running without suspicious tx filter.
+			log.Crit("Failed to create suspicious tx filter", "err", err)
+		} else {
+			log.Info("Created suspicious tx filter", "datadir", w.txfilterDatadir)
+		}
+	}
+
 	w.running.Store(true)
 	w.startCh <- struct{}{}
 }
@@ -700,9 +716,22 @@ func (w *worker) updateSnapshot(env *environment) {
 
 func (w *worker) commitTransaction(env *environment, tx *types.Transaction, receiptProcessors ...core.ReceiptProcessor) ([]*types.Log, error) {
 	if tx.Type() == types.BlobTxType {
+		// Fail if all transactions are blocked and value is not zero or data is not empty.
+		if w.chainConfig.Oasys != nil && vm.IsBlockedAll(env.state) {
+			if tx.Value().Sign() != 0 || len(tx.Data()) > 0 {
+				return nil, fmt.Errorf("%w: only transactions with zero value and empty tx data are allowed for blob-type transactions. value: %v, data: %v", vm.ErrAllTransactionBlocked, tx.Value(), tx.Data())
+			}
+		}
 		return w.commitBlobTransaction(env, tx, receiptProcessors...)
 	}
 
+	// Fail if all transactions are blocked
+	if w.chainConfig.Oasys != nil && vm.IsBlockedAll(env.state) {
+		// Bypass the blocked check for the transaction to the transaction blocker contract
+		if tx.To() == nil || tx.To().Cmp(vm.TransactionBlockerContract) != 0 {
+			return nil, vm.ErrAllTransactionBlocked
+		}
+	}
 	receipt, err := w.applyTransaction(env, tx, receiptProcessors...)
 	if err != nil {
 		return nil, err

@@ -83,6 +83,9 @@ const (
 	// limboedTransactionStore is the subfolder containing the currently included
 	// but not yet finalized transaction blobs.
 	limboedTransactionStore = "limbo"
+
+	// lifetime is the maximum amount of time a transaction can be in the pool.
+	lifetime = 3 * time.Minute
 )
 
 // blobTxMeta is the minimal subset of types.BlobTx necessary to validate and
@@ -111,6 +114,8 @@ type blobTxMeta struct {
 	evictionExecTip      *uint256.Int // Worst gas tip across all previous nonces
 	evictionExecFeeJumps float64      // Worst base fee (converted to fee jumps) across all previous nonces
 	evictionBlobFeeJumps float64      // Worse blob fee (converted to fee jumps) across all previous nonces
+
+	txtime int64 // Unix timestamp of transaction
 }
 
 // newBlobTxMeta retrieves the indexed metadata fields from a blob transaction
@@ -129,6 +134,7 @@ func newBlobTxMeta(id uint64, size uint64, storageSize uint32, tx *types.Transac
 		blobFeeCap:  uint256.MustFromBig(tx.BlobGasFeeCap()),
 		execGas:     tx.Gas(),
 		blobGas:     tx.BlobGas(),
+		txtime:      tx.Time().Unix(),
 	}
 	meta.basefeeJumps = dynamicFeeJumps(meta.execFeeCap)
 	meta.blobfeeJumps = dynamicFeeJumps(meta.blobFeeCap)
@@ -1187,6 +1193,9 @@ func (p *BlobPool) validateTx(tx *types.Transaction) error {
 	if err := txpool.ValidateTransactionWithState(tx, p.signer, stateOpts); err != nil {
 		return err
 	}
+	if err := txpool.ValidateTransactionWithOasysState(tx, p.signer, p.chain.Config(), p.state); err != nil {
+		return err
+	}
 	if err := p.checkDelegationLimit(tx); err != nil {
 		return err
 	}
@@ -1538,6 +1547,9 @@ func (p *BlobPool) add(tx *types.Transaction) (err error) {
 	}
 	p.updateStorageMetrics()
 
+	// Drop old transactions by lifetime to avoid suspicious txs remaining in the pool.
+	p.dropByLifetime()
+
 	addValidMeter.Mark(1)
 	return nil
 }
@@ -1593,6 +1605,46 @@ func (p *BlobPool) drop() {
 
 	if err := p.store.Delete(drop.id); err != nil {
 		log.Error("Failed to drop evicted transaction", "id", drop.id, "err", err)
+	}
+}
+
+// dropByLifetime drops transactions by lifetime from the pool.
+func (p *BlobPool) dropByLifetime() {
+	deletingAccounts := []common.Address{}
+	for from, txs := range p.index {
+		dropStartIndex := len(txs)
+		for i := 0; i < len(txs); i++ {
+			// check if the tx is expired
+			// if yes, set the dropStartIndex to drop all the higher nonces's tx (p.index is sorted by nonce)
+			if dropStartIndex > i && time.Now().Unix()-txs[i].txtime > int64(lifetime.Seconds()) {
+				dropStartIndex = i
+			}
+			if dropStartIndex <= i {
+				p.lookup.untrack(txs[i])
+				p.stored -= uint64(txs[i].storageSize)
+				p.spent[from] = new(uint256.Int).Sub(p.spent[from], txs[i].costCap)
+				if err := p.store.Delete(txs[i].id); err != nil {
+					log.Error("Failed to drop evicted transaction", "id", txs[i].id, "err", err)
+				}
+			}
+		}
+		if dropStartIndex == 0 {
+			// if dropStartIndex is 0, it means all the txs are expired, delete the account
+			deletingAccounts = append(deletingAccounts, from)
+		} else if dropStartIndex < len(txs) {
+			// partially dropped: truncate index and fix eviction heap
+			for i := dropStartIndex; i < len(txs); i++ {
+				txs[i] = nil
+			}
+			p.index[from] = txs[:dropStartIndex]
+			heap.Fix(p.evict, p.evict.index[from])
+		}
+	}
+	for _, addr := range deletingAccounts {
+		heap.Remove(p.evict, p.evict.index[addr])
+		delete(p.index, addr)
+		delete(p.spent, addr)
+		p.reserver.Release(addr)
 	}
 }
 
