@@ -11,15 +11,14 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"path/filepath"
 	"plugin"
 	"runtime"
-	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/log"
+	txfilterlog "github.com/ethereum/go-ethereum/txfilter/log"
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	sigverify "github.com/sigstore/sigstore-go/pkg/verify"
@@ -41,8 +40,9 @@ const (
 	// The suspicious txfilter plugin metadata file name
 	PluginMetadataFileName = "suspicious_txfilter.json"
 
-	// Exported symbol name in the plugin .so.
-	pluginSymbolName = "Plugin"
+	// Exported symbol names in the plugin .so.
+	pluginSymbolName           = "Plugin"
+	pluginBuildFingerprintName = "BuildFingerprint"
 )
 
 var (
@@ -53,6 +53,10 @@ var (
 	// multiple layers and changing many interfaces. Modifying those interfaces
 	// would significantly increase the merge conflict effort.
 	SuspiciousTxfilterGlobal *SuspiciousTxfilter
+
+	// pluginBuildFingerprint is set by -ldflags in build/ci.go doInstall().
+	// It is compared against the plugin's BuildFingerprint to verify build compatibility.
+	pluginBuildFingerprint string
 )
 
 // SuspiciousTxfilterPlugin is the interface that a loaded plugin must implement.
@@ -62,7 +66,7 @@ type SuspiciousTxfilterPlugin interface {
 	// Clear drops runtime state so the host can load a new plugin instance; called before plugin reload.
 	Clear() error
 	// FilterTransaction decides whether to block the transaction.
-	FilterTransaction(txhash common.Hash, from, to common.Address, value [32]byte, logs []types.Log) (isBlocked bool, reason string, err error)
+	FilterTransaction(txhash common.Hash, from, to common.Address, value [32]byte, logs []txfilterlog.Log) (isBlocked bool, reason string, err error)
 }
 
 type SuspiciousTxfilterPluginMetadata struct {
@@ -99,9 +103,12 @@ func NewSuspiciousTxfilter(config *params.ChainConfig, datadir string, exitCh ch
 		client:  &http.Client{Timeout: 30 * time.Second},
 	}
 
+	log.Info("Fetching suspicious txfilter plugin metadata", "url", s.pluginMetadataDownloadURL())
 	if _, err := s.fetchPluginMetadata(); err != nil {
 		return nil, fmt.Errorf("failed to download plugin metadata: %w", err)
 	}
+	log.Info("Suspicious txfilter plugin metadata loaded",
+		"version", s.metadata.Load().Version, "disable", s.metadata.Load().Disable)
 
 	// Do background loading of the plugin
 	go func() {
@@ -132,7 +139,30 @@ func (s *SuspiciousTxfilter) IsReady() bool {
 	return true
 }
 
-func (s *SuspiciousTxfilter) VerifyPluginVersion(p *plugin.Plugin) error {
+// verifyPluginBuild checks that the plugin was built with the same go.mod,
+// go.sum, Go version, and target OS/ARCH as the main binary.
+func verifyPluginBuild(p *plugin.Plugin) error {
+	if pluginBuildFingerprint == "" {
+		return nil // development build without fingerprint
+	}
+	sym, err := p.Lookup(pluginBuildFingerprintName)
+	if err != nil {
+		log.Warn("Plugin does not export BuildFingerprint, skipping build compatibility check")
+		return nil
+	}
+	pluginFP, ok := sym.(*string)
+	if !ok {
+		return fmt.Errorf("plugin BuildFingerprint has unexpected type: %T", sym)
+	}
+	if *pluginFP != pluginBuildFingerprint {
+		return fmt.Errorf("build fingerprint mismatch: host=%s plugin=%s (rebuild plugin with the same go.sum and Go version)", pluginBuildFingerprint, *pluginFP)
+	}
+	return nil
+}
+
+// verifyPluginVersion checks that the loaded plugin's version matches
+// the version declared in the metadata downloaded from the CDN.
+func (s *SuspiciousTxfilter) verifyPluginVersion(p *plugin.Plugin) error {
 	metadata := s.metadata.Load()
 	if metadata == nil || metadata.Version == "" {
 		return fmt.Errorf("plugin metadata not found")
@@ -168,7 +198,7 @@ func (s *SuspiciousTxfilter) FilterTransaction(txhash common.Hash, msg *Message,
 	var (
 		from, to   common.Address
 		value      [32]byte
-		copiedLogs = make([]types.Log, len(logs))
+		copiedLogs = make([]txfilterlog.Log, len(logs))
 	)
 	from = msg.From
 	if msg.To != nil {
@@ -190,6 +220,7 @@ func (s *SuspiciousTxfilter) FilterTransaction(txhash common.Hash, msg *Message,
 
 func (s *SuspiciousTxfilter) fetchPlugin() error {
 	url := s.pluginDownloadURL()
+	log.Info("Downloading suspicious txfilter plugin", "url", url)
 	body, err := s.fetch(url)
 	if err != nil {
 		return fmt.Errorf("failed to download plugin: %w", err)
@@ -279,7 +310,10 @@ func (s *SuspiciousTxfilter) startReloadLoop(reloadInterval time.Duration) {
 }
 
 func (s *SuspiciousTxfilter) loadPlugin() error {
-	bundleData, err := hex.DecodeString(s.metadata.Load().BundleHex)
+	pluginPath := s.pluginPath()
+	metadata := s.metadata.Load()
+
+	bundleData, err := hex.DecodeString(metadata.BundleHex)
 	if err != nil {
 		return fmt.Errorf("failed to decode bundle hex: %w", err)
 	}
@@ -289,25 +323,33 @@ func (s *SuspiciousTxfilter) loadPlugin() error {
 		return fmt.Errorf("failed to unmarshal bundle: %w", err)
 	}
 
-	metadata := s.metadata.Load()
-
 	// It's ok to update the verifier every time, as loading new plugin is not frequent.
 	if err = s.updateVerifier(metadata); err != nil {
 		return err
 	}
 
-	if err = s.verifyPlugin(bundle, metadata); err != nil {
+	log.Info("Verifying plugin integrity", "path", pluginPath)
+	if err = s.verifyPluginIntegrity(bundle, metadata); err != nil {
 		return err
 	}
 
-	newPlugin, err := plugin.Open(s.pluginPath())
+	log.Info("Opening plugin", "path", pluginPath)
+	newPlugin, err := plugin.Open(pluginPath)
 	if err != nil {
 		return fmt.Errorf("failed to open plugin: %w", err)
 	}
 
-	if err = s.VerifyPluginVersion(newPlugin); err != nil {
+	log.Info("Verifying plugin build compatibility")
+	if err = verifyPluginBuild(newPlugin); err != nil {
+		return fmt.Errorf("failed to verify plugin build compatibility: %w", err)
+	}
+
+	log.Info("Verifying plugin version", "expected", metadata.Version)
+	if err = s.verifyPluginVersion(newPlugin); err != nil {
 		return fmt.Errorf("failed to verify plugin version: %w", err)
 	}
+
+	log.Info("Plugin loaded successfully", "version", metadata.Version)
 
 	oldPlugin := s.plugin.Load()
 
@@ -367,7 +409,9 @@ func (s *SuspiciousTxfilter) updateVerifier(metadata *SuspiciousTxfilterPluginMe
 	return nil
 }
 
-func (s *SuspiciousTxfilter) verifyPlugin(bundle bundle.Bundle, metadata *SuspiciousTxfilterPluginMetadata) error {
+// verifyPluginIntegrity verifies that the plugin .so file has not been tampered
+// with by checking its Cosign signature bundle against the expected identity.
+func (s *SuspiciousTxfilter) verifyPluginIntegrity(bundle bundle.Bundle, metadata *SuspiciousTxfilterPluginMetadata) error {
 	if s.verifier == nil {
 		return fmt.Errorf("verifier not initialized")
 	}
@@ -438,17 +482,13 @@ func (s *SuspiciousTxfilter) pluginPath() string {
 func (s *SuspiciousTxfilter) buildPluginURL(filename string) string {
 	// For mainnet and testnet
 	if s.config.ChainID.Cmp(params.OasysMainnetChainConfig.ChainID) == 0 || s.config.ChainID.Cmp(params.OasysTestnetChainConfig.ChainID) == 0 {
-		var (
-			fileExt  = filepath.Ext(filename)                // e.g., ".so" or ".json"
-			fileName = strings.TrimSuffix(filename, fileExt) // e.g., "suspicious_txfilter"
-			network  = "mainnet"
-			osName   = runtime.GOOS
-			osArch   = runtime.GOARCH
-		)
+		network := "mainnet"
 		if s.config.ChainID.Cmp(params.OasysTestnetChainConfig.ChainID) == 0 {
 			network = "testnet"
 		}
-		return fmt.Sprintf("https://cdn.%s.oasys.games/suspicious_txfilter/%s_%s_%s%s", network, fileName, osName, osArch, fileExt)
+		// URL: /suspicious_txfilter/{os}/{arch}/{fingerprint}/{filename}
+		return fmt.Sprintf("https://cdn.%s.oasys.games/suspicious_txfilter/%s/%s/%s/%s",
+			network, runtime.GOOS, runtime.GOARCH, pluginBuildFingerprint, filename)
 	}
 
 	// For testing

@@ -28,8 +28,9 @@ Available commands are:
 	check_generate -- verifies that 'go generate' and 'go mod tidy' do not produce changes
 	check_baddeps  -- verifies that certain dependencies are avoided
 
-	install    [ -arch architecture ] [ -cc compiler ] [ packages... ] -- builds packages and executables
-	test       [ -coverage ] [ packages... ]                           -- runs the tests
+	install    [ -arch architecture ] [ -cc compiler ] [ packages... ]                        -- builds packages and executables
+	plugin     [ -arch architecture ] [ -cc compiler ] [ -o output ] [ -version ver ] [ -blocked ] -- builds the suspicious txfilter plugin
+	test       [ -coverage ] [ packages... ]                                                 -- runs the tests
 
 	archive    [ -arch architecture ] [ -type zip|tar ] [ -signer key-envvar ] [ -signify key-envvar ] [ -upload dest ] -- archives build artifacts
 	importkeys                                                                                  -- imports signing keys from env
@@ -43,7 +44,9 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"log"
@@ -156,6 +159,8 @@ func main() {
 	switch os.Args[1] {
 	case "install":
 		doInstall(os.Args[2:])
+	case "plugin":
+		doPlugin(os.Args[2:])
 	case "test":
 		doTest(os.Args[2:])
 	case "lint":
@@ -192,24 +197,15 @@ func doInstall(cmdline []string) {
 		output     = flag.String("o", "", "Output directory for build artifacts")
 	)
 	flag.CommandLine.Parse(cmdline)
-	env := build.Env()
 
-	// Configure the toolchain.
-	tc := build.GoToolchain{GOARCH: *arch, CC: *cc}
-	if *dlgo {
-		csdb := download.MustLoadChecksums("build/checksums.txt")
-		tc.Root = build.DownloadGo(csdb)
-	}
-	// Disable CLI markdown doc generation in release builds.
-	buildTags := []string{"urfave_cli_no_docs"}
+	env, tc, buildTags := buildEnvAndToolchain(*dlgo, *arch, *cc)
 
-	// Enable linking the CKZG library since we can make it work with additional flags.
-	if env.UbuntuVersion != "trusty" {
-		buildTags = append(buildTags, "ckzg")
-	}
+	// Compute ABI fingerprint and embed in main binary for plugin compatibility check.
+	fingerprint := computePluginBuildFingerprint(tc, buildTags)
 
 	// Configure the build.
-	gobuild := tc.Go("build", buildFlags(env, *staticlink, buildTags)...)
+	gobuild := tc.Go("build", buildFlags(env, *staticlink, buildTags,
+		"-X", "github.com/ethereum/go-ethereum/core.pluginBuildFingerprint="+fingerprint)...)
 
 	// We use -trimpath to avoid leaking local paths into the built executables.
 	gobuild.Args = append(gobuild.Args, "-trimpath")
@@ -237,8 +233,61 @@ func doInstall(cmdline []string) {
 	}
 }
 
+func doPlugin(cmdline []string) {
+	var (
+		dlgo    = flag.Bool("dlgo", false, "Download Go and build with it")
+		arch    = flag.String("arch", "", "Architecture to cross build for")
+		cc      = flag.String("cc", "", "C compiler to cross build with")
+		output  = flag.String("o", "", "Output path for plugin binary")
+		pver    = flag.String("version", "", "Plugin version to embed")
+		blocked = flag.Bool("blocked", false, "Set blockedByPlugin=true (for testing)")
+	)
+	flag.CommandLine.Parse(cmdline)
+
+	// Same toolchain setup and base tags as doInstall.
+	_, tc, buildTags := buildEnvAndToolchain(*dlgo, *arch, *cc)
+
+	// Compute build fingerprint (same base tags as doInstall).
+	fingerprint := computePluginBuildFingerprint(tc, buildTags)
+
+	// Build ldflags.
+	var ld []string
+	ld = append(ld, "-X", "main.BuildFingerprint="+fingerprint)
+	if *pver != "" {
+		ld = append(ld, "-X", "main.version="+*pver)
+	}
+	if *blocked {
+		ld = append(ld, "-X", "main.blockedByPlugin=true")
+	}
+
+	var flags []string
+	flags = append(flags, "-ldflags", strings.Join(ld, " "))
+	flags = append(flags, "-tags", strings.Join(buildTags, ","))
+
+	gobuild := tc.Go("build", flags...)
+	gobuild.Args = append(gobuild.Args, "-buildmode=plugin", "-trimpath", "-v")
+
+	outputPath := executablePath("suspicious_txfilter.so")
+	if *output != "" {
+		outputPath = *output
+	}
+	gobuild.Args = append(gobuild.Args, "-o", outputPath)
+	gobuild.Args = append(gobuild.Args, "txfilter/plugindummy/main.go")
+
+	fmt.Println("Building suspicious txfilter plugin...")
+	build.MustRun(&exec.Cmd{Path: gobuild.Path, Args: gobuild.Args, Env: gobuild.Env})
+
+	// Write fingerprint to a sidecar file so CI can use it for CDN directory structure.
+	fpPath := filepath.Join(filepath.Dir(outputPath), "build_fingerprint.txt")
+	if err := os.WriteFile(fpPath, []byte(fingerprint), 0644); err != nil {
+		log.Fatal("failed to write fingerprint file: ", err)
+	}
+	fmt.Println("Build fingerprint:", fingerprint)
+}
+
 // buildFlags returns the go tool flags for building.
-func buildFlags(env build.Environment, staticLinking bool, buildTags []string) (flags []string) {
+// extraLDFlags are appended to the linker flags (e.g., "-X", "pkg.var=value" pairs).
+func buildFlags(env build.Environment, staticLinking bool, buildTags []string, extraLDFlags ...string) (flags []string) {
 	var ld []string
 	// See https://github.com/golang/go/issues/33772#issuecomment-528176001
 	// We need to set --buildid to the linker here, and also pass --build-id to the
@@ -269,6 +318,7 @@ func buildFlags(env build.Environment, staticLinking bool, buildTags []string) (
 		}
 		ld = append(ld, "-extldflags", "'"+strings.Join(extld, " ")+"'")
 	}
+	ld = append(ld, extraLDFlags...)
 	if len(ld) > 0 {
 		flags = append(flags, "-ldflags", strings.Join(ld, " "))
 	}
@@ -1185,4 +1235,74 @@ func doPurge(cmdline []string) {
 func doSanityCheck() {
 	csdb := download.MustLoadChecksums("build/checksums.txt")
 	csdb.DownloadAndVerifyAll()
+}
+
+// buildEnvAndToolchain returns the shared build environment, toolchain, and
+// base build tags. Both doInstall and doPlugin use this to ensure identical
+// configuration.
+func buildEnvAndToolchain(dlgo bool, arch, cc string) (build.Environment, build.GoToolchain, []string) {
+	env := build.Env()
+
+	tc := build.GoToolchain{GOARCH: arch, CC: cc}
+	if dlgo {
+		csdb := download.MustLoadChecksums("build/checksums.txt")
+		tc.Root = build.DownloadGo(csdb)
+	}
+
+	// Base build tags — shared between main binary and plugin.
+	// Disable CLI markdown doc generation in release builds.
+	buildTags := []string{"urfave_cli_no_docs"}
+	// Enable linking the CKZG library since we can make it work with additional flags.
+	if env.UbuntuVersion != "trusty" {
+		buildTags = append(buildTags, "ckzg")
+	}
+
+	return env, tc, buildTags
+}
+
+// computePluginBuildFingerprint computes a fingerprint from go.mod, go.sum,
+// Go toolchain version, base build tags, and target OS/ARCH. This is embedded
+// in both the main binary and the plugin to verify build compatibility at
+// plugin load time. Both doInstall and doPlugin must pass the same baseBuildTags
+// (the shared tags from buildEnvAndToolchain, before adding target-specific
+// tags like "purego" or "osusergo").
+func computePluginBuildFingerprint(tc build.GoToolchain, baseBuildTags []string) string {
+	h := sha256.New()
+
+	// go.mod (contains go directive and toolchain directive that affect build behavior)
+	goModData, err := os.ReadFile("go.mod")
+	if err != nil {
+		log.Fatal("failed to read go.mod for build fingerprint: ", err)
+	}
+	h.Write(goModData)
+
+	// go.sum (dependency content hashes)
+	goSumData, err := os.ReadFile("go.sum")
+	if err != nil {
+		log.Fatal("failed to read go.sum for build fingerprint: ", err)
+	}
+	h.Write(goSumData)
+
+	// Go toolchain version (from the actual toolchain, not the build script's runtime)
+	goVersionCmd := tc.Go("version")
+	goVersionOut, err := goVersionCmd.Output()
+	if err != nil {
+		log.Fatal("failed to get Go version for build fingerprint: ", err)
+	}
+	h.Write(bytes.TrimSpace(goVersionOut))
+
+	// Base build tags (shared between main binary and plugin)
+	h.Write([]byte(strings.Join(baseBuildTags, ",")))
+
+	// Target OS/ARCH
+	targetOS, targetArch := runtime.GOOS, runtime.GOARCH
+	if tc.GOOS != "" {
+		targetOS = tc.GOOS
+	}
+	if tc.GOARCH != "" {
+		targetArch = tc.GOARCH
+	}
+	h.Write([]byte(targetOS + "/" + targetArch))
+
+	return hex.EncodeToString(h.Sum(nil))[:16]
 }
