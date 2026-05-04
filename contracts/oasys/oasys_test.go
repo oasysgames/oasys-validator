@@ -1216,7 +1216,7 @@ func _deployments15(genesisHash common.Hash, contracts wantContracts) {
 	case params.OasysMainnetGenesisHash:
 		appends["0x520000000000000000000000000000000000004F"].storage = map[string]string{
 			"0x0bce92cc78449169524412e83bbfd32ee216dec5bba171ae073372f5ed4cecef": "0x0000000000000000000000000000000000000000000000000000000000000001",
-			"0x9d45e49a732f60a178c294b56c93b9ad5c903d62acc0d9d7d7efc850a5d71054": "0x0000000000000000000000000000000000000000000000000000000000000001",
+			"0xdce56cbff965e05b132d17e754ee948acfe7cb8c82d09d6bb12aff98b35702a0": "0x0000000000000000000000000000000000000000000000000000000000000001",
 		}
 		// DeterministicDeploymentProxy
 		appends["0x4e59b44847b379578588920ca78fbf26c0b4956c"] = &wantContract{
@@ -1225,7 +1225,7 @@ func _deployments15(genesisHash common.Hash, contracts wantContracts) {
 		}
 	case params.OasysTestnetGenesisHash:
 		appends["0x520000000000000000000000000000000000004F"].storage = map[string]string{
-			"0x8544f4d9501cd2ef57e66ff394f96f2a0b39125d6cdb5f1740571be3740295b6": "0x0000000000000000000000000000000000000000000000000000000000000001",
+			"0x76f845cfb706db1029035d237e233553e1b85dc6448cf8d3604db62bafdca07c": "0x0000000000000000000000000000000000000000000000000000000000000001",
 			"0x9deaf035b302af9e8d3ffb94ff3cf77718c97fca1cafc9835e08481dd6411eb5": "0x0000000000000000000000000000000000000000000000000000000000000001",
 		}
 	default:
@@ -1279,7 +1279,7 @@ func TestDeploy(t *testing.T) {
 				{blockNumber: 5527429, deploy: []deployFn{_deployments13}},
 				{blockNumber: 8728540 - 1, blockTime: 1753761660, deploy: []deployFn{_deployEIP2935}},
 				{blockNumber: 8728540, deploy: []deployFn{_deployments14}},
-				{blockNumber: 90000000, deploy: []deployFn{_deployments15}},
+				{blockNumber: 12970330, deploy: []deployFn{_deployments15}},
 			},
 		},
 		{
@@ -1302,7 +1302,7 @@ func TestDeploy(t *testing.T) {
 				{blockNumber: 5445775, deploy: []deployFn{_deployments13}},
 				{blockNumber: 8496170 - 1, blockTime: 1751590860, deploy: []deployFn{_deployEIP2935}},
 				{blockNumber: 8496170, deploy: []deployFn{_deployments14}},
-				{blockNumber: 90000000, deploy: []deployFn{_deployments15}},
+				{blockNumber: 12729520, deploy: []deployFn{_deployments15}},
 			},
 		},
 		{
