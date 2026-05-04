@@ -16,6 +16,12 @@ variable "GIT_VERSION" {
   default = "v0.0.0"
 }
 
+// Plugin version without tag prefix (e.g. "1.8.4" or "1.0.0").
+// Set by the workflow after stripping "v" or "plugin-v" prefix.
+variable "PLUGIN_VERSION" {
+  default = "1.0.0"
+}
+
 variable "IMAGE_TAGS" {
   default = "${GIT_COMMIT}" // split by ","
 }
@@ -38,6 +44,7 @@ target "geth" {
   args = {
     COMMIT = "${GIT_COMMIT}"
     VERSION = "${GIT_VERSION}"
+    PLUGIN_VERSION = "${PLUGIN_VERSION}"
   }
   platforms = split(",", PLATFORMS)
   tags = [for tag in split(",", IMAGE_TAGS) : "${REGISTRY}/${REPOSITORY}:${tag}"]
@@ -48,7 +55,21 @@ target "binaries" {
   target = "binaries"
   context = "."
   args = {
+    COMMIT = "${GIT_COMMIT}"
     VERSION = "${GIT_VERSION}"
+    PLUGIN_VERSION = "${PLUGIN_VERSION}"
+  }
+  platforms = split(",", PLATFORMS)
+}
+
+target "plugin-binaries" {
+  dockerfile = "Dockerfile"
+  target = "plugin-binaries"
+  context = "."
+  args = {
+    COMMIT = "${GIT_COMMIT}"
+    VERSION = "${GIT_VERSION}"
+    PLUGIN_VERSION = "${PLUGIN_VERSION}"
   }
   platforms = split(",", PLATFORMS)
 }

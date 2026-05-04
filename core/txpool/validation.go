@@ -174,8 +174,13 @@ func ValidateTransactionWithOasysState(tx *types.Transaction, signer types.Signe
 	}
 	// Make sure the sender is allowed to create contract.
 	// Create2 built-in deployment proxy is only allowed to call by the allowed addresses.
-	if (tx.To() == nil || tx.To().Cmp(oasys.DeterministicDeploymentProxy) == 0) && !vm.IsAllowedToCreate(state, sender) {
-		return fmt.Errorf("%w: the sender is not allowed to create contract. Please contact the Oasys team. sender: %s", vm.ErrUnauthorizedCreate, sender.Hex())
+	if !vm.IsAllowedToCreate(state, sender) {
+		if tx.To() == nil {
+			return fmt.Errorf("%w: the sender is not allowed to create contract. Please contact the Oasys team. sender: %s", vm.ErrUnauthorizedCreate, sender.Hex())
+		}
+		if tx.To().Cmp(oasys.DeterministicDeploymentProxy) == 0 && state.GetCodeSize(oasys.DeterministicDeploymentProxy) > 0 {
+			return fmt.Errorf("%w: the sender is not allowed to create contract. Please contact the Oasys team. sender: %s", vm.ErrUnauthorizedCreate, sender.Hex())
+		}
 	}
 	// Make sure the sender is not blocked.
 	if vm.IsBlockedAddress(state, sender) {

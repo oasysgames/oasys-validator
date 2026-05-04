@@ -201,7 +201,7 @@ func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, g
 			return nil, 0, ErrAddressBlocked
 		}
 		// Check if the caller is allowed to create contract via the Deterministic Deployment Proxy (create2).
-		if addr.Cmp(oasys.DeterministicDeploymentProxy) == 0 && !IsAllowedToCreate(evm.StateDB, caller) {
+		if addr.Cmp(oasys.DeterministicDeploymentProxy) == 0 && evm.StateDB.GetCodeSize(addr) > 0 && !IsAllowedToCreate(evm.StateDB, caller) {
 			return nil, 0, ErrUnauthorizedCreate
 		}
 	}
@@ -348,7 +348,7 @@ func (evm *EVM) DelegateCall(originCaller common.Address, caller common.Address,
 	// Block unauthorized deployments via delegatecall to the Deterministic Deployment Proxy (create2).
 	readOnly := evm.Config.NoBaseFee
 	if !readOnly && evm.chainConfig.Oasys != nil {
-		if addr.Cmp(oasys.DeterministicDeploymentProxy) == 0 && !IsAllowedToCreate(evm.StateDB, caller) {
+		if addr.Cmp(oasys.DeterministicDeploymentProxy) == 0 && evm.StateDB.GetCodeSize(addr) > 0 && !IsAllowedToCreate(evm.StateDB, caller) {
 			return nil, 0, ErrUnauthorizedCreate
 		}
 	}

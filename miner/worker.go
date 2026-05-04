@@ -319,10 +319,8 @@ func (w *worker) setPrioAddresses(prio []common.Address) {
 
 // start sets the running status as 1 and triggers new work submitting.
 func (w *worker) start() {
-	w.running.Store(true)
-	w.startCh <- struct{}{}
-
-	// Create suspicious tx filter if not disabled and not already created.
+	// Create suspicious tx filter before starting the worker to ensure
+	// transactions are filtered from the very first block.
 	if !w.config.DisableSuspiciousTxFilter && core.SuspiciousTxfilterGlobal == nil {
 		var err error
 		if core.SuspiciousTxfilterGlobal, err = core.NewSuspiciousTxfilter(w.chainConfig, w.txfilterDatadir, w.exitCh); err != nil {
@@ -332,6 +330,9 @@ func (w *worker) start() {
 			log.Info("Created suspicious tx filter", "datadir", w.txfilterDatadir)
 		}
 	}
+
+	w.running.Store(true)
+	w.startCh <- struct{}{}
 }
 
 // stop sets the running status as 0.
