@@ -17,6 +17,7 @@
 package params
 
 import (
+	"math"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -27,18 +28,20 @@ const (
 	MinGasLimit          uint64 = 5000               // Minimum the gas limit may ever be.
 	MaxGasLimit          uint64 = 0x7fffffffffffffff // Maximum the gas limit (2^63-1).
 	GenesisGasLimit      uint64 = 4712388            // Gas limit of the Genesis block.
+	MinTxGasLimitCap     uint64 = 1 << 24            // Minimum the transaction gas limit cap.
 
-	MaximumExtraDataSize  uint64 = 32    // Maximum size extra data may be after Genesis.
-	ExpByteGas            uint64 = 10    // Times ceil(log256(exponent)) for the EXP instruction.
-	SloadGas              uint64 = 50    // Multiplied by the number of 32-byte words that are copied (round up) for any *COPY operation and added.
-	CallValueTransferGas  uint64 = 9000  // Paid for CALL when the value transfer is non-zero.
-	CallNewAccountGas     uint64 = 25000 // Paid for CALL when the destination address didn't exist prior.
-	TxGas                 uint64 = 21000 // Per transaction not creating a contract. NOTE: Not payable on data of calls between transactions.
-	TxGasContractCreation uint64 = 53000 // Per transaction that creates a contract. NOTE: Not payable on data of calls between transactions.
-	TxDataZeroGas         uint64 = 4     // Per byte of data attached to a transaction that equals zero. NOTE: Not payable on data of calls between transactions.
-	QuadCoeffDiv          uint64 = 512   // Divisor for the quadratic particle of the memory cost equation.
-	LogDataGas            uint64 = 8     // Per byte in a LOG* operation's data.
-	CallStipend           uint64 = 2300  // Free gas given at beginning of call.
+	MaximumExtraDataSize  uint64 = 32      // Maximum size extra data may be after Genesis.
+	ExpByteGas            uint64 = 10      // Times ceil(log256(exponent)) for the EXP instruction.
+	SloadGas              uint64 = 50      // Multiplied by the number of 32-byte words that are copied (round up) for any *COPY operation and added.
+	CallValueTransferGas  uint64 = 9000    // Paid for CALL when the value transfer is non-zero.
+	CallNewAccountGas     uint64 = 25000   // Paid for CALL when the destination address didn't exist prior.
+	TxGas                 uint64 = 21000   // Per transaction not creating a contract. NOTE: Not payable on data of calls between transactions.
+	SystemTxsGasSoftLimit uint64 = 2000000 // Maximum gas reserved for system transactions, excluding slash transactions (Oasys consensus only: 1500000 > 43598[slash] * 45)
+	TxGasContractCreation uint64 = 53000   // Per transaction that creates a contract. NOTE: Not payable on data of calls between transactions.
+	TxDataZeroGas         uint64 = 4       // Per byte of data attached to a transaction that equals zero. NOTE: Not payable on data of calls between transactions.
+	QuadCoeffDiv          uint64 = 512     // Divisor for the quadratic particle of the memory cost equation.
+	LogDataGas            uint64 = 8       // Per byte in a LOG* operation's data.
+	CallStipend           uint64 = 2300    // Free gas given at beginning of call.
 
 	Keccak256Gas     uint64 = 30 // Once per KECCAK256 operation.
 	Keccak256WordGas uint64 = 6  // Once per word of the KECCAK256 operation's data.
@@ -181,20 +184,19 @@ const (
 
 	// after maxwell(0.75s) / before maxwell(3s) = 0.25
 	MaxwellBlockTimeReductionFactorForBSC = 0.25
+	// after fermi(0.45s) / before fermi(3s) = 0.15
+	FermiBlockTimeReductionFactorForBSC = 0.15
 
 	// The factor to adjust blob reserve period for Oasys.
-	// Oasys blocktime(6s) / BSC maxwellBlocktime(0.75s) = 8
-	divisionFactorForOasys = 8
+	// Oasys blocktime(6s) / BSC Fermi Blocktime(0.45s) = 13.333...
+	divisionFactorForOasys = 13.333
 )
 
 var (
-	// it keeps blob data available for ~18.2 days in local, ref: https://github.com/bnb-chain/BEPs/blob/master/BEPs/BEP-336.md#51-parameters.
-	// Same as the default blob reserve period in Ethereum (4096 epochs).
-	MinTimeDurationForBlobRequests uint64 = uint64(float64(24*3600) * 18.2)
-	MinBlocksForBlobRequests       uint64 = uint64(float64(MinTimeDurationForBlobRequests)/0.75) / divisionFactorForOasys
-
-	// it adds more time for expired blobs for some request cases, like expiry blob when remote peer is syncing, default 1 day.
-	DefaultExtraReserveForBlobRequests uint64 = uint64(24*3600/0.75) / divisionFactorForOasys
+	// fermiBlockInterval                        = 0.45
+	MinTimeDurationForBlobRequests     uint64 = uint64(float64(24*3600) * 18.2)                                                 // it keeps blob data available for 18.2 days in local
+	MinBlocksForBlobRequests           uint64 = uint64(float64(MinTimeDurationForBlobRequests) / 0.45 / divisionFactorForOasys) // ref: https://github.com/bnb-chain/BEPs/blob/master/BEPs/BEP-524.md#421-change-table.
+	DefaultExtraReserveForBlobRequests uint64 = uint64(math.Trunc(24 * 3600 / 0.45 / divisionFactorForOasys))                   // it adds more time for expired blobs for some request cases, like expiry blob when remote peer is syncing, default 1 day.
 )
 
 var Bls12381G1MultiExpDiscountTable = [128]uint64{1000, 949, 848, 797, 764, 750, 738, 728, 719, 712, 705, 698, 692, 687, 682, 677, 673, 669, 665, 661, 658, 654, 651, 648, 645, 642, 640, 637, 635, 632, 630, 627, 625, 623, 621, 619, 617, 615, 613, 611, 609, 608, 606, 604, 603, 601, 599, 598, 596, 595, 593, 592, 591, 589, 588, 586, 585, 584, 582, 581, 580, 579, 577, 576, 575, 574, 573, 572, 570, 569, 568, 567, 566, 565, 564, 563, 562, 561, 560, 559, 558, 557, 556, 555, 554, 553, 552, 551, 550, 549, 548, 547, 547, 546, 545, 544, 543, 542, 541, 540, 540, 539, 538, 537, 536, 536, 535, 534, 533, 532, 532, 531, 530, 529, 528, 528, 527, 526, 525, 525, 524, 523, 522, 522, 521, 520, 520, 519}

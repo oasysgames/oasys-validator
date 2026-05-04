@@ -219,7 +219,8 @@ func newHandler(config *handlerConfig) (*handler, error) {
 		handlerStartCh:         make(chan struct{}),
 		stopCh:                 make(chan struct{}),
 	}
-	if config.Sync == ethconfig.FullSync {
+	if h.chain.NoTries() {
+	} else if config.Sync == ethconfig.FullSync {
 		// The database seems empty as the current block is the genesis. Yet the snap
 		// block is ahead, so snap sync was enabled for this node at a certain point.
 		// The scenarios where this can happen is
@@ -232,7 +233,7 @@ func newHandler(config *handlerConfig) (*handler, error) {
 		if fullBlock.Number.Uint64() == 0 && snapBlock.Number.Uint64() > 0 {
 			h.snapSync.Store(true)
 			log.Warn("Switch sync mode from full sync to snap sync", "reason", "snap sync incomplete")
-		} else if !h.chain.NoTries() && !h.chain.HasState(fullBlock.Root) {
+		} else if !h.chain.HasState(fullBlock.Root) {
 			h.snapSync.Store(true)
 			log.Warn("Switch sync mode from full sync to snap sync", "reason", "head state missing")
 		}
@@ -339,6 +340,7 @@ func newHandler(config *handlerConfig) (*handler, error) {
 // protoTracker tracks the number of active protocol handlers.
 func (h *handler) protoTracker() {
 	defer h.wg.Done()
+
 	var active int
 	for {
 		select {
@@ -387,12 +389,11 @@ func (h *handler) runEthPeer(peer *eth.Peer, handler eth.Handler) error {
 		peer.Log().Error("Snapshot extension barrier failed", "err", err)
 		return err
 	}
-	bsc, err := h.peers.waitBscExtension(peer)
+	bscExt, err := h.peers.waitBscExtension(peer)
 	if err != nil {
 		peer.Log().Error("Bsc extension barrier failed", "err", err)
 		return err
 	}
-
 	// Execute the Ethereum handshake
 	var (
 		head   = h.chain.CurrentHeader()
@@ -442,7 +443,7 @@ func (h *handler) runEthPeer(peer *eth.Peer, handler eth.Handler) error {
 	}
 
 	// Register the peer locally
-	if err := h.peers.registerPeer(peer, snap, bsc); err != nil {
+	if err := h.peers.registerPeer(peer, snap, bscExt); err != nil {
 		peer.Log().Error("Ethereum peer registration failed", "err", err)
 		return err
 	}
@@ -744,17 +745,23 @@ func (h *handler) BroadcastBlock(block *types.Block, propagate bool) {
 			log.Error("Propagating dangling block", "number", block.Number(), "hash", hash)
 			return
 		}
-		// Send the block to a subset of our peers
-		var transfer []*ethPeer
-		if h.directBroadcast {
-			transfer = peers[:]
-		} else {
-			transfer = peers[:int(math.Sqrt(float64(len(peers))))]
+
+		// Broadcast the block to peers based on broadcast strategy.
+		totalPeers := len(peers)
+
+		// Step 1: Select target peers for initial broadcast.
+		limit := totalPeers
+		if !h.directBroadcast { // Populate TD from every receiver on startup to establish proper sync.
+			limit = int(math.Sqrt(float64(totalPeers)))
 		}
-		for _, peer := range transfer {
+
+		// Step 2: Broadcast to selected peers.
+		transferPeersCnt := limit
+		for _, peer := range peers[:limit] {
 			peer.AsyncSendNewBlock(block, td)
 		}
-		log.Debug("Propagated block", "hash", hash, "recipients", len(transfer), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
+
+		log.Debug("Propagated block", "hash", hash, "recipients", transferPeersCnt, "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
 		return
 	}
 	// Otherwise if the block is indeed in our own chain, announce it
@@ -884,6 +891,9 @@ func (h *handler) BroadcastVote(vote *types.VoteEnvelope) {
 		averageDifficulty = new(big.Int).Div(new(big.Int).Sub(currentTD, h.firstTDInBroadcastVote), big.NewInt(int64(headBlock.Number.Uint64()-h.firstHeightInBroadcastVote)))
 	}
 	for _, peer := range peers {
+		if peer.bscExt == nil {
+			continue
+		}
 		_, peerTD := peer.Head()
 		deltaTD := new(big.Int).Abs(new(big.Int).Sub(currentTD, peerTD))
 		// broadcast if

@@ -162,7 +162,8 @@ func NewFreezer(datadir string, namespace string, readonly bool, maxTableSize ui
 	// Create the write batch.
 	freezer.writeBatch = newFreezerBatch(freezer)
 
-	log.Info("Opened ancient database", "database", datadir, "readonly", readonly, "tail", freezer.tail.Load(), "frozen", freezer.frozen.Load())
+	log.Info("Opened ancient database", "database", datadir, "readonly", readonly, "tail", freezer.tail.Load(),
+		"frozen", freezer.frozen.Load())
 	return freezer, nil
 }
 
@@ -234,16 +235,6 @@ func (f *Freezer) TableAncients(kind string) (uint64, error) {
 	f.writeLock.RLock()
 	defer f.writeLock.RUnlock()
 	return f.tables[kind].items.Load(), nil
-}
-
-// ItemAmountInAncient returns the actual length of current ancientDB.
-func (f *Freezer) ItemAmountInAncient() (uint64, error) {
-	return f.frozen.Load(), nil
-}
-
-// AncientOffSet returns the offset of current ancientDB.
-func (f *Freezer) AncientOffSet() uint64 {
-	return f.tail.Load()
 }
 
 // Tail returns the number of first stored item in the freezer.
@@ -426,12 +417,10 @@ func (f *Freezer) validate() error {
 			return fmt.Errorf("freezer table %s has a differing head: %d != %d", kind, table.items.Load(), head)
 		}
 		if !table.config.prunable {
-			// TODO(Nathan): In BSC's prune feature, `table.itemHidden.Load() != 0` may return true.
-			//
 			// non-prunable tables have to start at 0
-			// if table.itemHidden.Load() != 0 {
-			// 	return fmt.Errorf("non-prunable freezer table '%s' has a non-zero tail: %d", kind, table.itemHidden.Load())
-			// }
+			if table.itemHidden.Load() != 0 {
+				return fmt.Errorf("non-prunable freezer table '%s' has a non-zero tail: %d", kind, table.itemHidden.Load())
+			}
 		} else {
 			// prunable tables have to have the same length
 			if prunedTail == nil {
@@ -496,12 +485,10 @@ func (f *Freezer) repair() error {
 			return err
 		}
 		if !table.config.prunable {
-			// TODO(Nathan): In BSC's prune feature, `table.itemHidden.Load() != 0` may return true.
-			//
 			// non-prunable tables have to start at 0
-			// if table.itemHidden.Load() != 0 {
-			// 	panic(fmt.Sprintf("non-prunable freezer table %s has non-zero tail: %v", kind, table.itemHidden.Load()))
-			// }
+			if table.itemHidden.Load() != 0 {
+				panic(fmt.Sprintf("non-prunable freezer table %s has non-zero tail: %v", kind, table.itemHidden.Load()))
+			}
 		} else {
 			// prunable tables have to have the same length
 			if err := table.truncateTail(prunedTail); err != nil {

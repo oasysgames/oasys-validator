@@ -105,7 +105,7 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 
 	// Ensure the transaction doesn't exceed the current miner max acceptable limit gas
 	if opts.MaxGas > 0 && opts.MaxGas < tx.Gas() {
-		return ErrGasLimit
+		return fmt.Errorf("%w (cap: %d, tx: %d)", core.ErrGasLimitTooHigh, opts.MaxGas, tx.Gas())
 	}
 
 	// Sanity check for extremely large numbers (supported by RLP or RPC)
@@ -253,7 +253,7 @@ func validateBlobSidecarLegacy(sidecar *types.BlobTxSidecar, hashes []common.Has
 	}
 	for i := range sidecar.Blobs {
 		if err := kzg4844.VerifyBlobProof(&sidecar.Blobs[i], sidecar.Commitments[i], sidecar.Proofs[i]); err != nil {
-			return fmt.Errorf("invalid blob %d: %v", i, err)
+			return fmt.Errorf("%w: invalid blob proof: %v", ErrKZGVerificationError, err)
 		}
 	}
 	return nil
@@ -266,7 +266,10 @@ func validateBlobSidecarOsaka(sidecar *types.BlobTxSidecar, hashes []common.Hash
 	if len(sidecar.Proofs) != len(hashes)*kzg4844.CellProofsPerBlob {
 		return fmt.Errorf("invalid number of %d blob proofs expected %d", len(sidecar.Proofs), len(hashes)*kzg4844.CellProofsPerBlob)
 	}
-	return kzg4844.VerifyCellProofs(sidecar.Blobs, sidecar.Commitments, sidecar.Proofs)
+	if err := kzg4844.VerifyCellProofs(sidecar.Blobs, sidecar.Commitments, sidecar.Proofs); err != nil {
+		return fmt.Errorf("%w: %v", ErrKZGVerificationError, err)
+	}
+	return nil
 }
 
 // ValidationOptionsWithState define certain differences between stateful transaction

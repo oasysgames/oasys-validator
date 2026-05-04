@@ -35,16 +35,17 @@ var (
 
 // Config is the configuration parameters of mining.
 type Config struct {
-	Etherbase     common.Address `toml:",omitempty"` // Public address for block mining rewards
-	ExtraData     hexutil.Bytes  `toml:",omitempty"` // Block extra data set by the miner
-	DelayLeftOver *time.Duration // Time reserved to finalize a block(calculate root, distribute income...)
-	GasFloor      uint64         // Target gas floor for mined blocks.
-	GasCeil       uint64         // Target gas ceiling for mined blocks.
-	GasPrice      *big.Int       // Minimum gas price for mining a transaction
-	Recommit      *time.Duration // The time interval for miner to re-create mining work.
-	VoteEnable    bool           // Whether to vote when mining
+	Etherbase              common.Address `toml:",omitempty"` // Public address for block mining rewards
+	ExtraData              hexutil.Bytes  `toml:",omitempty"` // Block extra data set by the miner
+	DelayLeftOver          *time.Duration `toml:",omitempty"` // Time reserved to finalize a block(calculate root, distribute income...)
+	GasFloor               uint64         // Target gas floor for mined blocks.
+	GasCeil                uint64         // Target gas ceiling for mined blocks.
+	GasPrice               *big.Int       // Minimum gas price for mining a transaction
+	Recommit               *time.Duration `toml:",omitempty"` // The time interval for miner to re-create mining work.
+	VoteEnable             bool           // Whether to vote when mining
+	DisableVoteAttestation bool           // Whether to skip assembling vote attestation
+	TxGasLimit             uint64         // Maximum gas for per transaction
 
-	DisableVoteAttestation    bool // Whether to skip assembling vote attestation
 	DisableSuspiciousTxFilter bool // Whether to disable suspicious tx filter
 }
 
@@ -52,7 +53,6 @@ type Config struct {
 var DefaultConfig = Config{
 	GasCeil:  60_000_000, // Same as go-ethereum(v1.16.4)
 	GasPrice: big.NewInt(params.GWei),
-
 	// The default recommit time is chosen as two seconds since
 	// consensus-layer usually will wait a half slot of time(6s)
 	// for payload generation. It should be enough for Geth to

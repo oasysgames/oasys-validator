@@ -147,7 +147,9 @@ func (h *ethHandler) handleBlockBroadcast(peer *eth.Peer, packet *eth.NewBlockPa
 	log.Debug("handleBlockBroadcast", "peer", peer.ID(), "block", block.Number(), "hash", block.Hash())
 	h.blockFetcher.Enqueue(peer.ID(), block)
 	stats := h.chain.GetBlockStats(block.Hash())
+	blockFirstReceived := false
 	if stats.RecvNewBlockTime.Load() == 0 {
+		blockFirstReceived = true
 		stats.RecvNewBlockTime.Store(time.Now().UnixMilli())
 		addr := peer.RemoteAddr()
 		if addr != nil {
@@ -161,10 +163,16 @@ func (h *ethHandler) handleBlockBroadcast(peer *eth.Peer, packet *eth.NewBlockPa
 		trueHead = block.ParentHash()
 		trueTD   = new(big.Int).Sub(td, block.Difficulty())
 	)
+	if block.NumberU64() == 1 { // this enable sync with the right peer when starting up a new network
+		trueHead = block.Hash()
+		trueTD = td
+	}
 	// Update the peer's total difficulty if better than the previous
 	if _, td := peer.Head(); trueTD.Cmp(td) > 0 {
 		peer.SetHead(trueHead, trueTD)
-		h.chainSync.handlePeerEvent()
+		if blockFirstReceived {
+			h.chainSync.handlePeerEvent()
+		}
 	}
 	// Update the peer's justfied head if better than the previous
 	if pos, ok := h.chain.Engine().(consensus.PoS); ok {

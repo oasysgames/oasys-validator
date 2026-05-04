@@ -276,7 +276,7 @@ func (s *StateDB) setError(err error) {
 	}
 }
 
-func (s *StateDB) NoTrie() bool {
+func (s *StateDB) NoTries() bool {
 	return s.db.NoTries()
 }
 
@@ -712,6 +712,28 @@ func (s *StateDB) CreateContract(addr common.Address) {
 		obj.newContract = true
 		s.journal.createContract(addr)
 	}
+}
+
+// StateForPrefetch creates a mirrored StateDB instance that shares the same
+// underlying state reader and cache as the current one. It is typically used
+// for state prefetching.
+//
+// Note: If the reader implements readerWithCacheStats, a new wrapper is created
+// to maintain independent cache statistics while reusing the same cache source.
+func (s *StateDB) StateForPrefetch() *StateDB {
+	reader := s.reader
+	if readerWithCacheStats, ok := s.reader.(*readerWithCacheStats); ok {
+		reader = newReaderWithCacheStats(readerWithCacheStats.readerWithCache)
+	}
+	state, err := NewWithReader(s.originalRoot, s.db, reader)
+	if err != nil {
+		log.Error("Failed to create StateDB for prefetch", "err", err)
+		return nil
+	}
+
+	state.prefetcher = s.prefetcher
+
+	return state
 }
 
 // Copy creates a deep, independent copy of the state.
@@ -1283,6 +1305,9 @@ func (s *StateDB) commit(deleteEmptyObjects bool, noStorageWiping bool) (*stateU
 				storageTrieNodesUpdated += updates
 				storageTrieNodesDeleted += deletes
 			}
+			if s.NoTries() {
+				return nil
+			}
 			return nodes.Merge(set)
 		}
 	)
@@ -1592,9 +1617,4 @@ func (s *StateDB) Witness() *stateless.Witness {
 
 func (s *StateDB) AccessEvents() *AccessEvents {
 	return s.accessEvents
-}
-
-func (s *StateDB) IsAddressInMutations(addr common.Address) bool {
-	_, ok := s.mutations[addr]
-	return ok
 }

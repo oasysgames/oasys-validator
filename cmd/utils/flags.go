@@ -193,6 +193,12 @@ var (
 		Usage:    "Oasys testnet",
 		Category: flags.EthCategory,
 	}
+	EnableBALFlag = &cli.BoolFlag{
+		Name:     "enablebal",
+		Usage:    "Enable block access list feature, validator will generate BAL for each block",
+		Value:    bscFeaturesDefaultBool,
+		Category: flags.EthCategory,
+	}
 	// Dev mode
 	DeveloperFlag = &cli.BoolFlag{
 		Name:     "dev",
@@ -300,6 +306,11 @@ var (
 		Usage:    "Manually specify the hard fork timestamps which have passed on the mainnet, overriding the bundled setting",
 		Category: flags.EthCategory,
 	}
+	OverrideOsaka = &cli.Uint64Flag{
+		Name:     "override.osaka",
+		Usage:    "Manually specify the Osaka fork timestamp, overriding the bundled setting",
+		Category: flags.EthCategory,
+	}
 	OverrideVerkle = &cli.Uint64Flag{
 		Name:     "override.verkle",
 		Usage:    "Manually specify the Verkle fork timestamp, overriding the bundled setting",
@@ -331,7 +342,7 @@ var (
 	}
 	GCModeFlag = &cli.StringFlag{
 		Name:     "gcmode",
-		Usage:    `Blockchain garbage collection mode, only relevant in state.scheme=hash ("full", "archive")`,
+		Usage:    `Blockchain garbage collection mode ("full", "archive")`,
 		Value:    "full",
 		Category: flags.StateCategory,
 	}
@@ -354,7 +365,7 @@ var (
 	}
 	StateHistoryFlag = &cli.Uint64Flag{
 		Name:     "history.state",
-		Usage:    "Number of recent blocks to retain state history for, only relevant in state.scheme=path (default = 90,000 blocks, 0 = entire chain)",
+		Usage:    "Number of recent blocks to retain state history for, only relevant in state.scheme=path (default = 900,000 blocks, 0 = entire chain)",
 		Value:    ethconfig.Defaults.StateHistory,
 		Category: flags.StateCategory,
 	}
@@ -526,6 +537,11 @@ var (
 		Usage:    "Duration for announcing local pending transactions again (default = 10 years, minimum = 1 minute)",
 		Value:    ethconfig.Defaults.TxPool.ReannounceTime,
 		Category: flags.TxPoolCategory,
+	}
+	MinerTxGasLimitFlag = &cli.Uint64Flag{
+		Name:     "miner.txgaslimit",
+		Usage:    fmt.Sprintf("Maximum gas allowed per transaction (default = 0, disabled; min = %d)", params.MinTxGasLimitCap),
+		Category: flags.MinerCategory,
 	}
 	// Blob transaction pool settings
 	BlobPoolDataDirFlag = &cli.StringFlag{
@@ -1129,6 +1145,13 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 		Category: flags.MetricsCategory,
 	}
 
+	VMOpcodeOptimizeFlag = &cli.BoolFlag{
+		Name:     "vm.opcode.optimize",
+		Usage:    "enable opcode optimization",
+		Value:    bscFeaturesDefaultBool,
+		Category: flags.VMCategory,
+	}
+
 	CheckSnapshotWithMPT = &cli.BoolFlag{
 		Name:     "check-snapshot-with-mpt",
 		Usage:    "Enable checking between snapshot and MPT ",
@@ -1214,6 +1237,50 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 		Usage:    "HTTP-RPC server listening port of fake-beacon",
 		Value:    fakebeacon.DefaultPort,
 		Category: flags.APICategory,
+	}
+
+	// incremental snapshot related flags
+	EnableIncrSnapshotFlag = &cli.BoolFlag{
+		Name:     "incr.enable",
+		Usage:    "Enable incremental snapshot generation",
+		Value:    bscFeaturesDefaultBool,
+		Category: flags.StateCategory,
+	}
+	IncrSnapshotPathFlag = &flags.DirectoryFlag{
+		Name:     "incr.datadir",
+		Usage:    "Data directory for storing incremental snapshot data: can be used to store generated or downloaded incremental snapshot",
+		Value:    bscFeaturesDefaultString,
+		Category: flags.StateCategory,
+	}
+	IncrSnapshotBlockIntervalFlag = &cli.Uint64Flag{
+		Name:     "incr.block-interval",
+		Usage:    "Set how many blocks interval are stored into one incremental snapshot",
+		Value:    bscFeaturesDefaultInt,
+		Category: flags.StateCategory,
+	}
+	IncrSnapshotStateBufferFlag = &cli.Uint64Flag{
+		Name:     "incr.state-buffer",
+		Usage:    "Set the incr state memory buffer to aggregate MPT trie nodes. The larger the setting, the smaller the incr snapshot size",
+		Value:    bscFeaturesDefaultInt,
+		Category: flags.StateCategory,
+	}
+	IncrSnapshotKeptBlocksFlag = &cli.Uint64Flag{
+		Name:     "incr.kept-blocks",
+		Usage:    "Set how many blocks are kept in incr snapshot. At least is 1024 blocks",
+		Value:    bscFeaturesDefaultInt,
+		Category: flags.StateCategory,
+	}
+	UseRemoteIncrSnapshotFlag = &cli.BoolFlag{
+		Name:     "incr.use-remote",
+		Usage:    "Enable download and merge incremental snapshots into local data",
+		Value:    bscFeaturesDefaultBool,
+		Category: flags.StateCategory,
+	}
+	RemoteIncrSnapshotURLFlag = &cli.StringFlag{
+		Name:     "incr.remote-url",
+		Usage:    "Set from which remote url is used to download incremental snapshots",
+		Value:    bscFeaturesDefaultString,
+		Category: flags.StateCategory,
 	}
 )
 
@@ -1873,6 +1940,13 @@ func setMiner(ctx *cli.Context, cfg *minerconfig.Config) {
 	if ctx.Bool(DisableSuspiciousTxFilterFlag.Name) {
 		cfg.DisableSuspiciousTxFilter = true
 	}
+	if ctx.IsSet(MinerTxGasLimitFlag.Name) {
+		limit := ctx.Uint64(MinerTxGasLimitFlag.Name)
+		if limit != 0 && limit < params.MinTxGasLimitCap {
+			Fatalf("Invalid --miner.txgaslimit: %d (must be >= %d or 0)", limit, params.MinTxGasLimitCap)
+		}
+		cfg.TxGasLimit = limit
+	}
 }
 
 func setRequiredBlocks(ctx *cli.Context, cfg *ethconfig.Config) {
@@ -2030,9 +2104,8 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	if ctx.IsSet(PathDBSyncFlag.Name) {
 		cfg.PathSyncFlush = true
 	}
-	if ctx.IsSet(JournalFileFlag.Name) {
-		cfg.JournalFileEnabled = true
-	}
+
+	cfg.JournalFileEnabled = ctx.Bool(JournalFileFlag.Name)
 
 	if ctx.String(GCModeFlag.Name) == "archive" {
 		if cfg.TransactionHistory != 0 {

@@ -182,8 +182,8 @@ type BlockChainConfig struct {
 	TriesInMemory   uint64 // How many tries keeps in memory
 	NoTries         bool   // Insecure settings. Do not have any tries in databases if enabled.
 	PathSyncFlush   bool   // Whether sync flush the trienodebuffer of pathdb to disk.
-	JournalFilePath string
-	JournalFile     bool
+	JournalFilePath string // The path to store journal file which is used in pathdb
+	JournalFile     bool   // Whether to use single file to store journal data in pathdb
 
 	// Trie database related options
 	TrieCleanLimit   int           // Memory allowance (MB) to use for caching trie nodes in memory
@@ -413,7 +413,8 @@ func NewBlockChain(db ethdb.Database, genesis *Genesis, engine consensus.Engine,
 	if err != nil {
 		return nil, err
 	}
-	triedb := triedb.NewDatabase(db, cfg.triedbConfig(enableVerkle))
+	trieConfig := cfg.triedbConfig(enableVerkle)
+	triedb := triedb.NewDatabase(db, trieConfig)
 
 	// Write the supplied genesis to the database if it has not been initialized
 	// yet. The corresponding chain config will be returned, either from the
@@ -539,11 +540,7 @@ func NewBlockChain(db ethdb.Database, genesis *Genesis, engine consensus.Engine,
 		}
 	}
 	// Ensure that a previous crash in SetHead doesn't leave extra ancients
-	if frozen, err := bc.db.ItemAmountInAncient(); err == nil && frozen > 0 {
-		frozen, err = bc.db.Ancients()
-		if err != nil {
-			return nil, err
-		}
+	if frozen, err := bc.db.Ancients(); err == nil && frozen > 0 {
 		var (
 			needRewind bool
 			low        uint64
@@ -1413,7 +1410,6 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 func (bc *BlockChain) writeHeadBlock(block *types.Block) {
 	var dbWg sync.WaitGroup
 	dbWg.Add(2)
-	defer dbWg.Wait()
 	go func() {
 		defer dbWg.Done()
 		// Add the block to the canonical chain number scheme and mark as the head
@@ -1438,6 +1434,7 @@ func (bc *BlockChain) writeHeadBlock(block *types.Block) {
 			log.Crit("Failed to update chain indexes in chain db", "err", err)
 		}
 	}()
+	dbWg.Wait()
 
 	// Update all in-memory chain markers in the last step
 	bc.hc.SetCurrentHeader(block.Header())
@@ -1518,7 +1515,6 @@ func (bc *BlockChain) Stop() {
 						if err := triedb.Commit(recent.Root(), true); err != nil {
 							log.Error("Failed to commit recent state trie", "err", err)
 						} else {
-							rawdb.WriteSafePointBlockNumber(bc.db, recent.NumberU64())
 							once.Do(func() {
 								rawdb.WriteHeadBlockHash(bc.db, recent.Hash())
 							})
@@ -1529,8 +1525,6 @@ func (bc *BlockChain) Stop() {
 						log.Info("Writing snapshot state to disk", "root", snapBase)
 						if err := triedb.Commit(snapBase, true); err != nil {
 							log.Error("Failed to commit recent state trie", "err", err)
-						} else {
-							rawdb.WriteSafePointBlockNumber(bc.db, bc.CurrentBlock().Number.Uint64())
 						}
 					}
 					for !bc.triegc.Empty() {
@@ -2023,7 +2017,12 @@ func (bc *BlockChain) writeBlockAndSetHead(block *types.Block, receipts []*types
 	bc.futureBlocks.Remove(block.Hash())
 
 	if status == CanonStatTy {
-		bc.chainFeed.Send(ChainEvent{Header: block.Header()})
+		bc.chainFeed.Send(ChainEvent{
+			Header:       block.Header(),
+			Receipts:     receipts,
+			Transactions: block.Transactions(),
+		})
+
 		if len(logs) > 0 {
 			bc.logsFeed.Send(logs)
 		}
@@ -2467,6 +2466,8 @@ func (bc *BlockChain) processBlock(parentRoot common.Hash, block *types.Block, s
 			storageCacheMissMeter.Mark(stats.StorageMiss)
 		}()
 
+		interruptChan := make(chan struct{})
+		defer close(interruptChan)
 		go func(start time.Time, throwaway *state.StateDB, block *types.Block) {
 			// Disable tracing for prefetcher executions.
 			vmCfg := bc.cfg.VmConfig
@@ -2814,6 +2815,13 @@ func (bc *BlockChain) recoverAncestors(block *types.Block, makeWitness bool) (co
 // collectLogs collects the logs that were generated or removed during the
 // processing of a block. These logs are later announced as deleted or reborn.
 func (bc *BlockChain) collectLogs(b *types.Block, removed bool) []*types.Log {
+	_, logs := bc.collectReceiptsAndLogs(b, removed)
+	return logs
+}
+
+// collectReceiptsAndLogs retrieves receipts from the database and returns both receipts and logs.
+// This avoids duplicate database reads when both are needed.
+func (bc *BlockChain) collectReceiptsAndLogs(b *types.Block, removed bool) ([]*types.Receipt, []*types.Log) {
 	var blobGasPrice *big.Int
 	if b.ExcessBlobGas() != nil {
 		blobGasPrice = eip4844.CalcBlobFee(bc.chainConfig, b.Header())
@@ -2831,7 +2839,7 @@ func (bc *BlockChain) collectLogs(b *types.Block, removed bool) []*types.Log {
 			logs = append(logs, log)
 		}
 	}
-	return logs
+	return receipts, logs
 }
 
 // reorg takes two blocks, an old chain and a new chain and will reconstruct the
@@ -3066,8 +3074,12 @@ func (bc *BlockChain) SetCanonical(head *types.Block) (common.Hash, error) {
 	bc.writeHeadBlock(head)
 
 	// Emit events
-	logs := bc.collectLogs(head, false)
-	bc.chainFeed.Send(ChainEvent{Header: head.Header()})
+	receipts, logs := bc.collectReceiptsAndLogs(head, false)
+	bc.chainFeed.Send(ChainEvent{
+		Header:       head.Header(),
+		Receipts:     receipts,
+		Transactions: head.Transactions(),
+	})
 	if len(logs) > 0 {
 		bc.logsFeed.Send(logs)
 	}

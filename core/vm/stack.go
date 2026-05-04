@@ -54,6 +54,7 @@ func (st *Stack) push(d *uint256.Int) {
 	st.data = append(st.data, *d)
 }
 
+// pop the top most elem in stack or cache
 func (st *Stack) pop() (ret uint256.Int) {
 	ret = st.data[len(st.data)-1]
 	st.data = st.data[:len(st.data)-1]

@@ -125,7 +125,6 @@ type EVM struct {
 	precompiles map[common.Address]PrecompiledContract
 
 	// jumpDests is the aggregated result of JUMPDEST analysis made through
-	// the life cycle of EVM.
 	jumpDests map[common.Hash]bitvec
 }
 

@@ -851,7 +851,11 @@ func (c *Oasys) assembleVoteAttestation(chain consensus.ChainHeaderReader, heade
 	if parent == nil {
 		return errors.New("parent not found")
 	}
-	votes := c.VotePool.FetchVoteByBlockHash(parent.Hash())
+	justifiedBlockNumber, justifiedBlockHash, err := c.GetJustifiedNumberAndHash(chain, []*types.Header{parent})
+	if err != nil {
+		return errors.New("unexpected error when getting the highest justified number and hash")
+	}
+	votes := c.VotePool.FetchVotesByBlockHash(parent.Hash(), justifiedBlockNumber)
 	if len(votes) == 0 {
 		log.Debug("no votes found, skip assemble vote attestation", "header", header.Hash(), "number", header.Number, "parent", parent.Hash())
 		return nil
@@ -878,11 +882,6 @@ func (c *Oasys) assembleVoteAttestation(chain consensus.ChainHeaderReader, heade
 	}
 
 	// Prepare vote attestation
-	// Prepare vote data
-	justifiedBlockNumber, justifiedBlockHash, err := c.GetJustifiedNumberAndHash(chain, []*types.Header{parent})
-	if err != nil {
-		return errors.New("unexpected error when getting the highest justified number and hash")
-	}
 	attestation := &types.VoteAttestation{
 		Data: &types.VoteData{
 			SourceNumber: justifiedBlockNumber,

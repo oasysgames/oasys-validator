@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/params"
+
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/cmd/utils"
@@ -70,6 +72,7 @@ var (
 		utils.USBFlag,
 		utils.SmartCardDaemonPathFlag,
 		utils.OverridePassedForkTime,
+		utils.OverrideOsaka,
 		utils.OverrideVerkle,
 		utils.OverrideFullImmutabilityThreshold,
 		utils.OverrideMinBlocksForBlobRequests,
@@ -88,6 +91,7 @@ var (
 		// utils.TxPoolOverflowPoolSlotsFlag,
 		utils.TxPoolLifetimeFlag,
 		// utils.TxPoolReannounceTimeFlag,
+		utils.MinerTxGasLimitFlag,
 		utils.BlobPoolDataDirFlag,
 		utils.BlobPoolDataCapFlag,
 		utils.BlobPoolPriceBumpFlag,
@@ -138,6 +142,7 @@ var (
 		utils.MinerRecommitIntervalFlag,
 		utils.MinerNewPayloadTimeoutFlag, // deprecated
 		// utils.MinerDelayLeftoverFlag,
+		// utils.EnableBALFlag,
 		// utils.MinerNewPayloadTimeout,
 		utils.NATFlag,
 		utils.NoDiscoverFlag,
@@ -176,6 +181,14 @@ var (
 		utils.LogDebugFlag,
 		utils.LogBacktraceAtFlag,
 		utils.BlobExtraReserveFlag,
+		// utils.VMOpcodeOptimizeFlag,
+		// utils.EnableIncrSnapshotFlag,
+		// utils.IncrSnapshotPathFlag,
+		// utils.IncrSnapshotBlockIntervalFlag,
+		// utils.IncrSnapshotStateBufferFlag,
+		// utils.IncrSnapshotKeptBlocksFlag,
+		// utils.UseRemoteIncrSnapshotFlag,
+		// utils.RemoteIncrSnapshotURLFlag,
 		// utils.BeaconApiFlag,
 		// utils.BeaconApiHeaderFlag,
 		// utils.BeaconThresholdFlag,
@@ -436,12 +449,27 @@ func startNode(ctx *cli.Context, stack *node.Node, backend ethapi.Backend, isCon
 	}
 
 	// Start auxiliary services if enabled
+	ethBackend, ok := backend.(*eth.EthAPIBackend)
+	gasCeil := ethBackend.Miner().GasCeil()
+	maxTxGas := uint64(0)
+	if gasCeil > params.SystemTxsGasSoftLimit {
+		maxTxGas = gasCeil - params.SystemTxsGasSoftLimit
+	}
+	if txGasLimit := ethBackend.Miner().TxGasLimit(); txGasLimit > 0 {
+		if maxTxGas == 0 || txGasLimit < maxTxGas {
+			maxTxGas = txGasLimit
+		}
+	}
+	if maxTxGas > 0 {
+		ethBackend.TxPool().SetMaxGas(maxTxGas)
+	}
+
 	if ctx.Bool(utils.MiningEnabledFlag.Name) {
 		// Mining only makes sense if a full Ethereum node is running
 		if ctx.String(utils.SyncModeFlag.Name) == "light" {
 			utils.Fatalf("Light clients do not support mining")
 		}
-		ethBackend, ok := backend.(*eth.EthAPIBackend)
+
 		if !ok {
 			utils.Fatalf("Ethereum service not running")
 		}

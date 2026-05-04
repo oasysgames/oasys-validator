@@ -68,6 +68,7 @@ var (
 		Flags: slices.Concat([]cli.Flag{
 			utils.CachePreimagesFlag,
 			utils.OverridePassedForkTime,
+			utils.OverrideOsaka,
 			utils.OverrideVerkle,
 			// utils.MultiDataBaseFlag,
 		}, utils.DatabaseFlags),
@@ -316,6 +317,10 @@ func initGenesis(ctx *cli.Context) error {
 		v := ctx.Uint64(utils.OverridePassedForkTime.Name)
 		overrides.OverridePassedForkTime = &v
 	}
+	if ctx.IsSet(utils.OverrideOsaka.Name) {
+		v := ctx.Uint64(utils.OverrideOsaka.Name)
+		overrides.OverrideOsaka = &v
+	}
 	if ctx.IsSet(utils.OverrideVerkle.Name) {
 		v := ctx.Uint64(utils.OverrideVerkle.Name)
 		overrides.OverrideVerkle = &v
@@ -423,7 +428,7 @@ func createPorts(ipStr string, port int, size int) []int {
 // Create config for node i in the cluster
 //
 //nolint:unused
-func createNodeConfig(baseConfig gethConfig, ip string, port int, enodes []*enode.Node, index int, staticConnect bool) gethConfig {
+func createNodeConfig(baseConfig gethConfig, prefix string, ip string, port int, enodes []*enode.Node, index int) gethConfig {
 	baseConfig.Node.HTTPHost = ip
 	baseConfig.Node.P2P.ListenAddr = fmt.Sprintf(":%d", port)
 	connectEnodes := make([]*enode.Node, 0, len(enodes)-1)
@@ -434,9 +439,10 @@ func createNodeConfig(baseConfig gethConfig, ip string, port int, enodes []*enod
 		connectEnodes = append(connectEnodes, enodes[j])
 	}
 	// Set the P2P connections between this node and the other nodes
-	if staticConnect {
-		baseConfig.Node.P2P.StaticNodes = connectEnodes
-	} else {
+	baseConfig.Node.P2P.StaticNodes = connectEnodes
+	if prefix == "fullnode" {
+		// Fullnodes may reside in different regions than the `enodes`.
+		// StaticNodes cannot connect to them directly, but can still discover them.
 		baseConfig.Node.P2P.BootstrapNodes = connectEnodes
 	}
 	return baseConfig
@@ -495,7 +501,7 @@ func initNetwork(ctx *cli.Context) error {
 		return err
 	}
 
-	configs, _, _, err := createConfigs(config, initDir, "node", ips, ports, []*enode.Node{}, false, false)
+	configs, _, _, err := createConfigs(config, initDir, "node", ips, ports, []*enode.Node{}, false)
 	if err != nil {
 		utils.Fatalf("Failed to create node configs: %v", err)
 	}
@@ -512,7 +518,7 @@ func initNetwork(ctx *cli.Context) error {
 }
 
 //nolint:unused
-func createConfigs(base gethConfig, initDir string, prefix string, ips []string, ports []int, extraEnodes []*enode.Node, connectOneExtraEnodes bool, staticConnect bool) ([]gethConfig, []*enode.Node, [][]common.Address, error) {
+func createConfigs(base gethConfig, initDir string, prefix string, ips []string, ports []int, extraEnodes []*enode.Node, connectOneExtraEnodes bool) ([]gethConfig, []*enode.Node, [][]common.Address, error) {
 	if len(ips) != len(ports) {
 		return nil, nil, nil, errors.New("mismatch of size and length of ports")
 	}
@@ -543,7 +549,7 @@ func createConfigs(base gethConfig, initDir string, prefix string, ips []string,
 			allEnodes = []*enode.Node{enodes[i], extraEnodes[i]}
 			index = 0
 		}
-		configs[i] = createNodeConfig(base, ips[i], ports[i], allEnodes, index, staticConnect)
+		configs[i] = createNodeConfig(base, prefix, ips[i], ports[i], allEnodes, index)
 	}
 	return configs, enodes, accounts, nil
 }

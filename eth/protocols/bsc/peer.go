@@ -20,9 +20,9 @@ const (
 
 	// used to avoid of DDOS attack
 	// It's the max number of received votes per second from one peer
-	// 28 validators exist now, so 28 votes will be produced every one block interval
-	// so the limit is 4.6 = 28/6, here set it to 10 with a buffer.
-	receiveRateLimitPerSecond = 10
+	// 26 validators exist now, so 26 votes will be produced every one block interval
+	// so the limit is 4.33 = 26/6, here set it to 8 with a buffer.
+	receiveRateLimitPerSecond = 8
 
 	// the time span of one period
 	secondsPerPeriod = float64(30)
