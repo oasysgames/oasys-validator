@@ -1,0 +1,544 @@
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"math"
+	"math/bits"
+	"net/http"
+	"sync/atomic"
+	"time"
+
+	"github.com/ethereum/go-ethereum/common"
+	// "github.com/ethereum/go-ethereum/core" -> Avoid to import core package to reduce binary size and prevent unknown errors.
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/txfilter/plugintransfer/config"
+)
+
+var (
+	// Set version at build time using -ldflags "-X main.version=1.0.0"
+	version = "1.0.0"
+
+	// Set config URL at build time using -ldflags "-X main.configURL=https://cdn.oasys.games/suspicious_txfilter/plugintransfer.json"
+	configURL = "http://localhost:3030/plugintransfer.json"
+
+	// Don't change the name of the variable
+	// Host will use this variable to load the plugin.
+	Plugin = transferPlugin{
+		version: &version,
+		configCache: ConfigCache{
+			Config:    config.PluginConfig{},
+			updatedAt: time.Time{},
+			ttl:       1 * time.Hour,
+			client:    http.Client{Timeout: 30 * time.Second},
+		},
+		countedTxs: nil,
+	}
+
+	// Set version at build time using -ldflags "-X main.version=1.0.0"
+	// Zero value marker for common.Hash.
+	emptyHash common.Hash
+
+	// ERC20 Transfer(address,address,uint256) event signature.
+	transferEventTopic = common.HexToHash("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")
+
+	// transferPlugin implements core.Plugin interface.
+	// _ core.SuspiciousTxfilterPlugin = (*transferPlugin)(nil)
+)
+
+// transferPlugin is the long-lived plugin runtime state.
+// This struct exists so host can interact through a single exported Plugin instance.
+type transferPlugin struct {
+	version     *string
+	configCache ConfigCache
+	countedTxs  *lrucache // Recent counted transactions used for threshold/window checks.
+}
+
+// Version returns the version of the plugin.
+// Used to verify the plugin version matches the host version.
+func (p *transferPlugin) Version() string {
+	return *p.version
+}
+
+// Call before loading a new plugin instance.
+// Clear drops references to runtime state so GC can reclaim memory
+func (p *transferPlugin) Clear() error {
+	p.configCache.Config = config.PluginConfig{}
+	p.configCache.updatedAt = time.Time{}
+	p.countedTxs = nil
+	return nil
+}
+
+// FilterTransaction is the plugin entrypoint invoked by the host.
+// It refreshes config when needed, accumulates tx amount in JPY, and
+// blocks only when configured count/amount thresholds are exceeded.
+func (p *transferPlugin) FilterTransaction(txhash common.Hash, from, to common.Address, value [32]byte, logs []types.Log) (isBlocked bool, reason string, err error) {
+	// Initialize or update it if it's expired
+	if p.configCache.isExpired() {
+		// Asychronously download config, to avoid blocking the chain execution
+		p.configCache.asyncDownloadConfig()
+		// Update the config, if downloading finished
+		if err := p.configCache.update(&p.countedTxs); err != nil {
+			if p.configCache.isEmptyConfig() {
+				// No block, just return error to not block chain execution but notify the error to the caller
+				return false, "", fmt.Errorf("failed to fetch config: %w", err)
+			}
+			// Just log the error, keep using the old config
+			log.Error("failed to update config", "error", err, "url", configURL)
+		}
+	}
+
+	// Exit if the config is empty
+	if p.countedTxs == nil || p.configCache.isEmptyConfig() {
+		// No block, but notify the error to the caller
+		return false, "", fmt.Errorf("config is empty")
+	}
+
+	// Skip if the plugin is disabled, or whitelisted, or already counted
+	if p.configCache.Config.Disabled || p.configCache.isWhitelisted(from) || p.countedTxs.contains(txhash) {
+		return allow()
+	}
+
+	// initialize accumulated amount by native token amount
+	accumulatedYen := p.configCache.toYen(nil, value)
+
+	for i := range logs {
+		// Skip if the log is not a transfer event
+		if len(logs[i].Topics) != 3 || logs[i].Topics[0] != transferEventTopic {
+			continue
+		}
+		// Skip if the log is not a target ERC20
+		target, ok := p.configCache.isTargetERC20(logs[i].Address)
+		if !ok {
+			continue
+		}
+		// The amount is stored in `log.Data` as a 32-byte value.
+		// sanity check: this should not occur in a standard ERC20 transfer
+		if len(logs[i].Data) != 32 {
+			continue
+		}
+		// Add accumulated amount by ERC20 token amount
+		var amount [32]byte
+		copy(amount[:], logs[i].Data)
+		accumulatedYen += p.configCache.toYen(target, amount)
+	}
+
+	// Skip if the accumulated amount is zero or smaller than 1 yen
+	if accumulatedYen == 0 {
+		return allow()
+	}
+
+	// Check the count and amount thresholds
+	now := time.Now().Unix()
+	if blocks, reason := isOverThreshold(p.countedTxs, &p.configCache.Config, accumulatedYen, now); blocks {
+		return block(reason)
+	}
+
+	// Count the transaction
+	p.countedTxs.push(txhash, accumulatedYen, now)
+
+	return allow()
+}
+
+func allow() (bool, string, error) {
+	return false, "", nil
+}
+
+// block returns "blocked" with a textual reason expected by host code.
+func block(reason string) (bool, string, error) {
+	return true, reason, nil
+}
+
+// logWarn records threshold warnings without blocking.
+func logWarn(reason string) {
+	log.Warn("Exceed warning threshold", "plugin", "plugintransfer", "reason", reason)
+}
+
+type ConfigCache struct {
+	Config      config.PluginConfig
+	updatedAt   time.Time
+	ttl         time.Duration
+	client      http.Client
+	downloading atomic.Bool
+	newConfig   []byte
+}
+
+// isExpired returns true when cached config should be refreshed.
+func (c *ConfigCache) isExpired() bool {
+	return c.updatedAt.Before(time.Now().Add(-c.ttl))
+}
+
+// isEmptyConfig guards against acting on incomplete config.
+func (c *ConfigCache) isEmptyConfig() bool {
+	return c.Config.MeasurementWindow == 0 || c.Config.Threshold.BlockCountThreshold == 0 || c.Config.Threshold.BlockAmountThreshold == 0
+}
+
+// asyncDownloadConfig starts a background download of the latest config JSON.
+// If a download is already in-flight, this is a no-op.
+func (c *ConfigCache) asyncDownloadConfig() {
+	// Skip if the config is downloading
+	if c.downloading.Load() {
+		return
+	}
+
+	// Already new config is downloaded
+	if len(c.newConfig) > 0 {
+		return
+	}
+
+	// Set the downloading flag to true
+	c.downloading.Store(true)
+
+	// Async download config
+	go func() {
+		defer c.downloading.Store(false)
+
+		resp, err := c.client.Get(configURL)
+		if err != nil {
+			log.Error("failed to download config", "error", err, "url", configURL)
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			log.Error("download error", "status", resp.StatusCode, "url", configURL)
+			return
+		}
+
+		newConfig, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.Error("failed to read config body", "error", err, "url", configURL)
+			return
+		}
+		c.newConfig = newConfig
+	}()
+}
+
+// update applies the most recently downloaded config JSON (if any) and refreshes
+// internal state. It may initialize or grow the caller's `countedTxs` cache when
+// the config version changes or when the cache has not been created yet.
+func (c *ConfigCache) update(countedTxs **lrucache) error {
+	// Skip if the config is downloading
+	if c.downloading.Load() {
+		return nil
+	}
+
+	if len(c.newConfig) == 0 {
+		return fmt.Errorf("new config is empty")
+	}
+
+	// Clear the new config if any error occurs to be able to download the config again
+	defer func() {
+		c.newConfig = nil
+	}()
+
+	oldVersion := c.Config.Version
+
+	// Decode the new config with strictly checking the fields
+	jsonDecoder := json.NewDecoder(bytes.NewReader(c.newConfig))
+	jsonDecoder.DisallowUnknownFields()
+	if err := jsonDecoder.Decode(&c.Config); err != nil {
+		return fmt.Errorf("failed to decode config: %w, url: %s", err, configURL)
+	}
+
+	// Update the last updated time
+	c.updatedAt = time.Now()
+
+	// Initialize or expand the countedTxs cache
+	if oldVersion != c.Config.Version || *countedTxs == nil {
+		newCap := c.Config.Threshold.BlockCountThreshold
+		if *countedTxs == nil {
+			*countedTxs = newCache(newCap)
+		} else if newCap > (*countedTxs).cap {
+			(*countedTxs).expandCap(newCap)
+		}
+	}
+
+	return nil
+}
+
+func (c *ConfigCache) isWhitelisted(address common.Address) bool {
+	return c.Config.Whitelists[address]
+}
+
+// isTargetERC20 returns target token config by contract address.
+func (c *ConfigCache) isTargetERC20(address common.Address) (*config.TargetERC20Config, bool) {
+	for i := range c.Config.TargetERC20s {
+		if c.Config.TargetERC20s[i].Address == address {
+			return &c.Config.TargetERC20s[i], true
+		}
+	}
+	return nil, false
+}
+
+// toYen converts token raw amount to integer JPY units (truncating fractional part).
+func (c *ConfigCache) toYen(target *config.TargetERC20Config, value [32]byte) uint64 {
+	if target == nil { // native token
+		return uint64(float64(amountFromRaw(value, 18)) * c.Config.NativeToken.ToYenRate)
+	}
+	return uint64(float64(amountFromRaw(value, target.Decimals)) * target.ToYenRate)
+}
+
+// amountFromRaw converts a 256-bit big-endian integer to a uint64 token amount,
+// applying decimal scaling by integer division and saturating on overflow.
+func amountFromRaw(value [32]byte, decimals uint8) uint64 {
+	divisor := uint64(1)
+	for i := uint8(0); i < decimals; i++ {
+		divisor *= 10
+	}
+	const maxResult = (math.MaxUint64 - 255) / 256 // overflow threshold for result*256 + quotient
+	var remHi, remLo uint64                        // 128-bit remainder
+	var result uint64
+	for i := range value {
+		// val = remainder*256 + b (128-bit)
+		valHi := remHi<<8 | remLo>>56
+		valLo := remLo<<8 | uint64(value[i])
+		quotient, remainder := bits.Div64(valHi, valLo, divisor)
+		remHi, remLo = 0, remainder // remainder < divisor, fits in 64 bits
+
+		if result >= maxResult {
+			return math.MaxUint64 // overflow, value too large
+		}
+		result = result*256 + quotient
+	}
+	return result
+}
+
+// isOverThreshold checks both count and amount thresholds within measurement window.
+// Warning thresholds only emit logs; block thresholds return block=true.
+func isOverThreshold(countedTxs *lrucache, config *config.PluginConfig, amount uint64, now int64) (blocks bool, reason string) {
+	// Check warning count threshold
+	startTime := now - int64(config.MeasurementWindow/time.Second)
+	if b, r := checkCountThreshold(countedTxs, config.Threshold.WarningCountThreshold, startTime); b {
+		logWarn(r)
+
+		// Continue to check block count threshold
+		if b, r := checkCountThreshold(countedTxs, config.Threshold.BlockCountThreshold, startTime); b {
+			blocks = true
+			reason = r
+			// return -> continue checking amount threshold
+		}
+	}
+
+	// Check warning amount threshold
+	if b, r, _ := checkAmountThreshold(countedTxs, config.Threshold.WarningAmountThreshold, startTime, amount); b {
+		logWarn(r)
+
+		// Continue to check block amount threshold
+		if b, r, _ := checkAmountThreshold(countedTxs, config.Threshold.BlockAmountThreshold, startTime, amount); b {
+			if reason != "" {
+				reason = fmt.Sprintf("%s, %s", reason, r)
+			} else {
+				reason = r
+			}
+			return true, reason
+		}
+	}
+
+	return
+}
+
+// checkCountThreshold reports true when at least `threshold` txs exist in window.
+func checkCountThreshold(c *lrucache, threshold uint, startTime int64) (blocks bool, reason string) {
+	n := c.len()
+	if n >= threshold {
+		meta, ok := c.get(n - threshold)
+		if ok && meta.createdAt >= startTime {
+			blocks = true
+			reason = fmt.Sprintf("over count threshold: %d", threshold)
+			return
+		}
+	}
+
+	return
+}
+
+// checkAmountThreshold reports true when cumulative in-window amount exceeds threshold.
+// midindex is returned for tests to validate binary-search behavior.
+func checkAmountThreshold(c *lrucache, threshold uint64, startTime int64, currentAmount uint64) (block bool, reason string, midindex uint /* <- midindex is used for testing */) {
+	// Check if the current tx exceeds the threshold
+	if threshold < currentAmount {
+		return true, fmt.Sprintf("over amount threshold: %d (single tx)", threshold), 0
+	}
+
+	// Skip if the cache is empty
+	n := c.len()
+	if n == 0 {
+		return
+	}
+
+	// Check if the sum of all doesn't exceed the threshold
+	oldestMeta, _ := c.getOldest()
+	if computeTotal(c, oldestMeta, currentAmount) <= threshold {
+		return
+	}
+
+	// Binary search to find the first index where the sum of all exceeds the threshold within the measurement window
+	low, high := uint(0), n
+	for low <= high {
+		midindex = (low + high) / 2
+		midMeta, ok := c.get(midindex)
+		if !ok {
+			break // mid is out of range
+		}
+		sum := computeTotal(c, midMeta, currentAmount)
+		if sum <= threshold { // not exceed threshold
+			if midMeta.createdAt < startTime {
+				// Window elapsed, no need to check further
+				return
+			}
+			high = midindex - 1 // move to the left (go older items)
+		} else { // exceed threshold
+			if midMeta.createdAt >= startTime {
+				// Within window, found!
+				return true, fmt.Sprintf("over amount threshold: %d, window sum: %d, current tx amount: %d", threshold, sum, currentAmount), midindex
+			}
+			low = midindex + 1 // move to the right (go newer items)
+		}
+	}
+
+	return
+}
+
+// computeTotal computes window sum from target item to newest + current tx amount.
+// It tracks uint64 wraparound using per-record overflow parity.
+func computeTotal(c *lrucache, target metadata, currentAmount uint64) uint64 {
+	newestMeta, ok := c.getNewest()
+	if !ok {
+		return currentAmount
+	}
+	accumulatedAmountIncludeCurrent := newestMeta.accumulatedAmount + newestMeta.amount + currentAmount
+	isOddOverflow := newestMeta.isOddOverflow
+	if math.MaxUint64-newestMeta.accumulatedAmount < newestMeta.amount+currentAmount {
+		isOddOverflow = !newestMeta.isOddOverflow // overflow, flip the overflow flag
+	}
+	if target.isOddOverflow == isOddOverflow {
+		return accumulatedAmountIncludeCurrent - target.accumulatedAmount
+	}
+	return math.MaxUint64 - target.accumulatedAmount + accumulatedAmountIncludeCurrent + 1
+}
+
+// metadata keeps per-tx amount plus accumulated amount and overflow flag
+type metadata struct {
+	amount            uint64
+	createdAt         int64  // Unix timestamp
+	accumulatedAmount uint64 // sum of previous metadata's amount, don't include the current amount
+	isOddOverflow     bool   // true if the times of overflow is odd(e.g. 1, 3, 5, ...)
+}
+
+// lrucache is a first-in-first-out cache with a fixed size,
+type lrucache struct {
+	head  uint          // index of the next slot to be used
+	cap   uint          // capacity of the lrucache
+	items []common.Hash // ring-buffer of txhash
+	txMap map[common.Hash]metadata
+}
+
+func newCache(cap uint) *lrucache {
+	c := lrucache{
+		head:  0,
+		cap:   cap,
+		items: make([]common.Hash, cap),
+		txMap: make(map[common.Hash]metadata, cap),
+	}
+	return &c
+}
+
+// push inserts/replaces newest entry and evicts oldest when full.
+func (c *lrucache) push(txhash common.Hash, amount uint64, now int64) {
+	var meta metadata
+	evicting := c.items[c.head] != emptyHash
+	if evicting {
+		meta = c.txMap[c.items[c.head]] // reuse the will-be-evicted item
+	} else {
+		meta = metadata{}
+	}
+	meta.amount = amount
+	meta.createdAt = now
+
+	// Set accumulated amount and overflow flag
+	prevSlot := (c.head + c.cap - 1) % c.cap
+	prevRecord, ok := c.txMap[c.items[prevSlot]]
+	if c.len() > 0 && ok {
+		meta.accumulatedAmount = prevRecord.accumulatedAmount + prevRecord.amount
+		if math.MaxUint64-prevRecord.accumulatedAmount < prevRecord.amount {
+			// overflow, flip the overflow flag
+			meta.isOddOverflow = !prevRecord.isOddOverflow
+		} else {
+			meta.isOddOverflow = prevRecord.isOddOverflow
+		}
+	} else {
+		meta.accumulatedAmount = 0 // first record: no previous
+	}
+
+	if evicting {
+		delete(c.txMap, c.items[c.head]) // evict the oldest item
+	}
+	c.txMap[txhash] = meta
+	c.items[c.head] = txhash
+	c.head = (c.head + 1) % c.cap
+}
+
+func (c *lrucache) contains(txhash common.Hash) bool {
+	_, ok := c.txMap[txhash]
+	return ok
+}
+
+// get returns metadata by logical index (0=oldest) and false when out of range.
+// Logical index 0 is oldest, len-1 is newest.
+func (c *lrucache) get(index uint) (metadata, bool) {
+	n := c.len()
+	if index >= n {
+		return metadata{}, false
+	}
+	slot := c.physicalSlot(index)
+	meta, ok := c.txMap[c.items[slot]]
+	return meta, ok
+}
+
+// physicalSlot returns the items slice index for logical index i (0=oldest).
+func (c *lrucache) physicalSlot(logicalIndex uint) uint {
+	if c.len() < c.cap {
+		return logicalIndex // not wrapped: data is linear at 0..len-1
+	}
+	return (c.head + logicalIndex) % c.cap
+}
+
+func (c *lrucache) getOldest() (metadata, bool) {
+	return c.get(0)
+}
+
+func (c *lrucache) getNewest() (metadata, bool) {
+	n := c.len()
+	if n == 0 {
+		return metadata{}, false
+	}
+	return c.get(n - 1)
+}
+
+// len returns number of active entries in the ring buffer.
+func (c *lrucache) len() uint {
+	if c.items[c.head] == emptyHash {
+		return c.head
+	}
+	return c.cap
+}
+
+// expandCap grows the cache to newCap, keeping all existing entries and their LRU order.
+func (c *lrucache) expandCap(newCap uint) {
+	if newCap <= c.cap {
+		return // No-op if newCap <= current cap
+	}
+	currentLen := c.len()
+	newItems := make([]common.Hash, newCap)
+	// Copy in LRU order: oldest at 0, newest at currentLen-1
+	for i := uint(0); i < currentLen; i++ {
+		newItems[i] = c.items[c.physicalSlot(i)]
+	}
+	c.items = newItems
+	c.cap = newCap
+	c.head = currentLen
+}
