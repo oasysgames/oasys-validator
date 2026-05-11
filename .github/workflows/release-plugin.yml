@@ -45,6 +45,8 @@ jobs:
           GIT_COMMIT: ${{ github.sha }}
           GIT_VERSION: ${{ github.ref_name }}
           PLUGIN_VERSION: ${{ steps.plugin-version.outputs.value }}
+          # mainnet | testnet | empty (private L1). Repository variable PLUGIN_RELEASE_NETWORK; unset defaults to testnet.
+          PLUGIN_NETWORK: ${{ vars.PLUGIN_RELEASE_NETWORK != '' && vars.PLUGIN_RELEASE_NETWORK || 'testnet' }}
         with:
           files: docker-bake.hcl
           targets: plugin-binaries

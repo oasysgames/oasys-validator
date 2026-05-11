@@ -28,8 +28,10 @@ RUN cd /go-ethereum && go run build/ci.go install ./cmd/geth
 
 FROM base as plugin-builder
 ARG PLUGIN_VERSION=""
+ARG PLUGIN_NETWORK="testnet"
 RUN cd /go-ethereum && go run build/ci.go plugin \
-    ${PLUGIN_VERSION:+-version "$PLUGIN_VERSION"}
+    ${PLUGIN_VERSION:+-version "$PLUGIN_VERSION"} \
+    ${PLUGIN_NETWORK:+-network "$PLUGIN_NETWORK"}
 
 # Binary extraction stages
 FROM scratch as binaries

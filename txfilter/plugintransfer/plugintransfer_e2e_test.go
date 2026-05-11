@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -50,6 +52,12 @@ var (
 	// Destination address for transfers Native and ERC20
 	destinationAddress = common.HexToAddress("0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199")
 
+	// L1StandardERC20Factory predeploy (contracts/oasys/contracts.go: l1StandardERC20Factory).
+	l1StandardERC20FactoryAddr = common.HexToAddress("0x5200000000000000000000000000000000000004")
+
+	// createStandardERC20("E2E Test Token", "ETT") — fixed calldata (do not re-encode).
+	createStandardERC20Calldata = common.FromHex("0x0b6ec17800000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000e453245205465737420546f6b656e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000034554540000000000000000000000000000000000000000000000000000000000")
+
 	client            *ethclient.Client
 	cfg               config.PluginConfig
 	privKyes          []*ecdsaKey
@@ -58,7 +66,11 @@ var (
 	targetERC20       common.Address
 	targetERC20Config config.TargetERC20Config
 	nextTrasferKind   = 0
+
+	erc20CreatedEventSig = crypto.Keccak256Hash([]byte("ERC20Created(string,address)"))
 )
+
+const l1StandardERC20MintABI = `[{"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"mint","outputs":[],"stateMutability":"nonpayable","type":"function"}]`
 
 func TestPluginTransferE2E(t *testing.T) {
 	t.Logf("Starting PluginTransferE2E test...")
@@ -117,8 +129,20 @@ func TestPluginTransferE2E(t *testing.T) {
 	for i, priv := range whitelistPrivs {
 		whitelistKeys[i] = mustPrivKey(t, priv)
 	}
+
+	if len(cfg.TargetERC20s) == 0 {
+		t.Fatal("plugin config must include at least one target_erc20s entry")
+	}
 	targetERC20 = cfg.TargetERC20s[0].Address
 	targetERC20Config = cfg.TargetERC20s[0]
+
+	code, err := client.CodeAt(ctx, targetERC20, nil)
+	if err != nil {
+		t.Fatalf("CodeAt target ERC20 %s: %v", targetERC20.Hex(), err)
+	}
+	if len(code) == 0 {
+		deployTargetERC20(t, ctx)
+	}
 
 	// Count threshold scenario
 	t.Logf("Starting CountThreshold scenario...")
@@ -193,6 +217,144 @@ func runAmountThresholdScenario(t *testing.T, ctx context.Context) {
 	receipt = sendTransferAndWaitReceipt(t, ctx, whitelistKeys[0], &nativeValue, &erc20Value)
 	if receipt == nil {
 		t.Fatalf("amount threshold: tx from whitelist should be mined within %v", blockedTxTimeout)
+	}
+}
+
+// deployTargetERC20 deploys L1StandardERC20 via the predeployed factory using whitelistPrivs[0].
+// It requires receipt ERC20Created._address to match cfg.TargetERC20s[0].address (see https://github.com/oasysgames/oasys-optimism/blob/v0.1.5/packages/contracts/contracts/oasys/L1/token/L1StandardERC20Factory.sol).
+func deployTargetERC20(t *testing.T, ctx context.Context) {
+	t.Helper()
+	expectedAddr := cfg.TargetERC20s[0].Address
+
+	factoryCode, err := client.CodeAt(ctx, l1StandardERC20FactoryAddr, nil)
+	if err != nil {
+		t.Fatalf("CodeAt factory: %v", err)
+	}
+	if len(factoryCode) == 0 {
+		t.Fatalf("L1StandardERC20Factory has no code at %s", l1StandardERC20FactoryAddr.Hex())
+	}
+
+	if len(createStandardERC20Calldata) == 0 {
+		t.Fatal("createStandardERC20Calldata is empty")
+	}
+	data := createStandardERC20Calldata
+
+	deployer := whitelistKeys[0]
+	nonce, err := client.PendingNonceAt(ctx, deployer.addr)
+	if err != nil {
+		t.Fatalf("PendingNonceAt createStandardERC20: %v", err)
+	}
+	gasPrice, err := client.SuggestGasPrice(ctx)
+	if err != nil {
+		t.Fatalf("SuggestGasPrice createStandardERC20: %v", err)
+	}
+
+	factoryAddr := l1StandardERC20FactoryAddr
+	msg := ethereum.CallMsg{From: deployer.addr, To: &factoryAddr, Data: data}
+	gasLimit, err := client.EstimateGas(ctx, msg)
+	if err != nil {
+		gasLimit = 3_000_000
+		t.Logf("EstimateGas createStandardERC20 failed (%v), using fallback gas %d", err, gasLimit)
+	} else {
+		gasLimit += gasLimit/5 + 50_000
+	}
+
+	tx := types.NewTx(&types.LegacyTx{
+		Nonce:    nonce,
+		To:       &factoryAddr,
+		Value:    big.NewInt(0),
+		Gas:      gasLimit,
+		GasPrice: gasPrice,
+		Data:     data,
+	})
+	signed, err := types.SignTx(tx, types.LatestSignerForChainID(chainID), deployer.key)
+	if err != nil {
+		t.Fatalf("SignTx createStandardERC20: %v", err)
+	}
+	t.Logf("createStandardERC20 tx %s deployer=%s", signed.Hash().Hex(), deployer.addr.Hex())
+	receipt := sendTxAndWaitReceipt(t, ctx, signed)
+	if receipt == nil {
+		t.Fatal("createStandardERC20: no receipt within timeout")
+	}
+	if receipt.Status != types.ReceiptStatusSuccessful {
+		t.Fatalf("createStandardERC20 tx failed status=%d", receipt.Status)
+	}
+
+	var deployed common.Address
+	var found bool
+	for _, lg := range receipt.Logs {
+		if lg.Address != l1StandardERC20FactoryAddr {
+			continue
+		}
+		if len(lg.Topics) < 3 || lg.Topics[0] != erc20CreatedEventSig {
+			continue
+		}
+		deployed = common.BytesToAddress(lg.Topics[2][12:])
+		found = true
+		break
+	}
+	if !found {
+		t.Fatalf("ERC20Created not found for factory %s", l1StandardERC20FactoryAddr.Hex())
+	}
+	if deployed != expectedAddr {
+		t.Fatalf("deployed ERC20 %s does not match config target_erc20s[0].address %s (adjust genesis nonce/state or update suspicious_txfilter_config.json)",
+			deployed.Hex(), expectedAddr.Hex())
+	}
+
+	fundERC20FromDeployer(t, ctx, deployed, deployer)
+}
+
+// fundERC20FromDeployer mints L1StandardERC20 to the four test addresses (deployer holds MINTER_ROLE):
+// priv1, priv2, whitelistPrivs[0], whitelistPrivs[1].
+func fundERC20FromDeployer(t *testing.T, ctx context.Context, token common.Address, minter *ecdsaKey) {
+	t.Helper()
+	mintABI, err := abi.JSON(strings.NewReader(l1StandardERC20MintABI))
+	if err != nil {
+		t.Fatalf("mint ABI: %v", err)
+	}
+	amount := new(big.Int).Mul(big.NewInt(10_000_000), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
+	recipients := []*ecdsaKey{
+		privKyes[0], privKyes[1],
+		whitelistKeys[0], whitelistKeys[1],
+	}
+	for _, recip := range recipients {
+		data, err := mintABI.Pack("mint", recip.addr, amount)
+		if err != nil {
+			t.Fatalf("Pack mint: %v", err)
+		}
+		nonce, err := client.PendingNonceAt(ctx, minter.addr)
+		if err != nil {
+			t.Fatalf("PendingNonceAt mint: %v", err)
+		}
+		gasPrice, err := client.SuggestGasPrice(ctx)
+		if err != nil {
+			t.Fatalf("SuggestGasPrice mint: %v", err)
+		}
+		tokenAddr := token
+		msg := ethereum.CallMsg{From: minter.addr, To: &tokenAddr, Data: data}
+		gasLimit, err := client.EstimateGas(ctx, msg)
+		if err != nil {
+			gasLimit = 400_000
+			t.Logf("EstimateGas mint failed (%v), using fallback gas %d", err, gasLimit)
+		} else {
+			gasLimit += gasLimit/5 + 20_000
+		}
+		tx := types.NewTx(&types.LegacyTx{
+			Nonce:    nonce,
+			To:       &tokenAddr,
+			Value:    big.NewInt(0),
+			Gas:      gasLimit,
+			GasPrice: gasPrice,
+			Data:     data,
+		})
+		signed, err := types.SignTx(tx, types.LatestSignerForChainID(chainID), minter.key)
+		if err != nil {
+			t.Fatalf("SignTx mint: %v", err)
+		}
+		rec := sendTxAndWaitReceipt(t, ctx, signed)
+		if rec == nil || rec.Status != types.ReceiptStatusSuccessful {
+			t.Fatalf("mint to %s failed", recip.addr.Hex())
+		}
 	}
 }
 

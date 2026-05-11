@@ -2,3 +2,4 @@
 !.gitignore
 !cosign-test.key
 !cosign-test.pub
+!suspicious_txfilter_config.json

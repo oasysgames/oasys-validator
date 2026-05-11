@@ -13,8 +13,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	gethmath "github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	txfilterlog "github.com/ethereum/go-ethereum/txfilter/log"
 	"github.com/ethereum/go-ethereum/txfilter/plugintransfer/config"
 )
 
@@ -443,7 +443,7 @@ func TestFilterTransaction(t *testing.T) {
 		},
 	}
 	p.countedTxs = newCache(4)
-	logs := []types.Log{
+	logs := []txfilterlog.Log{
 		{
 			Address: erc20,
 			Topics: []common.Hash{
