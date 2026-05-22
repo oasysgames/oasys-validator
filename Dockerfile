@@ -14,8 +14,11 @@ ARG VERSION=""
 ARG BUILDNUM=""
 
 RUN yum update -y && yum install -y git gcc gcc-c++ make wget tar gzip ca-certificates && yum clean all && \
-    update-ca-trust && mkdir -p /usr/share/ca-certificates && \
-    cp -a /etc/pki/ca-trust/extracted/pem/. /usr/share/ca-certificates/
+    update-ca-trust && \
+    mkdir -p /usr/share/ca-certificates && \
+    cp -a /etc/pki/ca-trust/extracted/pem/. /usr/share/ca-certificates/ && \
+    rm -f /etc/ssl/certs && mkdir -p /etc/ssl/certs && \
+    cp -a /etc/pki/tls/certs/. /etc/ssl/certs/
 
 ARG TARGETARCH
 RUN wget -q https://go.dev/dl/go1.24.10.linux-${TARGETARCH}.tar.gz && \
