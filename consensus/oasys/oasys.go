@@ -1708,3 +1708,11 @@ func (c *Oasys) Delay(chain consensus.ChainReader, header *types.Header, leftOve
 func getSealingDelay(header *types.Header) time.Duration {
 	return time.Until(time.Unix(int64(header.Time), 0))
 }
+
+func (c *Oasys) SignBAL(bal *types.BlockAccessListEncode) error {
+	return nil
+}
+
+func (c *Oasys) VerifyBAL(block *types.Block, bal *types.BlockAccessListEncode) error {
+	return nil
+}

@@ -469,7 +469,6 @@ func startNode(ctx *cli.Context, stack *node.Node, backend ethapi.Backend, isCon
 		if ctx.String(utils.SyncModeFlag.Name) == "light" {
 			utils.Fatalf("Light clients do not support mining")
 		}
-
 		if !ok {
 			utils.Fatalf("Ethereum service not running")
 		}

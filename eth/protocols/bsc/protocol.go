@@ -10,6 +10,7 @@ import (
 // Constants to match up protocol versions and messages
 const (
 	Bsc1 = 1
+	Bsc3 = 3 // to BAL process
 )
 
 // ProtocolName is the official short name of the `bsc` protocol used during
