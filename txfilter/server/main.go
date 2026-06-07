@@ -12,12 +12,14 @@ import (
 )
 
 const (
-	defaultHost         = "localhost"
-	defaultPort         = "3030"
-	pluginEndpoint      = "/suspicious_txfilter.so"
-	metadataEndpoint    = "/suspicious_txfilter.json"
-	defaultPluginFile   = "suspicious_txfilter.so"
-	defaultMetadataFile = "suspicious_txfilter.json"
+	defaultHost             = "localhost"
+	defaultPort             = "3030"
+	pluginEndpoint          = "/suspicious_txfilter.so"
+	pluginConfigEndpoint    = "/suspicious_txfilter_config.json"
+	metadataEndpoint        = "/suspicious_txfilter.json"
+	defaultPluginFile       = "suspicious_txfilter.so"
+	defaultPluginConfigFile = "suspicious_txfilter_config.json"
+	defaultMetadataFile     = "suspicious_txfilter.json"
 )
 
 // loggingMiddleware logs HTTP requests with method, path, status, and duration
@@ -54,12 +56,13 @@ func (rw *responseWriter) WriteHeader(code int) {
 
 func main() {
 	var (
-		pluginFile   = flag.String("plugin", defaultPluginFile, "Path to the plugin .so file")
-		metadataFile = flag.String("metadata", defaultMetadataFile, "Path to the metadata JSON file")
-		host         = flag.String("host", defaultHost, "Host to bind to (empty string binds to all interfaces)")
-		port         = flag.String("port", defaultPort, "Port to listen on")
-		dir          = flag.String("dir", ".", "Directory to serve files from (if relative paths are used)")
-		logFile      = flag.String("log", "", "Path to log file (empty means stdout/stderr)")
+		pluginFile       = flag.String("plugin", defaultPluginFile, "Path to the plugin .so file")
+		pluginConfigFile = flag.String("config", defaultPluginConfigFile, "Path to the plugin config JSON file")
+		metadataFile     = flag.String("metadata", defaultMetadataFile, "Path to the metadata JSON file")
+		host             = flag.String("host", defaultHost, "Host to bind to (empty string binds to all interfaces)")
+		port             = flag.String("port", defaultPort, "Port to listen on")
+		dir              = flag.String("dir", ".", "Directory to serve files from (if relative paths are used)")
+		logFile          = flag.String("log", "", "Path to log file (empty means stdout/stderr)")
 	)
 	flag.Parse()
 
@@ -82,11 +85,15 @@ func main() {
 
 	// Get absolute paths
 	pluginFilePath := filepath.Join(*dir, *pluginFile)
+	pluginConfigFilePath := filepath.Join(*dir, *pluginConfigFile)
 	metadataFilePath := filepath.Join(*dir, *metadataFile)
 
 	// Verify files exist
 	if _, err := os.Stat(pluginFilePath); os.IsNotExist(err) {
 		logger.Fatalf("Plugin file not found: %s", pluginFilePath)
+	}
+	if _, err := os.Stat(pluginConfigFilePath); os.IsNotExist(err) {
+		logger.Fatalf("Plugin config file not found: %s", pluginConfigFilePath)
 	}
 	if _, err := os.Stat(metadataFilePath); os.IsNotExist(err) {
 		logger.Fatalf("Metadata file not found: %s", metadataFilePath)
@@ -108,6 +115,15 @@ func main() {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		http.ServeFile(w, r, metadataFilePath)
+	}, logger))
+
+	http.HandleFunc(pluginConfigEndpoint, loggingMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		http.ServeFile(w, r, pluginConfigFilePath)
 	}, logger))
 
 	// Health check endpoint
@@ -133,7 +149,9 @@ func main() {
 	logger.Printf("Starting plugin server on %s", addr)
 	logger.Printf("Serving plugin file: %s", pluginFilePath)
 	logger.Printf("Serving metadata file: %s", metadataFilePath)
+	logger.Printf("Serving plugin config file: %s", pluginConfigFilePath)
 	logger.Printf("Plugin endpoint: http://%s:%s%s", displayHost, *port, pluginEndpoint)
+	logger.Printf("Plugin config endpoint: http://%s:%s%s", displayHost, *port, pluginConfigEndpoint)
 	logger.Printf("Metadata endpoint: http://%s:%s%s", displayHost, *port, metadataEndpoint)
 
 	if err := http.ListenAndServe(addr, nil); err != nil {

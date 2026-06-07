@@ -34,9 +34,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/state/snapshot"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/urfave/cli/v2"
@@ -82,29 +80,6 @@ snapshot and recalculate the root hash of state for verification.
 In other words, this command does the snapshot to trie conversion.
 `,
 			},
-			// 			{
-			// 				Name: "insecure-prune-all",
-			// 				Usage: "Prune all trie state data except genesis block, it will break storage for fullnode, only suitable for fast node " +
-			// 					"who do not need trie storage at all",
-			// 				ArgsUsage: "<genesisPath>",
-			// 				Action:    pruneAllState,
-			// 				Category:  "MISCELLANEOUS COMMANDS",
-			// 				Flags: []cli.Flag{
-			// 					utils.DataDirFlag,
-			// 					utils.AncientFlag,
-			// 				},
-			// 				Description: `
-			// will prune all historical trie state data except genesis block.
-			// All trie nodes will be deleted from the database.
-
-			// It expects the genesis file as argument.
-
-			// WARNING: It's necessary to delete the trie clean cache after the pruning.
-			// If you specify another directory for the trie clean cache via "--cache.trie.journal"
-			// during the use of Geth, please also specify it here for correct deletion. Otherwise
-			// the trie clean cache with default directory will be deleted.
-			// `,
-			// 			},
 			{
 				Name:      "check-dangling-storage",
 				Usage:     "Check that there is no 'dangling' snap storage",
@@ -189,6 +164,15 @@ The export-preimages command exports hash preimages to a flat file, in exactly
 the expected order for the overlay tree migration.
 `,
 			},
+			{
+				Action:    mergeIncrSnapshot,
+				Name:      "merge-incr-snapshot",
+				Usage:     "Merge the incremental snapshot into local data",
+				ArgsUsage: "",
+				Flags: slices.Concat([]cli.Flag{utils.IncrSnapshotPathFlag},
+					utils.DatabaseFlags),
+				Description: `This command merges multiple incremental snapshots into local data`,
+			},
 		},
 	}
 )
@@ -235,50 +219,6 @@ func pruneState(ctx *cli.Context) error {
 	return nil
 }
 
-//nolint:unused
-func pruneAllState(ctx *cli.Context) error {
-	stack, _ := makeConfigNode(ctx)
-	defer stack.Close()
-
-	genesisPath := ctx.Args().First()
-	if len(genesisPath) == 0 {
-		utils.Fatalf("Must supply path to genesis JSON file")
-	}
-	file, err := os.Open(genesisPath)
-	if err != nil {
-		utils.Fatalf("Failed to read genesis file: %v", err)
-	}
-	defer file.Close()
-
-	g := new(core.Genesis)
-	if err := json.NewDecoder(file).Decode(g); err != nil {
-		cfg := gethConfig{
-			Eth:     ethconfig.Defaults,
-			Node:    defaultNodeConfig(),
-			Metrics: metrics.DefaultConfig,
-		}
-
-		// Load config file.
-		if err := loadConfig(genesisPath, &cfg); err != nil {
-			utils.Fatalf("%v", err)
-		}
-		g = cfg.Eth.Genesis
-	}
-
-	chaindb := utils.MakeChainDatabase(ctx, stack, false)
-	defer chaindb.Close()
-	pruner, err := pruner.NewAllPruner(chaindb)
-	if err != nil {
-		log.Error("Failed to open snapshot tree", "err", err)
-		return err
-	}
-	if err = pruner.PruneAll(g); err != nil {
-		log.Error("Failed to prune state", "err", err)
-		return err
-	}
-	return nil
-}
-
 func verifyState(ctx *cli.Context) error {
 	stack, _ := makeConfigNode(ctx)
 	defer stack.Close()
@@ -290,7 +230,7 @@ func verifyState(ctx *cli.Context) error {
 		log.Error("Failed to load head block")
 		return errors.New("no head block")
 	}
-	triedb := utils.MakeTrieDatabase(ctx, stack, chaindb, false, true, false)
+	triedb := utils.MakeTrieDatabase(ctx, stack, chaindb, false, true, false, false)
 	defer triedb.Close()
 
 	var (
@@ -355,7 +295,7 @@ func traverseState(ctx *cli.Context) error {
 	chaindb := utils.MakeChainDatabase(ctx, stack, true)
 	defer chaindb.Close()
 
-	triedb := utils.MakeTrieDatabase(ctx, stack, chaindb, false, true, false)
+	triedb := utils.MakeTrieDatabase(ctx, stack, chaindb, false, true, false, false)
 	defer triedb.Close()
 
 	headBlock := rawdb.ReadHeadBlock(chaindb)
@@ -464,7 +404,7 @@ func traverseRawState(ctx *cli.Context) error {
 	chaindb := utils.MakeChainDatabase(ctx, stack, true)
 	defer chaindb.Close()
 
-	triedb := utils.MakeTrieDatabase(ctx, stack, chaindb, false, true, false)
+	triedb := utils.MakeTrieDatabase(ctx, stack, chaindb, false, true, false, false)
 	defer triedb.Close()
 
 	headBlock := rawdb.ReadHeadBlock(chaindb)
@@ -632,7 +572,7 @@ func dumpState(ctx *cli.Context) error {
 		return err
 	}
 	defer db.Close()
-	triedb := utils.MakeTrieDatabase(ctx, stack, db, false, true, false)
+	triedb := utils.MakeTrieDatabase(ctx, stack, db, false, true, false, false)
 	defer triedb.Close()
 
 	snapConfig := snapshot.Config{
@@ -715,7 +655,7 @@ func snapshotExportPreimages(ctx *cli.Context) error {
 	chaindb := utils.MakeChainDatabase(ctx, stack, true)
 	defer chaindb.Close()
 
-	triedb := utils.MakeTrieDatabase(ctx, stack, chaindb, false, true, false)
+	triedb := utils.MakeTrieDatabase(ctx, stack, chaindb, false, true, false, false)
 	defer triedb.Close()
 
 	var root common.Hash
@@ -775,5 +715,72 @@ func checkAccount(ctx *cli.Context) error {
 		return err
 	}
 	log.Info("Checked the snapshot journalled storage", "time", common.PrettyDuration(time.Since(start)))
+	return nil
+}
+
+// mergeIncrSnapshot merges the incremental snapshot into local data.
+func mergeIncrSnapshot(ctx *cli.Context) error {
+	stack, _ := makeConfigNode(ctx)
+	defer stack.Close()
+
+	chainDB := utils.MakeChainDatabase(ctx, stack, false)
+	defer chainDB.Close()
+
+	trieDB := utils.MakeTrieDatabase(ctx, stack, chainDB, false, false, false, true)
+	defer trieDB.Close()
+
+	if !ctx.IsSet(utils.IncrSnapshotPathFlag.Name) {
+		return errors.New("incremental snapshot path is not set")
+	}
+	path := ctx.String(utils.IncrSnapshotPathFlag.Name)
+
+	startBlock, err := trieDB.GetStartBlock()
+	if err != nil {
+		log.Error("Failed to get start block", "error", err)
+		return err
+	}
+	dirs, err := rawdb.GetAllIncrDirs(path)
+	if err != nil {
+		log.Error("Failed to get all incremental directories", "err", err)
+		return err
+	}
+	if startBlock < dirs[0].StartBlockNum {
+		return fmt.Errorf("local start block %d is lower than incr first start block %d", startBlock, dirs[0].StartBlockNum)
+	}
+
+	for i := 1; i < len(dirs); i++ {
+		prevFile := dirs[i-1]
+		currFile := dirs[i]
+
+		expectedStartBlock := prevFile.EndBlockNum + 1
+		if currFile.StartBlockNum != expectedStartBlock {
+			return fmt.Errorf("file continuity broken: file %s ends at %d, but file %s starts at %d (expected %d)",
+				prevFile.Name, prevFile.EndBlockNum, currFile.Name, currFile.StartBlockNum, expectedStartBlock)
+		}
+	}
+
+	log.Info("Start merging incremental snapshot", "path", path, "incremental snapshot number", len(dirs))
+	for i, dir := range dirs {
+		if i == len(dirs)-1 {
+			complete, err := rawdb.CheckIncrSnapshotComplete(dir.Path)
+			if err != nil {
+				log.Error("Failed to check last incr snapshot complete", "err", err)
+				return err
+			}
+			if !complete {
+				log.Warn("Skip last incr snapshot due to data is incomplete")
+				continue
+			}
+		}
+
+		if dir.StartBlockNum >= startBlock && dir.EndBlockNum > startBlock {
+			if err = core.MergeIncrSnapshot(chainDB, trieDB, dir.Path); err != nil {
+				log.Error("Failed to merge incremental snapshot", "err", err)
+				return err
+			}
+		} else {
+			log.Info("Skip merge incremental snapshot", "dir", dir.Name)
+		}
+	}
 	return nil
 }

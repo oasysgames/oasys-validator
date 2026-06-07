@@ -125,6 +125,9 @@ type Peer struct {
 	testRemoteAddr string     // for testing
 
 	latency atomic.Int64 // mill second latency, estimated by ping msg
+
+	// it indicates the peer can handle BAL(block access list) packet
+	CanHandleBAL atomic.Bool
 }
 
 // NewPeer returns a peer for testing purposes.
@@ -199,10 +202,8 @@ func (p *Peer) Caps() []Cap {
 // versions is supported by both this node and the peer p.
 func (p *Peer) RunningCap(protocol string, versions []uint) bool {
 	if proto, ok := p.running[protocol]; ok {
-		for _, ver := range versions {
-			if proto.Version == ver {
-				return true
-			}
+		if slices.Contains(versions, proto.Version) {
+			return true
 		}
 	}
 	return false
