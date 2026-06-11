@@ -8,7 +8,6 @@ import (
 	"math"
 	"math/bits"
 	"net/http"
-	"runtime"
 	"sync/atomic"
 	"time"
 
@@ -68,8 +67,8 @@ func init() {
 func buildSuspiciousTxfilterConfigURL() string {
 	const filename = "suspicious_txfilter_config.json"
 	if network == "mainnet" || network == "testnet" {
-		return fmt.Sprintf("https://cdn.%s.oasys.games/suspicious_txfilter/%s/%s/%s/%s",
-			network, runtime.GOOS, runtime.GOARCH, BuildFingerprint, filename)
+		return fmt.Sprintf("https://cdn.%s.oasys.games/suspicious_txfilter/%s",
+			network, filename)
 	}
 	return fmt.Sprintf("http://localhost:3030/%s", filename)
 }
