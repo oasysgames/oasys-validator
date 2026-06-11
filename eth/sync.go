@@ -81,7 +81,7 @@ type chainSyncOp struct {
 func newChainSyncer(handler *handler) *chainSyncer {
 	return &chainSyncer{
 		handler:     handler,
-		peerEventCh: make(chan struct{}),
+		peerEventCh: make(chan struct{}, 10),
 	}
 }
 
@@ -205,9 +205,9 @@ func (cs *chainSyncer) nextSyncOp() *chainSyncOp {
 	} else if op.td.Cmp(new(big.Int).Add(ourTD, common.Big2)) <= 0 { // common.Big2: difficulty of an in-turn block
 		// On BSC, blocks are produced much faster than on Ethereum.
 		// If the node is only slightly behind (e.g., 1 block), syncing is unnecessary.
-		// It's likely still processing broadcasted blocks or block hash announcements.
-		// In most cases, the node will catch up within 3 seconds.
-		time.Sleep(3 * time.Second)
+		// It's likely still processing broadcasted blocks(such as including a big tx) or block hash announcements.
+		// In most cases, the node will catch up within 2 seconds.
+		time.Sleep(2 * time.Second)
 
 		// Re-check local head to see if it has caught up
 		if _, latestTD := cs.modeAndLocalHead(); ourTD.Cmp(latestTD) < 0 {
@@ -298,7 +298,11 @@ func (h *handler) doSync(op *chainSyncOp) error {
 		// degenerate connectivity, but it should be healthy for the mainnet too to
 		// more reliably update peers or the local TD state.
 		if block := h.chain.GetBlock(head.Hash(), head.Number.Uint64()); block != nil {
-			h.BroadcastBlock(block, false)
+			if head.Number.Uint64() == 1 { // Update TD from all receivers during network initialization.
+				h.BroadcastBlock(block, true)
+			} else {
+				h.BroadcastBlock(block, false)
+			}
 		}
 	}
 	return nil

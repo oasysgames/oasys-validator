@@ -88,9 +88,6 @@ var (
 	// database.
 	fastTxLookupLimitKey = []byte("FastTransactionLookupLimit")
 
-	//LastSafePointBlockKey tracks the block number for block state that write disk
-	LastSafePointBlockKey = []byte("LastSafePointBlockNumber")
-
 	// badBlockKey tracks the list of bad blocks seen by local
 	badBlockKey = []byte("InvalidBlock")
 
@@ -145,6 +142,8 @@ var (
 	OasysSnapshotPrefix  = []byte("oasys-")
 
 	BlockBlobSidecarsPrefix = []byte("blobs")
+
+	BlockBALPrefix = []byte("bal") // blockBALPrefix + blockNumber (uint64 big endian) + blockHash -> block access list
 
 	// new log index
 	filterMapsPrefix         = "fm-"
@@ -214,6 +213,11 @@ func blockReceiptsKey(number uint64, hash common.Hash) []byte {
 // blockBlobSidecarsKey = BlockBlobSidecarsPrefix + blockNumber (uint64 big endian) + blockHash
 func blockBlobSidecarsKey(number uint64, hash common.Hash) []byte {
 	return append(append(BlockBlobSidecarsPrefix, encodeBlockNumber(number)...), hash.Bytes()...)
+}
+
+// blockBALKey = blockBALPrefix + blockNumber (uint64 big endian) + blockHash
+func blockBALKey(number uint64, hash common.Hash) []byte {
+	return append(append(BlockBALPrefix, encodeBlockNumber(number)...), hash.Bytes()...)
 }
 
 // txLookupKey = txLookupPrefix + hash

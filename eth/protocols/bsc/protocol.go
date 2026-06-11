@@ -10,6 +10,7 @@ import (
 // Constants to match up protocol versions and messages
 const (
 	Bsc1 = 1
+	Bsc3 = 3 // to BAL process
 )
 
 // ProtocolName is the official short name of the `bsc` protocol used during
@@ -35,11 +36,9 @@ const (
 var defaultExtra = []byte{0x00}
 
 var (
-	errNoBscCapMsg             = errors.New("no bsc capability message")
-	errMsgTooLarge             = errors.New("message too long")
-	errDecode                  = errors.New("invalid message")
-	errInvalidMsgCode          = errors.New("invalid message code")
-	errProtocolVersionMismatch = errors.New("protocol version mismatch")
+	errMsgTooLarge    = errors.New("message too long")
+	errDecode         = errors.New("invalid message")
+	errInvalidMsgCode = errors.New("invalid message code")
 )
 
 // Packet represents a p2p message in the `bsc` protocol.

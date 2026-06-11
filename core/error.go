@@ -129,6 +129,9 @@ var (
 	ErrEmptyAuthList   = errors.New("EIP-7702 transaction with empty auth list")
 	ErrSetCodeTxCreate = errors.New("EIP-7702 transaction cannot be used to create contract")
 
+	// -- EIP-7825 errors --
+	ErrGasLimitTooHigh = errors.New("transaction gas limit too high")
+
 	// -- Oasys errors --
 
 	// ErrSuspiciousTxfilter is returned if the transaction is blocked by the suspicious txfilter.

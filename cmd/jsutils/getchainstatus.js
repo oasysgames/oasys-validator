@@ -6,7 +6,7 @@ program.option("--startNum <startNum>", "start num");
 program.option("--endNum <endNum>", "end num");
 program.option("--miner <miner>", "miner", "");
 program.option("--num <Num>", "validator num", 21);
-program.option("--turnLength <Num>", "the consecutive block length", 8);
+program.option("--turnLength <Num>", "the consecutive block length", 16);
 program.option("--topNum <Num>", "top num of address to be displayed", 20);
 program.option("--blockNum <Num>", "block num", 0);
 program.option("--stepLength <Num>", "step length", 115200);
@@ -43,7 +43,7 @@ function printUsage() {
     console.log("  --stepNum    the step num, default: 1");
     console.log("\nExample:");
     console.log("  node getchainstatus.js GetMaxTxCountInBlockRange --rpc https://bsc-testnet-dataseed.bnbchain.org --startNum 40000001  --endNum 40000005");
-    console.log("  node getchainstatus.js GetBinaryVersion --rpc https://bsc-testnet-dataseed.bnbchain.org --num 21 --turnLength 8");
+    console.log("  node getchainstatus.js GetBinaryVersion --rpc https://bsc-testnet-dataseed.bnbchain.org --num 21 --turnLength 16");
     console.log("  node getchainstatus.js GetTopAddr --rpc https://bsc-testnet-dataseed.bnbchain.org --startNum 40000001  --endNum 40000010 --topNum 10");
     console.log("  node getchainstatus.js GetSlashCount --rpc https://bsc-testnet-dataseed.bnbchain.org --blockNum 40000001 --stepNum 1 --stepLength 115200"); // default: latest block
     console.log("  node getchainstatus.js GetPerformanceData --rpc https://bsc-testnet-dataseed.bnbchain.org --startNum 40000001  --endNum 40000010");
@@ -172,6 +172,7 @@ const validatorMap = new Map([
     ['0x18c44f4FBEde9826C7f257d500A65a3D5A8edebc', [  'Nozti'  , '0x95E105468b3a9E158df258ee385CA873cB566bF2', '0xa76a951b947eda0b4585730049bf08338c0e679071127f0f2f7e7dce542a655d69b24e7af4586ed20efc2764044c0b3c']],
     ['0xEdB69D7AE8fE7c21a33e0491e76db241C8e09a5F', ['BlkRazor' , '0x5eBAf404d466a1cc2d02684B6A3bB1D43dCB7586', '0xb23e281776590409333b1b36019390f7fadce505f55bfb98969cd3df6660bfe873b73e73d28aeef04bac40e3f4520df1']],
     ['0xd6Ab358AD430F65EB4Aa5a1598FF2c34489dcfdE', [ 'Saturn'  , '0x54A9c15A143dBFf49539dfF4e095ec8D09464A4A', '0x835a7608cb0888fa649aa4120e81b1ab8c54c894e01b3b1d8c458563bec901ba6bb0c5f356dca5b962392872480f3b4c']],
+    ['0xCc767841fbB5b79B91EdF7a19EC5bd2F3D334fD8', [ 'Kraken'  , '0x4279baBE4293c0826810b6C59e40F9DA9e5fd45b', '0xaa7a4c76d38b9fe7f872bbc53ac172faa56c7db2ad4b4aea3af41de2c2df7738e82827f501f206ea82ad050b4ffead8a']],
     //  Testnet: Chapel
     ['0x08265dA01E1A65d62b903c7B34c08cB389bF3D99', [ 'Ararat'   , '0x341e228f22D4ec16297DD05A9d6347C74c125F66', '0x96f763f030b1adcfb369c5a5df4a18e1529baffe7feaec66db3dbd1bc06810f7f6f88b7be6645418a7e2a2a3f40514c2']],
     ['0x7f5f2cF1aec83bF0c74DF566a41aa7ed65EA84Ea', [  'Kita'    , '0x2716756EAF7F1B4f4DbB282A80efdbf96e90A644', '0x99e3849ef31887c0f880a0feb92f356f58fbd023a82f5311fc87a5883a662e9ebbbefc90bf13aa533c2438a4113804bf']],
@@ -207,6 +208,7 @@ const validatorMap = new Map([
     ['0x6a5470a3B7959ab064d6815e349eD4aE2dE5210d', ['Skynet10k' , '0xDD1fD7C74BaCCA08e1b88a24199F19aB1b1b9cE4', '0x81f13afdbd6976d9784a05619405df430314e2707050b32f29ae683b9ef89d285d1a227df3e31ac147016c4c7533be70']],
     ['0xce6cCa0DE7b3EB3fd0CcE4bc38cceF473166e4f4', ['Infinity'  , '0xc8A6Bfe0834FB99340a0Df253d79B7CaE25053b8', '0xa40f553889e9de6b4fe8005a06d7335fa061ae51ef5ba2b0c4ea477fcaa8f6de1650e318cf59824462b1831a725488da']],
     ['0xa7deE0bCAEb78849Ec4aD4e2f48688D2e9f2315B', ['KrakV'     , '0x6563AA29C30d9f80968c2fb7DFFed092a03FBdeD', '0x848ffc9a3fac00d9fbaebcb63f2b7c0a4747d9ffecd4b484073ad03d91584cb51af29870c1c8421b757f4f6fae813288']],
+    ['0x32415e630B9B3489639dEE7de21274Ab64016226', ['Kraken'     , '0x70Cd30d9216AF7A5654D245e9F5c649b811aB2eB', '0xa80ebd07bd9d717bd538413e8830f673e63dfad496c901de324be5d16b0496aee39352ecfb84fa58d8d8a67746f8ae6c']],
 ]);
 
 const builderMap = new Map([
@@ -264,9 +266,9 @@ const builderMap = new Map([
 
     // Chapel
     ["0x627fE6AFA2E84e461CB7AE7C2c46e8adf9a954a2", "txboost"],
-    ["0x5EC60f73f938e36400ec3CC3Ff4d7a7703F7c005", "nodereal ap"],
+    ["0xa5559F1761e6dCa79Ac0c7A301CCDcC71D378fee", "nodereal ap"],
     ["0x6C98EB21139F6E12db5b78a4AeD4d8eBA147FB7b", "nodereal eu"],
-    ["0x5b67a234592331e85fC57Bb148769c1d2fF62520", "nodereal us"],
+    ["0x4E8cbf5912717B212db5b450ae7737455A5cc0aF", "nodereal us"],
     ["0x4827b423D03a349b7519Dda537e9A28d31ecBB48", "club48 ap"],
     ["0x48B2665E5E9a343409199D70F7495c8aB660BB48", "club48 eu"],
     ["0x48B4bBEbF0655557A461e91B8905b85864B8BB48", "club48 us"],
@@ -313,10 +315,53 @@ async function getBinaryVersion() {
     let turnLength = program.turnLength;
     for (let i = 0; i < program.num; i++) {
         let blockData = await provider.getBlock(blockNum - i * turnLength);
-        // 1.get Geth client version
-        let major = ethers.toNumber(ethers.dataSlice(blockData.extraData, 2, 3));
-        let minor = ethers.toNumber(ethers.dataSlice(blockData.extraData, 3, 4));
-        let patch = ethers.toNumber(ethers.dataSlice(blockData.extraData, 4, 5));
+
+        let major = 0, minor = 0, patch = 0;
+        let commitID = "";
+
+        try {
+            major = ethers.toNumber(ethers.dataSlice(blockData.extraData, 2, 3));
+            minor = ethers.toNumber(ethers.dataSlice(blockData.extraData, 3, 4));
+            patch = ethers.toNumber(ethers.dataSlice(blockData.extraData, 4, 5));
+            
+            // Check version: >= 1.6.4 uses new format with commitID
+            const isNewFormat = major > 1 || (major === 1 && minor > 6) || (major === 1 && minor === 6 && patch >= 4);
+            
+            if (isNewFormat) {
+                const extraVanity = 28;
+                let vanityBytes = ethers.getBytes(ethers.dataSlice(blockData.extraData, 0, extraVanity));
+
+                let rlpLength = vanityBytes.length;
+                if (vanityBytes[0] >= 0xC0 && vanityBytes[0] <= 0xF7) {
+                    rlpLength = (vanityBytes[0] - 0xC0) + 1; 
+                }
+                
+                const rlpData = ethers.dataSlice(blockData.extraData, 0, rlpLength);
+                const decoded = ethers.decodeRlp(rlpData);
+                
+                if (Array.isArray(decoded) && decoded.length >= 2) {
+                     const secondElemHex = decoded[1];
+                     let secondElemStr = "";
+                     try {
+                         secondElemStr = ethers.toUtf8String(secondElemHex);
+                     } catch (e) {
+                         secondElemStr = secondElemHex;
+                     }
+                     
+                     if (secondElemStr.length > 0 && secondElemStr !== "geth") {
+                         commitID = secondElemStr.startsWith("0x") ? secondElemStr.substring(2) : secondElemStr;
+                     }
+                }
+            }
+        } catch (e) {
+            console.log("Parsing failed:", e.message);
+        }
+
+        // Format version string
+        let versionStr = major + "." + minor + "." + patch;
+        if (commitID && commitID.length > 0) {
+            versionStr = versionStr + "-" + commitID;
+        }
 
         // 2.get minimum txGasPrice based on the last non-zero-gasprice transaction
         let lastGasPrice = 0;
@@ -330,7 +375,7 @@ async function getBinaryVersion() {
             break;
         }
         var moniker = await getValidatorMoniker(blockData.miner, blockNum);
-        console.log(blockNum - i * turnLength, blockData.miner, "version =", major + "." + minor + "." + patch, " MinGasPrice = " + lastGasPrice, moniker);
+        console.log(blockNum - i * turnLength, blockData.miner, "version =", versionStr, " MinGasPrice = " + lastGasPrice, moniker);
     }
 }
 
@@ -408,7 +453,7 @@ async function getSlashCountAtHeight(num) {
     }
     let slashScale = await validatorSet.maintainSlashScale({ blockTag: blockNum });
     let maxElected = await stakeHub.maxElectedValidators({ blockTag: blockNum });
-    const maintainThreshold = BigInt(150); // governable, hardcode to avoid one RPC call
+    const maintainThreshold = BigInt(200); // governable, hardcode to avoid one RPC call
     const felonyThreshold = BigInt(600); // governable, hardcode to avoid one RPC call
 
     let block = await provider.getBlock(blockNum);
@@ -466,7 +511,7 @@ async function getPerformanceData() {
     let gasUsedTotal = 0;
     let inturnBlocks = 0;
     let justifiedBlocks = 0;
-    let turnLength = 8;
+    let turnLength = 16;
     let lastTimestamp = null; 
     let parliaEnabled = true;
     

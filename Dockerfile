@@ -1,12 +1,31 @@
 # Build Geth in a stock Go builder container
-FROM golang:1.24.10-bookworm as base
+# FROM golang:1.24.10-bookworm as base
+
+# Build Geth in Amazon Linux 2 to support the following distros:
+# - Amazon Linux 2
+# - Rocky Linux 8
+# These distros use older versions of glibc, so binaries built with `golang:1.24.10-bookworm` fail to run.
+# As such, Geth is built in an Amazon Linux 2 environment.
+FROM amazonlinux:2 as base
 
 # Support setting various labels on the final image
 ARG COMMIT=""
 ARG VERSION=""
 ARG BUILDNUM=""
 
-RUN apt update && apt install -y git ca-certificates
+RUN yum update -y && yum install -y git gcc gcc-c++ make wget tar gzip ca-certificates && yum clean all && \
+    update-ca-trust && \
+    mkdir -p /usr/share/ca-certificates && \
+    cp -a /etc/pki/ca-trust/extracted/pem/. /usr/share/ca-certificates/ && \
+    rm -f /etc/ssl/certs && mkdir -p /etc/ssl/certs && \
+    cp -a /etc/pki/tls/certs/. /etc/ssl/certs/
+
+ARG TARGETARCH
+RUN wget -q https://go.dev/dl/go1.24.10.linux-${TARGETARCH}.tar.gz && \
+    rm -rf /usr/local/go && tar -C /usr/local -xzf go1.24.10.linux-${TARGETARCH}.tar.gz && \
+    rm -f go1.24.10.linux-${TARGETARCH}.tar.gz
+
+ENV PATH="/usr/local/go/bin:${PATH}"
 
 # Get dependencies - will also be cached if we won't change go.mod/go.sum
 COPY go.mod /go-ethereum/

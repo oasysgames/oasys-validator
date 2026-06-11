@@ -28,9 +28,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/params"
+
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/beacon"
 	"github.com/ethereum/go-ethereum/consensus/clique"
@@ -66,7 +68,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/dnsdisc"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/triedb/pathdb"
@@ -171,6 +172,11 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	if err != nil {
 		return nil, err
 	}
+	noTries := config.TriesVerifyMode != core.LocalVerify
+	if noTries && config.StateScheme != rawdb.HashScheme {
+		config.StateScheme = rawdb.HashScheme
+		log.Info("Using hash-based state scheme since tries are disabled")
+	}
 
 	if config.StateScheme == rawdb.HashScheme && config.NoPruning && config.TrieDirtyCache > 0 {
 		if config.SnapshotCache > 0 {
@@ -213,6 +219,10 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		chainConfig.ShanghaiTime = config.OverridePassedForkTime
 		chainConfig.CancunTime = config.OverridePassedForkTime
 		overrides.OverridePassedForkTime = config.OverridePassedForkTime
+	}
+	if config.OverrideOsaka != nil {
+		chainConfig.OsakaTime = config.OverrideOsaka
+		overrides.OverrideOsaka = config.OverrideOsaka
 	}
 	if config.OverrideVerkle != nil {
 		chainConfig.VerkleTime = config.OverrideVerkle
@@ -284,24 +294,33 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	journalFilePath := stack.ResolvePath(path) + "/" + JournalFileName
 	var (
 		options = &core.BlockChainConfig{
-			TrieCleanLimit:   config.TrieCleanCache,
-			NoPrefetch:       config.NoPrefetch,
-			TrieDirtyLimit:   config.TrieDirtyCache,
-			ArchiveMode:      config.NoPruning,
-			TrieTimeLimit:    config.TrieTimeout,
-			NoTries:          config.TriesVerifyMode != core.LocalVerify,
-			SnapshotLimit:    config.SnapshotCache,
-			TriesInMemory:    config.TriesInMemory,
-			Preimages:        config.Preimages,
-			StateHistory:     config.StateHistory,
-			StateScheme:      config.StateScheme,
-			PathSyncFlush:    config.PathSyncFlush,
-			JournalFilePath:  journalFilePath,
-			JournalFile:      config.JournalFileEnabled,
-			ChainHistoryMode: config.HistoryMode,
-			TxLookupLimit:    int64(min(config.TransactionHistory, math.MaxInt64)),
+			TrieCleanLimit:        config.TrieCleanCache,
+			NoPrefetch:            config.NoPrefetch,
+			EnableBAL:             config.EnableBAL,
+			TrieDirtyLimit:        config.TrieDirtyCache,
+			ArchiveMode:           config.NoPruning,
+			TrieTimeLimit:         config.TrieTimeout,
+			NoTries:               noTries,
+			SnapshotLimit:         config.SnapshotCache,
+			TriesInMemory:         config.TriesInMemory,
+			Preimages:             config.Preimages,
+			StateHistory:          config.StateHistory,
+			StateScheme:           config.StateScheme,
+			PathSyncFlush:         config.PathSyncFlush,
+			JournalFilePath:       journalFilePath,
+			JournalFile:           config.JournalFileEnabled,
+			EnableIncr:            config.EnableIncrSnapshots,
+			IncrHistoryPath:       config.IncrSnapshotPath,
+			IncrHistory:           config.IncrSnapshotBlockInterval,
+			IncrStateBuffer:       config.IncrSnapshotStateBuffer,
+			IncrKeptBlocks:        config.IncrSnapshotKeptBlocks,
+			UseRemoteIncrSnapshot: config.UseRemoteIncrSnapshot,
+			RemoteIncrURL:         config.RemoteIncrSnapshotURL,
+			ChainHistoryMode:      config.HistoryMode,
+			TxLookupLimit:         int64(min(config.TransactionHistory, math.MaxInt64)),
 			VmConfig: vm.Config{
-				EnablePreimageRecording: config.EnablePreimageRecording,
+				EnablePreimageRecording:   config.EnablePreimageRecording,
+				EnableOpcodeOptimizations: config.EnableOpcodeOptimizing,
 			},
 		}
 	)

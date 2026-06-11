@@ -49,12 +49,12 @@ type resettableFreezer struct {
 //
 // The reset function will delete directory atomically and re-create the
 // freezer from scratch.
-func newResettableFreezer(datadir string, namespace string, readonly bool, maxTableSize uint32, tables map[string]freezerTableConfig) (*resettableFreezer, error) {
+func newResettableFreezer(datadir string, namespace string, readonly bool, maxTableSize uint32, tables map[string]freezerTableConfig, isIncr bool) (*resettableFreezer, error) {
 	if err := cleanup(datadir); err != nil {
 		return nil, err
 	}
 	opener := func() (*Freezer, error) {
-		return NewFreezer(datadir, namespace, readonly, maxTableSize, tables)
+		return NewFreezer(datadir, namespace, readonly, maxTableSize, tables, isIncr)
 	}
 	freezer, err := opener()
 	if err != nil {
@@ -159,22 +159,6 @@ func (f *resettableFreezer) ReadAncients(fn func(ethdb.AncientReaderOp) error) (
 	return f.freezer.ReadAncients(fn)
 }
 
-// ItemAmountInAncient returns the actual length of current ancientDB.
-func (f *resettableFreezer) ItemAmountInAncient() (uint64, error) {
-	f.lock.RLock()
-	defer f.lock.RUnlock()
-
-	return f.freezer.ItemAmountInAncient()
-}
-
-// AncientOffSet returns the offset of current ancientDB.
-func (f *resettableFreezer) AncientOffSet() uint64 {
-	f.lock.RLock()
-	defer f.lock.RUnlock()
-
-	return f.freezer.AncientOffSet()
-}
-
 // ModifyAncients runs the given write operation.
 func (f *resettableFreezer) ModifyAncients(fn func(ethdb.AncientWriteOp) error) (writeSize int64, err error) {
 	f.lock.RLock()
@@ -215,6 +199,13 @@ func (f *resettableFreezer) ResetTable(kind string, startAt uint64, onlyEmpty bo
 	defer f.lock.RUnlock()
 
 	return f.freezer.ResetTable(kind, startAt, onlyEmpty)
+}
+
+func (f *resettableFreezer) ResetTableForIncr(kind string, startAt uint64, onlyEmpty bool) error {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+
+	return f.freezer.ResetTableForIncr(kind, startAt, onlyEmpty)
 }
 
 // SyncAncient flushes all data tables to disk.

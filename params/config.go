@@ -710,7 +710,12 @@ func (c *ChainConfig) String() string {
 		PragueTime = big.NewInt(0).SetUint64(*c.PragueTime)
 	}
 
-	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, ArrowGlacier: %v, MergeFork:%v, ShanghaiTime: %v, CancunTime: %v, PragueTime: %v, Engine: %v}",
+	var OsakaTime *big.Int
+	if c.OsakaTime != nil {
+		OsakaTime = big.NewInt(0).SetUint64(*c.OsakaTime)
+	}
+
+	return fmt.Sprintf("{ChainID: %v Engine: %v, Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, London: %v, ArrowGlacier: %v, MergeFork:%v, ShanghaiTime: %v, CancunTime: %v, PragueTime: %v, OsakaTime: %v}",
 		c.ChainID,
 		engine,
 		c.HomesteadBlock,
@@ -731,6 +736,7 @@ func (c *ChainConfig) String() string {
 		ShanghaiTime,
 		CancunTime,
 		PragueTime,
+		OsakaTime,
 	)
 }
 
@@ -958,6 +964,15 @@ func (c *ChainConfig) IsOnPrague(currentBlockNumber *big.Int, lastBlockTime uint
 // IsOsaka returns whether time is either equal to the Osaka fork time or greater.
 func (c *ChainConfig) IsOsaka(num *big.Int, time uint64) bool {
 	return c.IsLondon(num) && isTimestampForked(c.OsakaTime, time)
+}
+
+// IsOnOsaka eturns whether currentBlockTime is either equal to the Osaka fork time or greater firstly.
+func (c *ChainConfig) IsOnOsaka(currentBlockNumber *big.Int, lastBlockTime uint64, currentBlockTime uint64) bool {
+	lastBlockNumber := new(big.Int)
+	if currentBlockNumber.Cmp(big.NewInt(1)) >= 0 {
+		lastBlockNumber.Sub(currentBlockNumber, big.NewInt(1))
+	}
+	return !c.IsOsaka(lastBlockNumber, lastBlockTime) && c.IsOsaka(currentBlockNumber, currentBlockTime)
 }
 
 // IsVerkle returns whether time is either equal to the Verkle fork time or greater.
