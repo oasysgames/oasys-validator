@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-sign:
-    name: Build and sign (${{ matrix.arch }})
+    name: Build and sign (${{ matrix.network }} / ${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -15,8 +15,16 @@ jobs:
         include:
           - arch: amd64
             runner: ubuntu-latest
+            network: testnet
+          - arch: amd64
+            runner: ubuntu-latest
+            network: mainnet
           - arch: arm64
             runner: ubuntu-24.04-arm
+            network: testnet
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            network: mainnet
     permissions:
       id-token: write
       contents: read
@@ -45,12 +53,13 @@ jobs:
           GIT_COMMIT: ${{ github.sha }}
           GIT_VERSION: ${{ github.ref_name }}
           PLUGIN_VERSION: ${{ steps.plugin-version.outputs.value }}
+          PLUGIN_NETWORK: ${{ matrix.network }}
         with:
           files: docker-bake.hcl
           targets: plugin-binaries
           set: |
-            *.cache-from=type=gha,scope=plugin-${{ matrix.arch }}
-            *.cache-to=type=gha,scope=plugin-${{ matrix.arch }},mode=max
+            *.cache-from=type=gha,scope=plugin-${{ matrix.network }}-${{ matrix.arch }}
+            *.cache-to=type=gha,scope=plugin-${{ matrix.network }}-${{ matrix.arch }},mode=max
             plugin-binaries.output=type=local,dest=./binaries
 
       - name: Read build fingerprint
@@ -86,12 +95,12 @@ jobs:
           cp binaries/suspicious_txfilter.so "${dir}/"
           cp binaries/suspicious_txfilter.so.bundle "${dir}/"
           cp binaries/suspicious_txfilter.json "${dir}/"
-          zip -qr suspicious_txfilter-${{ github.ref_name }}-linux-${{ matrix.arch }}.zip linux/
+          zip -qr suspicious_txfilter-${{ github.ref_name }}-linux-${{ matrix.arch }}-${{ matrix.network }}.zip linux/
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ github.ref_name }}-${{ matrix.arch }}
+          name: ${{ github.ref_name }}-${{ matrix.network }}-${{ matrix.arch }}
           path: suspicious_txfilter-*.zip
 
   release:

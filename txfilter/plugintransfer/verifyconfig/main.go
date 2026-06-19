@@ -74,7 +74,7 @@ func Verify(cfg *config.PluginConfig) error {
 		return fmt.Errorf("%w: measurement_window must be set", ErrValidation)
 	}
 	if cfg.MeasurementWindow < minMeasurementWindow {
-		return fmt.Errorf("%w: measurement_window must be larger than 1 minute (got %v)", ErrValidation, cfg.MeasurementWindow)
+		return fmt.Errorf("%w: measurement_window must be larger than 1 hour (got %v)", ErrValidation, cfg.MeasurementWindow)
 	}
 
 	// warning threshold is smaller than block threshold (count and amount)

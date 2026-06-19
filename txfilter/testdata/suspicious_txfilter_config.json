@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "whitelists": {
+    "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266": true,
+    "0x70997970c51812dc3a010c7d01b50e0d17dc79c8": true
+  },
+  "measurement_window": 90000000000,
+  "threshold": {
+    "warning_tx_count_threshold": 4,
+    "block_count_threshold": 8,
+    "warning_amount_threshold": 500000,
+    "block_amount_threshold": 1000000
+  },
+  "native_token": {
+    "to_yen_rate": 0.1
+  },
+  "target_erc20s": [
+    {
+      "address": "0x5fbdb2315678afecb367f032d93f642f64180aa3",
+      "decimals": 6,
+      "to_yen_rate": 150.0
+    }
+  ],
+  "disabled": false
+}

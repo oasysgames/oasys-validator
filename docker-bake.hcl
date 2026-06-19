@@ -22,6 +22,12 @@ variable "PLUGIN_VERSION" {
   default = "1.0.0"
 }
 
+// Passed to plugin build as -network (mainnet | testnet | empty for private L1).
+// Release workflow defaults to testnet when unset.
+variable "PLUGIN_NETWORK" {
+  default = "testnet"
+}
+
 variable "IMAGE_TAGS" {
   default = "${GIT_COMMIT}" // split by ","
 }
@@ -70,6 +76,7 @@ target "plugin-binaries" {
     COMMIT = "${GIT_COMMIT}"
     VERSION = "${GIT_VERSION}"
     PLUGIN_VERSION = "${PLUGIN_VERSION}"
+    PLUGIN_NETWORK = "${PLUGIN_NETWORK}"
   }
   platforms = split(",", PLATFORMS)
 }

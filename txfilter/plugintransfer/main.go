@@ -12,18 +12,26 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	// "github.com/ethereum/go-ethereum/core" -> Avoid to import core package to reduce binary size and prevent unknown errors.
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
+	txfilterlog "github.com/ethereum/go-ethereum/txfilter/log"
 	"github.com/ethereum/go-ethereum/txfilter/plugintransfer/config"
+	// "github.com/ethereum/go-ethereum/core" -> Avoid to import core package to reduce binary size and prevent unknown errors.
+	// "github.com/ethereum/go-ethereum/core/types" -> Avoid to import core/types package to bypass the AMD plugin build error. Use txfilter/log.Log instead (see txfilter/log/log.go).
 )
 
 var (
 	// Set version at build time using -ldflags "-X main.version=1.0.0"
 	version = "1.0.0"
 
-	// Set config URL at build time using -ldflags "-X main.configURL=https://cdn.oasys.games/suspicious_txfilter/plugintransfer.json"
-	configURL = "http://localhost:3030/plugintransfer.json"
+	// BuildFingerprint is set by build/ci.go doPlugin via -ldflags for host compatibility checks.
+	BuildFingerprint string
+
+	// Set network at build time using -ldflags "-X main.network=mainnet"
+	// Either "mainnet", "testnet", or an empty string for a private L1
+	network string
+
+	// Optional full override: -ldflags "-X main.configURL=https://example/config.json"
+	configURL string
 
 	// Don't change the name of the variable
 	// Host will use this variable to load the plugin.
@@ -48,6 +56,22 @@ var (
 	// transferPlugin implements core.Plugin interface.
 	// _ core.SuspiciousTxfilterPlugin = (*transferPlugin)(nil)
 )
+
+func init() {
+	if configURL == "" {
+		configURL = buildSuspiciousTxfilterConfigURL()
+	}
+}
+
+// buildSuspiciousTxfilterConfigURL builds the URL for the suspicious txfilter config.
+func buildSuspiciousTxfilterConfigURL() string {
+	const filename = "suspicious_txfilter_config.json"
+	if network == "mainnet" || network == "testnet" {
+		return fmt.Sprintf("https://cdn.%s.oasys.games/suspicious_txfilter/%s",
+			network, filename)
+	}
+	return fmt.Sprintf("http://localhost:3030/%s", filename)
+}
 
 // transferPlugin is the long-lived plugin runtime state.
 // This struct exists so host can interact through a single exported Plugin instance.
@@ -75,7 +99,7 @@ func (p *transferPlugin) Clear() error {
 // FilterTransaction is the plugin entrypoint invoked by the host.
 // It refreshes config when needed, accumulates tx amount in JPY, and
 // blocks only when configured count/amount thresholds are exceeded.
-func (p *transferPlugin) FilterTransaction(txhash common.Hash, from, to common.Address, value [32]byte, logs []types.Log) (isBlocked bool, reason string, err error) {
+func (p *transferPlugin) FilterTransaction(txhash common.Hash, from, to common.Address, value [32]byte, logs []txfilterlog.Log) (isBlocked bool, reason string, err error) {
 	// Initialize or update it if it's expired
 	if p.configCache.isExpired() {
 		// Asychronously download config, to avoid blocking the chain execution

@@ -10,7 +10,7 @@ import (
 type PluginConfig struct {
 	Version           uint64                  `json:"version"`
 	Whitelists        map[common.Address]bool `json:"whitelists"`
-	MeasurementWindow time.Duration           `json:"measurement_window"`
+	MeasurementWindow time.Duration           `json:"measurement_window"` // nanoseconds, 1h = 3600000000000
 	Threshold         ThresholdConfig         `json:"threshold"`
 	NativeToken       NativeTokenConfig       `json:"native_token"`
 	TargetERC20s      []TargetERC20Config     `json:"target_erc20s"`

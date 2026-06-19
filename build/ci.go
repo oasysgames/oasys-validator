@@ -29,7 +29,7 @@ Available commands are:
 	check_baddeps  -- verifies that certain dependencies are avoided
 
 	install    [ -arch architecture ] [ -cc compiler ] [ packages... ]                        -- builds packages and executables
-	plugin     [ -arch architecture ] [ -cc compiler ] [ -o output ] [ -version ver ] [ -blocked ] -- builds the suspicious txfilter plugin
+	plugin     [ -arch architecture ] [ -cc compiler ] [ -o output ] [ -version ver ] [ -network mainnet|testnet ] -- builds the suspicious txfilter plugin
 	test       [ -coverage ] [ packages... ]                                                 -- runs the tests
 
 	archive    [ -arch architecture ] [ -type zip|tar ] [ -signer key-envvar ] [ -signify key-envvar ] [ -upload dest ] -- archives build artifacts
@@ -240,7 +240,7 @@ func doPlugin(cmdline []string) {
 		cc      = flag.String("cc", "", "C compiler to cross build with")
 		output  = flag.String("o", "", "Output path for plugin binary")
 		pver    = flag.String("version", "", "Plugin version to embed")
-		blocked = flag.Bool("blocked", false, "Set blockedByPlugin=true (for testing)")
+		network = flag.String("network", "", "Embed main.network for config URL: mainnet, testnet, or empty for private L1")
 	)
 	flag.CommandLine.Parse(cmdline)
 
@@ -256,8 +256,8 @@ func doPlugin(cmdline []string) {
 	if *pver != "" {
 		ld = append(ld, "-X", "main.version="+*pver)
 	}
-	if *blocked {
-		ld = append(ld, "-X", "main.blockedByPlugin=true")
+	if *network != "" {
+		ld = append(ld, "-X", "main.network="+*network)
 	}
 
 	var flags []string
@@ -272,7 +272,7 @@ func doPlugin(cmdline []string) {
 		outputPath = *output
 	}
 	gobuild.Args = append(gobuild.Args, "-o", outputPath)
-	gobuild.Args = append(gobuild.Args, "txfilter/plugindummy/main.go")
+	gobuild.Args = append(gobuild.Args, "txfilter/plugintransfer/main.go")
 
 	fmt.Println("Building suspicious txfilter plugin...")
 	build.MustRun(&exec.Cmd{Path: gobuild.Path, Args: gobuild.Args, Env: gobuild.Env})
