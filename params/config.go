@@ -905,6 +905,20 @@ func (c *ChainConfig) IsFastFinalityEnabled(num *big.Int) bool {
 	return isBlockForked(c.OasysFastFinalityEnabledBlock(), num)
 }
 
+// OasysLowValidatorThresholdForkEpoch returns the hard fork of Oasys.
+func (c *ChainConfig) OasysLowValidatorThresholdForkEpoch() *big.Int {
+	if c.ChainID == nil || c.Oasys == nil {
+		return nil
+	}
+	if c.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 {
+		return big.NewInt(LOW_VALIDATOR_THRESHOLD_FORK_EPOCH_MAINNET)
+	}
+	if c.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0 {
+		return big.NewInt(LOW_VALIDATOR_THRESHOLD_FORK_EPOCH_TESTNET)
+	}
+	return big.NewInt(LOW_VALIDATOR_THRESHOLD_FORK_EPOCH_OTHERS)
+}
+
 // IsTerminalPoWBlock returns whether the given block is the last block of PoW stage.
 func (c *ChainConfig) IsTerminalPoWBlock(parentTotalDiff *big.Int, totalDiff *big.Int) bool {
 	if c.TerminalTotalDifficulty == nil {

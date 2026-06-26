@@ -14,7 +14,14 @@ const (
 	SHORT_BLOCK_TIME_FORK_EPOCH_MAINNET = 711 // Block #4089600
 	SHORT_BLOCK_TIME_FORK_EPOCH_TESTNET = 699 // Block #4020480
 	SHORT_BLOCK_TIME_FORK_EPOCH_OTHERS  = 10  // for local chain
+
+	LOW_VALIDATOR_THRESHOLD_FORK_EPOCH_MAINNET = 90000000
+	LOW_VALIDATOR_THRESHOLD_FORK_EPOCH_TESTNET = 90000000
+	LOW_VALIDATOR_THRESHOLD_FORK_EPOCH_OTHERS  = 11
 )
+
+// 10M -> 1M OAS
+var LOW_VALIDATOR_THRESHOLD = new(big.Int).Mul(big.NewInt(Ether), big.NewInt(1_000_000))
 
 // EnvironmentValue is a representation of `Environment.EnvironmentValue`.
 type EnvironmentValue struct {
