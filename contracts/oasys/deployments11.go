@@ -28,14 +28,7 @@ var deployments11 = []*deployment{
 				length: 2,
 				values: map[int64]interface{}{
 					1: func(cfg *params.ChainConfig) interface{} {
-						initial := params.InitialEnvironmentValue(cfg.Oasys)
-
-						updated := initial.Copy()
-						updated.StartEpoch = cfg.OasysShortenedBlockTimeStartEpoch()
-						updated.StartBlock = new(big.Int).SetUint64(
-							initial.NewValueStartBlock(updated.StartEpoch.Uint64()))
-						updated.BlockPeriod = big.NewInt(params.SHORT_BLOCK_TIME_SECONDS)
-						updated.EpochPeriod = big.NewInt(params.SHORT_BLOCK_TIME_EPOCH_PERIOD)
+						updated := params.ShortBlockTimeEnvironmentValue(cfg)
 
 						return structvalue{
 							updated.StartBlock,
