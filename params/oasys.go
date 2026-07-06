@@ -159,6 +159,6 @@ func LowValidatorThresholdEnvironmentValue(cfg *ChainConfig) *EnvironmentValue {
 	updated.StartEpoch = cfg.OasysLowValidatorThresholdForkEpoch()
 	updated.StartBlock = new(big.Int).SetUint64(
 		shortBlockTimeUpdate.NewValueStartBlock(updated.StartEpoch.Uint64()))
-	updated.ValidatorThreshold = LOW_VALIDATOR_THRESHOLD
+	updated.ValidatorThreshold = new(big.Int).Set(LOW_VALIDATOR_THRESHOLD)
 	return updated
 }
