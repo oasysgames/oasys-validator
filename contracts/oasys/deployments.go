@@ -27,6 +27,8 @@ var deploymentSets = map[common.Hash]map[uint64]deploymentSet{
 		5527429:  deploymentSet{deployments13},
 		8728540:  deploymentSet{deployments14, deployments14_slash_indicator_mainnet},        // Fri Jul 29 2025 13:00:00 GMT+0900
 		12970330: deploymentSet{deployments15, deployments15_deterministic_deployment_proxy}, // Fri May 21 2026 11:00:00 GMT+0900
+		// -----------------------------------
+		90000000: deploymentSet{deployments19},
 	},
 	params.OasysTestnetGenesisHash: {
 		1:        deploymentSet{deployments0},
@@ -44,6 +46,8 @@ var deploymentSets = map[common.Hash]map[uint64]deploymentSet{
 		5445775:  deploymentSet{deployments13},
 		8496170:  deploymentSet{deployments14, deployments14_slash_indicator_testnet}, // Fri Jul 04 2025 10:00:00 GMT+0900
 		12729520: deploymentSet{deployments15},                                        // Fri Apr 24 2026 11:00:00 GMT+0900 No `deployments15_deterministic_deployment_proxy` as it already exists in testnet.
+		// -----------------------------------
+		90000000: deploymentSet{deployments19},
 	},
 	defaultGenesisHash: {
 		2: deploymentSet{
@@ -58,12 +62,14 @@ var deploymentSets = map[common.Hash]map[uint64]deploymentSet{
 			deployments8,
 			deployments9,
 			deployments10,
-			// deployments11, // Disable this feature as it changes the epoch, which can impact development.
+			deployments11, // Disable this feature as it changes the epoch, which can impact development. -> Enable, without this changes, deployments19 don't work.
 			deployments12,
 			deployments13,
 			deployments14, deployments14_slash_indicator_localnet,
 			deployments15, deployments15_deterministic_deployment_proxy,
+			// ----------
 		},
+		11: deploymentSet{deployments19},
 	},
 }
 

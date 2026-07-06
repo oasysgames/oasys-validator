@@ -8,13 +8,21 @@ import (
 )
 
 const (
-	SHORT_BLOCK_TIME_SECONDS      = 6
-	SHORT_BLOCK_TIME_EPOCH_PERIOD = 14400 // 6 sec * 14400 block = 1 days
+	SHORT_BLOCK_TIME_SECONDS             = 6
+	SHORT_BLOCK_TIME_EPOCH_PERIOD        = 14400 // 6 sec * 14400 block = 1 days
+	SHORT_BLOCK_TIME_EPOCH_PERIOD_OTHERS = 10    // for local chain
 
 	SHORT_BLOCK_TIME_FORK_EPOCH_MAINNET = 711 // Block #4089600
 	SHORT_BLOCK_TIME_FORK_EPOCH_TESTNET = 699 // Block #4020480
-	SHORT_BLOCK_TIME_FORK_EPOCH_OTHERS  = 10  // for local chain
+	SHORT_BLOCK_TIME_FORK_EPOCH_OTHERS  = 2   // for local chain
+
+	LOW_VALIDATOR_THRESHOLD_FORK_EPOCH_MAINNET = 90000000
+	LOW_VALIDATOR_THRESHOLD_FORK_EPOCH_TESTNET = 90000000
+	LOW_VALIDATOR_THRESHOLD_FORK_EPOCH_OTHERS  = 3
 )
+
+// 10M -> 1M OAS
+var LOW_VALIDATOR_THRESHOLD = new(big.Int).Mul(big.NewInt(Ether), big.NewInt(1_000_000))
 
 // EnvironmentValue is a representation of `Environment.EnvironmentValue`.
 type EnvironmentValue struct {
@@ -121,4 +129,36 @@ func InitialEnvironmentValue(cfg *OasysConfig) *EnvironmentValue {
 		JailThreshold:      big.NewInt(500),
 		JailPeriod:         big.NewInt(2),
 	}
+}
+
+// Returns the environment value after the short block time fork.
+func ShortBlockTimeEnvironmentValue(cfg *ChainConfig) *EnvironmentValue {
+	initial := InitialEnvironmentValue(cfg.Oasys)
+
+	updated := initial.Copy()
+	updated.StartEpoch = cfg.OasysShortenedBlockTimeStartEpoch()
+	updated.StartBlock = new(big.Int).SetUint64(
+		initial.NewValueStartBlock(updated.StartEpoch.Uint64()))
+	updated.BlockPeriod = big.NewInt(SHORT_BLOCK_TIME_SECONDS)
+	var epochPeriod int64
+	if cfg.ChainID != nil && (cfg.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 || cfg.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0) {
+		epochPeriod = SHORT_BLOCK_TIME_EPOCH_PERIOD
+	} else {
+		// Set short epoch time to test in local(private-l1)
+		epochPeriod = SHORT_BLOCK_TIME_EPOCH_PERIOD_OTHERS
+	}
+	updated.EpochPeriod = big.NewInt(epochPeriod)
+	return updated
+}
+
+// Returns the environment value after the low validator threshold fork.
+func LowValidatorThresholdEnvironmentValue(cfg *ChainConfig) *EnvironmentValue {
+	shortBlockTimeUpdate := ShortBlockTimeEnvironmentValue(cfg)
+
+	updated := shortBlockTimeUpdate.Copy()
+	updated.StartEpoch = cfg.OasysLowValidatorThresholdForkEpoch()
+	updated.StartBlock = new(big.Int).SetUint64(
+		shortBlockTimeUpdate.NewValueStartBlock(updated.StartEpoch.Uint64()))
+	updated.ValidatorThreshold = new(big.Int).Set(LOW_VALIDATOR_THRESHOLD)
+	return updated
 }
