@@ -141,7 +141,7 @@ func ShortBlockTimeEnvironmentValue(cfg *ChainConfig) *EnvironmentValue {
 		initial.NewValueStartBlock(updated.StartEpoch.Uint64()))
 	updated.BlockPeriod = big.NewInt(SHORT_BLOCK_TIME_SECONDS)
 	var epochPeriod int64
-	if cfg.ChainID == OasysMainnetChainConfig.ChainID || cfg.ChainID == OasysTestnetChainConfig.ChainID {
+	if cfg.ChainID != nil && (cfg.ChainID.Cmp(OasysMainnetChainConfig.ChainID) == 0 || cfg.ChainID.Cmp(OasysTestnetChainConfig.ChainID) == 0) {
 		epochPeriod = SHORT_BLOCK_TIME_EPOCH_PERIOD
 	} else {
 		// Set short epoch time to test in local(private-l1)
